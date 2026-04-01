@@ -23,6 +23,7 @@ interface MediaItem {
   like_count: number;
   comments_count: number;
   plays: number;
+  shares: number;
 }
 
 export function InstagramOverview() {

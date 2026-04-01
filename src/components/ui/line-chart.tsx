@@ -11,7 +11,8 @@ import {
 } from "recharts";
 
 interface LineChartProps {
-  data: Array<Record<string, unknown>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data: Array<Record<string, any>>;
   xKey: string;
   lines: Array<{
     key: string;
@@ -36,8 +37,8 @@ export function LineChart({ data, xKey, lines, height = 300 }: LineChartProps) {
           />
           <YAxis tick={{ fontSize: 12 }} />
           <Tooltip
-            labelFormatter={(value: string) =>
-              new Date(value).toLocaleDateString("pt-BR")
+            labelFormatter={(value) =>
+              new Date(String(value)).toLocaleDateString("pt-BR")
             }
           />
           {lines.map((line) => (
