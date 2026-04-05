@@ -1,4 +1,5 @@
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import type { Account, YouTubeCredentials } from "@/types/accounts";
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
 
@@ -25,9 +26,13 @@ interface YouTubeVideoItem {
   };
 }
 
-async function youtubeGet(endpoint: string, params: Record<string, string>) {
+async function youtubeGet(
+  endpoint: string,
+  params: Record<string, string>,
+  apiKey: string
+) {
   const url = new URL(`${YOUTUBE_API_BASE}/${endpoint}`);
-  url.searchParams.set("key", process.env.YOUTUBE_API_KEY!);
+  url.searchParams.set("key", apiKey);
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value);
   }
@@ -38,26 +43,27 @@ async function youtubeGet(endpoint: string, params: Record<string, string>) {
   return res.json();
 }
 
-export async function collectYouTubeChannel(): Promise<{
+export async function collectYouTube(account: Account): Promise<{
   channelRecords: number;
   videoRecords: number;
 }> {
-  const channelId = process.env.YOUTUBE_CHANNEL_ID!;
+  const { api_key, channel_id } = account.credentials as YouTubeCredentials;
   const supabase = createSupabaseServiceClient();
   const now = new Date().toISOString();
 
   // 1. Fetch channel statistics
-  const channelData = await youtubeGet("channels", {
-    part: "statistics",
-    id: channelId,
-  });
+  const channelData = await youtubeGet(
+    "channels",
+    { part: "statistics", id: channel_id },
+    api_key
+  );
 
   const stats: YouTubeChannelStats = channelData.items[0].statistics;
 
   const { error: channelError } = await supabase
-    .from("dash_gestao_youtube_channel")
+    .from("dash_gestao_youtube_channel_snapshots")
     .insert({
-      channel_id: channelId,
+      account_id: account.id,
       subscriber_count: parseInt(stats.subscriberCount),
       view_count: parseInt(stats.viewCount),
       video_count: parseInt(stats.videoCount),
@@ -66,14 +72,12 @@ export async function collectYouTubeChannel(): Promise<{
 
   if (channelError) throw new Error(`Channel insert error: ${channelError.message}`);
 
-  // 2. Fetch recent videos (last 50 via search)
-  const searchData = await youtubeGet("search", {
-    part: "id",
-    channelId: channelId,
-    order: "date",
-    maxResults: "50",
-    type: "video",
-  });
+  // 2. Fetch recent videos (last 50)
+  const searchData = await youtubeGet(
+    "search",
+    { part: "id", channelId: channel_id, order: "date", maxResults: "50", type: "video" },
+    api_key
+  );
 
   const videoIds: string[] = searchData.items.map(
     (item: { id: { videoId: string } }) => item.id.videoId
@@ -83,13 +87,15 @@ export async function collectYouTubeChannel(): Promise<{
     return { channelRecords: 1, videoRecords: 0 };
   }
 
-  // 3. Fetch video details in batches of 50
-  const videosData = await youtubeGet("videos", {
-    part: "snippet,statistics,contentDetails",
-    id: videoIds.join(","),
-  });
+  // 3. Fetch video details
+  const videosData = await youtubeGet(
+    "videos",
+    { part: "snippet,statistics,contentDetails", id: videoIds.join(",") },
+    api_key
+  );
 
   const videoRows = videosData.items.map((video: YouTubeVideoItem) => ({
+    account_id: account.id,
     video_id: video.id,
     title: video.snippet.title,
     published_at: video.snippet.publishedAt,
@@ -102,7 +108,7 @@ export async function collectYouTubeChannel(): Promise<{
   }));
 
   const { error: videosError } = await supabase
-    .from("dash_gestao_youtube_videos")
+    .from("dash_gestao_youtube_video_snapshots")
     .insert(videoRows);
 
   if (videosError) throw new Error(`Videos insert error: ${videosError.message}`);

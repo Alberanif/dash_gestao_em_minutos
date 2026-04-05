@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
+import { NavLinks } from "@/components/layout/nav-links";
 
 export default async function DashboardLayout({
   children,
@@ -8,7 +8,9 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     redirect("/login");
@@ -18,18 +20,8 @@ export default async function DashboardLayout({
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-6">
-          <h1 className="text-lg font-bold">Gestao em 4 Minutos</h1>
-          <nav className="flex gap-4 text-sm">
-            <Link href="/dashboard" className="hover:text-blue-600">
-              Visao Geral
-            </Link>
-            <Link href="/dashboard/youtube" className="hover:text-blue-600">
-              YouTube
-            </Link>
-            <Link href="/dashboard/instagram" className="hover:text-blue-600">
-              Instagram
-            </Link>
-          </nav>
+          <h1 className="text-lg font-bold">IGT Dashboard</h1>
+          <NavLinks />
         </div>
         <form action="/api/auth/signout" method="post">
           <button className="text-sm text-gray-500 hover:text-gray-700">
@@ -37,7 +29,7 @@ export default async function DashboardLayout({
           </button>
         </form>
       </header>
-      <main className="p-6">{children}</main>
+      <main>{children}</main>
     </div>
   );
 }

@@ -6,6 +6,11 @@ export async function GET(request: NextRequest) {
   const { error } = await validateApiAuth();
   if (error) return error;
 
+  const accountId = request.nextUrl.searchParams.get("account_id");
+  if (!accountId) {
+    return NextResponse.json({ error: "account_id é obrigatório" }, { status: 400 });
+  }
+
   const supabase = await createSupabaseServerClient();
   const days = parseInt(request.nextUrl.searchParams.get("days") || "30");
 
@@ -13,8 +18,9 @@ export async function GET(request: NextRequest) {
   since.setDate(since.getDate() - days);
 
   const { data, error: dbError } = await supabase
-    .from("dash_gestao_instagram_profile")
+    .from("dash_gestao_instagram_profile_snapshots")
     .select("*")
+    .eq("account_id", accountId)
     .gte("collected_at", since.toISOString())
     .order("collected_at", { ascending: true });
 

@@ -1,10 +1,15 @@
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import type { Account, InstagramCredentials } from "@/types/accounts";
 
 const IG_API_BASE = "https://graph.facebook.com/v21.0";
 
-async function igGet(endpoint: string, params: Record<string, string> = {}) {
+async function igGet(
+  endpoint: string,
+  params: Record<string, string>,
+  accessToken: string
+) {
   const url = new URL(`${IG_API_BASE}/${endpoint}`);
-  url.searchParams.set("access_token", process.env.INSTAGRAM_ACCESS_TOKEN!);
+  url.searchParams.set("access_token", accessToken);
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value);
   }
@@ -15,29 +20,35 @@ async function igGet(endpoint: string, params: Record<string, string> = {}) {
   return res.json();
 }
 
-export async function collectInstagramProfile(): Promise<{
+export async function collectInstagram(account: Account): Promise<{
   profileRecords: number;
   mediaRecords: number;
 }> {
-  const userId = process.env.INSTAGRAM_USER_ID!;
+  const { access_token, user_id } = account.credentials as InstagramCredentials;
   const supabase = createSupabaseServiceClient();
   const now = new Date().toISOString();
 
   // 1. Fetch profile data
-  const profile = await igGet(userId, {
-    fields: "followers_count,follows_count,media_count",
-  });
+  const profile = await igGet(
+    user_id,
+    { fields: "followers_count,follows_count,media_count" },
+    access_token
+  );
 
-  // 2. Fetch profile insights (impressions, reach) for last 28 days
+  // 2. Fetch profile insights (impressions, reach) — last 28 days
   let impressions = 0;
   let reach = 0;
   try {
-    const insights = await igGet(`${userId}/insights`, {
-      metric: "impressions,reach",
-      period: "day",
-      since: String(Math.floor(Date.now() / 1000) - 28 * 86400),
-      until: String(Math.floor(Date.now() / 1000)),
-    });
+    const insights = await igGet(
+      `${user_id}/insights`,
+      {
+        metric: "impressions,reach",
+        period: "day",
+        since: String(Math.floor(Date.now() / 1000) - 28 * 86400),
+        until: String(Math.floor(Date.now() / 1000)),
+      },
+      access_token
+    );
     for (const metric of insights.data) {
       const total = metric.values.reduce(
         (sum: number, v: { value: number }) => sum + v.value,
@@ -51,9 +62,9 @@ export async function collectInstagramProfile(): Promise<{
   }
 
   const { error: profileError } = await supabase
-    .from("dash_gestao_instagram_profile")
+    .from("dash_gestao_instagram_profile_snapshots")
     .insert({
-      ig_user_id: userId,
+      account_id: account.id,
       followers_count: profile.followers_count,
       follows_count: profile.follows_count,
       media_count: profile.media_count,
@@ -65,23 +76,34 @@ export async function collectInstagramProfile(): Promise<{
   if (profileError) throw new Error(`Profile insert error: ${profileError.message}`);
 
   // 3. Fetch recent media (posts + reels)
-  const mediaList = await igGet(`${userId}/media`, {
-    fields: "id,media_type,caption,permalink,timestamp",
-    limit: "50",
-  });
+  const mediaList = await igGet(
+    `${user_id}/media`,
+    { fields: "id,media_type,caption,permalink,timestamp", limit: "50" },
+    access_token
+  );
 
   // 4. Fetch stories
-  let storyItems: Array<{ id: string; media_type: string; caption?: string; permalink?: string; timestamp: string }> = [];
+  let storyItems: Array<{
+    id: string;
+    media_type: string;
+    caption?: string;
+    permalink?: string;
+    timestamp: string;
+  }> = [];
   try {
-    const stories = await igGet(`${userId}/stories`, {
-      fields: "id,media_type,caption,permalink,timestamp",
-    });
-    storyItems = (stories.data || []).map((s: { id: string; media_type: string; caption?: string; permalink?: string; timestamp: string }) => ({
-      ...s,
-      media_type: "STORY",
-    }));
+    const stories = await igGet(
+      `${user_id}/stories`,
+      { fields: "id,media_type,caption,permalink,timestamp" },
+      access_token
+    );
+    storyItems = (stories.data || []).map(
+      (s: { id: string; media_type: string; caption?: string; permalink?: string; timestamp: string }) => ({
+        ...s,
+        media_type: "STORY",
+      })
+    );
   } catch {
-    // Stories endpoint may fail if no active stories
+    // No active stories — continue
   }
 
   const allMedia = [...(mediaList.data || []), ...storyItems];
@@ -102,22 +124,20 @@ export async function collectInstagramProfile(): Promise<{
       plays = 0;
 
     try {
-      const mediaType = media.media_type === "REEL" ? "REEL" :
-                         media.media_type === "STORY" ? "STORY" :
-                         media.media_type === "VIDEO" ? "VIDEO" : "POST";
-
       let metrics = "impressions,reach";
-      if (mediaType === "STORY") {
+      if (media.media_type === "STORY") {
         metrics = "impressions,reach,replies";
-      } else if (mediaType === "REEL") {
+      } else if (media.media_type === "REEL") {
         metrics = "impressions,reach,saved,shares,plays,likes,comments";
       } else {
         metrics = "impressions,reach,saved,likes,comments,shares";
       }
 
-      const insightsData = await igGet(`${media.id}/insights`, {
-        metric: metrics,
-      });
+      const insightsData = await igGet(
+        `${media.id}/insights`,
+        { metric: metrics },
+        access_token
+      );
 
       for (const m of insightsData.data) {
         const val = m.values[0]?.value || 0;
@@ -141,6 +161,7 @@ export async function collectInstagramProfile(): Promise<{
       media.media_type === "STORY" ? "STORY" : "IMAGE";
 
     mediaRows.push({
+      account_id: account.id,
       media_id: media.id,
       media_type: normalizedType,
       caption: media.caption || null,
@@ -158,7 +179,7 @@ export async function collectInstagramProfile(): Promise<{
   }
 
   const { error: mediaError } = await supabase
-    .from("dash_gestao_instagram_media")
+    .from("dash_gestao_instagram_media_snapshots")
     .insert(mediaRows);
 
   if (mediaError) throw new Error(`Media insert error: ${mediaError.message}`);

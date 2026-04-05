@@ -1,61 +1,57 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AccountTabs } from "@/components/dashboard/account-tabs";
+import { SectionTabs } from "@/components/dashboard/section-tabs";
+import { KpiCard } from "@/components/ui/kpi-card";
 import { LineChart } from "@/components/ui/line-chart";
 import { DataTable } from "@/components/ui/data-table";
+import type { Account, ProfileSnapshot, MediaSnapshot } from "@/types/accounts";
 
-interface ProfileSnapshot {
-  followers_count: number;
-  reach: number;
-  impressions: number;
-  collected_at: string;
-}
+const SECTIONS = ["Visão Geral", "Posts/Reels", "Tendências"];
 
-interface MediaRow {
-  media_id: string;
-  media_type: string;
-  caption: string | null;
-  permalink: string | null;
-  like_count: number;
-  comments_count: number;
-  reach: number;
-  impressions: number;
-  saved: number;
-  shares: number;
-  plays: number;
-  published_at: string;
-  [key: string]: unknown;
-}
-
-export default function InstagramDetailPage() {
+export default function InstagramPage() {
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selectedId, setSelectedId] = useState("");
+  const [selectedSection, setSelectedSection] = useState("Visão Geral");
   const [profileData, setProfileData] = useState<ProfileSnapshot[]>([]);
-  const [media, setMedia] = useState<MediaRow[]>([]);
-  const [typeFilter, setTypeFilter] = useState<string>("");
-  const [loading, setLoading] = useState(true);
+  const [media, setMedia] = useState<MediaSnapshot[]>([]);
+  const [loading, setLoading] = useState(false);
 
+  // Load Instagram accounts
   useEffect(() => {
-    fetch("/api/instagram/profile?days=90")
+    fetch("/api/accounts?platform=instagram")
       .then((r) => r.json())
-      .then(setProfileData);
+      .then((accs: Account[]) => {
+        setAccounts(accs);
+        if (accs.length > 0) setSelectedId(accs[0].id);
+      });
   }, []);
 
+  // Load data when selected account changes
   useEffect(() => {
+    if (!selectedId) return;
     setLoading(true);
-    const url = typeFilter
-      ? `/api/instagram/media?limit=100&type=${typeFilter}`
-      : "/api/instagram/media?limit=100";
-    fetch(url)
-      .then((r) => r.json())
-      .then(setMedia)
+    Promise.all([
+      fetch(`/api/instagram/profile?account_id=${selectedId}&days=90`).then((r) => r.json()),
+      fetch(`/api/instagram/media?account_id=${selectedId}&limit=100`).then((r) => r.json()),
+    ])
+      .then(([profile, med]) => {
+        setProfileData(Array.isArray(profile) ? profile : []);
+        setMedia(Array.isArray(med) ? med : []);
+      })
       .finally(() => setLoading(false));
-  }, [typeFilter]);
+  }, [selectedId]);
+
+  const latest = profileData[profileData.length - 1];
+  const previous = profileData[profileData.length - 2];
 
   function exportCsv() {
-    const headers = "Tipo,Legenda,Likes,Comentarios,Alcance,Impressoes,Salvos,Shares,Plays,Publicado\n";
+    const headers = "Tipo,Legenda,Curtidas,Comentarios,Alcance,Impressoes,Plays,Publicado\n";
     const rows = media
       .map(
         (m) =>
-          `"${m.media_type}","${(m.caption || "").replace(/"/g, '""')}",${m.like_count},${m.comments_count},${m.reach},${m.impressions},${m.saved},${m.shares},${m.plays},"${m.published_at}"`
+          `"${m.media_type}","${(m.caption ?? "").replace(/"/g, "''")}",${m.like_count},${m.comments_count},${m.reach},${m.impressions},${m.plays},"${m.published_at}"`
       )
       .join("\n");
     const blob = new Blob([headers + rows], { type: "text/csv" });
@@ -67,86 +63,118 @@ export default function InstagramDetailPage() {
     URL.revokeObjectURL(url);
   }
 
-  return (
-    <div className="space-y-6 max-w-5xl">
-      <h2 className="text-xl font-semibold">Instagram - Detalhes</h2>
-
-      {profileData.length > 1 && (
-        <LineChart
-          data={profileData}
-          xKey="collected_at"
-          lines={[
-            { key: "followers_count", color: "#e11d48", label: "Seguidores" },
-            { key: "reach", color: "#8b5cf6", label: "Alcance" },
-            { key: "impressions", color: "#f59e0b", label: "Impressoes" },
-          ]}
-          height={350}
-        />
-      )}
-
-      <div className="flex gap-2">
-        {["", "IMAGE", "VIDEO", "CAROUSEL", "REEL", "STORY"].map((type) => (
-          <button
-            key={type}
-            onClick={() => setTypeFilter(type)}
-            className={`text-xs px-3 py-1 rounded border ${
-              typeFilter === type
-                ? "bg-blue-600 text-white border-blue-600"
-                : "bg-white text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            {type || "Todos"}
-          </button>
-        ))}
+  if (accounts.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+        <p className="text-lg mb-2">Nenhuma conta Instagram cadastrada</p>
+        <a href="/dashboard/settings" className="text-blue-600 text-sm hover:underline">
+          Cadastrar conta em Configurações →
+        </a>
       </div>
+    );
+  }
 
-      {loading ? (
-        <div className="text-gray-400">Carregando...</div>
-      ) : (
-        <DataTable
-          data={media}
-          columns={[
-            { key: "media_type", label: "Tipo" },
-            {
-              key: "caption",
-              label: "Legenda",
-              render: (v) => (
-                <span className="truncate block max-w-xs text-sm">
-                  {(v as string) || "(sem legenda)"}
-                </span>
-              ),
-            },
-            { key: "like_count", label: "Likes" },
-            { key: "comments_count", label: "Coment." },
-            { key: "reach", label: "Alcance" },
-            { key: "impressions", label: "Impress." },
-            { key: "saved", label: "Salvos" },
-            { key: "plays", label: "Plays" },
-            {
-              key: "published_at",
-              label: "Publicado",
-              render: (v) =>
-                v ? new Date(v as string).toLocaleDateString("pt-BR") : "",
-            },
-            {
-              key: "permalink",
-              label: "",
-              render: (v) =>
-                v ? (
-                  <a
-                    href={v as string}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline text-xs"
-                  >
-                    Ver
-                  </a>
-                ) : null,
-            },
-          ]}
-          onExportCsv={exportCsv}
-        />
-      )}
+  return (
+    <div>
+      <AccountTabs
+        accounts={accounts}
+        selectedId={selectedId}
+        onSelect={(id) => {
+          setSelectedId(id);
+          setSelectedSection("Visão Geral");
+        }}
+      />
+      <SectionTabs
+        sections={SECTIONS}
+        selected={selectedSection}
+        onSelect={setSelectedSection}
+      />
+
+      <div className="p-6 max-w-5xl">
+        {loading && <div className="text-gray-400">Carregando...</div>}
+
+        {!loading && selectedSection === "Visão Geral" && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <KpiCard
+              title="Seguidores"
+              value={latest?.followers_count ?? 0}
+              format="compact"
+              previousValue={previous?.followers_count}
+              currentValue={latest?.followers_count}
+            />
+            <KpiCard
+              title="Alcance (28d)"
+              value={latest?.reach ?? 0}
+              format="compact"
+              previousValue={previous?.reach}
+              currentValue={latest?.reach}
+            />
+            <KpiCard
+              title="Impressões (28d)"
+              value={latest?.impressions ?? 0}
+              format="compact"
+              previousValue={previous?.impressions}
+              currentValue={latest?.impressions}
+            />
+          </div>
+        )}
+
+        {!loading && selectedSection === "Posts/Reels" && (
+          <DataTable
+            data={media}
+            columns={[
+              {
+                key: "media_type",
+                label: "Tipo",
+                render: (v) => (
+                  <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full font-medium">
+                    {v as string}
+                  </span>
+                ),
+              },
+              {
+                key: "caption",
+                label: "Legenda",
+                render: (v) => (
+                  <span className="text-sm text-gray-600 line-clamp-2 max-w-xs">
+                    {(v as string) || "—"}
+                  </span>
+                ),
+              },
+              { key: "like_count", label: "Curtidas" },
+              { key: "comments_count", label: "Comentários" },
+              { key: "reach", label: "Alcance" },
+              { key: "plays", label: "Plays" },
+              {
+                key: "published_at",
+                label: "Publicado",
+                render: (v) =>
+                  v ? new Date(v as string).toLocaleDateString("pt-BR") : "",
+              },
+            ]}
+            onExportCsv={exportCsv}
+          />
+        )}
+
+        {!loading && selectedSection === "Tendências" && profileData.length > 1 && (
+          <LineChart
+            data={profileData}
+            xKey="collected_at"
+            lines={[
+              { key: "followers_count", color: "#e1306c", label: "Seguidores" },
+              { key: "reach", color: "#f59e0b", label: "Alcance" },
+              { key: "impressions", color: "#8b5cf6", label: "Impressões" },
+            ]}
+            height={350}
+          />
+        )}
+
+        {!loading && selectedSection === "Tendências" && profileData.length <= 1 && (
+          <div className="text-gray-400 py-12 text-center">
+            Dados insuficientes para exibir tendências. Execute o cron pelo menos 2 vezes.
+          </div>
+        )}
+      </div>
     </div>
   );
 }
