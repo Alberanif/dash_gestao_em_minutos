@@ -89,7 +89,7 @@ export function AccountList({ initialAccounts }: AccountListProps) {
         return (
           <div key={platform} className="mb-8">
             <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">
-              {PLATFORM_ICONS[platform]} {platform === "youtube" ? "YouTube" : "Instagram"}
+              {PLATFORM_ICONS[platform]} {platform === "youtube" ? "YouTube" : platform === "instagram" ? "Instagram" : "Hotmart"}
             </h3>
             <div className="space-y-2">
               {platformAccounts.map((account) => (
