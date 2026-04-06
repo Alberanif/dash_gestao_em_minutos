@@ -12,7 +12,7 @@ interface AccountFormProps {
 export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
   const isEditing = !!account;
   const [name, setName] = useState(account?.name ?? "");
-  const [platform, setPlatform] = useState<"youtube" | "instagram">(
+  const [platform, setPlatform] = useState<"youtube" | "instagram" | "hotmart">(
     account?.platform ?? "youtube"
   );
   const [apiKey, setApiKey] = useState(
@@ -35,6 +35,16 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
       ? (account.credentials as { user_id: string }).user_id
       : ""
   );
+  const [clientId, setClientId] = useState(
+    isEditing && account.platform === "hotmart"
+      ? (account.credentials as { client_id: string }).client_id
+      : ""
+  );
+  const [clientSecret, setClientSecret] = useState(
+    isEditing && account.platform === "hotmart"
+      ? (account.credentials as { client_secret: string }).client_secret
+      : ""
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -46,7 +56,9 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
     const credentials =
       platform === "youtube"
         ? { api_key: apiKey, channel_id: channelId }
-        : { access_token: accessToken, user_id: userId };
+        : platform === "instagram"
+        ? { access_token: accessToken, user_id: userId }
+        : { client_id: clientId, client_secret: clientSecret };
 
     try {
       const url = isEditing
@@ -102,13 +114,14 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
             <select
               value={platform}
               onChange={(e) =>
-                setPlatform(e.target.value as "youtube" | "instagram")
+                setPlatform(e.target.value as "youtube" | "instagram" | "hotmart")
               }
               disabled={isEditing}
               className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
             >
               <option value="youtube">YouTube</option>
               <option value="instagram">Instagram</option>
+              <option value="hotmart">Hotmart</option>
             </select>
           </div>
 
@@ -167,6 +180,37 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
                   value={userId}
                   onChange={(e) => setUserId(e.target.value)}
                   placeholder="1234567890"
+                  required
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </>
+          )}
+
+          {platform === "hotmart" && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Client ID
+                </label>
+                <input
+                  type="text"
+                  value={clientId}
+                  onChange={(e) => setClientId(e.target.value)}
+                  placeholder="Ex: a1b2c3d4-..."
+                  required
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Client Secret
+                </label>
+                <input
+                  type="password"
+                  value={clientSecret}
+                  onChange={(e) => setClientSecret(e.target.value)}
+                  placeholder="••••••••"
                   required
                   className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
