@@ -11,11 +11,13 @@ interface AccountListProps {
 const PLATFORM_ICONS: Record<string, string> = {
   youtube: "▶",
   instagram: "📷",
+  hotmart: "🛒",
 };
 
 const PLATFORM_COLORS: Record<string, string> = {
   youtube: "bg-red-100 text-red-700",
   instagram: "bg-pink-100 text-pink-700",
+  hotmart: "bg-orange-100 text-orange-700",
 };
 
 export function AccountList({ initialAccounts }: AccountListProps) {
@@ -59,6 +61,7 @@ export function AccountList({ initialAccounts }: AccountListProps) {
   const byPlatform = {
     youtube: accounts.filter((a) => a.platform === "youtube"),
     instagram: accounts.filter((a) => a.platform === "instagram"),
+    hotmart: accounts.filter((a) => a.platform === "hotmart"),
   };
 
   return (
@@ -79,7 +82,7 @@ export function AccountList({ initialAccounts }: AccountListProps) {
         </div>
       )}
 
-      {(["youtube", "instagram"] as const).map((platform) => {
+      {(["youtube", "instagram", "hotmart"] as const).map((platform) => {
         const platformAccounts = byPlatform[platform];
         if (platformAccounts.length === 0) return null;
 
