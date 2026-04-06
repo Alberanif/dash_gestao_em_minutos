@@ -8,11 +8,33 @@ export interface InstagramCredentials {
   user_id: string;
 }
 
+export interface HotmartCredentials {
+  client_id: string;
+  client_secret: string;
+}
+
+export interface HotmartSale {
+  id: string;
+  account_id: string;
+  transaction_code: string;
+  product_id: string;
+  product_name: string;
+  offer_code: string | null;
+  offer_name: string | null;
+  status: string;
+  price: number;
+  currency: string;
+  purchase_date: string;
+  approved_date: string | null;
+  buyer_email: string;
+  collected_at: string;
+}
+
 export interface Account {
   id: string;
-  platform: "youtube" | "instagram";
+  platform: "youtube" | "instagram" | "hotmart";
   name: string;
-  credentials: YouTubeCredentials | InstagramCredentials;
+  credentials: YouTubeCredentials | InstagramCredentials | HotmartCredentials;
   is_active: boolean;
   created_at: string;
 }
