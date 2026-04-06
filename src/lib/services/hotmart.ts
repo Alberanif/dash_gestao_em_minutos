@@ -6,16 +6,14 @@ const HOTMART_SALES_URL = "https://developers.hotmart.com/payments/api/v1/sales/
 
 async function fetchHotmartToken(clientId: string, clientSecret: string): Promise<string> {
   const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-  const res = await fetch(
-    `${HOTMART_TOKEN_URL}?grant_type=client_credentials`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${basic}`,
-        "Content-Type": "application/json",
-      },
-    }
-  );
+  const res = await fetch(HOTMART_TOKEN_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${basic}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "grant_type=client_credentials",
+  });
   if (!res.ok) {
     throw new Error(`Hotmart OAuth error: ${res.status} ${await res.text()}`);
   }
@@ -26,7 +24,7 @@ async function fetchHotmartToken(clientId: string, clientSecret: string): Promis
 interface HotmartSaleItem {
   transaction: string;
   product: { id: string; name: string };
-  offer?: { code?: string; payment_mode?: string };
+  offer?: { code?: string; name?: string; payment_mode?: string };
   purchase: {
     status: string;
     price: { value: number; currency_value: string };
@@ -102,7 +100,7 @@ export async function collectHotmart(account: Account): Promise<{ salesRecords: 
     product_id: item.product.id,
     product_name: item.product.name,
     offer_code: item.offer?.code ?? null,
-    offer_name: null,
+    offer_name: item.offer?.name ?? null,
     status: item.purchase.status,
     price: item.purchase.price.value,
     currency: item.purchase.price.currency_value,

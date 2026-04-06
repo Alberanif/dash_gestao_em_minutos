@@ -41,9 +41,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!["youtube", "instagram"].includes(platform)) {
+  if (!["youtube", "instagram", "hotmart"].includes(platform)) {
     return NextResponse.json(
-      { error: "platform deve ser 'youtube' ou 'instagram'" },
+      { error: "platform deve ser 'youtube', 'instagram' ou 'hotmart'" },
       { status: 400 }
     );
   }

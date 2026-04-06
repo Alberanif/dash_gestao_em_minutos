@@ -122,8 +122,8 @@ export default function HotmartPage() {
     setLoading(true);
     const params = new URLSearchParams({
       account_id: selectedAccountId,
-      start_date: new Date(appliedStart).toISOString(),
-      end_date: new Date(appliedEnd + "T23:59:59").toISOString(),
+      start_date: `${appliedStart}T00:00:00`,
+      end_date: `${appliedEnd}T23:59:59`,
     });
     if (selectedProductId) params.set("product_id", selectedProductId);
 
