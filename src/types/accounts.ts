@@ -28,6 +28,7 @@ export interface HotmartSale {
   approved_date: string | null;
   buyer_email: string;
   collected_at: string;
+  [key: string]: unknown;
 }
 
 export interface Account {
