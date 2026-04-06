@@ -102,7 +102,7 @@ export async function collectHotmart(account: Account): Promise<{ salesRecords: 
     product_id: item.product.id,
     product_name: item.product.name,
     offer_code: item.offer?.code ?? null,
-    offer_name: item.offer?.payment_mode ?? null,
+    offer_name: null,
     status: item.purchase.status,
     price: item.purchase.price.value,
     currency: item.purchase.price.currency_value,
