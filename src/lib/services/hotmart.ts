@@ -1,0 +1,124 @@
+import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import type { Account, HotmartCredentials } from "@/types/accounts";
+
+const HOTMART_TOKEN_URL = "https://api-sec-vlc.hotmart.com/security/oauth/token";
+const HOTMART_SALES_URL = "https://developers.hotmart.com/payments/api/v1/sales/history";
+
+async function fetchHotmartToken(clientId: string, clientSecret: string): Promise<string> {
+  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+  const res = await fetch(
+    `${HOTMART_TOKEN_URL}?grant_type=client_credentials`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${basic}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  if (!res.ok) {
+    throw new Error(`Hotmart OAuth error: ${res.status} ${await res.text()}`);
+  }
+  const data = await res.json();
+  return data.access_token as string;
+}
+
+interface HotmartSaleItem {
+  transaction: string;
+  product: { id: string; name: string };
+  offer?: { code?: string; payment_mode?: string };
+  purchase: {
+    status: string;
+    price: { value: number; currency_value: string };
+    transaction_date: number;
+    approved_date?: number;
+  };
+  buyer: { email: string };
+}
+
+interface HotmartSalesResponse {
+  items: HotmartSaleItem[];
+  page_info?: {
+    next_page_token?: string;
+    total_results?: number;
+  };
+}
+
+export async function collectHotmart(account: Account): Promise<{ salesRecords: number }> {
+  const { client_id, client_secret } = account.credentials as HotmartCredentials;
+  const supabase = createSupabaseServiceClient();
+  const now = new Date();
+
+  // Determine start date: most recent purchase_date or 90 days ago
+  const { data: latest } = await supabase
+    .from("dash_gestao_hotmart_sales")
+    .select("purchase_date")
+    .eq("account_id", account.id)
+    .order("purchase_date", { ascending: false })
+    .limit(1)
+    .single();
+
+  const startDate = latest?.purchase_date
+    ? new Date(latest.purchase_date)
+    : new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+  const startMs = startDate.getTime();
+  const endMs = now.getTime();
+
+  const accessToken = await fetchHotmartToken(client_id, client_secret);
+
+  // Paginate through all sales
+  const allItems: HotmartSaleItem[] = [];
+  let pageToken: string | undefined;
+
+  do {
+    const url = new URL(HOTMART_SALES_URL);
+    url.searchParams.set("start_date", String(startMs));
+    url.searchParams.set("end_date", String(endMs));
+    url.searchParams.set("max_results", "500");
+    if (pageToken) url.searchParams.set("page_token", pageToken);
+
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Hotmart sales API error: ${res.status} ${await res.text()}`);
+    }
+
+    const data: HotmartSalesResponse = await res.json();
+    allItems.push(...(data.items ?? []));
+    pageToken = data.page_info?.next_page_token;
+  } while (pageToken);
+
+  if (allItems.length === 0) {
+    return { salesRecords: 0 };
+  }
+
+  // Map to DB rows
+  const rows = allItems.map((item) => ({
+    account_id: account.id,
+    transaction_code: item.transaction,
+    product_id: item.product.id,
+    product_name: item.product.name,
+    offer_code: item.offer?.code ?? null,
+    offer_name: item.offer?.payment_mode ?? null,
+    status: item.purchase.status,
+    price: item.purchase.price.value,
+    currency: item.purchase.price.currency_value,
+    purchase_date: new Date(item.purchase.transaction_date).toISOString(),
+    approved_date: item.purchase.approved_date
+      ? new Date(item.purchase.approved_date).toISOString()
+      : null,
+    buyer_email: item.buyer.email,
+    collected_at: now.toISOString(),
+  }));
+
+  const { error } = await supabase
+    .from("dash_gestao_hotmart_sales")
+    .upsert(rows, { onConflict: "transaction_code" });
+
+  if (error) throw new Error(`Hotmart upsert error: ${error.message}`);
+
+  return { salesRecords: rows.length };
+}
