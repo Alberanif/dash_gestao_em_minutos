@@ -22,16 +22,16 @@ async function fetchHotmartToken(clientId: string, clientSecret: string): Promis
 }
 
 interface HotmartSaleItem {
-  transaction: string;
-  product: { id: string; name: string };
-  offer?: { code?: string; name?: string; payment_mode?: string };
+  product: { id: number; name: string };
+  buyer: { email: string; name?: string };
   purchase: {
-    status: string;
-    price: { value: number; currency_value: string };
-    transaction_date: number;
+    transaction: string;
+    order_date: number;
     approved_date?: number;
+    status: string;
+    price: { value: number; currency_code: string };
+    offer?: { code?: string; name?: string; payment_mode?: string };
   };
-  buyer: { email: string };
 }
 
 interface HotmartSalesResponse {
@@ -96,15 +96,15 @@ export async function collectHotmart(account: Account): Promise<{ salesRecords: 
   // Map to DB rows
   const rows = allItems.map((item) => ({
     account_id: account.id,
-    transaction_code: item.transaction,
-    product_id: item.product.id,
+    transaction_code: item.purchase.transaction,
+    product_id: String(item.product.id),
     product_name: item.product.name,
-    offer_code: item.offer?.code ?? null,
-    offer_name: item.offer?.name ?? null,
+    offer_code: item.purchase.offer?.code ?? null,
+    offer_name: item.purchase.offer?.name ?? null,
     status: item.purchase.status,
     price: item.purchase.price.value,
-    currency: item.purchase.price.currency_value,
-    purchase_date: new Date(item.purchase.transaction_date).toISOString(),
+    currency: item.purchase.price.currency_code,
+    purchase_date: new Date(item.purchase.order_date).toISOString(),
     approved_date: item.purchase.approved_date
       ? new Date(item.purchase.approved_date).toISOString()
       : null,
