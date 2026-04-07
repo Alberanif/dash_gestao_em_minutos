@@ -67,33 +67,6 @@ function formatCompact(n: number): string {
   return Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 }).format(n);
 }
 
-function EngagementBadge({ views, likes, comments }: { views: number; likes: number; comments: number }) {
-  if (!views) return <span className="text-xs text-gray-400">—</span>;
-  const rate = ((likes + comments) / views) * 100;
-  let label: string;
-  let style: React.CSSProperties;
-  if (rate >= 5) {
-    label = "Alto";
-    style = { background: "#DCFCE7", color: "#15803D", fontWeight: 600 };
-  } else if (rate >= 2) {
-    label = "Médio";
-    style = { background: "#FEF9C3", color: "#A16207", fontWeight: 600 };
-  } else {
-    label = "Baixo";
-    style = { background: "#FEE2E2", color: "#B91C1C", fontWeight: 600 };
-  }
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="px-2 py-0.5 rounded-full text-xs" style={style}>
-        {label}
-      </span>
-      <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-        {rate.toFixed(1)}%
-      </span>
-    </div>
-  );
-}
-
 // SVG icons
 const IconUsers = (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
