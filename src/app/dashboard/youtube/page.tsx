@@ -35,8 +35,12 @@ function parseIsoDurationToSeconds(iso: string): number {
 }
 
 function formatSeconds(totalSec: number): string {
-  const min = Math.floor(totalSec / 60);
+  const h = Math.floor(totalSec / 3600);
+  const min = Math.floor((totalSec % 3600) / 60);
   const sec = Math.round(totalSec % 60);
+  if (h > 0) {
+    return `${h}:${String(min).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+  }
   return `${min}:${String(sec).padStart(2, "0")}`;
 }
 
@@ -137,6 +141,8 @@ export default function YouTubePage() {
   useEffect(() => {
     if (!selectedId) return;
     setLoading(true);
+    setChannelData([]);
+    setVideos([]);
     Promise.all([
       fetch(`/api/youtube/channel?account_id=${selectedId}&days=90`).then((r) => r.json()),
       fetch(`/api/youtube/videos?account_id=${selectedId}&limit=100`).then((r) => r.json()),
