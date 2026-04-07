@@ -177,6 +177,7 @@ export default function YouTubePage() {
 
   const latest = channelData[channelData.length - 1];
   const previous = channelData[channelData.length - 2];
+  const metrics = calcRetentionMetrics(videos);
 
   function exportCsv() {
     const headers = "Titulo,Views,Likes,Comentarios,Engajamento%,Duracao,Publicado\n";
@@ -240,6 +241,9 @@ export default function YouTubePage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <SkeletonCard /><SkeletonCard /><SkeletonCard />
                 </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
+                </div>
                 <SkeletonChart />
               </>
             ) : (
@@ -274,6 +278,34 @@ export default function YouTubePage() {
                     icon={IconVideo}
                     accentColor="#0EA5E9"
                     sparklineData={channelData.map((d) => d.video_count)}
+                  />
+                </div>
+
+                {/* KPI Cards — Performance */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <KpiCard
+                    title="Retenção"
+                    value={`${(metrics.retencao * 100).toFixed(2)}%`}
+                    icon={IconThumbUp}
+                    accentColor="#16A34A"
+                  />
+                  <KpiCard
+                    title="Engajamento Total"
+                    value={`${(metrics.engajamento * 100).toFixed(2)}%`}
+                    icon={IconActivity}
+                    accentColor="#D97706"
+                  />
+                  <KpiCard
+                    title="Coment./Views"
+                    value={`${(metrics.taxaComentarios * 100).toFixed(2)}%`}
+                    icon={IconMessageSquare}
+                    accentColor="#7C3AED"
+                  />
+                  <KpiCard
+                    title="Duração Média"
+                    value={metrics.duracaoMedia}
+                    icon={IconClock}
+                    accentColor="#0EA5E9"
                   />
                 </div>
 
