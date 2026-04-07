@@ -180,11 +180,17 @@ export default function YouTubePage() {
   const metrics = calcRetentionMetrics(videos);
 
   function exportCsv() {
-    const headers = "Titulo,Views,Likes,Comentarios,Engajamento%,Duracao,Publicado\n";
+    const headers = "Titulo,Views,Retencao%,Engajamento%,ComentariosViews%,Duracao,Publicado\n";
     const rows = videos
       .map((v) => {
-        const eng = v.view_count ? (((v.like_count + v.comment_count) / v.view_count) * 100).toFixed(1) : "0";
-        return `"${v.title}",${v.view_count},${v.like_count},${v.comment_count},${eng},"${parseIsoDuration(v.duration)}","${v.published_at}"`;
+        const retencao = v.view_count ? ((v.like_count / v.view_count) * 100).toFixed(2) : "0";
+        const engajamento = v.view_count
+          ? (((v.like_count + v.comment_count) / v.view_count) * 100).toFixed(2)
+          : "0";
+        const taxaComentarios = v.view_count
+          ? ((v.comment_count / v.view_count) * 100).toFixed(2)
+          : "0";
+        return `"${v.title}",${v.view_count},${retencao},${engajamento},${taxaComentarios},"${parseIsoDuration(v.duration)}","${v.published_at}"`;
       })
       .join("\n");
     const blob = new Blob([headers + rows], { type: "text/csv" });
@@ -371,38 +377,58 @@ export default function YouTubePage() {
                   },
                   {
                     key: "like_count",
-                    label: "Curtidas",
-                    render: (v) => (
-                      <span className="text-sm tabular-nums">{formatCompact(v as number)}</span>
-                    ),
+                    label: "Retenção",
+                    render: (_, row) => {
+                      const views = row.view_count as number;
+                      const likes = row.like_count as number;
+                      if (!views) return <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>—</span>;
+                      return (
+                        <span className="text-sm tabular-nums font-medium" style={{ color: "var(--color-text)" }}>
+                          {((likes / views) * 100).toFixed(2)}%
+                        </span>
+                      );
+                    },
                   },
                   {
                     key: "comment_count",
-                    label: "Comentários",
-                    render: (v) => (
-                      <span className="text-sm tabular-nums">{formatCompact(v as number)}</span>
-                    ),
+                    label: "Engajamento",
+                    render: (_, row) => {
+                      const views = row.view_count as number;
+                      const likes = row.like_count as number;
+                      const comments = row.comment_count as number;
+                      if (!views) return <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>—</span>;
+                      return (
+                        <span className="text-sm tabular-nums" style={{ color: "var(--color-text-muted)" }}>
+                          {(((likes + comments) / views) * 100).toFixed(2)}%
+                        </span>
+                      );
+                    },
+                  },
+                  {
+                    key: "thumbnail_url",
+                    label: "Coment./Views",
+                    render: (_, row) => {
+                      const views = row.view_count as number;
+                      const comments = row.comment_count as number;
+                      if (!views) return <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>—</span>;
+                      return (
+                        <span className="text-sm tabular-nums" style={{ color: "var(--color-text-muted)" }}>
+                          {((comments / views) * 100).toFixed(2)}%
+                        </span>
+                      );
+                    },
                   },
                   {
                     key: "duration",
-                    label: "Engajamento",
+                    label: "Duração",
                     render: (_, row) => (
-                      <EngagementBadge
-                        views={row.view_count as number}
-                        likes={row.like_count as number}
-                        comments={row.comment_count as number}
-                      />
+                      <span className="text-sm font-mono tabular-nums">
+                        {parseIsoDuration(row.duration as string)}
+                      </span>
                     ),
                   },
                   {
                     key: "published_at",
-                    label: "Duração",
-                    render: (_, row) => (
-                      <span className="text-sm font-mono tabular-nums">{parseIsoDuration(row.duration as string)}</span>
-                    ),
-                  },
-                  {
-                    key: "thumbnail_url",
                     label: "Publicado",
                     render: (_, row) =>
                       row.published_at ? (
