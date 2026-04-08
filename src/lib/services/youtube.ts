@@ -1,117 +1,126 @@
+// src/lib/services/youtube.ts
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import { getValidAccessToken } from "@/lib/youtube/auth";
+import {
+  queryChannelDaily,
+  queryVideoDaily,
+  fetchVideoMetadata,
+} from "@/lib/youtube/analytics";
 import type { Account, YouTubeCredentials } from "@/types/accounts";
 
-const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
+async function detectSyncRange(
+  account: Account
+): Promise<{ start: string; end: string }> {
+  const creds = account.credentials as YouTubeCredentials;
+  const today = new Date().toISOString().slice(0, 10);
+  const supabase = createSupabaseServiceClient();
 
-interface YouTubeChannelStats {
-  subscriberCount: string;
-  viewCount: string;
-  videoCount: string;
-}
+  const { data } = await supabase
+    .from("dash_gestao_youtube_channel_daily")
+    .select("date")
+    .eq("account_id", account.id)
+    .order("date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-interface YouTubeVideoItem {
-  id: string;
-  snippet: {
-    title: string;
-    publishedAt: string;
-    thumbnails: { medium: { url: string } };
-  };
-  statistics: {
-    viewCount: string;
-    likeCount: string;
-    commentCount: string;
-  };
-  contentDetails: {
-    duration: string;
-  };
-}
-
-async function youtubeGet(
-  endpoint: string,
-  params: Record<string, string>,
-  apiKey: string
-) {
-  const url = new URL(`${YOUTUBE_API_BASE}/${endpoint}`);
-  url.searchParams.set("key", apiKey);
-  for (const [key, value] of Object.entries(params)) {
-    url.searchParams.set(key, value);
+  if (!data) {
+    // No existing data → full backfill from history_start_date
+    return { start: creds.history_start_date, end: today };
   }
-  const res = await fetch(url.toString());
-  if (!res.ok) {
-    throw new Error(`YouTube API error: ${res.status} ${await res.text()}`);
-  }
-  return res.json();
+
+  // Incremental: re-fetch last 3 days to cover the data stabilisation window
+  const lastDate = new Date(data.date);
+  lastDate.setDate(lastDate.getDate() - 3);
+  return { start: lastDate.toISOString().slice(0, 10), end: today };
 }
 
 export async function collectYouTube(account: Account): Promise<{
   channelRecords: number;
   videoRecords: number;
 }> {
-  const { api_key, channel_id } = account.credentials as YouTubeCredentials;
+  const creds = account.credentials as YouTubeCredentials;
   const supabase = createSupabaseServiceClient();
-  const now = new Date().toISOString();
 
-  // 1. Fetch channel statistics
-  const channelData = await youtubeGet(
-    "channels",
-    { part: "statistics", id: channel_id },
-    api_key
+  // 1. Ensure we have a valid access token (refreshes automatically if needed)
+  const accessToken = await getValidAccessToken(account);
+
+  // 2. Determine what date range to collect
+  const syncRange = await detectSyncRange(account);
+
+  // 3. Collect channel-level daily metrics
+  const channelRows = await queryChannelDaily(
+    accessToken,
+    creds.channel_id,
+    syncRange.start,
+    syncRange.end
   );
 
-  const stats: YouTubeChannelStats = channelData.items[0].statistics;
-
-  const { error: channelError } = await supabase
-    .from("dash_gestao_youtube_channel_snapshots")
-    .insert({
-      account_id: account.id,
-      subscriber_count: parseInt(stats.subscriberCount),
-      view_count: parseInt(stats.viewCount),
-      video_count: parseInt(stats.videoCount),
-      collected_at: now,
-    });
-
-  if (channelError) throw new Error(`Channel insert error: ${channelError.message}`);
-
-  // 2. Fetch recent videos (last 50)
-  const searchData = await youtubeGet(
-    "search",
-    { part: "id", channelId: channel_id, order: "date", maxResults: "50", type: "video" },
-    api_key
+  // 4. Collect video-level daily metrics
+  const videoRows = await queryVideoDaily(
+    accessToken,
+    creds.channel_id,
+    syncRange.start,
+    syncRange.end
   );
 
-  const videoIds: string[] = searchData.items.map(
-    (item: { id: { videoId: string } }) => item.id.videoId
-  );
+  // 5. Fetch metadata only for video_ids not yet in the videos table
+  if (videoRows.length > 0) {
+    const allVideoIds = [...new Set(videoRows.map((r) => r.video_id))];
 
-  if (videoIds.length === 0) {
-    return { channelRecords: 1, videoRecords: 0 };
+    const { data: existing } = await supabase
+      .from("dash_gestao_youtube_videos")
+      .select("video_id")
+      .eq("account_id", account.id)
+      .in("video_id", allVideoIds);
+
+    const existingSet = new Set((existing ?? []).map((v) => v.video_id));
+    const newVideoIds = allVideoIds.filter((id) => !existingSet.has(id));
+
+    if (newVideoIds.length > 0) {
+      const metadata = await fetchVideoMetadata(accessToken, newVideoIds);
+      if (metadata.length > 0) {
+        const { error } = await supabase
+          .from("dash_gestao_youtube_videos")
+          .upsert(
+            metadata.map((m) => ({
+              account_id: account.id,
+              video_id: m.video_id,
+              title: m.title,
+              published_at: m.published_at,
+              thumbnail_url: m.thumbnail_url,
+              duration: m.duration,
+            })),
+            { onConflict: "account_id,video_id" }
+          );
+        if (error) throw new Error(`Video metadata upsert: ${error.message}`);
+      }
+    }
   }
 
-  // 3. Fetch video details
-  const videosData = await youtubeGet(
-    "videos",
-    { part: "snippet,statistics,contentDetails", id: videoIds.join(",") },
-    api_key
-  );
+  // 6. Upsert channel daily metrics (idempotent via UNIQUE on account_id, date)
+  if (channelRows.length > 0) {
+    const { error } = await supabase
+      .from("dash_gestao_youtube_channel_daily")
+      .upsert(
+        channelRows.map((r) => ({ account_id: account.id, ...r })),
+        { onConflict: "account_id,date" }
+      );
+    if (error) throw new Error(`Channel daily upsert: ${error.message}`);
+  }
 
-  const videoRows = videosData.items.map((video: YouTubeVideoItem) => ({
-    account_id: account.id,
-    video_id: video.id,
-    title: video.snippet.title,
-    published_at: video.snippet.publishedAt,
-    view_count: parseInt(video.statistics.viewCount || "0"),
-    like_count: parseInt(video.statistics.likeCount || "0"),
-    comment_count: parseInt(video.statistics.commentCount || "0"),
-    duration: video.contentDetails.duration,
-    thumbnail_url: video.snippet.thumbnails.medium.url,
-    collected_at: now,
-  }));
+  // 7. Upsert video daily metrics
+  if (videoRows.length > 0) {
+    const { error } = await supabase
+      .from("dash_gestao_youtube_video_daily")
+      .upsert(
+        videoRows.map((r) => ({ account_id: account.id, ...r })),
+        { onConflict: "account_id,video_id,date" }
+      );
+    if (error) throw new Error(`Video daily upsert: ${error.message}`);
+  }
 
-  const { error: videosError } = await supabase
-    .from("dash_gestao_youtube_video_snapshots")
-    .insert(videoRows);
-
-  if (videosError) throw new Error(`Videos insert error: ${videosError.message}`);
-
-  return { channelRecords: 1, videoRecords: videoRows.length };
+  return {
+    channelRecords: channelRows.length,
+    videoRecords: videoRows.length,
+  };
 }

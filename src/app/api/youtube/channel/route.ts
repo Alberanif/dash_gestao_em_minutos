@@ -1,3 +1,4 @@
+// src/app/api/youtube/channel/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiAuth } from "@/lib/utils/api-auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -12,21 +13,24 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = await createSupabaseServerClient();
-  const days = parseInt(request.nextUrl.searchParams.get("days") || "30");
 
-  const since = new Date();
-  since.setDate(since.getDate() - days);
+  const startDateStr = request.nextUrl.searchParams.get("start_date");
+  const endDateStr = request.nextUrl.searchParams.get("end_date");
 
-  const { data, error: dbError } = await supabase
-    .from("dash_gestao_youtube_channel_snapshots")
+  let query = supabase
+    .from("dash_gestao_youtube_channel_daily")
     .select("*")
     .eq("account_id", accountId)
-    .gte("collected_at", since.toISOString())
-    .order("collected_at", { ascending: true });
+    .order("date", { ascending: true });
+
+  if (startDateStr) query = query.gte("date", startDateStr.slice(0, 10));
+  if (endDateStr) query = query.lte("date", endDateStr.slice(0, 10));
+
+  const { data, error: dbError } = await query;
 
   if (dbError) {
     return NextResponse.json({ error: dbError.message }, { status: 500 });
   }
 
-  return NextResponse.json(data);
+  return NextResponse.json(data ?? []);
 }

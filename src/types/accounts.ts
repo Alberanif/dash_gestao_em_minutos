@@ -1,6 +1,12 @@
 export interface YouTubeCredentials {
-  api_key: string;
-  channel_id: string;
+  client_id: string;
+  client_secret: string;
+  refresh_token: string;
+  channel_id: string;           // auto-detected via OAuth callback
+  history_start_date: string;   // YYYY-MM-DD — backfill start
+  // auto-managed by getValidAccessToken:
+  access_token?: string;
+  access_token_expiry?: string; // ISO timestamp
 }
 
 export interface InstagramCredentials {
@@ -40,30 +46,47 @@ export interface Account {
   created_at: string;
 }
 
-export interface ChannelSnapshot {
+// YouTube Analytics daily rows
+export interface ChannelDailyRow extends Record<string, unknown> {
   id: string;
   account_id: string;
-  subscriber_count: number;
-  view_count: number;
-  video_count: number;
-  collected_at: string;
+  date: string;
+  views: number;
+  estimated_minutes_watched: number;
+  average_view_duration: number;
+  average_view_percentage: number;
+  subscribers_gained: number;
+  subscribers_lost: number;
+  likes: number;
+  comments: number;
+  shares: number;
 }
 
-export interface VideoSnapshot {
+export interface VideoMetadata {
   id: string;
   account_id: string;
   video_id: string;
   title: string;
   published_at: string;
-  view_count: number;
-  like_count: number;
-  comment_count: number;
-  duration: string;
   thumbnail_url: string;
-  collected_at: string;
-  [key: string]: unknown;
+  duration: string;
 }
 
+export interface VideoAggregated extends Record<string, unknown> {
+  video_id: string;
+  title: string;
+  published_at: string;
+  thumbnail_url: string;
+  duration: string;
+  total_views: number;
+  total_watch_min: number;
+  avg_view_percentage: number;
+  avg_view_duration: number;
+  total_likes: number;
+  total_comments: number;
+}
+
+// Instagram (unchanged)
 export interface ProfileSnapshot {
   id: string;
   account_id: string;
