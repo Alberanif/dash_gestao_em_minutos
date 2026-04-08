@@ -42,26 +42,20 @@ interface HotmartSalesResponse {
   };
 }
 
-export async function collectHotmart(account: Account): Promise<{ salesRecords: number }> {
+export async function collectHotmart(
+  account: Account,
+  options?: { startDate?: Date; endDate?: Date }
+): Promise<{ salesRecords: number }> {
   const { client_id, client_secret } = account.credentials as HotmartCredentials;
   const supabase = createSupabaseServiceClient();
   const now = new Date();
 
-  // Determine start date: most recent purchase_date or 90 days ago
-  const { data: latest } = await supabase
-    .from("dash_gestao_hotmart_sales")
-    .select("purchase_date")
-    .eq("account_id", account.id)
-    .order("purchase_date", { ascending: false })
-    .limit(1)
-    .single();
-
-  const startDate = latest?.purchase_date
-    ? new Date(latest.purchase_date)
-    : new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  // Usa datas fornecidas ou, por padrão, 90 dias para capturar mudanças de status
+  const startDate = options?.startDate ?? new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  const endDate   = options?.endDate   ?? now;
 
   const startMs = startDate.getTime();
-  const endMs = now.getTime();
+  const endMs = endDate.getTime();
 
   const accessToken = await fetchHotmartToken(client_id, client_secret);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AccountTabs } from "@/components/dashboard/account-tabs";
 import { SectionTabs } from "@/components/dashboard/section-tabs";
 import { KpiCard } from "@/components/ui/kpi-card";
@@ -12,7 +12,7 @@ import type { Account, HotmartSale } from "@/types/accounts";
 const SECTIONS = ["Visão Geral", "Vendas"];
 
 const STATUS_APPROVED = ["COMPLETE"];
-const STATUS_PENDING = ["WAITING_PAYMENT", "PRINTED_BILLET", "UNDER_ANALISYS"];
+const STATUS_PENDING = ["WAITING_PAYMENT", "PRINTED_BILLET", "UNDER_ANALISYS", "UNDER_ANALYSIS", "BILLET_PRINTED", "OVERDUE"];
 const STATUS_CANCELLED = ["REFUNDED", "CANCELLED", "CHARGEBACK", "BLOCKED", "EXPIRED"];
 
 function formatBRL(value: number): string {
@@ -81,11 +81,21 @@ const IconTag = (
   </svg>
 );
 
+const IconRefund = (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="1 4 1 10 7 10" />
+    <path d="M3.51 15a9 9 0 1 0 .49-4" />
+  </svg>
+);
+
 export default function HotmartPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [products, setProducts] = useState<{ product_id: string; product_name: string }[]>([]);
   const [selectedProductId, setSelectedProductId] = useState("");
+  const [productSearch, setProductSearch] = useState("");
+  const [productDropdownOpen, setProductDropdownOpen] = useState(false);
+  const productDropdownRef = useRef<HTMLDivElement>(null);
   const [startDate, setStartDate] = useState(daysAgo(30));
   const [endDate, setEndDate] = useState(today());
   const [appliedStart, setAppliedStart] = useState(daysAgo(30));
@@ -133,6 +143,23 @@ export default function HotmartPage() {
       .finally(() => setLoading(false));
   }, [selectedAccountId, selectedProductId, appliedStart, appliedEnd]);
 
+  // Close product dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (productDropdownRef.current && !productDropdownRef.current.contains(e.target as Node)) {
+        setProductDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredProducts = products.filter((p) =>
+    p.product_name.toLowerCase().includes(productSearch.toLowerCase())
+  );
+
+  const selectedProduct = products.find((p) => p.product_id === selectedProductId);
+
   function applyDateFilter() {
     setAppliedStart(startDate);
     setAppliedEnd(endDate);
@@ -145,6 +172,13 @@ export default function HotmartPage() {
   const ticketMedio = salesCount > 0 ? revenue / salesCount : 0;
   const pendingCount = sales.filter((s) => STATUS_PENDING.includes(s.status)).length;
   const cancelledCount = sales.filter((s) => STATUS_CANCELLED.includes(s.status)).length;
+  const otherCount = sales.filter(
+    (s) => !STATUS_APPROVED.includes(s.status) && !STATUS_PENDING.includes(s.status) && !STATUS_CANCELLED.includes(s.status)
+  ).length;
+  const refundedCount = sales.filter((s) => s.status === "REFUNDED").length;
+  const refundRate = salesCount + refundedCount > 0
+    ? (refundedCount / (salesCount + refundedCount)) * 100
+    : 0;
 
   // Chart data: group approved sales by day
   const revenueByDay: Record<string, number> = {};
@@ -203,23 +237,138 @@ export default function HotmartPage() {
         />
       </div>
 
-      {/* Product tabs */}
+      {/* Product dropdown */}
       {products.length > 0 && (
-        <div className="px-8 pt-3 flex gap-2 flex-wrap">
-          {products.map((p) => (
+        <div className="px-8 pt-3">
+          <div ref={productDropdownRef} style={{ position: "relative", maxWidth: 400 }}>
             <button
-              key={p.product_id}
-              onClick={() => setSelectedProductId(p.product_id)}
-              className="px-4 py-1.5 rounded-full text-sm font-medium transition-colors"
-              style={
-                selectedProductId === p.product_id
-                  ? { background: "var(--color-primary)", color: "#fff" }
-                  : { background: "var(--color-border)", color: "var(--color-text-muted)" }
-              }
+              onClick={() => {
+                setProductDropdownOpen((v) => !v);
+                setProductSearch("");
+              }}
+              className="w-full flex items-center justify-between px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              style={{
+                border: "1px solid var(--color-border)",
+                background: "white",
+                color: "var(--color-text)",
+                cursor: "pointer",
+              }}
             >
-              {p.product_name}
+              <span className="truncate" style={{ maxWidth: "calc(100% - 24px)" }}>
+                {selectedProduct ? selectedProduct.product_name : "Selecione um produto"}
+              </span>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{
+                  flexShrink: 0,
+                  transform: productDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+                  transition: "transform 0.15s ease",
+                }}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
             </button>
-          ))}
+
+            {productDropdownOpen && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 4px)",
+                  left: 0,
+                  right: 0,
+                  zIndex: 50,
+                  background: "white",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 10,
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
+                  overflow: "hidden",
+                }}
+              >
+                {/* Search input */}
+                <div style={{ padding: "8px 8px 4px", borderBottom: "1px solid var(--color-border)" }}>
+                  <div style={{ position: "relative" }}>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: "var(--color-text-muted)" }}
+                    >
+                      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    <input
+                      autoFocus
+                      type="text"
+                      placeholder="Pesquisar produto..."
+                      value={productSearch}
+                      onChange={(e) => setProductSearch(e.target.value)}
+                      className="w-full text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      style={{
+                        paddingLeft: 28,
+                        paddingRight: 8,
+                        paddingTop: 6,
+                        paddingBottom: 6,
+                        border: "1px solid var(--color-border)",
+                        background: "var(--color-bg, #f9fafb)",
+                        color: "var(--color-text)",
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Options list */}
+                <div style={{ maxHeight: 260, overflowY: "auto" }}>
+                  {filteredProducts.length === 0 ? (
+                    <div style={{ padding: "12px 16px", fontSize: 13, color: "var(--color-text-muted)", textAlign: "center" }}>
+                      Nenhum produto encontrado
+                    </div>
+                  ) : (
+                    filteredProducts.map((p) => (
+                      <button
+                        key={p.product_id}
+                        onClick={() => {
+                          setSelectedProductId(p.product_id);
+                          setProductDropdownOpen(false);
+                          setProductSearch("");
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm transition-colors"
+                        style={{
+                          display: "block",
+                          background: selectedProductId === p.product_id ? "var(--color-primary)" : "transparent",
+                          color: selectedProductId === p.product_id ? "#fff" : "var(--color-text)",
+                          cursor: "pointer",
+                          border: "none",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (selectedProductId !== p.product_id) {
+                            (e.currentTarget as HTMLButtonElement).style.background = "var(--color-border)";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (selectedProductId !== p.product_id) {
+                            (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                          }
+                        }}
+                      >
+                        {p.product_name}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -271,7 +420,7 @@ export default function HotmartPage() {
             ) : (
               <>
                 {/* KPI Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                   <KpiCard
                     title="Receita Total"
                     value={formatBRL(revenue)}
@@ -291,14 +440,21 @@ export default function HotmartPage() {
                     icon={IconTag}
                     accentColor="#8B5CF6"
                   />
+                  <KpiCard
+                    title="Taxa de Reembolso"
+                    value={`${refundRate.toFixed(1)}%`}
+                    icon={IconRefund}
+                    accentColor="#EF4444"
+                  />
                 </div>
 
                 {/* Status breakdown */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                   {[
                     { label: "Aprovadas", count: salesCount, color: "#15803D", bg: "#DCFCE7" },
                     { label: "Pendentes", count: pendingCount, color: "#B45309", bg: "#FEF3C7" },
                     { label: "Canceladas/Reemb.", count: cancelledCount, color: "#B91C1C", bg: "#FEE2E2" },
+                    { label: "Outros", count: otherCount, color: "#6B7280", bg: "#F3F4F6" },
                     { label: "Total", count: sales.length, color: "var(--color-text)", bg: "white" },
                   ].map(({ label, count, color, bg }) => (
                     <div

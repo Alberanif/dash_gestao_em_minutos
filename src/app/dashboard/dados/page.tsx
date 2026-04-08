@@ -18,6 +18,11 @@ interface LogEntry extends Record<string, unknown> {
   error_message: string | null;
 }
 
+interface HotmartAccount {
+  id: string;
+  name: string;
+}
+
 const PLATFORM_TABS: Platform[] = ["youtube", "instagram", "hotmart"];
 const PLATFORM_LABELS: Record<Platform, string> = {
   youtube: "YouTube",
@@ -108,6 +113,15 @@ export default function DadosPage() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [syncSuccess, setSyncSuccess] = useState(false);
 
+  // Batch collection state (Hotmart only)
+  const [hotmartAccounts, setHotmartAccounts] = useState<HotmartAccount[]>([]);
+  const [batchAccountId, setBatchAccountId] = useState("");
+  const [batchStart, setBatchStart] = useState("");
+  const [batchEnd, setBatchEnd] = useState("");
+  const [batchStatus, setBatchStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [batchResult, setBatchResult] = useState<{ salesRecords: number } | null>(null);
+  const [batchError, setBatchError] = useState<string | null>(null);
+
   const fetchLogs = useCallback(async (platform: Platform) => {
     setLoading(true);
     try {
@@ -126,6 +140,19 @@ export default function DadosPage() {
     setSyncSuccess(false);
     fetchLogs(activeTab);
   }, [activeTab, fetchLogs]);
+
+  // Load Hotmart accounts when switching to Hotmart tab
+  useEffect(() => {
+    if (activeTab !== "hotmart") return;
+    fetch("/api/accounts?platform=hotmart")
+      .then((r) => r.json())
+      .then((accs: HotmartAccount[]) => {
+        setHotmartAccounts(Array.isArray(accs) ? accs : []);
+        if (accs.length > 0 && !batchAccountId) setBatchAccountId(accs[0].id);
+      })
+      .catch(() => setHotmartAccounts([]));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   async function handleSync() {
     setSyncing(true);
@@ -154,6 +181,38 @@ export default function DadosPage() {
     }
   }
 
+  async function handleBatchCollect() {
+    setBatchStatus("loading");
+    setBatchResult(null);
+    setBatchError(null);
+
+    try {
+      const res = await fetch("/api/hotmart/batch-collect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          account_id: batchAccountId,
+          start_date: batchStart,
+          end_date: batchEnd,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        setBatchStatus("error");
+        setBatchError(json.error ?? "Erro desconhecido");
+      } else {
+        setBatchStatus("success");
+        setBatchResult({ salesRecords: json.salesRecords });
+        await fetchLogs(activeTab);
+      }
+    } catch {
+      setBatchStatus("error");
+      setBatchError("Falha na comunicação com o servidor");
+    }
+  }
+
   const sectionLabels = PLATFORM_TABS.map((p) => PLATFORM_LABELS[p]);
   const activeLabel = PLATFORM_LABELS[activeTab];
 
@@ -161,6 +220,9 @@ export default function DadosPage() {
     const platform = PLATFORM_TABS.find((p) => PLATFORM_LABELS[p] === label);
     if (platform) setActiveTab(platform);
   }
+
+  const batchCanSubmit =
+    !!batchAccountId && !!batchStart && !!batchEnd && batchStatus !== "loading";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0, height: "100%" }}>
@@ -244,6 +306,155 @@ export default function DadosPage() {
             </span>
           )}
         </div>
+
+        {/* Batch collect section — Hotmart only */}
+        {activeTab === "hotmart" && (
+          <div
+            style={{
+              marginBottom: 24,
+              padding: "20px 24px",
+              borderRadius: 12,
+              border: "1px solid var(--color-border)",
+              background: "var(--color-bg, #f9fafb)",
+            }}
+          >
+            <p style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text)", marginBottom: 16 }}>
+              Coleta em Lote
+            </p>
+
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 12, flexWrap: "wrap" }}>
+              {/* Account selector */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "var(--color-text-muted)", fontWeight: 500 }}>
+                  Conta
+                </label>
+                <select
+                  value={batchAccountId}
+                  onChange={(e) => setBatchAccountId(e.target.value)}
+                  style={{
+                    padding: "7px 12px",
+                    borderRadius: 8,
+                    border: "1px solid var(--color-border)",
+                    fontSize: 14,
+                    color: "var(--color-text)",
+                    background: "white",
+                    minWidth: 200,
+                  }}
+                >
+                  {hotmartAccounts.length === 0 && (
+                    <option value="">Nenhuma conta encontrada</option>
+                  )}
+                  {hotmartAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Start date */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "var(--color-text-muted)", fontWeight: 500 }}>
+                  De
+                </label>
+                <input
+                  type="date"
+                  value={batchStart}
+                  onChange={(e) => setBatchStart(e.target.value)}
+                  style={{
+                    padding: "7px 12px",
+                    borderRadius: 8,
+                    border: "1px solid var(--color-border)",
+                    fontSize: 14,
+                    color: "var(--color-text)",
+                    background: "white",
+                  }}
+                />
+              </div>
+
+              {/* End date */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, color: "var(--color-text-muted)", fontWeight: 500 }}>
+                  Até
+                </label>
+                <input
+                  type="date"
+                  value={batchEnd}
+                  onChange={(e) => setBatchEnd(e.target.value)}
+                  style={{
+                    padding: "7px 12px",
+                    borderRadius: 8,
+                    border: "1px solid var(--color-border)",
+                    fontSize: 14,
+                    color: "var(--color-text)",
+                    background: "white",
+                  }}
+                />
+              </div>
+
+              {/* Submit button */}
+              <button
+                onClick={handleBatchCollect}
+                disabled={!batchCanSubmit}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 18px",
+                  borderRadius: 8,
+                  fontSize: 14,
+                  fontWeight: 500,
+                  border: "none",
+                  cursor: batchCanSubmit ? "pointer" : "not-allowed",
+                  background: batchCanSubmit ? "#F97316" : "#FED7AA",
+                  color: "#fff",
+                  transition: "background 0.15s",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {batchStatus === "loading" ? (
+                  <>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      style={{ animation: "spin 1s linear infinite" }}
+                    >
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                    </svg>
+                    Coletando…
+                  </>
+                ) : (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Iniciar Coleta
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Batch feedback */}
+            {batchStatus === "success" && batchResult && (
+              <p style={{ marginTop: 12, fontSize: 13, color: "#166534", display: "flex", alignItems: "center", gap: 6 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                {batchResult.salesRecords.toLocaleString("pt-BR")} registro{batchResult.salesRecords !== 1 ? "s" : ""} importado{batchResult.salesRecords !== 1 ? "s" : ""}
+              </p>
+            )}
+
+            {batchStatus === "error" && batchError && (
+              <p style={{ marginTop: 12, fontSize: 13, color: "#DC2626" }}>
+                {batchError}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Logs table */}
         {loading ? (
