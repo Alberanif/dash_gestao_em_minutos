@@ -1,0 +1,76 @@
+<h2>Como reestruturar o projeto para múltiplas contas?</h2>
+<p class="subtitle">O banco atual não tem suporte a múltiplas contas. Precisamos decidir como evoluir o schema e a arquitetura.</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0f172a;padding:16px;border-radius:8px;font-size:11px;font-family:monospace;">
+      <div style="color:#22d3ee;margin-bottom:6px;">NOVA TABELA: accounts</div>
+      <div style="background:#1e293b;border-radius:4px;padding:8px;margin-bottom:8px;">
+        <div style="color:#94a3b8;">id · platform · name · credentials · is_active</div>
+      </div>
+      <div style="color:#86efac;margin-bottom:4px;">MIGRAÇÃO: adicionar account_id</div>
+      <div style="background:#1e293b;border-radius:4px;padding:8px;">
+        <div style="color:#94a3b8;">youtube_channel → + account_id FK</div>
+        <div style="color:#94a3b8;">youtube_videos  → + account_id FK</div>
+        <div style="color:#94a3b8;">instagram_profile → + account_id FK</div>
+        <div style="color:#94a3b8;">instagram_media   → + account_id FK</div>
+      </div>
+      <div style="color:#64748b;font-size:10px;margin-top:6px;">Dados existentes migrados para a conta inicial</div>
+    </div>
+    <div class="card-body">
+      <h3>A — Migração incremental ✨ Recomendado</h3>
+      <p>Adiciona uma tabela <code>accounts</code> e uma coluna <code>account_id</code> nas tabelas existentes. Preserva dados já coletados e evolui o schema sem quebrar nada.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Prós</h4><ul><li>Preserva dados existentes</li><li>Menor risco</li><li>Evolução natural</li></ul></div>
+        <div class="cons"><h4>Contras</h4><ul><li>Migration script mais trabalhoso</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0f172a;padding:16px;border-radius:8px;font-size:11px;font-family:monospace;">
+      <div style="color:#f87171;margin-bottom:6px;">DROP das tabelas atuais</div>
+      <div style="background:#1e293b;border-radius:4px;padding:8px;margin-bottom:8px;">
+        <div style="color:#94a3b8;">↓ remove tabelas sem account_id</div>
+      </div>
+      <div style="color:#22d3ee;margin-bottom:4px;">CRIA schema novo limpo</div>
+      <div style="background:#1e293b;border-radius:4px;padding:8px;">
+        <div style="color:#86efac;">accounts (platform, credentials...)</div>
+        <div style="color:#94a3b8;">youtube_channel_snapshots (account_id, ...)</div>
+        <div style="color:#94a3b8;">youtube_video_snapshots (account_id, ...)</div>
+        <div style="color:#94a3b8;">instagram_profile_snapshots (account_id, ...)</div>
+        <div style="color:#94a3b8;">instagram_media_snapshots (account_id, ...)</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Schema limpo do zero</h3>
+      <p>Descarta as tabelas atuais e recria tudo com <code>account_id</code> desde o início. Schema mais limpo e consistente. Ideal se não há dados reais ainda.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Prós</h4><ul><li>Schema perfeito desde o início</li><li>Sem legado</li></ul></div>
+        <div class="cons"><h4>Contras</h4><ul><li>Perde dados existentes</li><li>Reescreve mais código</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0f172a;padding:16px;border-radius:8px;font-size:11px;font-family:monospace;">
+      <div style="background:#1e293b;border-radius:4px;padding:8px;margin-bottom:8px;">
+        <div style="color:#f59e0b;">youtube_igt_channel_snapshots</div>
+        <div style="color:#f59e0b;">youtube_igt_kids_channel_snapshots</div>
+        <div style="color:#94a3b8;margin-top:4px;">instagram_igt_profile_snapshots</div>
+        <div style="color:#94a3b8;">instagram_igt_kids_profile_snapshots</div>
+      </div>
+      <div style="color:#64748b;font-size:10px;">Uma tabela por conta, prefixada com o nome</div>
+    </div>
+    <div class="card-body">
+      <h3>C — Tabelas separadas por conta</h3>
+      <p>Cada conta gera seu próprio conjunto de tabelas no banco. Sem foreign keys, sem migrations complexas. Mas escala muito mal e é difícil de manter.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Prós</h4><ul><li>Zero conflito entre contas</li></ul></div>
+        <div class="cons"><h4>Contras</h4><ul><li>Não escala</li><li>Código duplicado</li><li>Difícil de manter</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+</div>

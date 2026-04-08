@@ -56,6 +56,8 @@ export async function GET(request: NextRequest) {
   const existingCreds = account.credentials as Partial<YouTubeCredentials>;
 
   try {
+    console.log("[youtube/callback] accountId from cookie:", accountId);
+
     // Exchange authorisation code for tokens
     const tokens = await exchangeCodeForTokens(
       code,
@@ -63,26 +65,40 @@ export async function GET(request: NextRequest) {
       existingCreds.client_secret!
     );
 
+    console.log("[youtube/callback] tokens received:", {
+      has_access_token: !!tokens.access_token,
+      has_refresh_token: !!tokens.refresh_token,
+      expires_in: tokens.expires_in,
+    });
+
     // Auto-detect channel_id using the fresh access_token
     const channelId = await detectChannelId(tokens.access_token);
+    console.log("[youtube/callback] channel detected:", channelId);
 
     const newExpiry = new Date(
       Date.now() + tokens.expires_in * 1000
     ).toISOString();
 
+    const newCredentials: YouTubeCredentials = {
+      ...existingCreds,
+      refresh_token: tokens.refresh_token,
+      access_token: tokens.access_token,
+      access_token_expiry: newExpiry,
+      channel_id: channelId,
+    } as YouTubeCredentials;
+
     // Persist all credentials
-    await supabase
+    const { error: updateError, count } = await supabase
       .from("dash_gestao_accounts")
-      .update({
-        credentials: {
-          ...existingCreds,
-          refresh_token: tokens.refresh_token,
-          access_token: tokens.access_token,
-          access_token_expiry: newExpiry,
-          channel_id: channelId,
-        } as YouTubeCredentials,
-      })
-      .eq("id", accountId);
+      .update({ credentials: newCredentials })
+      .eq("id", accountId)
+      .select();
+
+    console.log("[youtube/callback] update result:", { updateError, count });
+
+    if (updateError) {
+      throw new Error(`Falha ao salvar credenciais: ${updateError.message}`);
+    }
 
     const response = NextResponse.redirect(
       new URL(`${SETTINGS_URL}?connected=${encodeURIComponent(channelId)}`, request.url)
@@ -91,6 +107,7 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (err) {
     const msg = err instanceof Error ? err.message : "unknown_error";
+    console.error("[youtube/callback] error:", msg);
     return NextResponse.redirect(
       new URL(`${SETTINGS_URL}?error=${encodeURIComponent(msg)}`, request.url)
     );

@@ -1,0 +1,87 @@
+<h2>Design — Navegação e Layout</h2>
+<p class="subtitle">Como o dashboard vai ser organizado. Veja o mockup e me diz se faz sentido.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Dashboard — visão geral</div>
+  <div class="mockup-body" style="padding:0;">
+
+    <!-- Top nav -->
+    <div style="background:#0f172a;padding:12px 20px;display:flex;align-items:center;gap:24px;border-bottom:1px solid #1e293b;">
+      <span style="color:#f8fafc;font-weight:700;font-size:14px;">IGT Dashboard</span>
+      <div style="display:flex;gap:4px;margin-left:auto;">
+        <div style="background:#1d4ed8;color:#fff;padding:6px 16px;border-radius:6px;font-size:12px;font-weight:600;">▶ YouTube</div>
+        <div style="color:#94a3b8;padding:6px 16px;border-radius:6px;font-size:12px;">📷 Instagram</div>
+        <div style="color:#94a3b8;padding:6px 16px;border-radius:6px;font-size:12px;">⚙ Configurações</div>
+      </div>
+    </div>
+
+    <!-- Account sub-tabs -->
+    <div style="background:#0f172a;padding:8px 20px;display:flex;gap:8px;border-bottom:1px solid #1e293b;">
+      <div style="background:#1e3a8a;color:#93c5fd;padding:4px 14px;border-radius:20px;font-size:11px;font-weight:600;">IGT Principal</div>
+      <div style="color:#64748b;padding:4px 14px;border-radius:20px;font-size:11px;border:1px solid #1e293b;">IGT Kids</div>
+      <div style="color:#64748b;padding:4px 14px;border-radius:20px;font-size:11px;border:1px solid #1e293b;">+ conta</div>
+    </div>
+
+    <!-- KPIs -->
+    <div style="padding:20px;background:#020617;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
+        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;">
+          <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Inscritos</div>
+          <div style="color:#f8fafc;font-size:24px;font-weight:700;">124.3K</div>
+          <div style="color:#22c55e;font-size:11px;margin-top:4px;">▲ +2.1% vs mês anterior</div>
+        </div>
+        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;">
+          <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Views Totais</div>
+          <div style="color:#f8fafc;font-size:24px;font-weight:700;">8.2M</div>
+          <div style="color:#22c55e;font-size:11px;margin-top:4px;">▲ +5.4% vs mês anterior</div>
+        </div>
+        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;">
+          <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Vídeos</div>
+          <div style="color:#f8fafc;font-size:24px;font-weight:700;">342</div>
+          <div style="color:#64748b;font-size:11px;margin-top:4px;">— sem variação</div>
+        </div>
+      </div>
+      <!-- Chart placeholder -->
+      <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;height:80px;display:flex;align-items:center;justify-content:center;">
+        <span style="color:#1e293b;font-size:12px;">Gráfico de tendência — inscritos e views (30 dias)</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div style="margin-top:20px;" class="mockup">
+  <div class="mockup-header">Configurações — Gerenciar contas</div>
+  <div class="mockup-body" style="padding:16px;background:#020617;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <span style="color:#f8fafc;font-weight:600;font-size:13px;">Contas registradas</span>
+      <button class="mock-button" style="font-size:11px;padding:6px 12px;">+ Nova conta</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div style="background:#0f172a;border:1px solid #1e293b;border-radius:6px;padding:12px;display:flex;align-items:center;gap:12px;">
+        <div style="background:#dc2626;border-radius:4px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;">▶</div>
+        <div>
+          <div style="color:#f8fafc;font-size:12px;font-weight:600;">IGT Principal</div>
+          <div style="color:#64748b;font-size:10px;">YouTube · ativo</div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:8px;">
+          <span style="color:#22c55e;font-size:10px;">● ativo</span>
+          <span style="color:#64748b;font-size:10px;cursor:pointer;">editar</span>
+          <span style="color:#ef4444;font-size:10px;cursor:pointer;">remover</span>
+        </div>
+      </div>
+      <div style="background:#0f172a;border:1px solid #1e293b;border-radius:6px;padding:12px;display:flex;align-items:center;gap:12px;">
+        <div style="background:#e1306c;border-radius:4px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;">📷</div>
+        <div>
+          <div style="color:#f8fafc;font-size:12px;font-weight:600;">IGT Principal</div>
+          <div style="color:#64748b;font-size:10px;">Instagram · ativo</div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:8px;">
+          <span style="color:#22c55e;font-size:10px;">● ativo</span>
+          <span style="color:#64748b;font-size:10px;cursor:pointer;">editar</span>
+          <span style="color:#ef4444;font-size:10px;cursor:pointer;">remover</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -66,6 +66,13 @@ export async function detectChannelId(accessToken: string): Promise<string> {
 export async function getValidAccessToken(account: Account): Promise<string> {
   const creds = account.credentials as YouTubeCredentials;
 
+  if (!creds.refresh_token) {
+    throw new Error(
+      `Conta "${account.name}" não possui refresh_token. ` +
+      "Reconecte a conta via Configurações → Editar → Reconectar com Google."
+    );
+  }
+
   // Return current token if valid for at least 5 more minutes
   if (creds.access_token && creds.access_token_expiry) {
     const expiresAt = new Date(creds.access_token_expiry).getTime();

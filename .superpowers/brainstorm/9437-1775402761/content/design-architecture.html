@@ -1,0 +1,105 @@
+<h2>Design — Arquitetura e fluxo de dados</h2>
+<p class="subtitle">O que será criado, modificado e como tudo se conecta.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Fluxo de dados</div>
+  <div class="mockup-body" style="padding:16px;background:#020617;font-family:monospace;font-size:11px;">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <div style="background:#1e293b;border-radius:6px;padding:8px 12px;color:#f8fafc;">⏱ Cron Job</div>
+      <div style="color:#64748b;">→</div>
+      <div style="background:#1e3a8a;border-radius:6px;padding:8px 12px;color:#93c5fd;">Busca contas ativas<br><span style="color:#64748b;">accounts WHERE is_active</span></div>
+      <div style="color:#64748b;">→</div>
+      <div style="background:#1e3a8a;border-radius:6px;padding:8px 12px;color:#93c5fd;">Para cada conta:<br>collectYouTube(account)<br>collectInstagram(account)</div>
+      <div style="color:#64748b;">→</div>
+      <div style="background:#14532d;border-radius:6px;padding:8px 12px;color:#86efac;">Salva snapshot<br>no Supabase<br>com account_id</div>
+    </div>
+    <div style="height:1px;background:#1e293b;margin:16px 0;"></div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <div style="background:#1e293b;border-radius:6px;padding:8px 12px;color:#f8fafc;">🖥 Usuário abre dash</div>
+      <div style="color:#64748b;">→</div>
+      <div style="background:#3b1764;border-radius:6px;padding:8px 12px;color:#c4b5fd;">API Route<br>/api/accounts</div>
+      <div style="color:#64748b;">→</div>
+      <div style="background:#3b1764;border-radius:6px;padding:8px 12px;color:#c4b5fd;">API Route<br>/api/youtube/kpis?account_id=X</div>
+      <div style="color:#64748b;">→</div>
+      <div style="background:#1e293b;border-radius:6px;padding:8px 12px;color:#f8fafc;">Componentes<br>KpiCard + Chart + Table</div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:16px;" class="mockup">
+  <div class="mockup-header">Arquivos — O que muda</div>
+  <div class="mockup-body" style="padding:16px;background:#020617;font-size:11px;font-family:monospace;">
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+      <div>
+        <div style="color:#f87171;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">🗑 Removidos / substituídos</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div style="color:#64748b;">supabase/migrations/001_create_tables.sql</div>
+          <div style="color:#64748b;">src/app/dashboard/page.tsx</div>
+          <div style="color:#64748b;">src/app/dashboard/youtube/page.tsx</div>
+          <div style="color:#64748b;">src/app/dashboard/instagram/page.tsx</div>
+          <div style="color:#64748b;">src/app/api/cron/youtube/route.ts</div>
+          <div style="color:#64748b;">src/app/api/cron/instagram/route.ts</div>
+          <div style="color:#64748b;">src/app/api/youtube/*.ts</div>
+          <div style="color:#64748b;">src/app/api/instagram/*.ts</div>
+          <div style="color:#64748b;">src/lib/services/youtube.ts</div>
+          <div style="color:#64748b;">src/lib/services/instagram.ts</div>
+          <div style="color:#64748b;">src/components/dashboard/*.tsx</div>
+        </div>
+      </div>
+
+      <div>
+        <div style="color:#22d3ee;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">✨ Novos arquivos</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div style="color:#86efac;">supabase/migrations/002_multi_account.sql</div>
+          <div style="color:#86efac;">src/app/api/accounts/route.ts <span style="color:#64748b;">(CRUD)</span></div>
+          <div style="color:#86efac;">src/app/api/accounts/[id]/route.ts</div>
+          <div style="color:#86efac;">src/app/dashboard/youtube/page.tsx</div>
+          <div style="color:#86efac;">src/app/dashboard/instagram/page.tsx</div>
+          <div style="color:#86efac;">src/app/dashboard/settings/page.tsx</div>
+          <div style="color:#86efac;">src/components/dashboard/account-tabs.tsx</div>
+          <div style="color:#86efac;">src/components/dashboard/section-tabs.tsx</div>
+          <div style="color:#86efac;">src/components/settings/account-form.tsx</div>
+          <div style="color:#86efac;">src/components/settings/account-list.tsx</div>
+          <div style="color:#86efac;">src/lib/services/youtube.ts <span style="color:#64748b;">(reescrito)</span></div>
+          <div style="color:#86efac;">src/lib/services/instagram.ts <span style="color:#64748b;">(reescrito)</span></div>
+          <div style="color:#86efac;">src/types/accounts.ts</div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<div style="margin-top:16px;" class="mockup">
+  <div class="mockup-header">Configurações — tela de gerenciamento de conta (modal)</div>
+  <div class="mockup-body" style="padding:16px;background:#020617;font-size:11px;font-family:monospace;">
+    <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:16px;max-width:340px;margin:0 auto;">
+      <div style="color:#f8fafc;font-weight:600;font-size:13px;margin-bottom:12px;">Nova conta — YouTube</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div>
+          <div style="color:#64748b;font-size:10px;margin-bottom:3px;">NOME DA CONTA</div>
+          <input class="mock-input" placeholder="Ex: IGT Principal" style="width:100%;box-sizing:border-box;">
+        </div>
+        <div>
+          <div style="color:#64748b;font-size:10px;margin-bottom:3px;">PLATAFORMA</div>
+          <div style="background:#1e293b;border-radius:4px;padding:6px 10px;color:#94a3b8;">YouTube ▾</div>
+        </div>
+        <div>
+          <div style="color:#64748b;font-size:10px;margin-bottom:3px;">YOUTUBE API KEY</div>
+          <input class="mock-input" placeholder="AIza..." style="width:100%;box-sizing:border-box;">
+        </div>
+        <div>
+          <div style="color:#64748b;font-size:10px;margin-bottom:3px;">CHANNEL ID</div>
+          <input class="mock-input" placeholder="UCxx..." style="width:100%;box-sizing:border-box;">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:4px;">
+          <button class="mock-button" style="flex:1;">Salvar conta</button>
+          <button style="flex:1;background:#1e293b;border:none;border-radius:4px;padding:6px;color:#94a3b8;cursor:pointer;">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

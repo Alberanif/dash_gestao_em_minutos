@@ -1,0 +1,89 @@
+<h2>Como o dashboard deve organizar múltiplas contas?</h2>
+<p class="subtitle">O projeto já tem coleta de dados para YouTube e Instagram. Agora precisamos suportar várias contas por plataforma. Como você quer navegar entre elas?</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0f172a;padding:16px;border-radius:8px;font-family:monospace;font-size:12px;">
+      <div style="background:#1e293b;border-radius:6px;padding:12px 16px;display:flex;gap:16px;align-items:center;margin-bottom:12px;">
+        <span style="color:#94a3b8;">▤</span>
+        <span style="color:#f8fafc;font-weight:600;">Dashboard</span>
+        <span style="color:#94a3b8;margin-left:auto;">▼ IGT Principal</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div style="background:#1e293b;border-radius:6px;padding:10px;">
+          <div style="color:#f59e0b;font-size:10px;margin-bottom:4px;">▶ YOUTUBE</div>
+          <div style="color:#f8fafc;font-size:14px;font-weight:700;">124K</div>
+          <div style="color:#94a3b8;font-size:10px;">inscritos</div>
+        </div>
+        <div style="background:#1e293b;border-radius:6px;padding:10px;">
+          <div style="color:#e1306c;font-size:10px;margin-bottom:4px;">📷 INSTAGRAM</div>
+          <div style="color:#f8fafc;font-size:14px;font-weight:700;">89K</div>
+          <div style="color:#94a3b8;font-size:10px;">seguidores</div>
+        </div>
+      </div>
+      <div style="color:#64748b;font-size:10px;margin-top:8px;text-align:center;">Troca de conta via dropdown no topo</div>
+    </div>
+    <div class="card-body">
+      <h3>A — Dropdown de conta global</h3>
+      <p>Uma conta ativa por vez, selecionada no topo do dashboard. Todos os KPIs e gráficos se atualizam para a conta selecionada. Simples e focado.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0f172a;padding:16px;border-radius:8px;font-family:monospace;font-size:12px;">
+      <div style="background:#1e293b;border-radius:6px;padding:8px 12px;margin-bottom:8px;">
+        <span style="color:#f8fafc;font-weight:600;">Plataformas</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <div style="background:#1d4ed8;border-radius:4px;padding:4px 10px;color:#fff;font-size:11px;">YouTube ▾</div>
+        <div style="background:#1e293b;border-radius:4px;padding:4px 10px;color:#94a3b8;font-size:11px;">Instagram ▾</div>
+      </div>
+      <div style="background:#1e293b;border-radius:6px;padding:8px;">
+        <div style="color:#94a3b8;font-size:10px;margin-bottom:6px;">Contas YouTube</div>
+        <div style="display:flex;gap:6px;">
+          <div style="background:#0f172a;border-radius:4px;padding:4px 8px;color:#f8fafc;font-size:10px;border:1px solid #1d4ed8;">IGT Principal</div>
+          <div style="background:#0f172a;border-radius:4px;padding:4px 8px;color:#94a3b8;font-size:10px;">IGT Kids</div>
+          <div style="background:#0f172a;border-radius:4px;padding:4px 8px;color:#94a3b8;font-size:10px;">+ Adicionar</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Tabs por plataforma + sub-tabs por conta</h3>
+      <p>Navegação em dois níveis: primeiro escolhe a plataforma (YouTube / Instagram), depois a conta dentro dessa plataforma. Organizado por canal.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0f172a;padding:16px;border-radius:8px;font-family:monospace;font-size:12px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div style="background:#1e293b;border-radius:6px;padding:10px;">
+          <div style="color:#f59e0b;font-size:9px;margin-bottom:2px;">▶ YOUTUBE · IGT Principal</div>
+          <div style="color:#f8fafc;font-size:13px;font-weight:700;">124K</div>
+          <div style="color:#64748b;font-size:9px;">inscritos</div>
+        </div>
+        <div style="background:#1e293b;border-radius:6px;padding:10px;">
+          <div style="color:#f59e0b;font-size:9px;margin-bottom:2px;">▶ YOUTUBE · IGT Kids</div>
+          <div style="color:#f8fafc;font-size:13px;font-weight:700;">41K</div>
+          <div style="color:#64748b;font-size:9px;">inscritos</div>
+        </div>
+        <div style="background:#1e293b;border-radius:6px;padding:10px;">
+          <div style="color:#e1306c;font-size:9px;margin-bottom:2px;">📷 INSTAGRAM · IGT</div>
+          <div style="color:#f8fafc;font-size:13px;font-weight:700;">89K</div>
+          <div style="color:#64748b;font-size:9px;">seguidores</div>
+        </div>
+        <div style="background:#1e293b;border-radius:6px;padding:10px;">
+          <div style="color:#e1306c;font-size:9px;margin-bottom:2px;">📷 INSTAGRAM · IGT Kids</div>
+          <div style="color:#f8fafc;font-size:13px;font-weight:700;">22K</div>
+          <div style="color:#64748b;font-size:9px;">seguidores</div>
+        </div>
+      </div>
+      <div style="color:#64748b;font-size:10px;text-align:center;">Overview com todas as contas visíveis simultaneamente</div>
+    </div>
+    <div class="card-body">
+      <h3>C — Overview consolidado (todas as contas juntas)</h3>
+      <p>Página inicial mostra todos os KPIs de todas as contas de todas as plataformas de uma vez. Clica em qualquer card para ver o detalhe daquela conta.</p>
+    </div>
+  </div>
+
+</div>

@@ -1,0 +1,106 @@
+<h2>Design — Banco de dados (novo schema)</h2>
+<p class="subtitle">Schema limpo com suporte nativo a múltiplas contas desde o início.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Tabelas do Supabase</div>
+  <div class="mockup-body" style="padding:16px;background:#020617;font-family:monospace;font-size:12px;">
+
+    <div style="margin-bottom:16px;">
+      <div style="color:#22d3ee;font-weight:700;margin-bottom:6px;">accounts <span style="color:#64748b;font-weight:400;font-size:10px;">— nova tabela central</span></div>
+      <div style="background:#0f172a;border:1px solid #1e293b;border-radius:6px;padding:10px;display:grid;grid-template-columns:160px 1fr;gap:4px;">
+        <span style="color:#86efac;">id</span><span style="color:#94a3b8;">uuid PRIMARY KEY</span>
+        <span style="color:#86efac;">platform</span><span style="color:#94a3b8;">text — 'youtube' | 'instagram'</span>
+        <span style="color:#86efac;">name</span><span style="color:#94a3b8;">text — nome amigável (ex: "IGT Principal")</span>
+        <span style="color:#86efac;">credentials</span><span style="color:#94a3b8;">jsonb — tokens e IDs da API</span>
+        <span style="color:#86efac;">is_active</span><span style="color:#94a3b8;">boolean DEFAULT true</span>
+        <span style="color:#86efac;">created_at</span><span style="color:#94a3b8;">timestamptz DEFAULT now()</span>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+      <div>
+        <div style="color:#f59e0b;font-weight:700;margin-bottom:6px;">youtube_channel_snapshots</div>
+        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:6px;padding:10px;display:grid;grid-template-columns:140px 1fr;gap:3px;">
+          <span style="color:#86efac;">id</span><span style="color:#94a3b8;">uuid PK</span>
+          <span style="color:#f87171;">account_id</span><span style="color:#94a3b8;">uuid FK → accounts</span>
+          <span style="color:#86efac;">subscriber_count</span><span style="color:#94a3b8;">bigint</span>
+          <span style="color:#86efac;">view_count</span><span style="color:#94a3b8;">bigint</span>
+          <span style="color:#86efac;">video_count</span><span style="color:#94a3b8;">integer</span>
+          <span style="color:#86efac;">collected_at</span><span style="color:#94a3b8;">timestamptz</span>
+        </div>
+      </div>
+      <div>
+        <div style="color:#f59e0b;font-weight:700;margin-bottom:6px;">youtube_video_snapshots</div>
+        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:6px;padding:10px;display:grid;grid-template-columns:140px 1fr;gap:3px;">
+          <span style="color:#86efac;">id</span><span style="color:#94a3b8;">uuid PK</span>
+          <span style="color:#f87171;">account_id</span><span style="color:#94a3b8;">uuid FK → accounts</span>
+          <span style="color:#86efac;">video_id</span><span style="color:#94a3b8;">text</span>
+          <span style="color:#86efac;">title</span><span style="color:#94a3b8;">text</span>
+          <span style="color:#86efac;">view_count</span><span style="color:#94a3b8;">bigint</span>
+          <span style="color:#86efac;">like_count / comment_count</span><span style="color:#94a3b8;">integer</span>
+          <span style="color:#86efac;">collected_at</span><span style="color:#94a3b8;">timestamptz</span>
+        </div>
+      </div>
+      <div>
+        <div style="color:#e1306c;font-weight:700;margin-bottom:6px;">instagram_profile_snapshots</div>
+        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:6px;padding:10px;display:grid;grid-template-columns:140px 1fr;gap:3px;">
+          <span style="color:#86efac;">id</span><span style="color:#94a3b8;">uuid PK</span>
+          <span style="color:#f87171;">account_id</span><span style="color:#94a3b8;">uuid FK → accounts</span>
+          <span style="color:#86efac;">followers_count</span><span style="color:#94a3b8;">integer</span>
+          <span style="color:#86efac;">follows_count</span><span style="color:#94a3b8;">integer</span>
+          <span style="color:#86efac;">media_count</span><span style="color:#94a3b8;">integer</span>
+          <span style="color:#86efac;">impressions / reach</span><span style="color:#94a3b8;">integer</span>
+          <span style="color:#86efac;">collected_at</span><span style="color:#94a3b8;">timestamptz</span>
+        </div>
+      </div>
+      <div>
+        <div style="color:#e1306c;font-weight:700;margin-bottom:6px;">instagram_media_snapshots</div>
+        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:6px;padding:10px;display:grid;grid-template-columns:140px 1fr;gap:3px;">
+          <span style="color:#86efac;">id</span><span style="color:#94a3b8;">uuid PK</span>
+          <span style="color:#f87171;">account_id</span><span style="color:#94a3b8;">uuid FK → accounts</span>
+          <span style="color:#86efac;">media_id</span><span style="color:#94a3b8;">text</span>
+          <span style="color:#86efac;">media_type</span><span style="color:#94a3b8;">text</span>
+          <span style="color:#86efac;">like_count / reach / plays</span><span style="color:#94a3b8;">integer</span>
+          <span style="color:#86efac;">collected_at</span><span style="color:#94a3b8;">timestamptz</span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div style="color:#94a3b8;font-weight:700;margin-bottom:6px;">cron_logs <span style="color:#64748b;font-weight:400;font-size:10px;">— atualizada</span></div>
+      <div style="background:#0f172a;border:1px solid #1e293b;border-radius:6px;padding:10px;display:grid;grid-template-columns:160px 1fr;gap:3px;">
+        <span style="color:#f87171;">account_id</span><span style="color:#94a3b8;">uuid FK → accounts (nullable)</span>
+        <span style="color:#86efac;">job_name / status</span><span style="color:#94a3b8;">text</span>
+        <span style="color:#86efac;">records_collected</span><span style="color:#94a3b8;">integer</span>
+        <span style="color:#86efac;">started_at / finished_at</span><span style="color:#94a3b8;">timestamptz</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div style="margin-top:16px;background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:16px;font-size:12px;">
+  <div style="color:#f8fafc;font-weight:600;margin-bottom:8px;">Exemplo de credentials (jsonb) por plataforma</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-family:monospace;">
+    <div>
+      <div style="color:#f59e0b;margin-bottom:4px;">YouTube</div>
+      <div style="background:#020617;border-radius:4px;padding:8px;color:#94a3b8;">
+        {<br>
+        &nbsp;&nbsp;"api_key": "AIza...",<br>
+        &nbsp;&nbsp;"channel_id": "UCxx..."<br>
+        }
+      </div>
+    </div>
+    <div>
+      <div style="color:#e1306c;margin-bottom:4px;">Instagram</div>
+      <div style="background:#020617;border-radius:4px;padding:8px;color:#94a3b8;">
+        {<br>
+        &nbsp;&nbsp;"access_token": "EAAx...",<br>
+        &nbsp;&nbsp;"user_id": "1234..."<br>
+        }
+      </div>
+    </div>
+  </div>
+</div>
+
+<p style="color:#64748b;font-size:12px;margin-top:12px;text-align:center;">Esse schema faz sentido? Algum campo faltando?</p>

@@ -1,0 +1,74 @@
+<h2>Design — Fluxo de dados (atualizado)</h2>
+<p class="subtitle">O cron lê apenas contas já cadastradas. Não cria, não descobre contas novas.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Fluxo de coleta — Cron Job</div>
+  <div class="mockup-body" style="padding:20px;background:#020617;font-family:monospace;font-size:11px;">
+
+    <div style="display:flex;flex-direction:column;gap:12px;">
+
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="background:#1e293b;border-radius:6px;padding:10px 14px;color:#f8fafc;min-width:120px;text-align:center;">⏱ Cron dispara<br><span style="color:#64748b;font-size:10px;">POST /api/cron/collect</span></div>
+        <div style="color:#64748b;font-size:16px;">→</div>
+        <div style="background:#1e3a8a;border-radius:6px;padding:10px 14px;color:#93c5fd;flex:1;">
+          Lê contas já cadastradas<br>
+          <span style="color:#64748b;">SELECT * FROM accounts WHERE is_active = true</span><br>
+          <span style="color:#f87171;font-size:10px;">⚠ Não descobre nem cria contas novas</span>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;padding-left:50px;">
+        <div style="width:2px;background:#1e293b;margin-left:59px;"></div>
+      </div>
+
+      <div style="display:flex;gap:12px;padding-left:0;">
+        <div style="flex:1;background:#172554;border-radius:6px;padding:10px 14px;border:1px solid #1e3a8a;">
+          <div style="color:#f59e0b;margin-bottom:6px;">Para conta YouTube:</div>
+          <div style="color:#94a3b8;">collectYouTube(account.credentials)</div>
+          <div style="color:#64748b;font-size:10px;margin-top:4px;">→ usa api_key + channel_id das credentials</div>
+        </div>
+        <div style="flex:1;background:#2d1b4e;border-radius:6px;padding:10px 14px;border:1px solid #4c1d95;">
+          <div style="color:#e1306c;margin-bottom:6px;">Para conta Instagram:</div>
+          <div style="color:#94a3b8;">collectInstagram(account.credentials)</div>
+          <div style="color:#64748b;font-size:10px;margin-top:4px;">→ usa access_token + user_id das credentials</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="flex:1;background:#14532d;border-radius:6px;padding:10px 14px;color:#86efac;text-align:center;">
+          Salva snapshot no Supabase<br>
+          <span style="color:#64748b;">INSERT com account_id + collected_at</span>
+        </div>
+        <div style="color:#64748b;font-size:16px;">→</div>
+        <div style="background:#1e293b;border-radius:6px;padding:10px 14px;color:#94a3b8;min-width:120px;text-align:center;">
+          Registra em<br>cron_logs
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<div style="margin-top:16px;background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:14px;font-size:12px;">
+  <div style="color:#f8fafc;font-weight:600;margin-bottom:8px;">Responsabilidades separadas</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+    <div>
+      <div style="color:#22c55e;margin-bottom:4px;">✅ Cron faz</div>
+      <ul style="color:#94a3b8;margin:0;padding-left:16px;display:flex;flex-direction:column;gap:3px;">
+        <li>Lê contas ativas do banco</li>
+        <li>Coleta dados de cada conta via API</li>
+        <li>Persiste snapshots com account_id</li>
+        <li>Registra log de execução</li>
+      </ul>
+    </div>
+    <div>
+      <div style="color:#f87171;margin-bottom:4px;">❌ Cron NÃO faz</div>
+      <ul style="color:#94a3b8;margin:0;padding-left:16px;display:flex;flex-direction:column;gap:3px;">
+        <li>Descobrir novas contas</li>
+        <li>Criar ou editar contas</li>
+        <li>Validar tokens</li>
+      </ul>
+    </div>
+  </div>
+</div>
