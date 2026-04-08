@@ -4,14 +4,14 @@ import type { Account, YouTubeCredentials } from "@/types/accounts";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 
-export function buildOAuthUrl(accountId: string, state: string): string {
+export function buildOAuthUrl(accountId: string, state: string, clientId: string): string {
   const scopes = [
     "https://www.googleapis.com/auth/yt-analytics.readonly",
     "https://www.googleapis.com/auth/youtube.readonly",
   ].join(" ");
 
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
-  url.searchParams.set("client_id", process.env.GOOGLE_CLIENT_ID!);
+  url.searchParams.set("client_id", clientId);
   url.searchParams.set(
     "redirect_uri",
     `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/youtube/callback`

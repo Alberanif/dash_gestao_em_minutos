@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   const supabase = createSupabaseServiceClient();
   const { data: account } = await supabase
     .from("dash_gestao_accounts")
-    .select("id, platform")
+    .select("id, platform, credentials")
     .eq("id", accountId)
     .eq("platform", "youtube")
     .maybeSingle();
@@ -30,12 +30,20 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const clientId = (account.credentials as { client_id?: string }).client_id;
+  if (!clientId) {
+    return NextResponse.json(
+      { error: "client_id não configurado na conta. Edite a conta e salve o Google Client ID primeiro." },
+      { status: 400 }
+    );
+  }
+
   // Generate HMAC state for CSRF protection (reuses CRON_SECRET as signing key)
   const state = createHmac("sha256", process.env.CRON_SECRET!)
     .update(accountId)
     .digest("hex");
 
-  const oauthUrl = buildOAuthUrl(accountId, state);
+  const oauthUrl = buildOAuthUrl(accountId, state, clientId);
 
   // Store account_id in a short-lived httpOnly cookie for the callback
   const response = NextResponse.redirect(oauthUrl);
