@@ -1,7 +1,8 @@
-// src/app/dashboard/youtube/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
+import { PageHeader } from "@/components/layout/page-header";
+import { DateRangeControls } from "@/components/layout/date-range-controls";
 import { AccountTabs } from "@/components/dashboard/account-tabs";
 import { SectionTabs } from "@/components/dashboard/section-tabs";
 import { KpiCard } from "@/components/ui/kpi-card";
@@ -45,41 +46,35 @@ function formatCompact(n: number): string {
   return Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 }).format(n);
 }
 
-// SVG icons (unchanged from original)
 const IconUsers = (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
     <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </svg>
 );
 const IconEye = (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
   </svg>
 );
 const IconVideo = (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
   </svg>
 );
 const IconThumbUp = (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3z" />
     <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
   </svg>
 );
-const IconActivity = (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-  </svg>
-);
 const IconClock = (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
   </svg>
 );
 const IconTrendingUp = (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" />
   </svg>
 );
@@ -87,6 +82,14 @@ const IconTrendingUp = (
 interface ChannelStats {
   subscriber_count: number;
   video_count: number;
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="surface-card rounded-[var(--radius-card)] p-8 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>
+      {message}
+    </div>
+  );
 }
 
 export default function YouTubePage() {
@@ -97,7 +100,6 @@ export default function YouTubePage() {
   const [channelStats, setChannelStats] = useState<ChannelStats | null>(null);
   const [videos, setVideos] = useState<VideoAggregated[]>([]);
   const [loading, setLoading] = useState(false);
-
   const [startDate, setStartDate] = useState(daysAgo(30));
   const [endDate, setEndDate] = useState(today());
   const [appliedStart, setAppliedStart] = useState(daysAgo(30));
@@ -119,45 +121,44 @@ export default function YouTubePage() {
 
   useEffect(() => {
     if (!selectedId) return;
-    setLoading(true);
-    setChannelData([]);
-    setChannelStats(null);
-    setVideos([]);
+    async function loadChannel() {
+      setLoading(true);
+      setChannelData([]);
+      setChannelStats(null);
+      setVideos([]);
 
-    const params = new URLSearchParams({
-      account_id: selectedId,
-      start_date: appliedStart,
-      end_date: appliedEnd,
-    });
+      const params = new URLSearchParams({
+        account_id: selectedId,
+        start_date: appliedStart,
+        end_date: appliedEnd,
+      });
 
-    Promise.all([
-      fetch(`/api/youtube/channel?${params}`).then((r) => r.json()),
-      fetch(`/api/youtube/stats?account_id=${selectedId}`).then((r) => r.json()),
-      fetch(`/api/youtube/videos?${params}`).then((r) => r.json()),
-    ])
-      .then(([daily, stats, vids]) => {
+      try {
+        const [daily, stats, vids] = await Promise.all([
+          fetch(`/api/youtube/channel?${params}`).then((r) => r.json()),
+          fetch(`/api/youtube/stats?account_id=${selectedId}`).then((r) => r.json()),
+          fetch(`/api/youtube/videos?${params}`).then((r) => r.json()),
+        ]);
         setChannelData(Array.isArray(daily) ? daily : []);
         setChannelStats(stats?.subscriber_count != null ? stats : null);
         setVideos(Array.isArray(vids) ? vids : []);
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    void loadChannel();
   }, [selectedId, appliedStart, appliedEnd]);
 
-  // Aggregate period metrics from daily rows
   const periodViews = channelData.reduce((s, d) => s + d.views, 0);
   const periodWatchMin = channelData.reduce((s, d) => s + d.estimated_minutes_watched, 0);
-  const netSubsChange = channelData.reduce(
-    (s, d) => s + d.subscribers_gained - d.subscribers_lost,
-    0
-  );
-  const avgRetention =
-    channelData.length > 0
-      ? channelData.reduce((s, d) => s + d.average_view_percentage, 0) / channelData.length
-      : 0;
-  const avgViewDuration =
-    channelData.length > 0
-      ? channelData.reduce((s, d) => s + d.average_view_duration, 0) / channelData.length
-      : 0;
+  const netSubsChange = channelData.reduce((s, d) => s + d.subscribers_gained - d.subscribers_lost, 0);
+  const avgRetention = channelData.length > 0
+    ? channelData.reduce((s, d) => s + d.average_view_percentage, 0) / channelData.length
+    : 0;
+  const avgViewDuration = channelData.length > 0
+    ? channelData.reduce((s, d) => s + d.average_view_duration, 0) / channelData.length
+    : 0;
 
   function exportCsv() {
     const headers = "Titulo,Views,RetencaoMedia%,DuracaoMediaVis,WatchMin,Likes,Comentarios,Publicado\n";
@@ -186,8 +187,8 @@ export default function YouTubePage() {
 
   if (accounts.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-64" style={{ color: "var(--color-text-muted)" }}>
-        <p className="text-lg mb-2">Nenhuma conta YouTube cadastrada</p>
+      <div className="flex h-64 flex-col items-center justify-center" style={{ color: "var(--color-text-muted)" }}>
+        <p className="mb-2 text-lg">Nenhuma conta YouTube cadastrada</p>
         <a href="/dashboard/settings" style={{ color: "var(--color-primary)" }} className="text-sm hover:underline">
           Cadastrar conta em Configurações →
         </a>
@@ -195,16 +196,9 @@ export default function YouTubePage() {
     );
   }
 
-  return (
-    <div>
-      {/* Header */}
-      <div className="px-8 pt-8 pb-4" style={{ borderBottom: "1px solid var(--color-border)" }}>
-        <h1 className="text-xl font-bold mb-1" style={{ color: "var(--color-text)" }}>YouTube</h1>
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Métricas e desempenho do canal</p>
-      </div>
-
-      {/* Account tabs */}
-      <div className="px-8 pt-4">
+  const headerActions = (
+    <div className="flex w-full flex-col gap-3 xl:w-auto xl:flex-row xl:flex-nowrap xl:items-center xl:justify-end">
+      <div className="min-w-[220px]">
         <AccountTabs
           accounts={accounts}
           selectedId={selectedId}
@@ -214,233 +208,109 @@ export default function YouTubePage() {
           }}
         />
       </div>
+      <DateRangeControls
+        startDate={startDate}
+        endDate={endDate}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+        onApply={applyDateFilter}
+      />
+    </div>
+  );
 
-      {/* Date range filter */}
-      <div className="px-8 pt-4 flex items-center gap-3 flex-wrap">
-        <span className="text-sm" style={{ color: "var(--color-text-muted)" }}>De:</span>
-        <input
-          type="date"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-          className="border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <span className="text-sm" style={{ color: "var(--color-text-muted)" }}>Até:</span>
-        <input
-          type="date"
-          value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
-          className="border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <button
-          onClick={applyDateFilter}
-          className="px-4 py-1.5 rounded-md text-sm font-medium text-white"
-          style={{ background: "var(--color-primary)" }}
-        >
-          Aplicar
-        </button>
-      </div>
+  return (
+    <div className="min-h-full">
+      <PageHeader title="YouTube" subtitle="Análise de canal" actions={headerActions} />
 
-      {/* Section tabs */}
-      <div className="px-8 pt-4">
+      <div style={{ padding: "24px" }}>
         <SectionTabs sections={SECTIONS} selected={selectedSection} onSelect={setSelectedSection} />
-      </div>
 
-      <div className="px-8 py-6 space-y-6">
-        {/* === VISÃO GERAL === */}
-        {selectedSection === "Visão Geral" && (
-          <>
-            {loading ? (
+        <div className="mt-6 space-y-6">
+          {selectedSection === "Visão Geral" ? (
+            loading ? (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <SkeletonCard /><SkeletonCard /><SkeletonCard />
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
                 </div>
                 <SkeletonChart />
               </>
             ) : (
               <>
-                {/* Primary KPIs */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <KpiCard
-                    title="Inscritos (Total)"
-                    value={channelStats?.subscriber_count ?? 0}
-                    format="compact"
-                    icon={IconUsers}
-                    accentColor="#2563EB"
-                  />
-                  <KpiCard
-                    title="Views no Período"
-                    value={periodViews}
-                    format="compact"
-                    icon={IconEye}
-                    accentColor="#7C3AED"
-                    sparklineData={channelData.map((d) => d.views)}
-                  />
-                  <KpiCard
-                    title="Watch Time (min)"
-                    value={formatCompact(periodWatchMin)}
-                    icon={IconVideo}
-                    accentColor="#0EA5E9"
-                    sparklineData={channelData.map((d) => d.estimated_minutes_watched)}
-                  />
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <KpiCard title="Inscritos" value={channelStats?.subscriber_count ?? 0} format="compact" icon={IconUsers} sparklineData={channelData.map((d) => d.subscribers_gained - d.subscribers_lost)} />
+                  <KpiCard title="Views no período" value={periodViews} format="compact" icon={IconEye} sparklineData={channelData.map((d) => d.views)} />
+                  <KpiCard title="Watch time (min)" value={formatCompact(periodWatchMin)} icon={IconVideo} sparklineData={channelData.map((d) => d.estimated_minutes_watched)} />
+                  <KpiCard title="Vídeos publicados" value={channelStats?.video_count ?? 0} icon={IconVideo} />
                 </div>
 
-                {/* Secondary KPIs */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <KpiCard
-                    title="Retenção Média"
-                    value={`${avgRetention.toFixed(2)}%`}
-                    icon={IconThumbUp}
-                    accentColor="#16A34A"
-                  />
-                  <KpiCard
-                    title="Duração Média Vis."
-                    value={formatSeconds(avgViewDuration)}
-                    icon={IconClock}
-                    accentColor="#0EA5E9"
-                  />
-                  <KpiCard
-                    title="Inscritos Ganhos"
-                    value={netSubsChange >= 0 ? `+${formatCompact(netSubsChange)}` : formatCompact(netSubsChange)}
-                    icon={IconTrendingUp}
-                    accentColor={netSubsChange >= 0 ? "#16A34A" : "#DC2626"}
-                  />
-                  <KpiCard
-                    title="Vídeos Publicados"
-                    value={channelStats?.video_count ?? 0}
-                    icon={IconVideo}
-                    accentColor="#D97706"
-                  />
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <KpiCard title="Retenção média" value={`${avgRetention.toFixed(2)}%`} icon={IconThumbUp} />
+                  <KpiCard title="Duração média" value={formatSeconds(avgViewDuration)} icon={IconClock} />
+                  <KpiCard title="Saldo de inscritos" value={netSubsChange >= 0 ? `+${formatCompact(netSubsChange)}` : formatCompact(netSubsChange)} previousValue={0} currentValue={0} icon={IconTrendingUp} accentColor={netSubsChange >= 0 ? "#16A34A" : "#DC2626"} />
+                  <KpiCard title="Dias com coleta" value={channelData.length} icon={IconClock} />
                 </div>
 
-                {/* Chart */}
                 {channelData.length > 1 ? (
                   <LineChart
                     data={channelData}
                     xKey="date"
                     lines={[
-                      { key: "views", color: "#2563EB", label: "Views" },
-                      { key: "estimated_minutes_watched", color: "#7C3AED", label: "Watch Time (min)" },
+                      { key: "views", color: "var(--color-primary)", label: "Views" },
+                      { key: "estimated_minutes_watched", color: "#F5A623", label: "Watch Time (min)" },
                     ]}
-                    height={280}
-                    title="Evolução Diária do Canal"
-                    subtitle="Views e watch time no período selecionado"
-                    hideRangeSelector={true}
+                    height={320}
+                    title="Evolução diária do canal"
+                    subtitle="Performance consolidada do período selecionado"
+                    hideRangeSelector
                   />
                 ) : (
-                  <div
-                    className="rounded-[10px] p-8 text-center text-sm"
-                    style={{ border: "1px solid var(--color-border)", color: "var(--color-text-muted)", background: "white" }}
-                  >
-                    Sem dados para o período. Execute a sincronização no painel Dados.
-                  </div>
+                  <EmptyState message="Sem dados para o período. Execute a sincronização no painel Dados." />
                 )}
               </>
-            )}
-          </>
-        )}
-
-        {/* === VÍDEOS === */}
-        {selectedSection === "Vídeos" && (
-          <>
-            {loading ? (
-              <SkeletonTable />
-            ) : (
-              <DataTable<VideoAggregated>
-                data={videos}
-                columns={[
-                  {
-                    key: "title",
-                    label: "Título",
-                    render: (_, row) => (
-                      <div className="flex items-center gap-3 min-w-[220px]">
-                        {row.thumbnail_url && (
-                          <img
-                            src={row.thumbnail_url as string}
-                            alt=""
-                            className="rounded flex-shrink-0 object-cover"
-                            style={{ width: 72, height: 40 }}
-                            loading="lazy"
-                          />
-                        )}
-                        <span className="text-sm font-medium line-clamp-2" style={{ color: "var(--color-text)" }}>
-                          {row.title as string}
-                        </span>
-                      </div>
-                    ),
-                  },
-                  {
-                    key: "total_views",
-                    label: "Views",
-                    render: (v) => (
-                      <span className="text-sm font-medium tabular-nums">
-                        {formatCompact(v as number)}
-                      </span>
-                    ),
-                  },
-                  {
-                    key: "avg_view_percentage",
-                    label: "Retenção",
-                    render: (v) => (
-                      <span className="text-sm tabular-nums font-medium" style={{ color: "var(--color-text)" }}>
-                        {(v as number).toFixed(1)}%
-                      </span>
-                    ),
-                  },
-                  {
-                    key: "avg_view_duration",
-                    label: "Duração Média Vis.",
-                    render: (v) => (
-                      <span className="text-sm font-mono tabular-nums">
-                        {formatSeconds(v as number)}
-                      </span>
-                    ),
-                  },
-                  {
-                    key: "total_watch_min",
-                    label: "Watch Time (min)",
-                    render: (v) => (
-                      <span className="text-sm tabular-nums" style={{ color: "var(--color-text-muted)" }}>
-                        {formatCompact(v as number)}
-                      </span>
-                    ),
-                  },
-                  {
-                    key: "total_likes",
-                    label: "Likes",
-                    render: (v) => (
-                      <span className="text-sm tabular-nums" style={{ color: "var(--color-text-muted)" }}>
-                        {formatCompact(v as number)}
-                      </span>
-                    ),
-                  },
-                  {
-                    key: "duration",
-                    label: "Duração",
-                    render: (v) => (
-                      <span className="text-sm font-mono tabular-nums">
-                        {parseIsoDuration(v as string)}
-                      </span>
-                    ),
-                  },
-                  {
-                    key: "published_at",
-                    label: "Publicado",
-                    render: (v) =>
-                      v ? (
-                        <span className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-                          {new Date(v as string).toLocaleDateString("pt-BR")}
-                        </span>
-                      ) : "—",
-                  },
-                ]}
-                onExportCsv={exportCsv}
-              />
-            )}
-          </>
-        )}
+            )
+          ) : loading ? (
+            <SkeletonTable />
+          ) : (
+            <DataTable<VideoAggregated>
+              data={videos}
+              columns={[
+                {
+                  key: "title",
+                  label: "Título",
+                  render: (_, row) => (
+                    <div className="flex min-w-[260px] items-center gap-3">
+                      {row.thumbnail_url ? (
+                        <img
+                          src={row.thumbnail_url as string}
+                          alt=""
+                          className="flex-shrink-0 rounded object-cover"
+                          style={{ width: 72, height: 40 }}
+                          loading="lazy"
+                        />
+                      ) : null}
+                      <span className="line-clamp-2 text-sm font-medium">{row.title as string}</span>
+                    </div>
+                  ),
+                },
+                { key: "total_views", label: "Views", render: (v) => <span className="tabular-nums">{formatCompact(v as number)}</span> },
+                { key: "avg_view_percentage", label: "Retenção", render: (v) => <span className="tabular-nums">{(v as number).toFixed(1)}%</span> },
+                { key: "avg_view_duration", label: "Duração média", render: (v) => <span className="tabular-nums">{formatSeconds(v as number)}</span> },
+                { key: "total_watch_min", label: "Watch time", render: (v) => <span className="tabular-nums">{formatCompact(v as number)}</span> },
+                { key: "total_likes", label: "Likes", render: (v) => <span className="tabular-nums">{formatCompact(v as number)}</span> },
+                { key: "duration", label: "Duração", render: (v) => <span className="tabular-nums">{parseIsoDuration(v as string)}</span> },
+                {
+                  key: "published_at",
+                  label: "Publicado",
+                  render: (v) => v ? <span>{new Date(v as string).toLocaleDateString("pt-BR")}</span> : "—",
+                },
+              ]}
+              onExportCsv={exportCsv}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

@@ -68,27 +68,21 @@ export function DataTable<T extends Record<string, unknown>>({
 
   return (
     <div
-      className="bg-white rounded-[10px] overflow-hidden"
-      style={{ border: "1px solid var(--color-border)", boxShadow: "var(--shadow-card)" }}
+      className="overflow-hidden rounded-[var(--radius-card)]"
+      style={{
+        background: "var(--color-surface)",
+        border: "1px solid var(--color-border)",
+        boxShadow: "var(--shadow-card)",
+      }}
     >
-      {/* Toolbar */}
       {onExportCsv && (
         <div
-          className="px-4 py-3 flex justify-end"
+          className="flex justify-end px-4 py-3"
           style={{ borderBottom: "1px solid var(--color-border)" }}
         >
           <button
             onClick={onExportCsv}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer"
-            style={{ background: "#F1F5F9", color: "var(--color-text-muted)" }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "#E2E8F0";
-              (e.currentTarget as HTMLElement).style.color = "var(--color-text)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "#F1F5F9";
-              (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)";
-            }}
+            className="btn-secondary flex items-center gap-1.5 px-3 py-2 text-xs"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -100,7 +94,6 @@ export function DataTable<T extends Record<string, unknown>>({
         </div>
       )}
 
-      {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -114,10 +107,8 @@ export function DataTable<T extends Record<string, unknown>>({
                     className="px-4 py-3 text-left cursor-pointer select-none"
                     style={{
                       color: isActive ? "var(--color-primary)" : "var(--color-text-muted)",
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
+                      fontSize: 13,
+                      fontWeight: 500,
                     }}
                   >
                     <span className="flex items-center gap-1">
@@ -147,21 +138,21 @@ export function DataTable<T extends Record<string, unknown>>({
               <tr
                 key={i}
                 style={{
-                  background: i % 2 === 0 ? "white" : "#FAFBFD",
-                  borderBottom: i < sorted.length - 1 ? "1px solid #F1F5F9" : undefined,
+                  background: "var(--color-surface)",
+                  borderBottom: i < sorted.length - 1 ? "1px solid var(--color-border)" : undefined,
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = "#EFF6FF";
+                  (e.currentTarget as HTMLElement).style.background = "#F8FAFC";
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? "white" : "#FAFBFD";
+                  (e.currentTarget as HTMLElement).style.background = "var(--color-surface)";
                 }}
               >
                 {columns.map((col) => (
                   <td
                     key={String(col.key)}
                     className="px-4 py-3"
-                    style={{ color: "var(--color-text)" }}
+                    style={{ color: "var(--color-text)", fontSize: 14 }}
                   >
                     {col.render
                       ? col.render(row[col.key], row)

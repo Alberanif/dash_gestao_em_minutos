@@ -31,6 +31,13 @@ interface HotmartSaleItem {
     status: string;
     price: { value: number; currency_code: string };
     offer?: { code?: string; name?: string; payment_mode?: string };
+    hotmart_fee?: {
+      base: number;
+      total: number;
+      percentage?: number;
+      fixed?: number;
+      currency_code?: string;
+    };
   };
 }
 
@@ -96,7 +103,14 @@ export async function collectHotmart(
     offer_code: item.purchase.offer?.code ?? null,
     offer_name: item.purchase.offer?.name ?? null,
     status: item.purchase.status,
-    price: item.purchase.price.value,
+    // hotmart_fee.base é o preço da oferta antes dos encargos da Hotmart.
+    // hotmart_fee.total é apenas a taxa percentual da plataforma.
+    // hotmart_fee.fixed é a taxa fixa (ex: R$ 0,99 por transação HotPay).
+    // Preço da Oferta (painel Hotmart) = base - total - fixed.
+    // price.value inclui juros do parcelamento ("Parcelado Hotmart"), inflando o valor.
+    price: item.purchase.hotmart_fee
+      ? Math.round((item.purchase.hotmart_fee.base - item.purchase.hotmart_fee.total - (item.purchase.hotmart_fee.fixed ?? 0)) * 100) / 100
+      : item.purchase.price.value,
     currency: item.purchase.price.currency_code,
     purchase_date: new Date(item.purchase.order_date).toISOString(),
     approved_date: item.purchase.approved_date

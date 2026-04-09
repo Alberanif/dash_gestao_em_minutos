@@ -2,22 +2,17 @@
 
 import { useState } from "react";
 import type { Account } from "@/types/accounts";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { AccountForm } from "./account-form";
 
 interface AccountListProps {
   initialAccounts: Account[];
 }
 
-const PLATFORM_ICONS: Record<string, string> = {
-  youtube: "▶",
-  instagram: "📷",
-  hotmart: "🛒",
-};
-
-const PLATFORM_COLORS: Record<string, string> = {
-  youtube: "bg-red-100 text-red-700",
-  instagram: "bg-pink-100 text-pink-700",
-  hotmart: "bg-orange-100 text-orange-700",
+const PLATFORM_LABELS: Record<string, string> = {
+  youtube: "YouTube",
+  instagram: "Instagram",
+  hotmart: "Hotmart",
 };
 
 export function AccountList({ initialAccounts }: AccountListProps) {
@@ -66,18 +61,21 @@ export function AccountList({ initialAccounts }: AccountListProps) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold">Contas registradas</h2>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text)" }}>Contas registradas</h2>
+          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Conexões ativas para YouTube, Instagram e Hotmart.</p>
+        </div>
         <button
           onClick={() => setShowForm(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700"
+          className="btn-primary"
         >
           + Nova conta
         </button>
       </div>
 
       {accounts.length === 0 && (
-        <div className="text-center py-12 text-gray-400">
+        <div className="py-12 text-center" style={{ color: "var(--color-text-muted)" }}>
           Nenhuma conta cadastrada. Clique em &ldquo;+ Nova conta&rdquo; para começar.
         </div>
       )}
@@ -88,35 +86,27 @@ export function AccountList({ initialAccounts }: AccountListProps) {
 
         return (
           <div key={platform} className="mb-8">
-            <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">
-              {PLATFORM_ICONS[platform]} {platform === "youtube" ? "YouTube" : platform === "instagram" ? "Instagram" : "Hotmart"}
+            <h3 className="mb-3 uppercase tracking-[0.08em]" style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-muted)" }}>
+              {PLATFORM_LABELS[platform]}
             </h3>
             <div className="space-y-2">
               {platformAccounts.map((account) => (
                 <div
                   key={account.id}
-                  className="bg-white border rounded-lg px-4 py-3 flex items-center gap-3"
+                  className="flex items-center gap-3 rounded-[var(--radius-card)] px-4 py-4"
+                  style={{ background: "#F8FAFC", border: "1px solid var(--color-border)" }}
                 >
-                  <span
-                    className={`text-xs font-medium px-2 py-0.5 rounded-full ${PLATFORM_COLORS[platform]}`}
-                  >
-                    {PLATFORM_ICONS[platform]}
-                  </span>
+                  <StatusBadge tone="analysis" label={PLATFORM_LABELS[platform]} />
                   <div className="flex-1">
-                    <p className="text-sm font-medium">{account.name}</p>
-                    <p className="text-xs text-gray-400">
-                      {platform} ·{" "}
-                      {account.is_active ? (
-                        <span className="text-green-600">● ativo</span>
-                      ) : (
-                        <span className="text-gray-400">○ inativo</span>
-                      )}
-                    </p>
+                    <p className="text-sm font-medium" style={{ color: "var(--color-text)" }}>{account.name}</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <StatusBadge tone={account.is_active ? "active" : "inactive"} />
+                    </div>
                   </div>
                   <div className="flex items-center gap-3 text-sm">
                     <button
                       onClick={() => toggleActive(account)}
-                      className="text-gray-400 hover:text-gray-700"
+                      style={{ color: "var(--color-text-muted)" }}
                     >
                       {account.is_active ? "desativar" : "ativar"}
                     </button>
@@ -125,13 +115,13 @@ export function AccountList({ initialAccounts }: AccountListProps) {
                         setEditingAccount(account);
                         setShowForm(true);
                       }}
-                      className="text-blue-500 hover:text-blue-700"
+                      style={{ color: "var(--color-primary)" }}
                     >
                       editar
                     </button>
                     <button
                       onClick={() => deleteAccount(account)}
-                      className="text-red-400 hover:text-red-600"
+                      style={{ color: "var(--color-danger)" }}
                     >
                       remover
                     </button>

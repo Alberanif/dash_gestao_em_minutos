@@ -8,16 +8,28 @@ interface SectionTabsProps {
 
 export function SectionTabs({ sections, selected, onSelect }: SectionTabsProps) {
   return (
-    <div className="flex border-b bg-white px-6">
+    <div
+      className="flex flex-wrap gap-1"
+      style={{ borderBottom: "1px solid var(--color-border)", background: "transparent" }}
+    >
       {sections.map((section) => (
         <button
           key={section}
           onClick={() => onSelect(section)}
-          className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+          className="-mb-px border-b-2 px-4 py-2.5 text-sm transition-colors hover:text-[var(--color-text)]"
+          style={
             section === selected
-              ? "border-blue-600 text-gray-900"
-              : "border-transparent text-gray-500 hover:text-gray-700"
-          }`}
+              ? {
+                  borderBottomColor: "var(--color-primary)",
+                  color: "var(--color-primary)",
+                  fontWeight: 600,
+                }
+              : {
+                  borderBottomColor: "transparent",
+                  color: "var(--color-text-muted)",
+                  fontWeight: 400,
+                }
+          }
         >
           {section}
         </button>

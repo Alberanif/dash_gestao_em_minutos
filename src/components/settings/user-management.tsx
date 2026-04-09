@@ -26,7 +26,14 @@ export function UserManagement() {
   }
 
   useEffect(() => {
-    loadUsers();
+    async function run() {
+      const res = await fetch("/api/admin/users");
+      if (!res.ok) return;
+      const data = await res.json();
+      setUsers(data);
+    }
+
+    void run();
   }, []);
 
   async function handleCreate(e: React.FormEvent) {
@@ -65,11 +72,14 @@ export function UserManagement() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold">Usuários com acesso</h2>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text)" }}>Usuários com acesso</h2>
+          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Controle de acesso ao painel administrativo.</p>
+        </div>
         <button
           onClick={() => setShowForm(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700"
+          className="btn-primary"
         >
           + Novo usuário
         </button>
@@ -79,11 +89,12 @@ export function UserManagement() {
         {users.map((user) => (
           <div
             key={user.id}
-            className="bg-white border rounded-lg px-4 py-3 flex items-center gap-3"
+            className="flex items-center gap-3 rounded-[var(--radius-card)] px-4 py-4"
+            style={{ background: "#F8FAFC", border: "1px solid var(--color-border)" }}
           >
             <div className="flex-1">
-              <p className="text-sm font-medium">{user.email}</p>
-              <p className="text-xs text-gray-400">
+              <p className="text-sm font-medium" style={{ color: "var(--color-text)" }}>{user.email}</p>
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                 Cadastrado em{" "}
                 {new Date(user.created_at).toLocaleDateString("pt-BR")}
                 {user.last_sign_in_at && (
@@ -96,7 +107,8 @@ export function UserManagement() {
             </div>
             <button
               onClick={() => handleDelete(user)}
-              className="text-red-400 hover:text-red-600 text-sm"
+              className="text-sm"
+              style={{ color: "var(--color-danger)" }}
             >
               remover
             </button>
@@ -106,11 +118,19 @@ export function UserManagement() {
 
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-sm shadow-xl">
+          <div
+            className="w-full max-w-sm"
+            style={{
+              background: "var(--color-surface)",
+              borderRadius: "var(--radius-lg)",
+              padding: 24,
+              boxShadow: "var(--shadow-md)",
+            }}
+          >
             <h3 className="text-lg font-semibold mb-4">Novo usuário</h3>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
                   E-mail
                 </label>
                 <input
@@ -119,11 +139,11 @@ export function UserManagement() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="usuario@exemplo.com"
                   required
-                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="field-control"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
                   Senha
                 </label>
                 <input
@@ -133,7 +153,7 @@ export function UserManagement() {
                   placeholder="Mínimo 6 caracteres"
                   required
                   minLength={6}
-                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="field-control"
                 />
               </div>
               {error && <p className="text-sm text-red-600">{error}</p>}
@@ -141,7 +161,7 @@ export function UserManagement() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 bg-blue-600 text-white rounded-md py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                  className="btn-primary flex-1"
                 >
                   {saving ? "Criando..." : "Criar usuário"}
                 </button>
@@ -151,7 +171,7 @@ export function UserManagement() {
                     setShowForm(false);
                     setError("");
                   }}
-                  className="flex-1 border rounded-md py-2 text-sm text-gray-600 hover:bg-gray-50"
+                  className="btn-secondary flex-1"
                 >
                   Cancelar
                 </button>

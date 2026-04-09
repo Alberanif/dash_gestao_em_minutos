@@ -130,8 +130,16 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl">
-        <h3 className="text-lg font-semibold mb-4">
+      <div
+        className="w-full max-w-md"
+        style={{
+          background: "var(--color-surface)",
+          borderRadius: "var(--radius-lg)",
+          padding: 24,
+          boxShadow: "var(--shadow-md)",
+        }}
+      >
+        <h3 className="mb-4 text-lg font-semibold">
           {isEditing ? "Editar conta" : "Nova conta"}
         </h3>
 
@@ -140,7 +148,7 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
           className="space-y-4"
         >
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
               Nome da conta
             </label>
             <input
@@ -149,12 +157,12 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
               onChange={(e) => setName(e.target.value)}
               placeholder="Ex: IGT Principal"
               required
-              className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="field-control"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
               Plataforma
             </label>
             <select
@@ -163,7 +171,7 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
                 setPlatform(e.target.value as "youtube" | "instagram" | "hotmart")
               }
               disabled={isEditing}
-              className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              className="field-control"
             >
               <option value="youtube">YouTube</option>
               <option value="instagram">Instagram</option>
@@ -175,13 +183,13 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
           {platform === "youtube" && (
             <>
               {isYouTubeConnected && (
-                <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+                <div className="rounded-[var(--radius-sm)] border px-3 py-2 text-sm" style={{ color: "var(--color-success)", background: "#DCFCE7", borderColor: "#BBF7D0" }}>
                   <span>●</span>
                   <span>Conectado — canal: {ytCreds?.channel_id}</span>
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
                   Google Client ID
                 </label>
                 <input
@@ -190,11 +198,11 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
                   onChange={(e) => setYtClientId(e.target.value)}
                   placeholder="123456789-abc....apps.googleusercontent.com"
                   required
-                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="field-control"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
                   Google Client Secret
                 </label>
                 <input
@@ -203,11 +211,11 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
                   onChange={(e) => setYtClientSecret(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="field-control"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
                   Data de início do histórico
                 </label>
                 <input
@@ -215,9 +223,9 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
                   value={ytHistoryStart}
                   onChange={(e) => setYtHistoryStart(e.target.value)}
                   required
-                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="field-control"
                 />
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
                   Define até onde o backfill vai buscar dados históricos.
                 </p>
               </div>
@@ -228,7 +236,7 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
           {platform === "instagram" && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
                   Access Token
                 </label>
                 <input
@@ -237,11 +245,11 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
                   onChange={(e) => setAccessToken(e.target.value)}
                   placeholder="EAAx..."
                   required
-                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="field-control"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
                   User ID
                 </label>
                 <input
@@ -250,7 +258,7 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
                   onChange={(e) => setUserId(e.target.value)}
                   placeholder="1234567890"
                   required
-                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="field-control"
                 />
               </div>
             </>
@@ -260,7 +268,7 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
           {platform === "hotmart" && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
                   Client ID
                 </label>
                 <input
@@ -269,11 +277,11 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
                   onChange={(e) => setHmClientId(e.target.value)}
                   placeholder="Ex: a1b2c3d4-..."
                   required
-                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="field-control"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
                   Client Secret
                 </label>
                 <input
@@ -282,7 +290,7 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
                   onChange={(e) => setHmClientSecret(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="field-control"
                 />
               </div>
             </>
@@ -294,7 +302,7 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 bg-blue-600 text-white rounded-md py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              className="btn-primary flex-1"
             >
               {saving
                 ? "Salvando..."
@@ -307,7 +315,7 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 border rounded-md py-2 text-sm text-gray-600 hover:bg-gray-50"
+              className="btn-secondary flex-1"
             >
               Cancelar
             </button>

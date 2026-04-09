@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
   const startDate = params.get("start_date");
   const endDate = params.get("end_date");
   const productId = params.get("product_id");
+  const currency = params.get("currency");
 
   if (!accountId) {
     return NextResponse.json({ error: "account_id é obrigatório" }, { status: 400 });
@@ -26,7 +27,15 @@ export async function GET(request: NextRequest) {
 
   if (startDate) query = query.gte("purchase_date", startDate);
   if (endDate) query = query.lte("purchase_date", endDate);
-  if (productId) query = query.eq("product_id", productId);
+  if (currency) query = query.eq("currency", currency);
+  if (productId) {
+    const ids = productId.split(",").map((id) => id.trim()).filter(Boolean);
+    if (ids.length === 1) {
+      query = query.eq("product_id", ids[0]);
+    } else if (ids.length > 1) {
+      query = query.in("product_id", ids);
+    }
+  }
 
   const { data, error: dbError } = await query;
 

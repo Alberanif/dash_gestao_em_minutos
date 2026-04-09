@@ -12,16 +12,25 @@ export function AccountTabs({ accounts, selectedId, onSelect }: AccountTabsProps
   if (accounts.length === 0) return null;
 
   return (
-    <div className="flex gap-2 px-6 py-2 border-b bg-white">
+    <div className="flex flex-wrap gap-2">
       {accounts.map((account) => (
         <button
           key={account.id}
           onClick={() => onSelect(account.id)}
-          className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+          className="rounded-[var(--radius-sm)] px-3.5 py-1.5 text-[13px] font-medium transition-colors hover:bg-[var(--color-primary-light)]"
+          style={
             account.id === selectedId
-              ? "bg-blue-600 text-white"
-              : "text-gray-500 border hover:text-gray-700 hover:bg-gray-50"
-          }`}
+              ? {
+                  background: "var(--color-primary)",
+                  border: "1px solid var(--color-primary)",
+                  color: "white",
+                }
+              : {
+                  background: "transparent",
+                  border: "1px solid var(--color-border)",
+                  color: "var(--color-text-muted)",
+                }
+          }
         >
           {account.name}
         </button>

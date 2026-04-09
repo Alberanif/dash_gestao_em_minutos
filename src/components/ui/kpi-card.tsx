@@ -25,7 +25,7 @@ export function KpiCard({
   currentValue,
   format = "number",
   icon,
-  accentColor = "#2563EB",
+  accentColor = "var(--color-primary)",
   sparklineData,
 }: KpiCardProps) {
   let delta: number | null = null;
@@ -38,66 +38,55 @@ export function KpiCard({
 
   return (
     <div
-      className="bg-white rounded-[10px] p-5 flex flex-col gap-3"
+      className="flex flex-col gap-3 rounded-[var(--radius-card)] p-5"
       style={{
+        background: "var(--color-surface)",
         border: "1px solid var(--color-border)",
         boxShadow: "var(--shadow-card)",
       }}
     >
-      {/* Top row: icon + sparkline */}
       <div className="flex items-start justify-between">
-        {icon && (
+        <div className="flex min-w-0 items-center gap-3">
           <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ background: `${accentColor}18` }}
+            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full"
+            style={{ background: "var(--color-primary-light)", color: accentColor }}
           >
-            <span style={{ color: accentColor }}>{icon}</span>
+            <span className="flex h-4 w-4 items-center justify-center">{icon}</span>
           </div>
-        )}
-        {sparklineData && sparklineData.length >= 2 && (
-          <div className="w-24 flex-shrink-0">
+          <p
+            className="truncate"
+            style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-muted)" }}
+          >
+            {title}
+          </p>
+        </div>
+        {delta !== null ? (
+          <span
+            className="inline-flex items-center rounded-full px-2.5 py-1"
+            style={{
+              background: isPositive ? "#DCFCE7" : "#FEE2E2",
+              color: isPositive ? "#16A34A" : "#DC2626",
+              fontSize: 12,
+              fontWeight: 500,
+            }}
+          >
+            {isPositive ? "+" : ""}
+            {delta.toFixed(1)}%
+          </span>
+        ) : null}
+      </div>
+
+      <p style={{ fontSize: 28, lineHeight: 1.1, fontWeight: 700, color: "var(--color-text)" }}>
+        {displayValue}
+      </p>
+
+      {sparklineData && sparklineData.length >= 2 ? (
+        <div className="w-full" style={{ marginTop: 12 }}>
+          <div className="h-12">
             <Sparkline data={sparklineData} color={accentColor} height={48} />
           </div>
-        )}
-      </div>
-
-      {/* Value */}
-      <div>
-        <p
-          className="text-4xl font-bold tracking-tight leading-none"
-          style={{ color: "var(--color-text)" }}
-        >
-          {displayValue}
-        </p>
-      </div>
-
-      {/* Title + delta */}
-      <div>
-        <p className="text-sm font-medium mb-1" style={{ color: "var(--color-text-muted)" }}>
-          {title}
-        </p>
-        {delta !== null && (
-          <div className="flex items-center gap-1">
-            <span style={{ color: isPositive ? "var(--color-success)" : "var(--color-danger)" }}>
-              {isPositive ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="18 15 12 9 6 15" />
-                </svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              )}
-            </span>
-            <p
-              className="text-xs font-medium"
-              style={{ color: isPositive ? "var(--color-success)" : "var(--color-danger)" }}
-            >
-              {isPositive ? "+" : ""}{delta.toFixed(1)}% vs anterior
-            </p>
-          </div>
-        )}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }

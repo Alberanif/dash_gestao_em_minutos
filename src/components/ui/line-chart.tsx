@@ -36,6 +36,13 @@ function formatCompact(n: number): string {
   return Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 }).format(n);
 }
 
+function formatChartValue(value: number): string {
+  if (value >= 1000) {
+    return formatCompact(value);
+  }
+  return Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(value);
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
@@ -45,7 +52,7 @@ function CustomTooltip({ active, payload, label }: any) {
       style={{
         background: "white",
         border: "1px solid var(--color-border)",
-        boxShadow: "0 4px 12px rgb(0 0 0 / .1)",
+        boxShadow: "var(--shadow-md)",
       }}
     >
       <p className="font-medium mb-1" style={{ color: "var(--color-text)" }}>
@@ -53,7 +60,7 @@ function CustomTooltip({ active, payload, label }: any) {
       </p>
       {payload.map((entry: { color: string; name: string; value: number }) => (
         <p key={entry.name} className="text-xs" style={{ color: entry.color }}>
-          <span className="font-semibold">{entry.name}:</span> {formatCompact(entry.value)}
+          <span className="font-semibold">{entry.name}:</span> {formatChartValue(entry.value)}
         </p>
       ))}
     </div>
@@ -74,14 +81,17 @@ export function LineChart({ data, xKey, lines, height = 300, title, subtitle, hi
 
   return (
     <div
-      className="bg-white rounded-[10px] p-5"
-      style={{ border: "1px solid var(--color-border)", boxShadow: "var(--shadow-card)" }}
+      className="rounded-[var(--radius-card)] p-5"
+      style={{
+        background: "var(--color-surface)",
+        border: "1px solid var(--color-border)",
+        boxShadow: "var(--shadow-card)",
+      }}
     >
-      {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div>
           {title && (
-            <h3 className="text-base font-semibold" style={{ color: "var(--color-text)" }}>
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text)" }}>
               {title}
             </h3>
           )}
@@ -98,11 +108,19 @@ export function LineChart({ data, xKey, lines, height = 300, title, subtitle, hi
               <button
                 key={days}
                 onClick={() => setRange(days)}
-                className="px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer"
+                className="cursor-pointer rounded-full px-3 py-1 text-xs font-medium transition-colors"
                 style={
                   range === days
-                    ? { background: "var(--color-primary)", color: "white" }
-                    : { background: "#F1F5F9", color: "var(--color-text-muted)" }
+                    ? {
+                        background: "var(--color-primary)",
+                        border: "1px solid var(--color-primary)",
+                        color: "white",
+                      }
+                    : {
+                        background: "var(--color-surface)",
+                        border: "1px solid var(--color-border)",
+                        color: "var(--color-text-muted)",
+                      }
                 }
               >
                 {label}
@@ -112,12 +130,11 @@ export function LineChart({ data, xKey, lines, height = 300, title, subtitle, hi
         )}
       </div>
 
-      {/* Legend */}
-      <div className="flex items-center gap-4 mb-4 flex-wrap">
+      <div className="mb-4 flex flex-wrap items-center gap-4">
         {lines.map((line) => (
           <div key={line.key} className="flex items-center gap-1.5">
             <span
-              className="w-3 h-3 rounded-full flex-shrink-0"
+              className="h-3 w-3 flex-shrink-0 rounded-full"
               style={{ background: line.color }}
             />
             <span className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>
@@ -127,7 +144,6 @@ export function LineChart({ data, xKey, lines, height = 300, title, subtitle, hi
         ))}
       </div>
 
-      {/* Chart */}
       <ResponsiveContainer width="100%" height={height}>
         <AreaChart data={displayData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
           <defs>
@@ -138,7 +154,7 @@ export function LineChart({ data, xKey, lines, height = 300, title, subtitle, hi
               </linearGradient>
             ))}
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+          <CartesianGrid stroke="#F1F5F9" vertical={false} />
           <XAxis
             dataKey={xKey}
             tick={{ fontSize: 11, fill: "#64748B" }}
@@ -152,7 +168,7 @@ export function LineChart({ data, xKey, lines, height = 300, title, subtitle, hi
             tick={{ fontSize: 11, fill: "#64748B" }}
             tickLine={false}
             axisLine={false}
-            tickFormatter={formatCompact}
+            tickFormatter={formatChartValue}
             width={48}
           />
           <Tooltip content={<CustomTooltip />} />

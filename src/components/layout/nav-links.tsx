@@ -60,45 +60,50 @@ const LINKS = [
   },
 ];
 
-export function NavLinks() {
+interface NavLinksProps {
+  collapsed?: boolean;
+}
+
+export function NavLinks({ collapsed = false }: NavLinksProps) {
   const pathname = usePathname();
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1 px-2">
       {LINKS.map(({ href, label, icon }) => {
         const isActive = pathname.startsWith(href);
         return (
-          <Link
-            key={href}
-            href={href}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-            style={
-              isActive
-                ? {
-                    background: "var(--color-primary-light)",
-                    color: "var(--color-primary)",
-                    borderLeft: "2px solid var(--color-primary)",
-                  }
-                : {
-                    color: "var(--color-text-muted)",
-                  }
-            }
-            onMouseEnter={(e) => {
-              if (!isActive) {
-                (e.currentTarget as HTMLElement).style.background = "#F1F5F9";
-                (e.currentTarget as HTMLElement).style.color = "var(--color-text)";
+          <div key={href} className="group relative">
+            <Link
+              href={href}
+              className={`flex rounded-r-[10px] text-sm font-medium transition-colors ${
+                collapsed
+                  ? "justify-center px-0 py-2.5 hover:bg-slate-50 hover:text-slate-900"
+                  : "items-center gap-3 px-4 py-2.5 hover:bg-slate-50 hover:text-slate-900"
+              }`}
+              style={
+                isActive
+                  ? {
+                      background: "var(--color-primary-light)",
+                      color: "var(--color-primary)",
+                      borderLeft: "3px solid var(--color-primary)",
+                    }
+                  : {
+                      color: "var(--color-text-muted)",
+                    }
               }
-            }}
-            onMouseLeave={(e) => {
-              if (!isActive) {
-                (e.currentTarget as HTMLElement).style.background = "";
-                (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)";
-              }
-            }}
-          >
-            {icon}
-            {label}
-          </Link>
+            >
+              <span className="flex h-[18px] w-[18px] items-center justify-center">{icon}</span>
+              {!collapsed ? <span>{label}</span> : null}
+            </Link>
+            {collapsed ? (
+              <span
+                className="pointer-events-none absolute left-[calc(100%+12px)] top-1/2 z-30 hidden -translate-y-1/2 whitespace-nowrap rounded-md px-2 py-1 text-xs font-medium text-white shadow-md group-hover:block"
+                style={{ background: "var(--color-text)" }}
+              >
+                {label}
+              </span>
+            ) : null}
+          </div>
         );
       })}
     </div>
