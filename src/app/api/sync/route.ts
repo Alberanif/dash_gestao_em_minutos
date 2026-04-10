@@ -4,6 +4,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { collectYouTube } from "@/lib/services/youtube";
 import { collectInstagram } from "@/lib/services/instagram";
 import { collectHotmart } from "@/lib/services/hotmart";
+import { collectMetaAds } from "@/lib/services/meta-ads";
 import type { Account } from "@/types/accounts";
 
 export async function POST(request: NextRequest) {
@@ -13,9 +14,9 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const platform = body?.platform;
 
-  if (!platform || !["youtube", "instagram", "hotmart"].includes(platform)) {
+  if (!platform || !["youtube", "instagram", "hotmart", "meta-ads"].includes(platform)) {
     return NextResponse.json(
-      { error: "platform must be youtube, instagram or hotmart" },
+      { error: "platform must be youtube, instagram, hotmart or meta-ads" },
       { status: 400 }
     );
   }
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
     status: "success" | "error";
     records?: number;
     error?: string;
+    analytics_error?: string;
   }> = [];
 
   for (const account of accounts as Account[]) {
@@ -49,16 +51,21 @@ export async function POST(request: NextRequest) {
 
     try {
       let records = 0;
+      let analyticsError: string | undefined;
 
       if (account.platform === "youtube") {
         const result = await collectYouTube(account);
         records = result.channelRecords + result.videoRecords;
+        analyticsError = result.analyticsError;
       } else if (account.platform === "instagram") {
         const result = await collectInstagram(account);
         records = result.profileRecords + result.mediaRecords;
       } else if (account.platform === "hotmart") {
         const result = await collectHotmart(account);
         records = result.salesRecords;
+      } else if (account.platform === "meta-ads") {
+        const result = await collectMetaAds(account);
+        records = result.dailyRecords + result.campaignRecords;
       }
 
       await supabase.from("dash_gestao_cron_logs").insert({
@@ -75,6 +82,7 @@ export async function POST(request: NextRequest) {
         account_name: account.name,
         status: "success",
         records,
+        ...(analyticsError && { analytics_error: analyticsError }),
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";

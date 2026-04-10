@@ -2,11 +2,12 @@ export interface YouTubeCredentials {
   client_id: string;
   client_secret: string;
   refresh_token: string;
-  channel_id: string;           // auto-detected via OAuth callback
-  history_start_date: string;   // YYYY-MM-DD — backfill start
+  channel_id: string;            // informado pelo usuário no cadastro
+  uploads_playlist_id?: string;  // populado automaticamente ao validar o canal (opcional para compatibilidade com contas existentes)
+  history_start_date: string;    // YYYY-MM-DD — backfill start
   // auto-managed by getValidAccessToken:
   access_token?: string;
-  access_token_expiry?: string; // ISO timestamp
+  access_token_expiry?: string;  // ISO timestamp
 }
 
 export interface InstagramCredentials {
@@ -17,6 +18,11 @@ export interface InstagramCredentials {
 export interface HotmartCredentials {
   client_id: string;
   client_secret: string;
+}
+
+export interface MetaAdsCredentials {
+  access_token: string;
+  ad_account_id: string; // ex: "act_3689989500461"
 }
 
 export interface HotmartSale {
@@ -39,11 +45,45 @@ export interface HotmartSale {
 
 export interface Account {
   id: string;
-  platform: "youtube" | "instagram" | "hotmart";
+  platform: "youtube" | "instagram" | "hotmart" | "meta-ads";
   name: string;
-  credentials: YouTubeCredentials | InstagramCredentials | HotmartCredentials;
+  credentials: YouTubeCredentials | InstagramCredentials | HotmartCredentials | MetaAdsCredentials;
   is_active: boolean;
   created_at: string;
+}
+
+export interface MetaAdsDailyRow extends Record<string, unknown> {
+  id: string;
+  account_id: string;
+  date: string;
+  spend: number;
+  impressions: number;
+  reach: number;
+  clicks: number;
+  ctr: number;
+  cpc: number;
+  cpm: number;
+  conversions: number;
+  conversion_value: number;
+  collected_at: string;
+}
+
+export interface MetaAdsCampaign extends Record<string, unknown> {
+  id: string;
+  account_id: string;
+  campaign_id: string;
+  campaign_name: string;
+  status: string;
+  objective: string | null;
+  spend: number;
+  impressions: number;
+  reach: number;
+  clicks: number;
+  ctr: number;
+  cpc: number;
+  conversions: number;
+  conversion_value: number;
+  collected_date: string;
 }
 
 // YouTube Analytics daily rows

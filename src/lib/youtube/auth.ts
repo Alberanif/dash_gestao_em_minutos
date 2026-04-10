@@ -47,22 +47,6 @@ export async function exchangeCodeForTokens(
   return res.json();
 }
 
-export async function detectChannelId(accessToken: string): Promise<string> {
-  const url = new URL("https://www.googleapis.com/youtube/v3/channels");
-  url.searchParams.set("part", "id");
-  url.searchParams.set("mine", "true");
-  const res = await fetch(url.toString(), {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!res.ok) {
-    throw new Error(`Channel detection failed (${res.status}): ${await res.text()}`);
-  }
-  const data = await res.json();
-  const channelId = data.items?.[0]?.id;
-  if (!channelId) throw new Error("No YouTube channel found for this Google account");
-  return channelId;
-}
-
 export async function getValidAccessToken(account: Account): Promise<string> {
   const creds = account.credentials as YouTubeCredentials;
 

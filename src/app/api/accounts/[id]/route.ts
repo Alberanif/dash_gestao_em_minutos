@@ -12,17 +12,48 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
 
-  // Permite atualizar apenas campos seguros
   const allowed: Record<string, unknown> = {};
   if (body.name !== undefined) allowed.name = body.name;
-  if (body.credentials !== undefined) allowed.credentials = body.credentials;
   if (body.is_active !== undefined) allowed.is_active = body.is_active;
+
+  const supabase = createSupabaseServiceClient();
+
+  if (body.credentials !== undefined) {
+    const incomingCreds = body.credentials as Record<string, unknown>;
+
+    // Buscar plataforma e credenciais existentes do banco (não confiar em body.platform)
+    const { data: existingAccount } = await supabase
+      .from("dash_gestao_accounts")
+      .select("platform, credentials")
+      .eq("id", id)
+      .single();
+
+    const isYouTube = existingAccount?.platform === "youtube";
+
+    if (isYouTube && incomingCreds.channel_id !== undefined) {
+      const channelId = (incomingCreds.channel_id as string).trim();
+      if (!channelId) {
+        return NextResponse.json({ error: "channel_id não pode ser vazio" }, { status: 400 });
+      }
+      if (!channelId.startsWith("UC") || channelId.length !== 24) {
+        return NextResponse.json(
+          { error: "Channel ID inválido. Deve começar com 'UC' e ter 24 caracteres (ex: UCxxxxxxxxxxxxxxxxxxxxxx)." },
+          { status: 400 }
+        );
+      }
+      // uploads_playlist_id segue o padrão fixo do YouTube: UC → UU
+      incomingCreds.channel_id = channelId;
+      incomingCreds.uploads_playlist_id = "UU" + channelId.slice(2);
+    }
+
+    // Merge com credenciais existentes para preservar tokens OAuth e outros campos
+    const existingCreds = (existingAccount?.credentials ?? {}) as Record<string, unknown>;
+    allowed.credentials = { ...existingCreds, ...incomingCreds };
+  }
 
   if (Object.keys(allowed).length === 0) {
     return NextResponse.json({ error: "Nenhum campo válido para atualizar" }, { status: 400 });
   }
-
-  const supabase = createSupabaseServiceClient();
   const { data, error: dbError } = await supabase
     .from("dash_gestao_accounts")
     .update(allowed)
@@ -47,7 +78,6 @@ export async function DELETE(
   const { id } = await params;
   const supabase = createSupabaseServiceClient();
 
-  // CASCADE DELETE via FK remove todos os snapshots associados automaticamente
   const { error: dbError } = await supabase
     .from("dash_gestao_accounts")
     .delete()

@@ -12,6 +12,7 @@ interface AccountListProps {
 const PLATFORM_LABELS: Record<string, string> = {
   youtube: "YouTube",
   instagram: "Instagram",
+  "meta-ads": "Meta Ads",
   hotmart: "Hotmart",
 };
 
@@ -56,6 +57,7 @@ export function AccountList({ initialAccounts }: AccountListProps) {
   const byPlatform = {
     youtube: accounts.filter((a) => a.platform === "youtube"),
     instagram: accounts.filter((a) => a.platform === "instagram"),
+    "meta-ads": accounts.filter((a) => a.platform === "meta-ads"),
     hotmart: accounts.filter((a) => a.platform === "hotmart"),
   };
 
@@ -64,7 +66,7 @@ export function AccountList({ initialAccounts }: AccountListProps) {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text)" }}>Contas registradas</h2>
-          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Conexões ativas para YouTube, Instagram e Hotmart.</p>
+          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Conexões ativas para YouTube, Instagram, Meta Ads e Hotmart.</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
@@ -80,7 +82,7 @@ export function AccountList({ initialAccounts }: AccountListProps) {
         </div>
       )}
 
-      {(["youtube", "instagram", "hotmart"] as const).map((platform) => {
+      {(["youtube", "instagram", "meta-ads", "hotmart"] as const).map((platform) => {
         const platformAccounts = byPlatform[platform];
         if (platformAccounts.length === 0) return null;
 

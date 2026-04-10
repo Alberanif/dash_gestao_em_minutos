@@ -13,7 +13,7 @@ interface AccountFormProps {
 export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
   const isEditing = !!account;
   const [name, setName] = useState(account?.name ?? "");
-  const [platform, setPlatform] = useState<"youtube" | "instagram" | "hotmart">(
+  const [platform, setPlatform] = useState<"youtube" | "instagram" | "hotmart" | "meta-ads">(
     account?.platform ?? "youtube"
   );
 
@@ -26,6 +26,7 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
   const [ytHistoryStart, setYtHistoryStart] = useState(
     ytCreds?.history_start_date ?? new Date(new Date().setFullYear(new Date().getFullYear() - 2)).toISOString().slice(0, 10)
   );
+  const [ytChannelId, setYtChannelId] = useState(ytCreds?.channel_id ?? "");
 
   // Instagram fields
   const [accessToken, setAccessToken] = useState(
@@ -51,15 +52,30 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
       : ""
   );
 
+  // Meta Ads fields
+  const [metaAccessToken, setMetaAccessToken] = useState(
+    isEditing && account.platform === "meta-ads"
+      ? (account.credentials as { access_token: string }).access_token
+      : ""
+  );
+  const [metaAdAccountId, setMetaAdAccountId] = useState(
+    isEditing && account.platform === "meta-ads"
+      ? (account.credentials as { ad_account_id: string }).ad_account_id
+      : ""
+  );
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   function buildCredentials() {
     if (platform === "youtube") {
-      return { client_id: ytClientId, client_secret: ytClientSecret, history_start_date: ytHistoryStart };
+      return { client_id: ytClientId, client_secret: ytClientSecret, history_start_date: ytHistoryStart, channel_id: ytChannelId };
     }
     if (platform === "instagram") {
       return { access_token: accessToken, user_id: userId };
+    }
+    if (platform === "meta-ads") {
+      return { access_token: metaAccessToken, ad_account_id: metaAdAccountId };
     }
     return { client_id: hmClientId, client_secret: hmClientSecret };
   }
@@ -126,7 +142,7 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
   }
 
   const isYouTubeConnected =
-    isEditing && account.platform === "youtube" && !!ytCreds?.channel_id;
+    isEditing && account.platform === "youtube" && !!ytCreds?.refresh_token;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -168,13 +184,14 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
             <select
               value={platform}
               onChange={(e) =>
-                setPlatform(e.target.value as "youtube" | "instagram" | "hotmart")
+                setPlatform(e.target.value as "youtube" | "instagram" | "hotmart" | "meta-ads")
               }
               disabled={isEditing}
               className="field-control"
             >
               <option value="youtube">YouTube</option>
               <option value="instagram">Instagram</option>
+              <option value="meta-ads">Meta Ads</option>
               <option value="hotmart">Hotmart</option>
             </select>
           </div>
@@ -188,6 +205,22 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
                   <span>Conectado — canal: {ytCreds?.channel_id}</span>
                 </div>
               )}
+              <div>
+                <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
+                  Channel ID
+                </label>
+                <input
+                  type="text"
+                  value={ytChannelId}
+                  onChange={(e) => setYtChannelId(e.target.value)}
+                  placeholder="UCxxxxxxxxxxxxxxxxxxxxxxxx"
+                  required
+                  className="field-control"
+                />
+                <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
+                  ID do canal YouTube (começa com UC). Encontre em: YouTube Studio → Configurações → Informações do canal.
+                </p>
+              </div>
               <div>
                 <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
                   Google Client ID
@@ -260,6 +293,41 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
                   required
                   className="field-control"
                 />
+              </div>
+            </>
+          )}
+
+          {/* Meta Ads fields */}
+          {platform === "meta-ads" && (
+            <>
+              <div>
+                <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
+                  Access Token
+                </label>
+                <input
+                  type="text"
+                  value={metaAccessToken}
+                  onChange={(e) => setMetaAccessToken(e.target.value)}
+                  placeholder="EAAx..."
+                  required
+                  className="field-control"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
+                  Ad Account ID
+                </label>
+                <input
+                  type="text"
+                  value={metaAdAccountId}
+                  onChange={(e) => setMetaAdAccountId(e.target.value)}
+                  placeholder="act_3689989500461"
+                  required
+                  className="field-control"
+                />
+                <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
+                  Inclua o prefixo &quot;act_&quot; (ex: act_3689989500461)
+                </p>
               </div>
             </>
           )}

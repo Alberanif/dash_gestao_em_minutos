@@ -9,9 +9,9 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const platform = searchParams.get("platform");
 
-  if (!platform || !["youtube", "instagram", "hotmart"].includes(platform)) {
+  if (!platform || !["youtube", "instagram", "hotmart", "meta-ads"].includes(platform)) {
     return NextResponse.json(
-      { error: "platform must be youtube, instagram or hotmart" },
+      { error: "platform must be youtube, instagram, hotmart or meta-ads" },
       { status: 400 }
     );
   }

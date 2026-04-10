@@ -41,11 +41,31 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!["youtube", "instagram", "hotmart"].includes(platform)) {
+  if (!["youtube", "instagram", "hotmart", "meta-ads"].includes(platform)) {
     return NextResponse.json(
-      { error: "platform deve ser 'youtube', 'instagram' ou 'hotmart'" },
+      { error: "platform deve ser 'youtube', 'instagram', 'hotmart' ou 'meta-ads'" },
       { status: 400 }
     );
+  }
+
+  // YouTube: validar formato do channel_id e derivar uploads_playlist_id
+  // O uploads_playlist_id segue o padrão fixo do YouTube: UC → UU no início do channel_id
+  if (platform === "youtube") {
+    const channelId = (credentials.channel_id as string | undefined)?.trim();
+    if (!channelId) {
+      return NextResponse.json(
+        { error: "channel_id é obrigatório para contas YouTube" },
+        { status: 400 }
+      );
+    }
+    if (!channelId.startsWith("UC") || channelId.length !== 24) {
+      return NextResponse.json(
+        { error: "Channel ID inválido. Deve começar com 'UC' e ter 24 caracteres (ex: UCxxxxxxxxxxxxxxxxxxxxxx)." },
+        { status: 400 }
+      );
+    }
+    credentials.channel_id = channelId;
+    credentials.uploads_playlist_id = "UU" + channelId.slice(2);
   }
 
   const supabase = createSupabaseServiceClient();

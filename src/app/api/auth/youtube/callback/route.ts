@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac } from "crypto";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import { exchangeCodeForTokens, detectChannelId } from "@/lib/youtube/auth";
+import { exchangeCodeForTokens } from "@/lib/youtube/auth";
 import type { YouTubeCredentials } from "@/types/accounts";
 
 const SETTINGS_URL = "/dashboard/settings";
@@ -18,7 +18,6 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Recover account_id from short-lived cookie set during /connect
   const accountId = request.cookies.get("yt_oauth_account_id")?.value;
   if (!accountId) {
     return NextResponse.redirect(
@@ -26,7 +25,6 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Validate HMAC state to prevent CSRF
   const expectedState = createHmac("sha256", process.env.CRON_SECRET!)
     .update(accountId)
     .digest("hex");
@@ -39,8 +37,6 @@ export async function GET(request: NextRequest) {
 
   const supabase = createSupabaseServiceClient();
 
-  // Load existing credentials — client_id, client_secret, history_start_date
-  // were saved by the settings form before redirecting to /connect
   const { data: account } = await supabase
     .from("dash_gestao_accounts")
     .select("credentials")
@@ -56,52 +52,35 @@ export async function GET(request: NextRequest) {
   const existingCreds = account.credentials as Partial<YouTubeCredentials>;
 
   try {
-    console.log("[youtube/callback] accountId from cookie:", accountId);
-
-    // Exchange authorisation code for tokens
     const tokens = await exchangeCodeForTokens(
       code,
       existingCreds.client_id!,
       existingCreds.client_secret!
     );
 
-    console.log("[youtube/callback] tokens received:", {
-      has_access_token: !!tokens.access_token,
-      has_refresh_token: !!tokens.refresh_token,
-      expires_in: tokens.expires_in,
-    });
+    const newExpiry = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
 
-    // Auto-detect channel_id using the fresh access_token
-    const channelId = await detectChannelId(tokens.access_token);
-    console.log("[youtube/callback] channel detected:", channelId);
-
-    const newExpiry = new Date(
-      Date.now() + tokens.expires_in * 1000
-    ).toISOString();
-
+    // Preserve all existing credentials (channel_id, uploads_playlist_id, etc.)
+    // and only update the OAuth tokens
     const newCredentials: YouTubeCredentials = {
-      ...existingCreds,
+      ...(existingCreds as YouTubeCredentials),
       refresh_token: tokens.refresh_token,
       access_token: tokens.access_token,
       access_token_expiry: newExpiry,
-      channel_id: channelId,
-    } as YouTubeCredentials;
+    };
 
-    // Persist all credentials
-    const { error: updateError, count } = await supabase
+    const { error: updateError } = await supabase
       .from("dash_gestao_accounts")
       .update({ credentials: newCredentials })
       .eq("id", accountId)
       .select();
 
-    console.log("[youtube/callback] update result:", { updateError, count });
-
     if (updateError) {
-      throw new Error(`Falha ao salvar credenciais: ${updateError.message}`);
+      throw new Error(`Falha ao salvar tokens: ${updateError.message}`);
     }
 
     const response = NextResponse.redirect(
-      new URL(`${SETTINGS_URL}?connected=${encodeURIComponent(channelId)}`, request.url)
+      new URL(`${SETTINGS_URL}?connected=${encodeURIComponent(existingCreds.channel_id ?? "")}`, request.url)
     );
     response.cookies.delete("yt_oauth_account_id");
     return response;

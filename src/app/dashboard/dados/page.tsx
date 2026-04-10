@@ -7,7 +7,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { SkeletonTable } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 
-type Platform = "youtube" | "instagram" | "hotmart";
+type Platform = "youtube" | "instagram" | "hotmart" | "meta-ads";
 
 interface LogEntry extends Record<string, unknown> {
   id: string;
@@ -25,11 +25,12 @@ interface HotmartAccount {
   name: string;
 }
 
-const PLATFORM_TABS: Platform[] = ["youtube", "instagram", "hotmart"];
+const PLATFORM_TABS: Platform[] = ["youtube", "instagram", "hotmart", "meta-ads"];
 const PLATFORM_LABELS: Record<Platform, string> = {
   youtube: "YouTube",
   instagram: "Instagram",
   hotmart: "Hotmart",
+  "meta-ads": "Meta Ads",
 };
 
 const COLUMNS = [
@@ -44,7 +45,32 @@ const COLUMNS = [
     render: (value: LogEntry[keyof LogEntry]) => {
       const msg = value as string | null;
       if (!msg) return "—";
-      return <span title={msg} style={{ color: "var(--color-danger)" }}>{msg.length > 60 ? `${msg.slice(0, 60)}…` : msg}</span>;
+      return (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <span title={msg} style={{ color: "var(--color-danger)" }}>
+            {msg.length > 60 ? `${msg.slice(0, 60)}…` : msg}
+          </span>
+          <button
+            type="button"
+            title="Copiar mensagem de erro"
+            onClick={() => navigator.clipboard.writeText(msg)}
+            style={{
+              flexShrink: 0,
+              background: "none",
+              border: "none",
+              padding: "2px 4px",
+              cursor: "pointer",
+              color: "var(--color-text-muted)",
+              lineHeight: 1,
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z"/>
+              <path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h-1v1H2V6h1V5H2z"/>
+            </svg>
+          </button>
+        </span>
+      );
     },
   },
 ];
@@ -63,6 +89,15 @@ export default function DadosPage() {
   const [batchStatus, setBatchStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [batchResult, setBatchResult] = useState<{ salesRecords: number } | null>(null);
   const [batchError, setBatchError] = useState<string | null>(null);
+
+  // Meta Ads batch collect state
+  const [metaAccounts, setMetaAccounts] = useState<HotmartAccount[]>([]);
+  const [metaBatchAccountId, setMetaBatchAccountId] = useState("");
+  const [metaBatchStart, setMetaBatchStart] = useState("");
+  const [metaBatchEnd, setMetaBatchEnd] = useState("");
+  const [metaBatchStatus, setMetaBatchStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [metaBatchResult, setMetaBatchResult] = useState<{ dailyRecords: number; campaignRecords: number } | null>(null);
+  const [metaBatchError, setMetaBatchError] = useState<string | null>(null);
 
   const fetchLogs = useCallback(async (platform: Platform) => {
     setLoading(true);
@@ -93,6 +128,17 @@ export default function DadosPage() {
       })
       .catch(() => setHotmartAccounts([]));
   }, [activeTab, batchAccountId]);
+
+  useEffect(() => {
+    if (activeTab !== "meta-ads") return;
+    fetch("/api/accounts?platform=meta-ads")
+      .then((r) => r.json())
+      .then((accs: HotmartAccount[]) => {
+        setMetaAccounts(Array.isArray(accs) ? accs : []);
+        if (accs.length > 0 && !metaBatchAccountId) setMetaBatchAccountId(accs[0].id);
+      })
+      .catch(() => setMetaAccounts([]));
+  }, [activeTab, metaBatchAccountId]);
 
   async function handleSync() {
     setSyncing(true);
@@ -151,6 +197,37 @@ export default function DadosPage() {
     }
   }
 
+  async function handleMetaBatchCollect() {
+    setMetaBatchStatus("loading");
+    setMetaBatchResult(null);
+    setMetaBatchError(null);
+
+    try {
+      const res = await fetch("/api/meta-ads/batch-collect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          account_id: metaBatchAccountId,
+          start_date: metaBatchStart,
+          end_date: metaBatchEnd,
+        }),
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        setMetaBatchStatus("error");
+        setMetaBatchError(json.error ?? "Erro desconhecido");
+      } else {
+        setMetaBatchStatus("success");
+        setMetaBatchResult({ dailyRecords: json.dailyRecords, campaignRecords: json.campaignRecords });
+        await fetchLogs(activeTab);
+      }
+    } catch {
+      setMetaBatchStatus("error");
+      setMetaBatchError("Falha na comunicação com o servidor");
+    }
+  }
+
   const sectionLabels = PLATFORM_TABS.map((p) => PLATFORM_LABELS[p]);
   const activeLabel = PLATFORM_LABELS[activeTab];
   const batchCanSubmit = !!batchAccountId && !!batchStart && !!batchEnd && batchStatus !== "loading";
@@ -175,6 +252,55 @@ export default function DadosPage() {
             {syncSuccess ? <StatusBadge tone="success" label="Sincronização concluída" /> : null}
             {syncError ? <StatusBadge tone="error" label={syncError} /> : null}
           </div>
+
+          {activeTab === "meta-ads" ? (
+            <section className="surface-card p-5">
+              <div className="mb-4">
+                <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text)" }}>Coleta em lote Meta Ads</h2>
+                <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+                  Coleta métricas diárias e snapshots de campanhas para um intervalo específico.
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-4">
+                <div>
+                  <label className="mb-1 block text-[13px] font-medium" style={{ color: "var(--color-text-muted)" }}>Conta</label>
+                  <select value={metaBatchAccountId} onChange={(e) => setMetaBatchAccountId(e.target.value)} className="field-control">
+                    {metaAccounts.map((account) => (
+                      <option key={account.id} value={account.id}>{account.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-[13px] font-medium" style={{ color: "var(--color-text-muted)" }}>Data inicial</label>
+                  <input type="date" value={metaBatchStart} onChange={(e) => setMetaBatchStart(e.target.value)} className="field-control" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[13px] font-medium" style={{ color: "var(--color-text-muted)" }}>Data final</label>
+                  <input type="date" value={metaBatchEnd} onChange={(e) => setMetaBatchEnd(e.target.value)} className="field-control" />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={handleMetaBatchCollect}
+                    disabled={!metaBatchAccountId || !metaBatchStart || !metaBatchEnd || metaBatchStatus === "loading"}
+                    className="btn-primary w-full"
+                  >
+                    {metaBatchStatus === "loading" ? "Coletando..." : "Executar batch"}
+                  </button>
+                </div>
+              </div>
+
+              {metaBatchStatus === "success" && metaBatchResult ? (
+                <div className="mt-4">
+                  <StatusBadge tone="success" label={`${metaBatchResult.dailyRecords} dias + ${metaBatchResult.campaignRecords} campanhas coletadas`} />
+                </div>
+              ) : null}
+              {metaBatchStatus === "error" && metaBatchError ? (
+                <div className="mt-4"><StatusBadge tone="error" label={metaBatchError} /></div>
+              ) : null}
+            </section>
+          ) : null}
 
           {activeTab === "hotmart" ? (
             <section className="surface-card p-5">

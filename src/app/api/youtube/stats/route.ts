@@ -3,10 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateApiAuth } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { getValidAccessToken } from "@/lib/youtube/auth";
+import { fetchChannelInfo } from "@/lib/youtube/data-api";
 import type { Account, YouTubeCredentials } from "@/types/accounts";
 
-// Simple in-process cache: avoids hammering Data API on every page load
-const cache = new Map<string, { data: { subscriber_count: number; video_count: number }; expiresAt: number }>();
+// Cache em processo: evita chamar a Data API a cada carregamento de página
+const cache = new Map<
+  string,
+  { data: { subscriber_count: number; video_count: number }; expiresAt: number }
+>();
 
 export async function GET(request: NextRequest) {
   const { error } = await validateApiAuth();
@@ -17,7 +21,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "account_id é obrigatório" }, { status: 400 });
   }
 
-  // Return cached result if still fresh (1 hour)
   const cached = cache.get(accountId);
   if (cached && cached.expiresAt > Date.now()) {
     return NextResponse.json(cached.data);
@@ -37,25 +40,24 @@ export async function GET(request: NextRequest) {
   const creds = account.credentials as YouTubeCredentials;
 
   try {
-    const accessToken = await getValidAccessToken(account as Account);
+    let auth: { bearer: string } | { key: string };
 
-    const url = new URL("https://www.googleapis.com/youtube/v3/channels");
-    url.searchParams.set("part", "statistics");
-    url.searchParams.set("id", creds.channel_id);
-
-    const res = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (!res.ok) {
-      throw new Error(`Data API (${res.status}): ${await res.text()}`);
+    try {
+      const accessToken = await getValidAccessToken(account as Account);
+      auth = { bearer: accessToken };
+    } catch {
+      const apiKey = process.env.YOUTUBE_API_KEY;
+      if (!apiKey) {
+        return NextResponse.json({ error: "OAuth indisponível e YOUTUBE_API_KEY não configurada" }, { status: 500 });
+      }
+      auth = { key: apiKey };
     }
 
-    const json = await res.json();
-    const stats = json.items?.[0]?.statistics ?? {};
+    const info = await fetchChannelInfo(creds.channel_id, auth);
 
     const result = {
-      subscriber_count: parseInt(stats.subscriberCount ?? "0"),
-      video_count: parseInt(stats.videoCount ?? "0"),
+      subscriber_count: info.subscriberCount,
+      video_count: info.videoCount,
     };
 
     cache.set(accountId, { data: result, expiresAt: Date.now() + 3_600_000 });
