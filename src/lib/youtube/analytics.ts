@@ -88,6 +88,7 @@ export async function queryChannelDaily(
         "views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage," +
         "subscribersGained,subscribersLost,likes,comments,shares",
       dimensions: "day",
+      filters: "creatorContentType==VIDEO_ON_DEMAND",
     });
 
     const rows = columnarToObjects(data);
