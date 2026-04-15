@@ -149,12 +149,24 @@ export default function RelacionamentoPage() {
   }, [igSelectedId, appliedStart, appliedEnd]);
 
   // Derivados YouTube — views condicionais por tipo selecionado
-  const ytViewsSeries = ytDailyRows.map((r) =>
+  // ytPeriodRows: apenas o período selecionado — usado para totais e sparkline
+  const ytPeriodRows = ytDailyRows.filter(
+    (r) => r.date >= appliedStart && r.date <= appliedEnd
+  );
+  const ytViewsSeries = ytPeriodRows.map((r) =>
     ytViewsMode === "videos" ? r.views_videos : r.views_shorts
   );
   const ytTotalViews = ytViewsSeries.reduce((s, v) => s + v, 0);
-  const ytSparkline = ytDailyRows.map((r, i) => ({ date: r.date, value: ytViewsSeries[i] }));
-  const ytWeekDelta = calcWeekDeltaFromSeries(ytViewsSeries);
+  const ytSparkline = ytPeriodRows.map((r) => ({
+    date: r.date,
+    value: ytViewsMode === "videos" ? r.views_videos : r.views_shorts,
+  }));
+
+  // ytFullViewsSeries: range estendido (+14 dias) — apenas para cálculo de variação semanal
+  const ytFullViewsSeries = ytDailyRows.map((r) =>
+    ytViewsMode === "videos" ? r.views_videos : r.views_shorts
+  );
+  const ytWeekDelta = calcWeekDeltaFromSeries(ytFullViewsSeries);
 
   // Derivados Instagram — reach total do período
   const igTotalReach = igSnapshots.reduce((s, snap) => s + snap.reach, 0);
