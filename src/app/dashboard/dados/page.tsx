@@ -99,6 +99,15 @@ export default function DadosPage() {
   const [metaBatchResult, setMetaBatchResult] = useState<{ dailyRecords: number; campaignRecords: number } | null>(null);
   const [metaBatchError, setMetaBatchError] = useState<string | null>(null);
 
+  // YouTube batch collect state
+  const [youtubeAccounts, setYoutubeAccounts] = useState<HotmartAccount[]>([]);
+  const [ytBatchAccountId, setYtBatchAccountId] = useState("");
+  const [ytBatchStart, setYtBatchStart] = useState("");
+  const [ytBatchEnd, setYtBatchEnd] = useState("");
+  const [ytBatchStatus, setYtBatchStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [ytBatchResult, setYtBatchResult] = useState<{ channelRecords: number; videoRecords: number } | null>(null);
+  const [ytBatchError, setYtBatchError] = useState<string | null>(null);
+
   const fetchLogs = useCallback(async (platform: Platform) => {
     setLoading(true);
     try {
@@ -117,6 +126,17 @@ export default function DadosPage() {
     setSyncSuccess(false);
     fetchLogs(activeTab);
   }, [activeTab, fetchLogs]);
+
+  useEffect(() => {
+    if (activeTab !== "youtube") return;
+    fetch("/api/accounts?platform=youtube")
+      .then((r) => r.json())
+      .then((accs: HotmartAccount[]) => {
+        setYoutubeAccounts(Array.isArray(accs) ? accs : []);
+        if (accs.length > 0 && !ytBatchAccountId) setYtBatchAccountId(accs[0].id);
+      })
+      .catch(() => setYoutubeAccounts([]));
+  }, [activeTab, ytBatchAccountId]);
 
   useEffect(() => {
     if (activeTab !== "hotmart") return;
@@ -197,6 +217,37 @@ export default function DadosPage() {
     }
   }
 
+  async function handleYouTubeBatchCollect() {
+    setYtBatchStatus("loading");
+    setYtBatchResult(null);
+    setYtBatchError(null);
+
+    try {
+      const res = await fetch("/api/youtube/batch-collect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          account_id: ytBatchAccountId,
+          start_date: ytBatchStart,
+          end_date: ytBatchEnd,
+        }),
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        setYtBatchStatus("error");
+        setYtBatchError(json.error ?? "Erro desconhecido");
+      } else {
+        setYtBatchStatus("success");
+        setYtBatchResult({ channelRecords: json.channelRecords, videoRecords: json.videoRecords });
+        await fetchLogs(activeTab);
+      }
+    } catch {
+      setYtBatchStatus("error");
+      setYtBatchError("Falha na comunicação com o servidor");
+    }
+  }
+
   async function handleMetaBatchCollect() {
     setMetaBatchStatus("loading");
     setMetaBatchResult(null);
@@ -252,6 +303,55 @@ export default function DadosPage() {
             {syncSuccess ? <StatusBadge tone="success" label="Sincronização concluída" /> : null}
             {syncError ? <StatusBadge tone="error" label={syncError} /> : null}
           </div>
+
+          {activeTab === "youtube" ? (
+            <section className="surface-card p-5">
+              <div className="mb-4">
+                <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text)" }}>Coleta em lote YouTube</h2>
+                <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+                  Coleta métricas diárias do canal para um intervalo específico e cria histórico de dados.
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-4">
+                <div>
+                  <label className="mb-1 block text-[13px] font-medium" style={{ color: "var(--color-text-muted)" }}>Conta</label>
+                  <select value={ytBatchAccountId} onChange={(e) => setYtBatchAccountId(e.target.value)} className="field-control">
+                    {youtubeAccounts.map((account) => (
+                      <option key={account.id} value={account.id}>{account.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-[13px] font-medium" style={{ color: "var(--color-text-muted)" }}>Data inicial</label>
+                  <input type="date" value={ytBatchStart} onChange={(e) => setYtBatchStart(e.target.value)} className="field-control" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[13px] font-medium" style={{ color: "var(--color-text-muted)" }}>Data final</label>
+                  <input type="date" value={ytBatchEnd} onChange={(e) => setYtBatchEnd(e.target.value)} className="field-control" />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={handleYouTubeBatchCollect}
+                    disabled={!ytBatchAccountId || !ytBatchStart || !ytBatchEnd || ytBatchStatus === "loading"}
+                    className="btn-primary w-full"
+                  >
+                    {ytBatchStatus === "loading" ? "Coletando..." : "Executar batch"}
+                  </button>
+                </div>
+              </div>
+
+              {ytBatchStatus === "success" && ytBatchResult ? (
+                <div className="mt-4">
+                  <StatusBadge tone="success" label={`${ytBatchResult.channelRecords} dias coletados + ${ytBatchResult.videoRecords} vídeos atualizados`} />
+                </div>
+              ) : null}
+              {ytBatchStatus === "error" && ytBatchError ? (
+                <div className="mt-4"><StatusBadge tone="error" label={ytBatchError} /></div>
+              ) : null}
+            </section>
+          ) : null}
 
           {activeTab === "meta-ads" ? (
             <section className="surface-card p-5">

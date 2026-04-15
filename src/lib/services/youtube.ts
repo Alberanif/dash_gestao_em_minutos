@@ -9,6 +9,23 @@ import {
 } from "@/lib/youtube/data-api";
 import type { Account, YouTubeCredentials } from "@/types/accounts";
 
+// Retorna o subscriber_count do dia conhecido mais próximo (carry-forward).
+// Usado para preencher dias sem atividade que a Analytics API não retorna.
+function carryForwardCount(
+  date: string,
+  countByDate: Record<string, number>,
+  sortedDates: string[]
+): number {
+  if (sortedDates.length === 0) return 0;
+  // Último dia conhecido anterior ou igual à data alvo
+  let best = sortedDates[0];
+  for (const d of sortedDates) {
+    if (d <= date) best = d;
+    else break;
+  }
+  return countByDate[best] ?? 0;
+}
+
 async function detectSyncRange(
   account: Account
 ): Promise<{ start: string; end: string }> {
@@ -37,7 +54,10 @@ async function detectSyncRange(
   return { start: lastDate.toISOString().slice(0, 10), end: today };
 }
 
-export async function collectYouTube(account: Account): Promise<{
+export async function collectYouTube(
+  account: Account,
+  dateRange?: { start: string; end: string }
+): Promise<{
   channelRecords: number;
   videoRecords: number;
   analyticsError?: string;
@@ -131,7 +151,7 @@ export async function collectYouTube(account: Account): Promise<{
     };
   }
 
-  const syncRange = await detectSyncRange(account);
+  const syncRange = dateRange ?? await detectSyncRange(account);
   let channelRecords = 0;
   let analyticsError: string | undefined;
 
@@ -144,14 +164,61 @@ export async function collectYouTube(account: Account): Promise<{
     );
 
     if (channelRows.length > 0) {
+      // Reconstrução retroativa do total de inscritos por dia.
+      // Partimos do total atual da API e andamos de trás para frente usando os deltas.
+      // Exemplo: se hoje são 100k e ontem ganhamos 80 e perdemos 5 → ontem eram 99.925.
+      const sortedDesc = [...channelRows].sort((a, b) => b.date.localeCompare(a.date));
+      let runningCount = channelInfo.subscriberCount;
+      const subscriberCountByDate: Record<string, number> = {};
+
+      for (const row of sortedDesc) {
+        subscriberCountByDate[row.date] = runningCount;
+        runningCount = runningCount - row.subscribers_gained + row.subscribers_lost;
+      }
+
       const { error: channelError } = await supabase
         .from("dash_gestao_youtube_channel_daily")
         .upsert(
-          channelRows.map((r) => ({ account_id: account.id, ...r })),
+          channelRows.map((r) => ({
+            account_id: account.id,
+            ...r,
+            subscriber_count: subscriberCountByDate[r.date] ?? 0,
+          })),
           { onConflict: "account_id,date" }
         );
       if (channelError) throw new Error(`Channel daily upsert: ${channelError.message}`);
       channelRecords = channelRows.length;
+
+      // A Analytics API não retorna linhas para dias sem atividade (ex: 0 views),
+      // mas esses dias já existem no banco com subscriber_count = 0.
+      // Fazemos um carry-forward: atualizamos esses dias com o valor do dia conhecido mais próximo.
+      const knownDates = Object.keys(subscriberCountByDate).sort();
+      const { data: zeroRows } = await supabase
+        .from("dash_gestao_youtube_channel_daily")
+        .select("id, date")
+        .eq("account_id", account.id)
+        .gte("date", syncRange.start)
+        .lte("date", syncRange.end)
+        .eq("subscriber_count", 0);
+
+      if (zeroRows && zeroRows.length > 0 && knownDates.length > 0) {
+        // Agrupa por subscriber_count calculado para minimizar chamadas ao banco
+        const updateGroups = new Map<number, string[]>();
+        for (const row of zeroRows) {
+          const count = carryForwardCount(row.date, subscriberCountByDate, knownDates);
+          if (count > 0) {
+            const ids = updateGroups.get(count) ?? [];
+            ids.push(row.id);
+            updateGroups.set(count, ids);
+          }
+        }
+        for (const [count, ids] of updateGroups) {
+          await supabase
+            .from("dash_gestao_youtube_channel_daily")
+            .update({ subscriber_count: count })
+            .in("id", ids);
+        }
+      }
     } else {
       analyticsError = `Analytics API retornou 0 linhas para "${account.name}" no período ${syncRange.start}→${syncRange.end}. Verifique se o token tem permissão yt-analytics.readonly no canal ${creds.channel_id}.`;
     }

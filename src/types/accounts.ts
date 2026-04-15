@@ -97,6 +97,7 @@ export interface ChannelDailyRow extends Record<string, unknown> {
   average_view_percentage: number;
   subscribers_gained: number;
   subscribers_lost: number;
+  subscriber_count: number;
   likes: number;
   comments: number;
   shares: number;

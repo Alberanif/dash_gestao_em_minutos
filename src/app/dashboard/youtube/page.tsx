@@ -240,7 +240,7 @@ export default function YouTubePage() {
             ) : (
               <>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <KpiCard title="Inscritos" value={channelStats?.subscriber_count ?? 0} format="compact" icon={IconUsers} sparklineData={channelData.map((d) => d.subscribers_gained - d.subscribers_lost)} />
+                  <KpiCard title="Inscritos" value={[...channelData].reverse().find((d) => d.subscriber_count > 0)?.subscriber_count ?? 0} format="compact" icon={IconUsers} sparklineData={channelData.map((d) => d.subscribers_gained - d.subscribers_lost)} />
                   <KpiCard title="Views no período" value={periodViews} format="compact" icon={IconEye} sparklineData={channelData.map((d) => d.views)} />
                   <KpiCard title="Watch time (min)" value={formatCompact(periodWatchMin)} icon={IconVideo} sparklineData={channelData.map((d) => d.estimated_minutes_watched)} />
                   <KpiCard title="Vídeos publicados" value={channelStats?.video_count ?? 0} icon={IconVideo} />
