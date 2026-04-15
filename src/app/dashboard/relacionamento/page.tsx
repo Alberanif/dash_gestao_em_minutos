@@ -72,6 +72,9 @@ export default function RelacionamentoPage() {
   const [ytLoading, setYtLoading] = useState(true);
   const [igLoading, setIgLoading] = useState(true);
 
+  // Toggle de tipo de views do YouTube
+  const [ytViewsMode, setYtViewsMode] = useState<"videos" | "shorts">("videos");
+
   // Dados
   const [ytDailyRows, setYtDailyRows] = useState<ChannelDailyRow[]>([]);
   const [igSnapshots, setIgSnapshots] = useState<ProfileSnapshot[]>([]);
@@ -144,10 +147,12 @@ export default function RelacionamentoPage() {
     return () => { cancelled = true; };
   }, [igSelectedId, appliedStart, appliedEnd]);
 
-  // Derivados YouTube — views total do período
-  const ytViewsSeries = ytDailyRows.map((r) => r.views);
+  // Derivados YouTube — views condicionais por tipo selecionado
+  const ytViewsSeries = ytDailyRows.map((r) =>
+    ytViewsMode === "videos" ? r.views_videos : r.views_shorts
+  );
   const ytTotalViews = ytViewsSeries.reduce((s, v) => s + v, 0);
-  const ytSparkline = ytDailyRows.map((r) => ({ date: r.date, value: r.views }));
+  const ytSparkline = ytDailyRows.map((r, i) => ({ date: r.date, value: ytViewsSeries[i] }));
   const ytWeekDelta = calcWeekDeltaFromSeries(ytViewsSeries);
 
   // Derivados Instagram — reach total do período
@@ -180,15 +185,17 @@ export default function RelacionamentoPage() {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <PositioningCard
             platform="youtube"
-            label="Views (Total do Período)"
+            label={ytViewsMode === "videos" ? "Views de Vídeos (Período)" : "Views de Shorts (Período)"}
             value={ytTotalViews}
             weekDelta={ytWeekDelta}
             sparklineData={ytSparkline}
-            seriesLabel="Views diárias"
+            seriesLabel={ytViewsMode === "videos" ? "Views de Vídeos" : "Views de Shorts"}
             loading={ytLoading}
             accounts={ytAccounts}
             selectedAccountId={ytSelectedId}
             onAccountChange={setYtSelectedId}
+            toggleMode={ytViewsMode}
+            onToggleMode={setYtViewsMode}
           />
 
           <PositioningCard
