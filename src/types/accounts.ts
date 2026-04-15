@@ -91,7 +91,9 @@ export interface ChannelDailyRow extends Record<string, unknown> {
   id: string;
   account_id: string;
   date: string;
-  views: number;
+  views: number;           // total = views_videos + views_shorts
+  views_videos: number;    // VIDEO_ON_DEMAND only
+  views_shorts: number;    // SHORT only
   estimated_minutes_watched: number;
   average_view_duration: number;
   average_view_percentage: number;
