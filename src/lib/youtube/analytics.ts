@@ -80,27 +80,51 @@ export async function queryChannelDaily(
 
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i];
-    const data = await analyticsGet(accessToken, {
+
+    // Chamada 1: métricas de visualização filtradas por VIDEO_ON_DEMAND (exclui Shorts).
+    // subscribersGained/Lost NÃO aceitam filtro de creatorContentType (são métricas de conta),
+    // por isso são buscadas em uma chamada separada.
+    const viewData = await analyticsGet(accessToken, {
       ids: `channel==${channelId}`,
       startDate: chunk.start,
       endDate: chunk.end,
       metrics:
         "views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage," +
-        "subscribersGained,subscribersLost,likes,comments,shares",
+        "likes,comments,shares",
       dimensions: "day",
       filters: "creatorContentType==VIDEO_ON_DEMAND",
     });
 
-    const rows = columnarToObjects(data);
-    for (const r of rows) {
+    await sleep(100);
+
+    // Chamada 2: métricas de inscritos sem filtro de tipo de conteúdo.
+    const subsData = await analyticsGet(accessToken, {
+      ids: `channel==${channelId}`,
+      startDate: chunk.start,
+      endDate: chunk.end,
+      metrics: "subscribersGained,subscribersLost",
+      dimensions: "day",
+    });
+
+    const viewRows = columnarToObjects(viewData);
+    const subsRows = columnarToObjects(subsData);
+
+    // Indexa inscritos por data para merge eficiente
+    const subsByDate = new Map<string, Record<string, unknown>>(
+      subsRows.map((r) => [r.day as string, r])
+    );
+
+    for (const r of viewRows) {
+      const date = r.day as string;
+      const subs = subsByDate.get(date);
       allRows.push({
-        date: r.day as string,
+        date,
         views: Number(r.views ?? 0),
         estimated_minutes_watched: Number(r.estimatedMinutesWatched ?? 0),
         average_view_duration: Number(r.averageViewDuration ?? 0),
         average_view_percentage: Number(r.averageViewPercentage ?? 0),
-        subscribers_gained: Number(r.subscribersGained ?? 0),
-        subscribers_lost: Number(r.subscribersLost ?? 0),
+        subscribers_gained: Number(subs?.subscribersGained ?? 0),
+        subscribers_lost: Number(subs?.subscribersLost ?? 0),
         likes: Number(r.likes ?? 0),
         comments: Number(r.comments ?? 0),
         shares: Number(r.shares ?? 0),
