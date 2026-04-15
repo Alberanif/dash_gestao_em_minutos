@@ -107,6 +107,7 @@ export default function RelacionamentoPage() {
     }
     let cancelled = false;
     setYtLoading(true);
+    setYtViewsMode("videos");
 
     const extendedStart = shiftDateBack(appliedStart, 14);
     fetch(
