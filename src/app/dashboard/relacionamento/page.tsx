@@ -84,6 +84,15 @@ export default function RelacionamentoPage() {
     setAppliedEnd(endDate);
   }
 
+  function applyQuickRange(days: number) {
+    const s = daysAgo(days);
+    const e = today();
+    setStartDate(s);
+    setEndDate(e);
+    setAppliedStart(s);
+    setAppliedEnd(e);
+  }
+
   // Carrega contas uma única vez ao montar
   useEffect(() => {
     Promise.all([
@@ -177,13 +186,26 @@ export default function RelacionamentoPage() {
   const igWeekDelta = calcIgReachWeekDelta(igSnapshots);
 
   const headerActions = (
-    <DateRangeControls
-      startDate={startDate}
-      endDate={endDate}
-      onStartDateChange={setStartDate}
-      onEndDateChange={setEndDate}
-      onApply={applyDateFilter}
-    />
+    <div className="flex flex-wrap items-center gap-2">
+      {[7, 15, 30].map((days) => (
+        <button
+          key={days}
+          type="button"
+          onClick={() => applyQuickRange(days)}
+          className="rounded-md border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--color-accent)]"
+          style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
+        >
+          {days} Dias
+        </button>
+      ))}
+      <DateRangeControls
+        startDate={startDate}
+        endDate={endDate}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+        onApply={applyDateFilter}
+      />
+    </div>
   );
 
   return (
