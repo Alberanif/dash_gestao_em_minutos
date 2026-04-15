@@ -21,6 +21,8 @@ interface PositioningCardProps {
   accounts?: AccountOption[];
   selectedAccountId?: string;
   onAccountChange?: (id: string) => void;
+  toggleMode?: "videos" | "shorts";
+  onToggleMode?: (mode: "videos" | "shorts") => void;
 }
 
 const PLATFORM_CONFIG: Record<
@@ -100,6 +102,8 @@ export function PositioningCard({
   accounts = [],
   selectedAccountId = "",
   onAccountChange,
+  toggleMode,
+  onToggleMode,
 }: PositioningCardProps) {
   const { name, color, icon } = PLATFORM_CONFIG[platform];
 
@@ -177,6 +181,25 @@ export function PositioningCard({
           className="rounded-[var(--radius-sm)] p-4"
           style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)" }}
         >
+          {toggleMode !== undefined && onToggleMode ? (
+            <div className="mb-3 flex gap-1">
+              {(["videos", "shorts"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => onToggleMode(mode)}
+                  className="rounded-full px-3 py-1 text-xs font-semibold transition-colors"
+                  style={{
+                    background: toggleMode === mode ? color : "transparent",
+                    color: toggleMode === mode ? "#fff" : "var(--color-text-muted)",
+                    border: `1px solid ${toggleMode === mode ? color : "var(--color-border)"}`,
+                    cursor: "pointer",
+                  }}
+                >
+                  {mode === "videos" ? "Vídeos" : "Shorts"}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <p style={{ fontSize: 12, fontWeight: 500, color: "var(--color-text-muted)", marginBottom: 6 }}>
             {label}
           </p>
