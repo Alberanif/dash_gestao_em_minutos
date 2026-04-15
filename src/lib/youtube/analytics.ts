@@ -58,7 +58,9 @@ async function analyticsGet(
 
 export interface ChannelDailyApiRow {
   date: string;
-  views: number;
+  views: number;                    // total = views_videos + views_shorts
+  views_videos: number;             // VIDEO_ON_DEMAND only
+  views_shorts: number;             // SHORT only
   estimated_minutes_watched: number;
   average_view_duration: number;
   average_view_percentage: number;
@@ -81,10 +83,8 @@ export async function queryChannelDaily(
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i];
 
-    // Chamada 1: métricas de visualização filtradas por VIDEO_ON_DEMAND (exclui Shorts).
-    // subscribersGained/Lost NÃO aceitam filtro de creatorContentType (são métricas de conta),
-    // por isso são buscadas em uma chamada separada.
-    const viewData = await analyticsGet(accessToken, {
+    // Chamada 1: métricas de vídeos regulares (VIDEO_ON_DEMAND)
+    const viewVideoData = await analyticsGet(accessToken, {
       ids: `channel==${channelId}`,
       startDate: chunk.start,
       endDate: chunk.end,
@@ -97,7 +97,19 @@ export async function queryChannelDaily(
 
     await sleep(100);
 
-    // Chamada 2: métricas de inscritos sem filtro de tipo de conteúdo.
+    // Chamada 2: views de Shorts
+    const viewShortsData = await analyticsGet(accessToken, {
+      ids: `channel==${channelId}`,
+      startDate: chunk.start,
+      endDate: chunk.end,
+      metrics: "views",
+      dimensions: "day",
+      filters: "creatorContentType==SHORT",
+    });
+
+    await sleep(100);
+
+    // Chamada 3: métricas de inscritos (sem filtro — são métricas de conta)
     const subsData = await analyticsGet(accessToken, {
       ids: `channel==${channelId}`,
       startDate: chunk.start,
@@ -106,28 +118,51 @@ export async function queryChannelDaily(
       dimensions: "day",
     });
 
-    const viewRows = columnarToObjects(viewData);
+    const viewVideoRows = columnarToObjects(viewVideoData);
+    const viewShortsRows = columnarToObjects(viewShortsData);
     const subsRows = columnarToObjects(subsData);
 
-    // Indexa inscritos por data para merge eficiente
+    // Indexa cada dataset por data para merge O(1)
+    const videoByDate = new Map<string, Record<string, unknown>>(
+      viewVideoRows.map((r) => [r.day as string, r])
+    );
+    const shortsByDate = new Map<string, Record<string, unknown>>(
+      viewShortsRows.map((r) => [r.day as string, r])
+    );
     const subsByDate = new Map<string, Record<string, unknown>>(
       subsRows.map((r) => [r.day as string, r])
     );
 
-    for (const r of viewRows) {
-      const date = r.day as string;
-      const subs = subsByDate.get(date);
+    // Âncora: união de datas das 3 chamadas.
+    // Garante que nenhum dia é perdido, independente do tipo de conteúdo do canal
+    // (canal só de Shorts, só de vídeos, ou misto).
+    const allDates = new Set<string>([
+      ...subsRows.map((r) => r.day as string),
+      ...viewVideoRows.map((r) => r.day as string),
+      ...viewShortsRows.map((r) => r.day as string),
+    ]);
+
+    for (const date of [...allDates].sort()) {
+      const video = videoByDate.get(date);
+      const shorts = shortsByDate.get(date);
+      const sub = subsByDate.get(date);
+
+      const viewsVideos = Number(video?.views ?? 0);
+      const viewsShorts = Number(shorts?.views ?? 0);
+
       allRows.push({
         date,
-        views: Number(r.views ?? 0),
-        estimated_minutes_watched: Number(r.estimatedMinutesWatched ?? 0),
-        average_view_duration: Number(r.averageViewDuration ?? 0),
-        average_view_percentage: Number(r.averageViewPercentage ?? 0),
-        subscribers_gained: Number(subs?.subscribersGained ?? 0),
-        subscribers_lost: Number(subs?.subscribersLost ?? 0),
-        likes: Number(r.likes ?? 0),
-        comments: Number(r.comments ?? 0),
-        shares: Number(r.shares ?? 0),
+        views: viewsVideos + viewsShorts,
+        views_videos: viewsVideos,
+        views_shorts: viewsShorts,
+        estimated_minutes_watched: Number(video?.estimatedMinutesWatched ?? 0),
+        average_view_duration: Number(video?.averageViewDuration ?? 0),
+        average_view_percentage: Number(video?.averageViewPercentage ?? 0),
+        subscribers_gained: Number(sub?.subscribersGained ?? 0),
+        subscribers_lost: Number(sub?.subscribersLost ?? 0),
+        likes: Number(video?.likes ?? 0),
+        comments: Number(video?.comments ?? 0),
+        shares: Number(video?.shares ?? 0),
       });
     }
 
