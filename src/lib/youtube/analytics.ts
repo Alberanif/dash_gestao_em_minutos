@@ -61,9 +61,9 @@ export interface ChannelDailyApiRow {
   views: number;                    // total = views_videos + views_shorts
   views_videos: number;             // VIDEO_ON_DEMAND only
   views_shorts: number;             // SHORT only
-  estimated_minutes_watched: number;
-  average_view_duration: number;
-  average_view_percentage: number;
+  estimated_minutes_watched: number; // VIDEO_ON_DEMAND only; Shorts watch-time not collected
+  average_view_duration: number;     // VIDEO_ON_DEMAND only
+  average_view_percentage: number;   // VIDEO_ON_DEMAND only
   subscribers_gained: number;
   subscribers_lost: number;
   likes: number;
@@ -136,6 +136,8 @@ export async function queryChannelDaily(
     // Âncora: união de datas das 3 chamadas.
     // Garante que nenhum dia é perdido, independente do tipo de conteúdo do canal
     // (canal só de Shorts, só de vídeos, ou misto).
+    // Dias com subscriber_gained/lost mas views=0 são válidos (ex: recomendação de
+    // conteúdo antigo gera inscritos sem views no período filtrado).
     const allDates = new Set<string>([
       ...subsRows.map((r) => r.day as string),
       ...viewVideoRows.map((r) => r.day as string),
