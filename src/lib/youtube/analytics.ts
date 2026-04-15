@@ -83,29 +83,54 @@ export async function queryChannelDaily(
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i];
 
-    // Chamada 1: métricas de vídeos regulares (VIDEO_ON_DEMAND)
-    const viewVideoData = await analyticsGet(accessToken, {
-      ids: `channel==${channelId}`,
-      startDate: chunk.start,
-      endDate: chunk.end,
-      metrics:
-        "views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage," +
-        "likes,comments,shares",
-      dimensions: "day",
-      filters: "creatorContentType==VIDEO_ON_DEMAND",
-    });
+    // Chamada 1: tenta coletar métricas de vídeos regulares com filtro VIDEO_ON_DEMAND.
+    // Alguns canais não têm segmentação por tipo de conteúdo habilitada na Analytics API
+    // e recebem 400 para esse filtro. Nesse caso, faz fallback sem filtro (views totais).
+    let viewVideoData: Record<string, unknown>;
+    let contentTypeFilterSupported = true;
+    try {
+      viewVideoData = await analyticsGet(accessToken, {
+        ids: `channel==${channelId}`,
+        startDate: chunk.start,
+        endDate: chunk.end,
+        metrics:
+          "views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage," +
+          "likes,comments,shares",
+        dimensions: "day",
+        filters: "creatorContentType==VIDEO_ON_DEMAND",
+      });
+    } catch {
+      contentTypeFilterSupported = false;
+      viewVideoData = await analyticsGet(accessToken, {
+        ids: `channel==${channelId}`,
+        startDate: chunk.start,
+        endDate: chunk.end,
+        metrics:
+          "views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage," +
+          "likes,comments,shares",
+        dimensions: "day",
+      });
+    }
 
     await sleep(100);
 
-    // Chamada 2: views de Shorts
-    const viewShortsData = await analyticsGet(accessToken, {
-      ids: `channel==${channelId}`,
-      startDate: chunk.start,
-      endDate: chunk.end,
-      metrics: "views",
-      dimensions: "day",
-      filters: "creatorContentType==SHORT",
-    });
+    // Chamada 2: views de Shorts — ignorada se o canal não suporta filtro de tipo de conteúdo.
+    // Se VIDEO_ON_DEMAND falhou com 400, SHORT provavelmente também falharia.
+    let viewShortsData: Record<string, unknown> = {};
+    if (contentTypeFilterSupported) {
+      try {
+        viewShortsData = await analyticsGet(accessToken, {
+          ids: `channel==${channelId}`,
+          startDate: chunk.start,
+          endDate: chunk.end,
+          metrics: "views",
+          dimensions: "day",
+          filters: "creatorContentType==SHORT",
+        });
+      } catch {
+        // Canal não suporta filtro SHORT — views_shorts ficará 0 para todos os dias
+      }
+    }
 
     await sleep(100);
 
