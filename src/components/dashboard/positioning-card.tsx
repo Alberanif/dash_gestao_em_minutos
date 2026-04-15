@@ -187,6 +187,8 @@ export function PositioningCard({
                 <button
                   key={mode}
                   onClick={() => onToggleMode(mode)}
+                  aria-pressed={toggleMode === mode}
+                  aria-label={`Mostrar ${mode === "videos" ? "vídeos" : "shorts"}`}
                   className="rounded-full px-3 py-1 text-xs font-semibold transition-colors"
                   style={{
                     background: toggleMode === mode ? color : "transparent",
