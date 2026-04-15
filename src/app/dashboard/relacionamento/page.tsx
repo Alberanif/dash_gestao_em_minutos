@@ -72,9 +72,6 @@ export default function RelacionamentoPage() {
   const [ytLoading, setYtLoading] = useState(true);
   const [igLoading, setIgLoading] = useState(true);
 
-  // Toggle de tipo de views do YouTube
-  const [ytViewsMode, setYtViewsMode] = useState<"videos" | "shorts">("videos");
-
   // Dados
   const [ytDailyRows, setYtDailyRows] = useState<ChannelDailyRow[]>([]);
   const [igSnapshots, setIgSnapshots] = useState<ProfileSnapshot[]>([]);
@@ -116,7 +113,6 @@ export default function RelacionamentoPage() {
     }
     let cancelled = false;
     setYtLoading(true);
-    setYtViewsMode("videos");
 
     const extendedStart = shiftDateBack(appliedStart, 14);
     fetch(
@@ -157,24 +153,16 @@ export default function RelacionamentoPage() {
     return () => { cancelled = true; };
   }, [igSelectedId, appliedStart, appliedEnd]);
 
-  // Derivados YouTube — views condicionais por tipo selecionado
+  // Derivados YouTube
   // ytPeriodRows: apenas o período selecionado — usado para totais e sparkline
   const ytPeriodRows = ytDailyRows.filter(
     (r) => r.date >= appliedStart && r.date <= appliedEnd
   );
-  const ytViewsSeries = ytPeriodRows.map((r) =>
-    ytViewsMode === "videos" ? r.views_videos : r.views_shorts
-  );
-  const ytTotalViews = ytViewsSeries.reduce((s, v) => s + v, 0);
-  const ytSparkline = ytPeriodRows.map((r) => ({
-    date: r.date,
-    value: ytViewsMode === "videos" ? r.views_videos : r.views_shorts,
-  }));
+  const ytTotalViews = ytPeriodRows.reduce((s, r) => s + r.views, 0);
+  const ytSparkline = ytPeriodRows.map((r) => ({ date: r.date, value: r.views }));
 
   // ytFullViewsSeries: range estendido (+14 dias) — apenas para cálculo de variação semanal
-  const ytFullViewsSeries = ytDailyRows.map((r) =>
-    ytViewsMode === "videos" ? r.views_videos : r.views_shorts
-  );
+  const ytFullViewsSeries = ytDailyRows.map((r) => r.views);
   const ytWeekDelta = calcWeekDeltaFromSeries(ytFullViewsSeries);
 
   // Derivados Instagram — reach total do período
@@ -220,17 +208,15 @@ export default function RelacionamentoPage() {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <PositioningCard
             platform="youtube"
-            label={ytViewsMode === "videos" ? "Views de Vídeos (Período)" : "Views de Shorts (Período)"}
+            label="Views (Período)"
             value={ytTotalViews}
             weekDelta={ytWeekDelta}
             sparklineData={ytSparkline}
-            seriesLabel={ytViewsMode === "videos" ? "Views de Vídeos" : "Views de Shorts"}
+            seriesLabel="Views"
             loading={ytLoading}
             accounts={ytAccounts}
             selectedAccountId={ytSelectedId}
             onAccountChange={setYtSelectedId}
-            toggleMode={ytViewsMode}
-            onToggleMode={setYtViewsMode}
           />
 
           <PositioningCard
