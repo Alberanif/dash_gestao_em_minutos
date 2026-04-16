@@ -1,14 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { Funnel, HotmartProduct } from "@/types/funnels";
+import type { Funnel, HotmartProduct, CampaignOption } from "@/types/funnels";
 import type { Account } from "@/types/accounts";
-
-interface CampaignOption {
-  campaign_id: string;
-  campaign_name: string;
-  account_id: string;
-}
 
 interface FunnelFormData {
   name: string;
@@ -123,22 +117,27 @@ export function FunnelFormModal({ funnel, open, onClose, onSave }: FunnelFormMod
   }, [productSearch, open, fetchProducts]);
 
   // Buscar campanhas quando termos ou contas mudam
+  // Usar string key para evitar re-renders por nova referência de array
+  const adAccountIdsKey = form.ad_account_ids.join(",");
   useEffect(() => {
-    if (!open || form.ad_account_ids.length === 0 || campaignTerms.length === 0) {
+    if (!open || !adAccountIdsKey || campaignTerms.length === 0) {
       setCampaigns([]);
       return;
     }
+    const controller = new AbortController();
     setLoadingCampaigns(true);
     const params = new URLSearchParams({
-      account_ids: form.ad_account_ids.join(","),
+      account_ids: adAccountIdsKey,
       terms: campaignTerms.join(","),
     });
-    fetch(`/api/funnels/campaigns?${params}`)
+    fetch(`/api/funnels/campaigns?${params}`, { signal: controller.signal })
       .then((r) => r.json())
       .then((data) => setCampaigns(Array.isArray(data) ? data : []))
-      .catch(() => setCampaigns([]))
+      .catch((err) => { if (err.name !== "AbortError") setCampaigns([]); })
       .finally(() => setLoadingCampaigns(false));
-  }, [open, form.ad_account_ids, campaignTerms]);
+    return () => controller.abort();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, adAccountIdsKey, campaignTerms]);
 
   function toggleProductId(pid: string) {
     setForm((prev) => ({
