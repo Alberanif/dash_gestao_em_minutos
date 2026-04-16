@@ -4,6 +4,12 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import type { Funnel, HotmartProduct } from "@/types/funnels";
 import type { Account } from "@/types/accounts";
 
+interface CampaignOption {
+  campaign_id: string;
+  campaign_name: string;
+  account_id: string;
+}
+
 interface FunnelFormData {
   name: string;
   type: "destrave";
@@ -60,6 +66,12 @@ export function FunnelFormModal({ funnel, open, onClose, onSave }: FunnelFormMod
   // Contas Meta Ads
   const [metaAccounts, setMetaAccounts] = useState<Account[]>([]);
 
+  // Campanhas Meta Ads
+  const [campaignTerms, setCampaignTerms] = useState<string[]>([]);
+  const [termInput, setTermInput] = useState("");
+  const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
+  const [loadingCampaigns, setLoadingCampaigns] = useState(false);
+
   // Preencher form ao abrir
   useEffect(() => {
     if (open) {
@@ -67,6 +79,9 @@ export function FunnelFormModal({ funnel, open, onClose, onSave }: FunnelFormMod
       setError("");
       setProductSearch("");
       setProducts([]);
+      setCampaignTerms([]);
+      setTermInput("");
+      setCampaigns([]);
     }
   }, [open, funnel]);
 
@@ -107,6 +122,24 @@ export function FunnelFormModal({ funnel, open, onClose, onSave }: FunnelFormMod
     };
   }, [productSearch, open, fetchProducts]);
 
+  // Buscar campanhas quando termos ou contas mudam
+  useEffect(() => {
+    if (!open || form.ad_account_ids.length === 0 || campaignTerms.length === 0) {
+      setCampaigns([]);
+      return;
+    }
+    setLoadingCampaigns(true);
+    const params = new URLSearchParams({
+      account_ids: form.ad_account_ids.join(","),
+      terms: campaignTerms.join(","),
+    });
+    fetch(`/api/funnels/campaigns?${params}`)
+      .then((r) => r.json())
+      .then((data) => setCampaigns(Array.isArray(data) ? data : []))
+      .catch(() => setCampaigns([]))
+      .finally(() => setLoadingCampaigns(false));
+  }, [open, form.ad_account_ids, campaignTerms]);
+
   function toggleProductId(pid: string) {
     setForm((prev) => ({
       ...prev,
@@ -122,6 +155,34 @@ export function FunnelFormModal({ funnel, open, onClose, onSave }: FunnelFormMod
       ad_account_ids: prev.ad_account_ids.includes(aid)
         ? prev.ad_account_ids.filter((id) => id !== aid)
         : [...prev.ad_account_ids, aid],
+    }));
+  }
+
+  function addTerm() {
+    const t = termInput.trim();
+    if (!t || campaignTerms.includes(t)) return;
+    setCampaignTerms((prev) => [...prev, t]);
+    setTermInput("");
+  }
+
+  function removeTerm(term: string) {
+    setCampaignTerms((prev) => prev.filter((t) => t !== term));
+  }
+
+  function toggleCampaignId(cid: string) {
+    setForm((prev) => ({
+      ...prev,
+      campaign_ids: prev.campaign_ids.includes(cid)
+        ? prev.campaign_ids.filter((id) => id !== cid)
+        : [...prev.campaign_ids, cid],
+    }));
+  }
+
+  function selectAllCampaigns() {
+    const allIds = campaigns.map((c) => c.campaign_id);
+    setForm((prev) => ({
+      ...prev,
+      campaign_ids: [...new Set([...prev.campaign_ids, ...allIds])],
     }));
   }
 
@@ -454,6 +515,194 @@ export function FunnelFormModal({ funnel, open, onClose, onSave }: FunnelFormMod
               </div>
             )}
           </div>
+
+          {/* Filtro de campanhas — só aparece se houver contas selecionadas */}
+          {form.ad_account_ids.length > 0 && (
+            <div>
+              <label style={labelStyle}>
+                Campanhas Meta Ads{" "}
+                {form.campaign_ids.length > 0 && (
+                  <span style={{ color: "var(--color-primary)", fontWeight: 400, textTransform: "none" }}>
+                    ({form.campaign_ids.length} selecionada{form.campaign_ids.length > 1 ? "s" : ""})
+                  </span>
+                )}
+                {form.campaign_ids.length === 0 && (
+                  <span style={{ color: "var(--color-text-muted)", fontWeight: 400, textTransform: "none" }}>
+                    — usando gasto total das contas
+                  </span>
+                )}
+              </label>
+
+              {/* Input de termos + botão "+" */}
+              <div className="flex gap-2 mb-2">
+                <input
+                  style={{ ...inputStyle, flex: 1 }}
+                  type="text"
+                  placeholder="Termo de busca no nome da campanha..."
+                  value={termInput}
+                  onChange={(e) => setTermInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addTerm();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={addTerm}
+                  disabled={!termInput.trim()}
+                  style={{
+                    padding: "8px 14px",
+                    fontSize: 16,
+                    fontWeight: 700,
+                    borderRadius: "var(--radius-sm)",
+                    border: "1px solid var(--color-primary)",
+                    background: termInput.trim() ? "var(--color-primary)" : "var(--color-border)",
+                    color: termInput.trim() ? "#fff" : "var(--color-text-muted)",
+                    cursor: termInput.trim() ? "pointer" : "not-allowed",
+                    flexShrink: 0,
+                  }}
+                  title="Adicionar termo"
+                >
+                  +
+                </button>
+              </div>
+
+              {/* Tags de termos ativos */}
+              {campaignTerms.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {campaignTerms.map((term) => (
+                    <span
+                      key={term}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "3px 10px",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        borderRadius: 99,
+                        background: "var(--color-primary-light)",
+                        color: "var(--color-primary)",
+                        border: "1px solid var(--color-primary)",
+                      }}
+                    >
+                      {term}
+                      <button
+                        type="button"
+                        onClick={() => removeTerm(term)}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          color: "var(--color-primary)",
+                          fontSize: 14,
+                          lineHeight: 1,
+                          padding: 0,
+                        }}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Lista de campanhas filtradas */}
+              {campaignTerms.length > 0 && (
+                <>
+                  {campaigns.length > 0 && (
+                    <div
+                      className="flex items-center justify-between"
+                      style={{ marginBottom: 6 }}
+                    >
+                      <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                        {campaigns.length} campanha{campaigns.length > 1 ? "s" : ""} encontrada{campaigns.length > 1 ? "s" : ""}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={selectAllCampaigns}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: "var(--color-primary)",
+                          padding: 0,
+                        }}
+                      >
+                        Selecionar todas
+                      </button>
+                    </div>
+                  )}
+
+                  <div
+                    style={{
+                      maxHeight: 200,
+                      overflowY: "auto",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: "var(--radius-sm)",
+                      background: "var(--color-bg)",
+                    }}
+                  >
+                    {loadingCampaigns ? (
+                      <p style={{ padding: "10px 12px", fontSize: 12, color: "var(--color-text-muted)" }}>
+                        Buscando campanhas...
+                      </p>
+                    ) : campaigns.length === 0 ? (
+                      <p style={{ padding: "10px 12px", fontSize: 12, color: "var(--color-text-muted)" }}>
+                        Nenhuma campanha encontrada com os termos informados
+                      </p>
+                    ) : (
+                      campaigns.map((c) => {
+                        const checked = form.campaign_ids.includes(c.campaign_id);
+                        return (
+                          <label
+                            key={c.campaign_id}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                              padding: "8px 12px",
+                              cursor: "pointer",
+                              background: checked ? "var(--color-primary-light)" : "transparent",
+                              borderBottom: "1px solid var(--color-border)",
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleCampaignId(c.campaign_id)}
+                              style={{ accentColor: "var(--color-primary)", flexShrink: 0 }}
+                            />
+                            <span
+                              className="truncate"
+                              style={{
+                                fontSize: 12,
+                                color: "var(--color-text)",
+                                fontWeight: checked ? 600 : 400,
+                              }}
+                            >
+                              {c.campaign_name}
+                            </span>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Aviso quando há campanhas selecionadas mas termos foram removidos */}
+              {campaignTerms.length === 0 && form.campaign_ids.length > 0 && (
+                <p style={{ fontSize: 12, color: "var(--color-warning)", marginTop: 4 }}>
+                  {form.campaign_ids.length} campanha{form.campaign_ids.length > 1 ? "s" : ""} selecionada{form.campaign_ids.length > 1 ? "s" : ""} (adicione termos para visualizá-las novamente)
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Erro */}
           {error && (
