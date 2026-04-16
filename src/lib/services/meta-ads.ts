@@ -23,6 +23,33 @@ async function metaGet(endpoint: string, params: Record<string, string>, accessT
   return res.json();
 }
 
+async function metaGetAllPages<T>(
+  endpoint: string,
+  params: Record<string, string>,
+  accessToken: string
+): Promise<T[]> {
+  const all: T[] = [];
+  let nextUrl: string | null = null;
+
+  // First page via metaGet
+  const first = await metaGet(endpoint, params, accessToken);
+  all.push(...(first.data ?? []));
+  nextUrl = first.paging?.next ?? null;
+
+  // Subsequent pages follow the pre-signed `next` URL directly
+  while (nextUrl) {
+    const res = await fetch(nextUrl);
+    if (!res.ok) {
+      throw new Error(`Meta Ads API error (pagination): ${res.status} ${await res.text()}`);
+    }
+    const page = await res.json();
+    all.push(...(page.data ?? []));
+    nextUrl = page.paging?.next ?? null;
+  }
+
+  return all;
+}
+
 function extractConversions(
   actions: Array<{ action_type: string; value: string }> | undefined,
   actionValues: Array<{ action_type: string; value: string }> | undefined
@@ -144,19 +171,8 @@ export async function collectMetaAds(
     dailyRecords = dailyRows.length;
   }
 
-  // 2. Snapshot de campanhas no mesmo período
-  const campaignsResponse = await metaGet(
-    `${ad_account_id}/insights`,
-    {
-      fields: "campaign_id,campaign_name,spend,impressions,reach,clicks,ctr,cpc,actions,action_values",
-      level: "campaign",
-      since,
-      until,
-    },
-    access_token
-  );
-
-  const campaignRows = (campaignsResponse.data || []).map((row: {
+  // 2. Snapshot de campanhas no mesmo período (com paginação completa)
+  const campaignsData = await metaGetAllPages<{
     campaign_id: string;
     campaign_name: string;
     spend?: string;
@@ -167,7 +183,18 @@ export async function collectMetaAds(
     cpc?: string;
     actions?: Array<{ action_type: string; value: string }>;
     action_values?: Array<{ action_type: string; value: string }>;
-  }) => {
+  }>(
+    `${ad_account_id}/insights`,
+    {
+      fields: "campaign_id,campaign_name,spend,impressions,reach,clicks,ctr,cpc,actions,action_values",
+      level: "campaign",
+      since,
+      until,
+    },
+    access_token
+  );
+
+  const campaignRows = campaignsData.map((row) => {
     const { conversions, conversion_value } = extractConversions(row.actions, row.action_values);
     return {
       account_id: account.id,

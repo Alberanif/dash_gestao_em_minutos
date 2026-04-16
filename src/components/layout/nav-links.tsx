@@ -5,6 +5,17 @@ import { usePathname } from "next/navigation";
 
 const LINKS = [
   {
+    href: "/dashboard/eqa",
+    label: "EQA",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 3h18v4H3z" />
+        <path d="M3 9h12v4H3z" />
+        <path d="M3 15h7v4H3z" />
+      </svg>
+    ),
+  },
+  {
     href: "/dashboard/posicionamento",
     label: "Posicionamento",
     icon: (

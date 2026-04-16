@@ -2,6 +2,7 @@ export interface DestraveConfig {
   product_ids: string[];
   ad_account_ids: string[];
   campaign_ids: string[];
+  inactive_ads?: boolean;
 }
 
 export interface Funnel {

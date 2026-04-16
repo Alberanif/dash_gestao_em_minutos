@@ -13,6 +13,7 @@ interface FunnelFormData {
   product_ids: string[];
   ad_account_ids: string[];
   campaign_ids: string[];
+  inactive_ads: boolean;
 }
 
 interface FunnelFormModalProps {
@@ -31,6 +32,7 @@ const EMPTY_FORM: FunnelFormData = {
   product_ids: [],
   ad_account_ids: [],
   campaign_ids: [],
+  inactive_ads: false,
 };
 
 function funnelToForm(f: Funnel): FunnelFormData {
@@ -43,6 +45,7 @@ function funnelToForm(f: Funnel): FunnelFormData {
     product_ids: f.config.product_ids ?? [],
     ad_account_ids: f.config.ad_account_ids ?? [],
     campaign_ids: f.config.campaign_ids ?? [],
+    inactive_ads: f.config.inactive_ads ?? false,
   };
 }
 
@@ -219,6 +222,7 @@ export function FunnelFormModal({ funnel, open, onClose, onSave }: FunnelFormMod
           product_ids: form.product_ids,
           ad_account_ids: form.ad_account_ids,
           campaign_ids: form.campaign_ids,
+          inactive_ads: form.inactive_ads,
         },
       });
       onClose();
@@ -515,8 +519,32 @@ export function FunnelFormModal({ funnel, open, onClose, onSave }: FunnelFormMod
             )}
           </div>
 
-          {/* Filtro de campanhas — só aparece se houver contas selecionadas */}
-          {form.ad_account_ids.length > 0 && (
+          {/* Anúncios Inativos */}
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              cursor: "pointer",
+              userSelect: "none",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={form.inactive_ads}
+              onChange={(e) => setForm((p) => ({ ...p, inactive_ads: e.target.checked }))}
+              style={{ accentColor: "var(--color-primary)", width: 15, height: 15, flexShrink: 0 }}
+            />
+            <span style={{ fontSize: 13, color: "var(--color-text)" }}>
+              Anúncios Inativos
+            </span>
+            <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+              — sem cálculo de CAC
+            </span>
+          </label>
+
+          {/* Filtro de campanhas — só aparece se houver contas selecionadas e anúncios ativos */}
+          {form.ad_account_ids.length > 0 && !form.inactive_ads && (
             <div>
               <label style={labelStyle}>
                 Campanhas Meta Ads{" "}
