@@ -40,7 +40,7 @@ export async function GET(
       ? supabase
           .from("dash_gestao_hotmart_sales")
           .select("id", { count: "exact", head: true })
-          .in("product_id", config.product_ids)
+          .in("product_id", config.product_ids ?? [])
           .in("status", STATUS_APPROVED)
           .gte("purchase_date", start_date)
           .lte("purchase_date", end_date + "T23:59:59")
@@ -54,14 +54,14 @@ export async function GET(
       ? supabase
           .from("dash_gestao_meta_ads_campaigns")
           .select("spend")
-          .in("campaign_id", config.campaign_ids)
+          .in("campaign_id", config.campaign_ids ?? [])
           .gte("collected_date", start_date)
           .lte("collected_date", end_date)
       : (config.ad_account_ids ?? []).length > 0
       ? supabase
           .from("dash_gestao_meta_ads_daily")
           .select("spend")
-          .in("account_id", config.ad_account_ids)
+          .in("account_id", config.ad_account_ids ?? [])
           .gte("date", start_date)
           .lte("date", end_date)
       : Promise.resolve({ data: [], error: null });
