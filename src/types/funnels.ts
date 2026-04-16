@@ -27,3 +27,9 @@ export interface HotmartProduct {
   product_id: string;
   product_name: string;
 }
+
+export interface CampaignOption {
+  campaign_id: string;
+  campaign_name: string;
+  account_id: string;
+}

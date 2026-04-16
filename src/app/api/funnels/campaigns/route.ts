@@ -2,12 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiAuth } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-
-export interface CampaignOption {
-  campaign_id: string;
-  campaign_name: string;
-  account_id: string;
-}
+import type { CampaignOption } from "@/types/funnels";
 
 export async function GET(request: NextRequest) {
   const { error } = await validateApiAuth();
@@ -36,14 +31,19 @@ export async function GET(request: NextRequest) {
     .from("dash_gestao_meta_ads_campaigns")
     .select("campaign_id, campaign_name, account_id, collected_date")
     .in("account_id", accountIds)
-    .order("collected_date", { ascending: false });
+    .order("collected_date", { ascending: false })
+    .limit(500);
 
   // Filtrar por termos ILIKE (OR entre termos)
   if (terms.length > 0) {
     const ilikeClauses = terms
+      .map((t) => t.replace(/[(),%]/g, ""))
+      .filter(Boolean)
       .map((t) => `campaign_name.ilike.%${t}%`)
       .join(",");
-    query = query.or(ilikeClauses);
+    if (ilikeClauses) {
+      query = query.or(ilikeClauses);
+    }
   }
 
   const { data, error: dbError } = await query;
