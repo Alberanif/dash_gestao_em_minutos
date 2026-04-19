@@ -92,7 +92,7 @@ export async function GET(
 
   const total_sales = salesResult.count ?? 0;
   const total_sales_brl = salesBrlResult.count ?? 0;
-  const total_sales_other_currencies = total_sales - total_sales_brl;
+  const total_sales_other_currencies = Math.max(0, total_sales - total_sales_brl);
   const spendRows = (spendResult.data as { spend: number }[] | null) ?? [];
   const total_spend = spendRows.reduce((sum, r) => sum + (r.spend ?? 0), 0);
   const cac = total_sales > 0 ? total_spend / total_sales : 0;
