@@ -57,9 +57,28 @@ export async function collectHotmart(
   const supabase = createSupabaseServiceClient();
   const now = new Date();
 
-  // Usa datas fornecidas ou, por padrão, 90 dias para capturar mudanças de status
-  const startDate = options?.startDate ?? new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-  const endDate   = options?.endDate   ?? now;
+  let startDate: Date;
+  let endDate: Date = options?.endDate ?? now;
+
+  if (options?.startDate) {
+    startDate = options.startDate;
+  } else {
+    const today = now.toISOString().split("T")[0];
+    const { data: activeFunnels } = await supabase
+      .from("dash_gestao_funnels")
+      .select("start_date")
+      .gte("end_date", today);
+
+    const earliest = (activeFunnels ?? []).reduce<Date | null>((min, f) => {
+      const d = new Date(f.start_date);
+      return min === null || d < min ? d : min;
+    }, null);
+
+    startDate =
+      earliest !== null && earliest < now
+        ? earliest
+        : new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  }
 
   const startMs = startDate.getTime();
   const endMs = endDate.getTime();
