@@ -137,6 +137,11 @@ export function FunnelDetailModal({
             <p style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text)" }}>
               {metrics.total_sales}
             </p>
+            {metrics.total_sales_other_currencies > 0 && (
+              <p style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 3, lineHeight: 1.4 }}>
+                BRL: {metrics.total_sales_brl} · Outras: {metrics.total_sales_other_currencies}
+              </p>
+            )}
           </div>
           {!funnel.config.inactive_ads && (
             <div

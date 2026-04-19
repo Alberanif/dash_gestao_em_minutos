@@ -19,6 +19,8 @@ export interface Funnel {
 
 export interface FunnelMetrics {
   total_sales: number;
+  total_sales_brl: number;
+  total_sales_other_currencies: number;
   total_spend: number;
   cac: number;
   pace_diario: number;

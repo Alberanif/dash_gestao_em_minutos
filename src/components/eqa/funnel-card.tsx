@@ -209,6 +209,11 @@ export function FunnelCard({
                 <span style={{ color: "var(--color-text-muted)", fontWeight: 400 }}>
                   ({Math.round(progress)}%)
                 </span>
+                {metrics.total_sales_other_currencies > 0 && (
+                  <span style={{ color: "var(--color-text-muted)", fontWeight: 400, fontSize: 11 }}>
+                    {" "}· {metrics.total_sales_brl} BRL + {metrics.total_sales_other_currencies} ext.
+                  </span>
+                )}
               </span>
             </div>
             <div
