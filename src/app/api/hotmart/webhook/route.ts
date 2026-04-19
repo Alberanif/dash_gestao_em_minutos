@@ -11,8 +11,9 @@ const RELEVANT_EVENTS = new Set([
 ]);
 
 export async function POST(request: NextRequest) {
+  const expectedToken = process.env.HOTMART_WEBHOOK_TOKEN;
   const hottok = request.headers.get("x-hotmart-hottok");
-  if (!hottok || hottok !== process.env.HOTMART_WEBHOOK_TOKEN) {
+  if (!expectedToken || !hottok || hottok !== expectedToken) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
