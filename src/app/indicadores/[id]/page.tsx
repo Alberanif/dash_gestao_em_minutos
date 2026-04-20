@@ -192,6 +192,7 @@ export default function ProjectDetailPage() {
           <KpiBox title="Investimento Total" value={fmtBRL(metrics?.meta_spend)} />
           <KpiBox title="CPM" value={fmtBRL(metrics?.meta_cpm)} />
           <KpiBox title="CTR" value={fmtPct(metrics?.meta_ctr)} />
+          <KpiBox title="Leads" value={fmtNum(metrics?.meta_leads)} />
           <KpiBox title="Connect Rate" value={fmtPct(metrics?.meta_connect_rate)} />
           <KpiBox title="CPL Tráfego" value={fmtBRL(metrics?.meta_cpl_traffic)} />
           <KpiBox title="Taxa Conversão LP" value={fmtPct(metrics?.meta_lp_conversion)} />

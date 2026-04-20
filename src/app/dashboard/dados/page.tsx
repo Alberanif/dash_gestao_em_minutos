@@ -96,7 +96,7 @@ export default function DadosPage() {
   const [metaBatchStart, setMetaBatchStart] = useState("");
   const [metaBatchEnd, setMetaBatchEnd] = useState("");
   const [metaBatchStatus, setMetaBatchStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [metaBatchResult, setMetaBatchResult] = useState<{ dailyRecords: number; campaignRecords: number } | null>(null);
+  const [metaBatchResult, setMetaBatchResult] = useState<{ dailyRecords: number; campaignDailyRecords: number } | null>(null);
   const [metaBatchError, setMetaBatchError] = useState<string | null>(null);
 
   // YouTube batch collect state
@@ -270,7 +270,7 @@ export default function DadosPage() {
         setMetaBatchError(json.error ?? "Erro desconhecido");
       } else {
         setMetaBatchStatus("success");
-        setMetaBatchResult({ dailyRecords: json.dailyRecords, campaignRecords: json.campaignRecords });
+        setMetaBatchResult({ dailyRecords: json.dailyRecords, campaignDailyRecords: json.campaignDailyRecords });
         await fetchLogs(activeTab);
       }
     } catch {
@@ -393,7 +393,7 @@ export default function DadosPage() {
 
               {metaBatchStatus === "success" && metaBatchResult ? (
                 <div className="mt-4">
-                  <StatusBadge tone="success" label={`${metaBatchResult.dailyRecords} dias + ${metaBatchResult.campaignRecords} campanhas coletadas`} />
+                  <StatusBadge tone="success" label={`${metaBatchResult.dailyRecords} dias + ${metaBatchResult.campaignDailyRecords} registros de campanha coletados`} />
                 </div>
               ) : null}
               {metaBatchStatus === "error" && metaBatchError ? (
