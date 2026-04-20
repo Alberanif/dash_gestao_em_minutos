@@ -42,7 +42,7 @@ export async function GET(
 
   let campaignQuery = supabase
     .from("dash_gestao_meta_ads_campaigns_daily")
-    .select("spend, impressions, clicks, conversions")
+    .select("spend, impressions, link_clicks, leads_all")
     .gte("date", start_date)
     .lte("date", end_date);
 
@@ -75,10 +75,10 @@ export async function GET(
 
   const meta_spend = campaigns.reduce((s, r) => s + (r.spend ?? 0), 0);
   const totalImpressions = campaigns.reduce((s, r) => s + ((r.impressions as number) ?? 0), 0);
-  const totalClicks = campaigns.reduce((s, r) => s + ((r.clicks as number) ?? 0), 0);
-  const meta_leads = campaigns.reduce((s, r) => s + ((r.conversions as number) ?? 0), 0);
+  const totalLinkClicks = campaigns.reduce((s, r) => s + ((r.link_clicks as number) ?? 0), 0);
+  const meta_leads = campaigns.reduce((s, r) => s + ((r.leads_all as number) ?? 0), 0);
   const meta_cpm = totalImpressions > 0 ? (meta_spend / totalImpressions) * 1000 : 0;
-  const meta_ctr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+  const meta_ctr = totalImpressions > 0 ? (totalLinkClicks / totalImpressions) * 100 : 0;
 
   const metrics: IndicadoresMetrics = {
     meta_spend,
