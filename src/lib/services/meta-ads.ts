@@ -107,7 +107,7 @@ export async function collectMetaAds(
     since = startDate;
     until = endDate;
     campaignSince = startDate;
-    campaignUntil = endDate;
+    campaignUntil = endDate < yesterdayStr ? endDate : yesterdayStr;
   } else {
     // Account-level daily: incremental from last collected date
     const { data: lastDailyRow } = await supabase

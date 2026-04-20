@@ -1,6 +1,6 @@
 CREATE TABLE dash_gestao_meta_ads_campaigns_daily (
   id            uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  account_id    uuid NOT NULL,
+  account_id    uuid NOT NULL REFERENCES dash_gestao_accounts(id) ON DELETE CASCADE,
   campaign_id   text NOT NULL,
   campaign_name text NOT NULL,
   date          date NOT NULL,
