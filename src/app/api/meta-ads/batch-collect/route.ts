@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       account_id,
       job_name: "meta-ads",
       status: "success",
-      records_collected: result.dailyRecords + result.campaignRecords,
+      records_collected: result.dailyRecords + result.campaignDailyRecords,
       started_at: startedAt,
       finished_at: new Date().toISOString(),
     });

@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
         records = result.salesRecords;
       } else if (account.platform === "meta-ads") {
         const result = await collectMetaAds(account);
-        records = result.dailyRecords + result.campaignRecords;
+        records = result.dailyRecords + result.campaignDailyRecords;
       }
 
       await supabase.from("dash_gestao_cron_logs").insert({
