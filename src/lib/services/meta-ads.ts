@@ -198,12 +198,16 @@ export async function collectMetaAds(
     ctr?: string;
     cpc?: string;
     cpm?: string;
+    inline_link_clicks?: string;
+    inline_link_click_ctr?: string;
+    outbound_clicks?: Array<{ action_type: string; value: string }>;
+    outbound_clicks_ctr?: Array<{ action_type: string; value: string }>;
     actions?: Array<{ action_type: string; value: string }>;
     action_values?: Array<{ action_type: string; value: string }>;
   }>(
     `${ad_account_id}/insights`,
     {
-      fields: "campaign_id,campaign_name,spend,impressions,reach,clicks,ctr,cpc,cpm,actions,action_values",
+      fields: "campaign_id,campaign_name,spend,impressions,reach,clicks,ctr,cpm,inline_link_clicks,inline_link_click_ctr,outbound_clicks,outbound_clicks_ctr,actions,action_values",
       level: "campaign",
       time_increment: "1",
       since: campaignSince,
@@ -214,6 +218,25 @@ export async function collectMetaAds(
 
   const campaignDailyRows = campaignsData.map((row) => {
     const { conversions } = extractConversions(row.actions, row.action_values);
+
+    const leads_all = Math.round(
+      (row.actions ?? [])
+        .filter((a) => a.action_type === "lead")
+        .reduce((s, a) => s + (parseFloat(a.value) || 0), 0)
+    );
+    const leads_pixel = Math.round(
+      (row.actions ?? [])
+        .filter((a) => a.action_type === "offsite_conversion.fb_pixel_lead")
+        .reduce((s, a) => s + (parseFloat(a.value) || 0), 0)
+    );
+    const outbound_clicks_count = parseInt(
+      (row.outbound_clicks ?? []).find((x) => x.action_type === "outbound_click")?.value ?? "0",
+      10
+    );
+    const outbound_ctr_val = parseFloat(
+      (row.outbound_clicks_ctr ?? []).find((x) => x.action_type === "outbound_click")?.value ?? "0"
+    );
+
     return {
       account_id: account.id,
       campaign_id: row.campaign_id,
@@ -226,6 +249,12 @@ export async function collectMetaAds(
       ctr: parseFloat(row.ctr || "0"),
       cpm: parseFloat(row.cpm || "0"),
       conversions,
+      link_clicks: parseInt(row.inline_link_clicks || "0", 10),
+      link_ctr: parseFloat(row.inline_link_click_ctr || "0"),
+      outbound_clicks: outbound_clicks_count,
+      outbound_ctr: outbound_ctr_val,
+      leads_pixel,
+      leads_all,
     };
   });
 
