@@ -213,7 +213,7 @@ export async function collectMetaAds(
   );
 
   const campaignDailyRows = campaignsData.map((row) => {
-    const { conversions, conversion_value } = extractConversions(row.actions, row.action_values);
+    const { conversions } = extractConversions(row.actions, row.action_values);
     return {
       account_id: account.id,
       campaign_id: row.campaign_id,
@@ -226,7 +226,6 @@ export async function collectMetaAds(
       ctr: parseFloat(row.ctr || "0"),
       cpm: parseFloat(row.cpm || "0"),
       conversions,
-      conversion_value,
     };
   });
 
