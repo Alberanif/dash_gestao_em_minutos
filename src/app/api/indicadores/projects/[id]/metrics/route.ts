@@ -41,10 +41,10 @@ export async function GET(
   const terms: string[] = project.campaign_terms ?? [];
 
   let campaignQuery = supabase
-    .from("dash_gestao_meta_ads_campaigns")
-    .select("spend, impressions, clicks, ctr, cpm, conversions")
-    .gte("collected_date", start_date)
-    .lte("collected_date", end_date);
+    .from("dash_gestao_meta_ads_campaigns_daily")
+    .select("spend, impressions, clicks, conversions")
+    .gte("date", start_date)
+    .lte("date", end_date);
 
   if (terms.length > 0) {
     const ilikeFilter = terms.map((t) => `campaign_name.ilike.%${t}%`).join(",");
