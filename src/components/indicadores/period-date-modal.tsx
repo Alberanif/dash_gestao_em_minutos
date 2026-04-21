@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface PeriodDateModalProps {
   initialStart?: string;
@@ -18,6 +18,14 @@ export function PeriodDateModal({
   const [start, setStart] = useState(initialStart);
   const [end, setEnd] = useState(initialEnd);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onCancel();
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onCancel]);
 
   function handleSave() {
     if (!start || !end) {
@@ -40,7 +48,7 @@ export function PeriodDateModal({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        zIndex: 1000,
+        zIndex: 50,
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onCancel();
@@ -56,6 +64,7 @@ export function PeriodDateModal({
           display: "flex",
           flexDirection: "column",
           gap: 16,
+          boxShadow: "var(--shadow-md)",
         }}
       >
         <p
@@ -114,7 +123,7 @@ export function PeriodDateModal({
           </label>
 
           {error && (
-            <p style={{ fontSize: 12, color: "#ef4444" }}>{error}</p>
+            <p style={{ fontSize: 12, color: "var(--color-danger)" }}>{error}</p>
           )}
         </div>
 
