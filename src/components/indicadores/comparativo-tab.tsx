@@ -111,6 +111,7 @@ export function ComparativoTab({ projectId, projectName }: ComparativoTabProps) 
         const res = await fetch(
           `/api/indicadores/projects/${projectId}/metrics?${params}`
         );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: IndicadoresMetrics & { error?: string } = await res.json();
         setPeriods((prev) => {
           const next = [...prev];
@@ -396,12 +397,12 @@ function FilledSlot({
                       </span>
                       {period.loading ? (
                         <div
+                          className="animate-pulse"
                           style={{
                             height: 12,
                             width: 48,
                             borderRadius: 4,
                             background: "var(--color-border)",
-                            animation: "pulse 1.5s ease-in-out infinite",
                             flexShrink: 0,
                           }}
                         />
