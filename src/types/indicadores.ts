@@ -3,6 +3,7 @@ export interface IndicadoresProject {
   name: string;
   hotmart_product_id: string;
   campaign_terms: string[];
+  organic_lead_events: string[];
   created_at: string;
   updated_at: string;
 }
@@ -39,4 +40,14 @@ export interface IndicadoresMetrics {
   google_connect_rate: number | null;
   google_cpl_traffic: number | null;
   google_lp_conversion: number | null;
+  organic_leads: number | null;
+  unknown_leads: number | null;
+}
+
+export interface ComparativoPeriod {
+  startDate: string;
+  endDate: string;
+  metrics: IndicadoresMetrics | null;
+  loading: boolean;
+  error: boolean;
 }
