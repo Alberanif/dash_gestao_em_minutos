@@ -2,6 +2,8 @@ export interface IndicadoresProject {
   id: string;
   name: string;
   hotmart_product_id: string;
+  hotmart_account_id: string | null;
+  hotmart_product_ids: string[];
   campaign_terms: string[];
   organic_lead_events: string[];
   created_at: string;
@@ -50,4 +52,18 @@ export interface ComparativoPeriod {
   metrics: IndicadoresMetrics | null;
   loading: boolean;
   error: boolean;
+}
+
+export interface HotmartProductMetrics {
+  product_id: string;
+  product_name: string;
+  sales_count: number;
+  revenue: number;
+}
+
+export interface HotmartMetrics {
+  products: HotmartProductMetrics[];
+  total_sales: number;
+  total_revenue: number;
+  has_non_brl: boolean;
 }
