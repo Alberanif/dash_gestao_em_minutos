@@ -236,6 +236,11 @@ export async function collectMetaAds(
     const outbound_ctr_val = parseFloat(
       (row.outbound_clicks_ctr ?? []).find((x) => x.action_type === "outbound_click")?.value ?? "0"
     );
+    const page_views = Math.round(
+      (row.actions ?? [])
+        .filter((a) => a.action_type === "landing_page_view")
+        .reduce((s, a) => s + (parseFloat(a.value) || 0), 0)
+    );
 
     return {
       account_id: account.id,
@@ -255,6 +260,7 @@ export async function collectMetaAds(
       outbound_ctr: outbound_ctr_val,
       leads_pixel,
       leads_all,
+      page_views,
     };
   });
 

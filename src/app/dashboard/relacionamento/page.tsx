@@ -217,6 +217,7 @@ export default function RelacionamentoPage() {
             accounts={ytAccounts}
             selectedAccountId={ytSelectedId}
             onAccountChange={setYtSelectedId}
+            explorePath="/dashboard/youtube"
           />
 
           <PositioningCard
@@ -230,6 +231,7 @@ export default function RelacionamentoPage() {
             accounts={igAccounts}
             selectedAccountId={igSelectedId}
             onAccountChange={setIgSelectedId}
+            explorePath="/dashboard/instagram"
           />
 
           <PositioningCard

@@ -195,6 +195,7 @@ export default function PosicionamentoPage() {
             accounts={ytAccounts}
             selectedAccountId={ytSelectedId}
             onAccountChange={setYtSelectedId}
+            explorePath="/dashboard/youtube"
           />
 
           <PositioningCard
@@ -208,6 +209,7 @@ export default function PosicionamentoPage() {
             accounts={igAccounts}
             selectedAccountId={igSelectedId}
             onAccountChange={setIgSelectedId}
+            explorePath="/dashboard/instagram"
           />
 
           <PositioningCard

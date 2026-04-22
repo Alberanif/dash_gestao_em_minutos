@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { PositioningMiniChart, type MiniChartPoint } from "@/components/dashboard/positioning-mini-chart";
 
 export type PositioningPlatform = "youtube" | "instagram" | "spotify";
@@ -21,6 +22,7 @@ interface PositioningCardProps {
   accounts?: AccountOption[];
   selectedAccountId?: string;
   onAccountChange?: (id: string) => void;
+  explorePath?: string;
 }
 
 const PLATFORM_CONFIG: Record<
@@ -100,6 +102,7 @@ export function PositioningCard({
   accounts = [],
   selectedAccountId = "",
   onAccountChange,
+  explorePath,
 }: PositioningCardProps) {
   const { name, color, icon } = PLATFORM_CONFIG[platform];
 
@@ -224,6 +227,21 @@ export function PositioningCard({
             />
           )}
         </div>
+
+        {explorePath && (
+          <div className="flex justify-end pt-1">
+            <Link
+              href={explorePath}
+              className="inline-flex items-center gap-1 text-xs font-medium transition-opacity hover:opacity-70"
+              style={{ color }}
+            >
+              Explorar
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

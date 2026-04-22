@@ -30,7 +30,7 @@ export async function GET(
 
   const { data: project, error: projectError } = await supabase
     .from("dash_gestao_indicadores_projects")
-    .select("campaign_terms")
+    .select("campaign_terms, organic_lead_events")
     .eq("id", id)
     .single();
 
@@ -39,10 +39,11 @@ export async function GET(
   }
 
   const terms: string[] = project.campaign_terms ?? [];
+  const organicEvents: string[] = project.organic_lead_events ?? [];
 
   let campaignQuery = supabase
     .from("dash_gestao_meta_ads_campaigns_daily")
-    .select("spend, impressions, link_clicks, leads_all")
+    .select("spend, impressions, link_clicks, leads_all, page_views")
     .gte("date", start_date)
     .lte("date", end_date);
 
@@ -53,7 +54,25 @@ export async function GET(
     campaignQuery = campaignQuery.eq("campaign_id", "NO_MATCH");
   }
 
-  const [campaignsResult, weeklyResult] = await Promise.all([
+  const baseLeadsQuery = () =>
+    supabase
+      .from("dash_gestao_captacao_leads")
+      .select("*", { count: "exact", head: true })
+      .gte("data_cadastro", start_date)
+      .lte("data_cadastro", end_date + "T23:59:59");
+
+  let organicLeadsQuery = baseLeadsQuery().eq("utm_content", "ORG");
+  let unknownLeadsQuery = baseLeadsQuery().eq("utm_content", "");
+
+  if (organicEvents.length > 0) {
+    organicLeadsQuery = organicLeadsQuery.in("evento", organicEvents);
+    unknownLeadsQuery = unknownLeadsQuery.in("evento", organicEvents);
+  } else {
+    organicLeadsQuery = organicLeadsQuery.eq("evento", "__NO_MATCH__");
+    unknownLeadsQuery = unknownLeadsQuery.eq("evento", "__NO_MATCH__");
+  }
+
+  const [campaignsResult, weeklyResult, organicResult, unknownResult] = await Promise.all([
     campaignQuery,
     supabase
       .from("dash_gestao_indicadores_weekly_data")
@@ -61,6 +80,8 @@ export async function GET(
       .eq("project_id", id)
       .gte("week_start", start_date)
       .lte("week_start", end_date),
+    organicLeadsQuery,
+    unknownLeadsQuery,
   ]);
 
   if (campaignsResult.error) {
@@ -68,6 +89,12 @@ export async function GET(
   }
   if (weeklyResult.error) {
     return NextResponse.json({ error: weeklyResult.error.message }, { status: 500 });
+  }
+  if (organicResult.error) {
+    return NextResponse.json({ error: organicResult.error.message }, { status: 500 });
+  }
+  if (unknownResult.error) {
+    return NextResponse.json({ error: unknownResult.error.message }, { status: 500 });
   }
 
   const campaigns = campaignsResult.data ?? [];
@@ -77,23 +104,29 @@ export async function GET(
   const totalImpressions = campaigns.reduce((s, r) => s + ((r.impressions as number) ?? 0), 0);
   const totalLinkClicks = campaigns.reduce((s, r) => s + ((r.link_clicks as number) ?? 0), 0);
   const meta_leads = campaigns.reduce((s, r) => s + ((r.leads_all as number) ?? 0), 0);
+  const totalPageViews = campaigns.reduce((s, r) => s + ((r.page_views as number) ?? 0), 0);
   const meta_cpm = totalImpressions > 0 ? (meta_spend / totalImpressions) * 1000 : 0;
   const meta_ctr = totalImpressions > 0 ? (totalLinkClicks / totalImpressions) * 100 : 0;
+  const meta_connect_rate = totalLinkClicks > 0 ? (totalPageViews / totalLinkClicks) * 100 : null;
+  const meta_cpl_traffic = meta_leads > 0 ? meta_spend / meta_leads : null;
+  const meta_lp_conversion = totalPageViews > 0 ? (meta_leads / totalPageViews) * 100 : null;
 
   const metrics: IndicadoresMetrics = {
     meta_spend,
     meta_cpm,
     meta_ctr,
     meta_leads,
-    meta_connect_rate: avgField(weekly, "meta_connect_rate"),
-    meta_lp_conversion: avgField(weekly, "meta_lp_conversion"),
-    meta_cpl_traffic: avgField(weekly, "meta_cpl_traffic"),
+    meta_connect_rate,
+    meta_lp_conversion,
+    meta_cpl_traffic,
     google_spend: avgField(weekly, "google_spend"),
     google_cpm: avgField(weekly, "google_cpm"),
     google_leads: avgField(weekly, "google_leads"),
     google_connect_rate: avgField(weekly, "google_connect_rate"),
     google_cpl_traffic: avgField(weekly, "google_cpl_traffic"),
     google_lp_conversion: avgField(weekly, "google_lp_conversion"),
+    organic_leads: organicResult.count ?? 0,
+    unknown_leads: unknownResult.count ?? 0,
   };
 
   return NextResponse.json(metrics);
