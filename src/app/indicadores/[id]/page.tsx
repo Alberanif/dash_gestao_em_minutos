@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { WeeklyDataModal } from "@/components/indicadores/weekly-data-modal";
 import { ComparativoTab } from "@/components/indicadores/comparativo-tab";
-import type { IndicadoresProject, IndicadoresWeeklyData, IndicadoresMetrics } from "@/types/indicadores";
+import type { IndicadoresProject, IndicadoresWeeklyData, IndicadoresMetrics, HotmartMetrics } from "@/types/indicadores";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -109,6 +109,175 @@ function Section({ title, icon, accent, accentBg, children }: SectionProps) {
   );
 }
 
+function HotmartSkeleton() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {[0, 1].map((i) => (
+        <div
+          key={i}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 80px 120px",
+            gap: "8px 16px",
+          }}
+        >
+          <div
+            className="animate-pulse"
+            style={{ height: 16, borderRadius: 4, background: "var(--color-border)" }}
+          />
+          <div
+            className="animate-pulse"
+            style={{ height: 16, borderRadius: 4, background: "var(--color-border)" }}
+          />
+          <div
+            className="animate-pulse"
+            style={{ height: 16, borderRadius: 4, background: "var(--color-border)" }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function HotmartSection({ metrics }: { metrics: HotmartMetrics }) {
+  const showTotal = metrics.products.length > 1;
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 80px 140px",
+          gap: "4px 16px",
+          paddingBottom: 6,
+          marginBottom: 2,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: "var(--color-text-muted)",
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+          }}
+        >
+          Produto
+        </span>
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: "var(--color-text-muted)",
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+            textAlign: "right",
+          }}
+        >
+          Vendas
+        </span>
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: "var(--color-text-muted)",
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+            textAlign: "right",
+          }}
+        >
+          Receita (BRL)
+        </span>
+      </div>
+
+      {metrics.products.map((p) => (
+        <div
+          key={p.product_id}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 80px 140px",
+            gap: "4px 16px",
+            padding: "8px 0",
+            borderTop: "1px solid var(--color-border)",
+          }}
+        >
+          <span style={{ fontSize: 13, color: "var(--color-text)" }}>
+            {p.product_name}
+          </span>
+          <span
+            style={{
+              fontSize: 13,
+              color: "var(--color-text)",
+              textAlign: "right",
+              fontFamily: "monospace",
+            }}
+          >
+            {fmtNum(p.sales_count)}
+          </span>
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              color: "#f97316",
+              textAlign: "right",
+              fontFamily: "monospace",
+            }}
+          >
+            {fmtBRL(p.revenue)}
+          </span>
+        </div>
+      ))}
+
+      {showTotal && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 80px 140px",
+            gap: "4px 16px",
+            padding: "10px 0 4px",
+            borderTop: "2px solid var(--color-border)",
+          }}
+        >
+          <span
+            style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}
+          >
+            Total
+          </span>
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              color: "var(--color-text)",
+              textAlign: "right",
+              fontFamily: "monospace",
+            }}
+          >
+            {fmtNum(metrics.total_sales)}
+          </span>
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              color: "#f97316",
+              textAlign: "right",
+              fontFamily: "monospace",
+            }}
+          >
+            {fmtBRL(metrics.total_revenue)}
+          </span>
+        </div>
+      )}
+
+      {metrics.has_non_brl && (
+        <p
+          style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 8 }}
+        >
+          * Vendas em outras moedas não incluídas.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -119,6 +288,8 @@ export default function ProjectDetailPage() {
   const [metrics, setMetrics] = useState<IndicadoresMetrics | null>(null);
   const [weeklyData, setWeeklyData] = useState<IndicadoresWeeklyData[]>([]);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
+  const [hotmartMetrics, setHotmartMetrics] = useState<HotmartMetrics | null>(null);
+  const [loadingHotmart, setLoadingHotmart] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"overview" | "comparativo">("overview");
 
@@ -141,15 +312,23 @@ export default function ProjectDetailPage() {
   const loadData = useCallback(async () => {
     if (!startDate || !endDate) return;
     setLoadingMetrics(true);
+    setLoadingHotmart(true);
     const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
-    const [metricsRes, weeklyRes] = await Promise.all([
+    const [metricsRes, weeklyRes, hotmartRes] = await Promise.all([
       fetch(`/api/indicadores/projects/${id}/metrics?${params}`),
       fetch(`/api/indicadores/projects/${id}/weekly?${params}`),
+      fetch(`/api/indicadores/projects/${id}/hotmart-metrics?${params}`),
     ]);
-    const [metricsData, weeklyRaw] = await Promise.all([metricsRes.json(), weeklyRes.json()]);
+    const [metricsData, weeklyRaw, hotmartData] = await Promise.all([
+      metricsRes.json(),
+      weeklyRes.json(),
+      hotmartRes.json(),
+    ]);
     setMetrics(metricsData.error ? null : metricsData);
     setWeeklyData(Array.isArray(weeklyRaw) ? weeklyRaw : []);
+    setHotmartMetrics(hotmartData.error ? null : hotmartData);
     setLoadingMetrics(false);
+    setLoadingHotmart(false);
   }, [id, startDate, endDate]);
 
   useEffect(() => {
@@ -376,6 +555,38 @@ export default function ProjectDetailPage() {
             <KpiBox title="Leads Orgânicos" value={fmtNum(metrics?.organic_leads)} accent="#0891b2" loading={loadingMetrics} />
             <KpiBox title="Leads Desconhecidos" value={fmtNum(metrics?.unknown_leads)} loading={loadingMetrics} />
           </div>
+        </Section>
+
+        <Section
+          title="Hotmart"
+          accent="#f97316"
+          accentBg="#fff7ed"
+          icon={
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="9" cy="21" r="1" />
+              <circle cx="20" cy="21" r="1" />
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+            </svg>
+          }
+        >
+          {loadingHotmart ? (
+            <HotmartSkeleton />
+          ) : hotmartMetrics && hotmartMetrics.products.length > 0 ? (
+            <HotmartSection metrics={hotmartMetrics} />
+          ) : (
+            <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+              Nenhum produto Hotmart configurado.
+            </p>
+          )}
         </Section>
 
         {/* Weekly table */}
