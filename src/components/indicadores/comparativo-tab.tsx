@@ -122,7 +122,7 @@ export function ComparativoTab({ projectId, projectName }: ComparativoTabProps) 
           : null;
       const metricsError =
         metricsResult.status === "rejected" ||
-        !!metricsResult.value?.error;
+        (metricsResult.status === "fulfilled" && !!metricsResult.value?.error);
 
       const hotmartMetrics =
         hotmartResult.status === "fulfilled" && !hotmartResult.value.error
@@ -130,7 +130,7 @@ export function ComparativoTab({ projectId, projectName }: ComparativoTabProps) 
           : null;
       const hotmartError =
         hotmartResult.status === "rejected" ||
-        !!hotmartResult.value?.error;
+        (hotmartResult.status === "fulfilled" && !!hotmartResult.value?.error);
 
       setPeriods((prev) => {
         const next = [...prev];
