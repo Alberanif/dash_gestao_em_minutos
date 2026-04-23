@@ -183,9 +183,8 @@ export function ComparativoTab({ projectId, projectName }: ComparativoTabProps) 
               projectName={projectName}
               onEditDates={() => setModalIndex(index)}
               onClear={() => clearPeriod(index)}
-              onRetry={() =>
-                fetchMetrics(index, period.startDate, period.endDate)
-              }
+              onRetry={() => fetchMetrics(index, period.startDate, period.endDate)}
+              onRetryHotmart={() => fetchMetrics(index, period.startDate, period.endDate)}
             />
           )
         )}
@@ -245,18 +244,28 @@ function EmptySlot({ onAdd }: { onAdd: () => void }) {
   );
 }
 
+function calcHotmartSales(metrics: HotmartMetrics) {
+  const foreignSales = metrics.products
+    .filter((p) => p.is_foreign_currency)
+    .reduce((s, p) => s + p.sales_count, 0);
+  const brlSales = metrics.total_sales - foreignSales;
+  return { brlSales, foreignSales, totalRevenue: metrics.total_revenue };
+}
+
 function FilledSlot({
   period,
   projectName,
   onEditDates,
   onClear,
   onRetry,
+  onRetryHotmart,
 }: {
   period: ComparativoPeriod;
   projectName: string;
   onEditDates: () => void;
   onClear: () => void;
   onRetry: () => void;
+  onRetryHotmart: () => void;
 }) {
   return (
     <div
@@ -437,6 +446,105 @@ function FilledSlot({
                 </div>
               </div>
             ))}
+
+            {/* Seção Hotmart */}
+            {(period.hotmartLoading || period.hotmartError || period.hotmartMetrics) && (
+              <div>
+                <p
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "#F04E23",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    marginBottom: 6,
+                  }}
+                >
+                  Hotmart
+                </p>
+
+                {period.hotmartError ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
+                    <p style={{ fontSize: 12, color: "var(--color-danger)" }}>
+                      Erro ao carregar Hotmart
+                    </p>
+                    <button
+                      onClick={onRetryHotmart}
+                      style={{
+                        fontSize: 12,
+                        color: "var(--color-primary)",
+                        background: "none",
+                        border: "1px solid var(--color-primary)",
+                        borderRadius: "var(--radius-sm)",
+                        padding: "4px 10px",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Tentar novamente
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {[
+                      { label: "Vendas (BRL)", getValue: (m: HotmartMetrics) => fmtNum(calcHotmartSales(m).brlSales) },
+                      { label: "Faturamento", getValue: (m: HotmartMetrics) => fmtBRL(calcHotmartSales(m).totalRevenue) },
+                      { label: "Vendas Ext.", getValue: (m: HotmartMetrics) => fmtNum(calcHotmartSales(m).foreignSales) },
+                    ].map(({ label, getValue }) => (
+                      <div
+                        key={label}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          padding: "5px 8px",
+                          borderRadius: "var(--radius-sm)",
+                          background: "var(--color-bg)",
+                          gap: 8,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: "var(--color-text-muted)",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            minWidth: 0,
+                          }}
+                        >
+                          {label}
+                        </span>
+                        {period.hotmartLoading ? (
+                          <div
+                            className="animate-pulse"
+                            style={{
+                              height: 12,
+                              width: 48,
+                              borderRadius: 4,
+                              background: "var(--color-border)",
+                              flexShrink: 0,
+                            }}
+                          />
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: "var(--color-text)",
+                              fontFamily: "monospace",
+                              flexShrink: 0,
+                            }}
+                          >
+                            {period.hotmartMetrics ? getValue(period.hotmartMetrics) : "—"}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
