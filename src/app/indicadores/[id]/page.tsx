@@ -2,9 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { WeeklyDataModal } from "@/components/indicadores/weekly-data-modal";
 import { ComparativoTab } from "@/components/indicadores/comparativo-tab";
-import type { IndicadoresProject, IndicadoresWeeklyData, IndicadoresMetrics, HotmartMetrics } from "@/types/indicadores";
+import type { IndicadoresProject, IndicadoresMetrics, HotmartMetrics } from "@/types/indicadores";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -16,27 +15,6 @@ function daysAgo(n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function buildWeeks(start: string, end: string): { weekStart: string; weekEnd: string }[] {
-  const weeks: { weekStart: string; weekEnd: string }[] = [];
-  const endDate = new Date(end);
-  let current = new Date(start);
-  while (current <= endDate) {
-    const weekStart = current.toISOString().slice(0, 10);
-    const weekEndDate = new Date(current);
-    weekEndDate.setDate(weekEndDate.getDate() + 6);
-    const weekEnd = (weekEndDate > endDate ? endDate : weekEndDate)
-      .toISOString()
-      .slice(0, 10);
-    weeks.push({ weekStart, weekEnd });
-    current.setDate(current.getDate() + 7);
-  }
-  return weeks;
-}
-
-function formatDate(d: string): string {
-  const [y, m, day] = d.split("-");
-  return `${day}/${m}/${y}`;
-}
 
 function fmtBRL(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
@@ -200,8 +178,13 @@ function HotmartSection({ metrics }: { metrics: HotmartMetrics }) {
             borderTop: "1px solid var(--color-border)",
           }}
         >
-          <span style={{ fontSize: 13, color: "var(--color-text)" }}>
+          <span style={{ fontSize: 13, color: "var(--color-text)", display: "flex", alignItems: "center", gap: 6 }}>
             {p.product_name}
+            {p.is_foreign_currency && (
+              <span style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 4, padding: "1px 5px", whiteSpace: "nowrap", letterSpacing: "0.04em" }}>
+                moeda ext.
+              </span>
+            )}
           </span>
           <span
             style={{
@@ -217,12 +200,12 @@ function HotmartSection({ metrics }: { metrics: HotmartMetrics }) {
             style={{
               fontSize: 13,
               fontWeight: 700,
-              color: "#f97316",
+              color: p.is_foreign_currency ? "var(--color-text-muted)" : "#f97316",
               textAlign: "right",
               fontFamily: "monospace",
             }}
           >
-            {fmtBRL(p.revenue)}
+            {p.is_foreign_currency ? "—" : fmtBRL(p.revenue)}
           </span>
         </div>
       ))}
@@ -267,13 +250,6 @@ function HotmartSection({ metrics }: { metrics: HotmartMetrics }) {
         </div>
       )}
 
-      {metrics.has_non_brl && (
-        <p
-          style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 8 }}
-        >
-          * Vendas em outras moedas não incluídas.
-        </p>
-      )}
     </div>
   );
 }
@@ -286,18 +262,11 @@ export default function ProjectDetailPage() {
   const [startDate, setStartDate] = useState(daysAgo(28));
   const [endDate, setEndDate] = useState(today());
   const [metrics, setMetrics] = useState<IndicadoresMetrics | null>(null);
-  const [weeklyData, setWeeklyData] = useState<IndicadoresWeeklyData[]>([]);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [hotmartMetrics, setHotmartMetrics] = useState<HotmartMetrics | null>(null);
   const [loadingHotmart, setLoadingHotmart] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"overview" | "comparativo">("overview");
-
-  const [weeklyModal, setWeeklyModal] = useState<{
-    weekStart: string;
-    weekEnd: string;
-    existing: IndicadoresWeeklyData | null;
-  } | null>(null);
 
   useEffect(() => {
     fetch(`/api/indicadores/projects`)
@@ -314,18 +283,15 @@ export default function ProjectDetailPage() {
     setLoadingMetrics(true);
     setLoadingHotmart(true);
     const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
-    const [metricsRes, weeklyRes, hotmartRes] = await Promise.all([
+    const [metricsRes, hotmartRes] = await Promise.all([
       fetch(`/api/indicadores/projects/${id}/metrics?${params}`),
-      fetch(`/api/indicadores/projects/${id}/weekly?${params}`),
       fetch(`/api/indicadores/projects/${id}/hotmart-metrics?${params}`),
     ]);
-    const [metricsData, weeklyRaw, hotmartData] = await Promise.all([
+    const [metricsData, hotmartData] = await Promise.all([
       metricsRes.json(),
-      weeklyRes.json(),
       hotmartRes.json(),
     ]);
     setMetrics(metricsData.error ? null : metricsData);
-    setWeeklyData(Array.isArray(weeklyRaw) ? weeklyRaw : []);
     setHotmartMetrics(hotmartData.error ? null : hotmartData);
     setLoadingMetrics(false);
     setLoadingHotmart(false);
@@ -335,19 +301,6 @@ export default function ProjectDetailPage() {
     loadData();
   }, [loadData]);
 
-  function handleWeeklySave(saved: IndicadoresWeeklyData) {
-    setWeeklyData((prev) => {
-      const idx = prev.findIndex((w) => w.week_start === saved.week_start);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = saved;
-        return next;
-      }
-      return [...prev, saved].sort((a, b) => a.week_start.localeCompare(b.week_start));
-    });
-  }
-
-  const weeks = buildWeeks(startDate, endDate);
 
   return (
     <div>
@@ -589,105 +542,11 @@ export default function ProjectDetailPage() {
           )}
         </Section>
 
-        {/* Weekly table */}
-        <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-card)", overflow: "hidden" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 16px", borderBottom: "1px solid var(--color-border)" }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-              <line x1="3" y1="10" x2="21" y2="10" />
-            </svg>
-            <p style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}>Indicadores Semanais</p>
-          </div>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: "var(--color-bg)" }}>
-                  {["Semana", "Invest. Meta", "CPM Meta", "CTR Meta", "Leads Meta", "Connect Rate", "Conversão LP", "CPL Tráfego", "Invest. Google", "Leads Google", ""].map((col) => (
-                    <th
-                      key={col}
-                      style={{
-                        padding: "10px 12px",
-                        textAlign: "left",
-                        fontSize: 11,
-                        fontWeight: 600,
-                        color: "var(--color-text-muted)",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.06em",
-                        borderBottom: "1px solid var(--color-border)",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {col}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {weeks.map(({ weekStart, weekEnd }) => {
-                  const wd = weeklyData.find((w) => w.week_start === weekStart) ?? null;
-                  return (
-                    <tr
-                      key={weekStart}
-                      style={{ borderBottom: "1px solid var(--color-border)" }}
-                      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--color-bg)")}
-                      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
-                    >
-                      <td style={{ padding: "10px 12px", color: "var(--color-text)", whiteSpace: "nowrap", fontWeight: 600, fontSize: 12 }}>
-                        {formatDate(weekStart)} – {formatDate(weekEnd)}
-                      </td>
-                      <td style={{ padding: "10px 12px", color: "var(--color-text-muted)", fontFamily: "monospace" }}>—</td>
-                      <td style={{ padding: "10px 12px", color: "var(--color-text-muted)", fontFamily: "monospace" }}>—</td>
-                      <td style={{ padding: "10px 12px", color: "var(--color-text-muted)", fontFamily: "monospace" }}>—</td>
-                      <td style={{ padding: "10px 12px", color: "var(--color-text-muted)", fontFamily: "monospace" }}>—</td>
-                      <td style={{ padding: "10px 12px", color: wd ? "var(--color-text)" : "var(--color-text-muted)", fontFamily: "monospace" }}>{fmtPct(wd?.meta_connect_rate)}</td>
-                      <td style={{ padding: "10px 12px", color: wd ? "var(--color-text)" : "var(--color-text-muted)", fontFamily: "monospace" }}>{fmtPct(wd?.meta_lp_conversion)}</td>
-                      <td style={{ padding: "10px 12px", color: wd ? "var(--color-text)" : "var(--color-text-muted)", fontFamily: "monospace" }}>{fmtBRL(wd?.meta_cpl_traffic)}</td>
-                      <td style={{ padding: "10px 12px", color: wd ? "var(--color-text)" : "var(--color-text-muted)", fontFamily: "monospace" }}>{fmtBRL(wd?.google_spend)}</td>
-                      <td style={{ padding: "10px 12px", color: wd ? "var(--color-text)" : "var(--color-text-muted)", fontFamily: "monospace" }}>{fmtNum(wd?.google_leads)}</td>
-                      <td style={{ padding: "10px 12px" }}>
-                        <button
-                          onClick={() => setWeeklyModal({ weekStart, weekEnd, existing: wd })}
-                          style={{
-                            background: wd ? "var(--color-primary-light)" : "none",
-                            border: `1px solid ${wd ? "var(--color-primary)" : "var(--color-border)"}`,
-                            borderRadius: "var(--radius-sm)",
-                            padding: "4px 10px",
-                            fontSize: 12,
-                            color: wd ? "var(--color-primary)" : "var(--color-text-muted)",
-                            cursor: "pointer",
-                            fontWeight: 600,
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {wd ? "Editar" : "Inserir"}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
       </div>
       ) : (
         <ComparativoTab
           projectId={id}
           projectName={project?.name ?? ""}
-        />
-      )}
-
-      {weeklyModal && (
-        <WeeklyDataModal
-          projectId={id}
-          weekStart={weeklyModal.weekStart}
-          weekEnd={weeklyModal.weekEnd}
-          existing={weeklyModal.existing}
-          open={!!weeklyModal}
-          onClose={() => setWeeklyModal(null)}
-          onSave={handleWeeklySave}
         />
       )}
 
