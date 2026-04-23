@@ -145,9 +145,10 @@ export default function PosicionamentoPage() {
   }, [igSelectedId, appliedStart, appliedEnd]);
 
   // Derivados YouTube
-  // Último subscriber_count não-zero no período (do banco, sensível à data selecionada)
-  const ytSubscriberCount =
-    [...ytDailyRows].reverse().find((d) => d.subscriber_count > 0)?.subscriber_count ?? 0;
+  // subscriber_count do último dia do período selecionado
+  const ytSubscriberCount = ytDailyRows.length > 0
+    ? ytDailyRows[ytDailyRows.length - 1].subscriber_count ?? 0
+    : 0;
   const ytNetSubs = netSubsPerDay(ytDailyRows);
   const ytSparkline = ytDailyRows.map((r, i) => ({
     date: r.date,

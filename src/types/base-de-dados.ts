@@ -75,3 +75,47 @@ export interface SocialSellerRow {
   created_at: string;
   updated_at: string;
 }
+
+export interface EntregaNivelAMccFccProjetoRow {
+  id: string;
+  projeto: string;
+  nps: number;
+  no_show_geral: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EntregaNivelAFccMccMensalRow {
+  id: string;
+  month_year: string;
+  banco_formacoes_nao_realizadas_pago: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EntregaNivelAUltimateMensalRow {
+  id: string;
+  month_year: string;
+  nps_medio_entregas: number;
+  perc_presenca_sessao_feedback: number;
+  mau_usuarios_ativos_mensal: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EntregaNivelAUltimateProjetoRow {
+  id: string;
+  projeto: string;
+  perc_presenca_encontros_online_dia1: number;
+  perc_presenca_encontro_presencial: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EntregaNivelADestraveProjetoRow {
+  id: string;
+  projeto: string;
+  nps: number;
+  created_at: string;
+  updated_at: string;
+}

@@ -25,7 +25,26 @@ async function dataApiGet(
 
   const res = await fetch(url.toString(), { headers });
   if (!res.ok) {
-    throw new Error(`Data API (${res.status}): ${await res.text()}`);
+    const bodyText = await res.text();
+    let parsedReason: string | undefined;
+    try {
+      const json = JSON.parse(bodyText) as {
+        error?: { details?: Array<{ "@type": string; reason?: string }> };
+      };
+      parsedReason = json?.error?.details?.find((d) =>
+        d["@type"]?.includes("ErrorInfo")
+      )?.reason;
+    } catch { /* ignore */ }
+
+    if (parsedReason === "API_KEY_SERVICE_BLOCKED") {
+      throw new Error(
+        "YouTube Data API v3 está bloqueada para a chave de API configurada. " +
+        "Reconecte a conta YouTube via Configurações → Editar → Reconectar com Google " +
+        "para usar autenticação OAuth e contornar este bloqueio."
+      );
+    }
+
+    throw new Error(`Data API (${res.status}): ${bodyText}`);
   }
   return res.json();
 }

@@ -114,5 +114,109 @@ textarea {
 .btn-primary:disabled,
 .btn-secondary:disabled {
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.5;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.bdd-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  padding: 7px 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bdd-back-link:hover {
+  color: var(--color-text);
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  box-shadow: var(--shadow-md);
+}
+
+.bdd-page-header {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.bdd-page-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.bdd-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.bdd-section-label-bar {
+  display: block;
+  width: 3px;
+  height: 18px;
+  border-radius: 2px;
+  background: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.bdd-section-label-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.bdd-success-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: var(--radius-card);
+  padding: 10px 16px;
+  font-size: 13px;
+  color: #166534;
+}
+
+.bdd-warning-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fefce8;
+  border: 1px solid #fbbf24;
+  border-radius: var(--radius-card);
+  padding: 10px 16px;
+  font-size: 13px;
+  color: #92400e;
+}
+
+.bdd-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: var(--radius-card);
+  padding: 10px 16px;
+  font-size: 13px;
+  color: #991b1b;
 }

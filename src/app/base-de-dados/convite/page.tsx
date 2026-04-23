@@ -10,41 +10,26 @@ import SocialSeller from "./_SocialSeller";
 
 export default function ConvitePage() {
   return (
-    <div
-      style={{
-        maxWidth: 960,
-        margin: "0 auto",
-        padding: "32px 24px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 40,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <Link
-          href="/base-de-dados"
-          style={{
-            fontSize: 13,
-            color: "var(--color-text-muted)",
-            textDecoration: "none",
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-          }}
-        >
-          ← Voltar
+    <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 0 40px" }}>
+      <header className="bdd-page-header">
+        <Link href="/base-de-dados" className="bdd-back-link">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+          Voltar
         </Link>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: "var(--color-text)", margin: 0 }}>
-          Convite
-        </h1>
-      </div>
+        <span style={{ color: "var(--color-border)", fontSize: 18, userSelect: "none" }}>/</span>
+        <h1 className="bdd-page-title">Convite</h1>
+      </header>
 
-      <FunilDestrave />
-      <Ultimate />
-      <UltimatePercentuais />
-      <Fcc />
-      <Mcc />
-      <SocialSeller />
+      <div style={{ padding: "32px 24px 0", display: "flex", flexDirection: "column", gap: 48 }}>
+        <FunilDestrave />
+        <Ultimate />
+        <UltimatePercentuais />
+        <Fcc />
+        <Mcc />
+        <SocialSeller />
+      </div>
     </div>
   );
 }

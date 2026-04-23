@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { FccRow } from "@/types/base-de-dados";
-import { inputStyle, labelStyle, cellStyle, thStyle } from "./_styles";
+import { labelStyle, cellStyle, thStyle } from "./_styles";
 
 const fmtFloat = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
 
@@ -14,6 +14,7 @@ export default function Fcc() {
   const [form, setForm] = useState({ projeto: "", perc_assessment: "", perc_mcc: "", perc_pc_ao_vivo: "" });
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -27,6 +28,7 @@ export default function Fcc() {
   function handleChange(field: keyof typeof form, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
     setDirty(true);
+    setSaved(false);
   }
 
   async function handleSave() {
@@ -47,10 +49,12 @@ export default function Fcc() {
         const err = await res.json();
         throw new Error(err.error ?? "Erro ao salvar");
       }
-      const saved: FccRow = await res.json();
-      setRows((prev) => [saved, ...prev]);
+      const savedRow: FccRow = await res.json();
+      setRows((prev) => [savedRow, ...prev]);
       setForm({ projeto: "", perc_assessment: "", perc_mcc: "", perc_pc_ao_vivo: "" });
       setDirty(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao salvar");
     } finally {
@@ -66,22 +70,37 @@ export default function Fcc() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <p style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>
-        Métricas FCC
-      </p>
+      <div className="bdd-section-label">
+        <span className="bdd-section-label-bar" />
+        <span className="bdd-section-label-text">Métricas FCC</span>
+      </div>
 
-      {dirty && !saving && (
-        <div style={{ background: "#fefce8", border: "1px solid #fbbf24", borderRadius: "var(--radius-card)", padding: "10px 16px", fontSize: 13, color: "#92400e" }}>
-          Você tem alterações não salvas. Clique em &quot;Salvar&quot; para registrar os dados.
+      {dirty && !saving && !saved && (
+        <div className="bdd-warning-banner">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          Você tem alterações não salvas. Clique em &quot;Salvar&quot; para registrar.
+        </div>
+      )}
+      {saved && (
+        <div className="bdd-success-banner">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          Registro salvo com sucesso!
         </div>
       )}
       {error && (
-        <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: "var(--radius-card)", padding: "10px 16px", fontSize: 13, color: "#991b1b" }}>
+        <div className="bdd-error-banner">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
           {error}
         </div>
       )}
 
-      <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-card)", overflow: "hidden" }}>
+      <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-card)", overflow: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "var(--color-bg)" }}>
@@ -104,8 +123,8 @@ export default function Fcc() {
               ))
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={4} style={{ ...cellStyle, textAlign: "center", color: "var(--color-text-muted)", padding: "24px 16px" }}>
-                  Nenhum registro ainda
+                <td colSpan={4} style={{ ...cellStyle, textAlign: "center", color: "var(--color-text-muted)", padding: "32px 16px" }}>
+                  Nenhum registro ainda. Adicione o primeiro abaixo.
                 </td>
               </tr>
             ) : (
@@ -122,37 +141,33 @@ export default function Fcc() {
         </table>
       </div>
 
-      <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-card)", padding: "20px", display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-card)", padding: "20px", display: "flex", flexDirection: "column", gap: 16 }}>
         <p style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>
           Novo registro
         </p>
 
         <div>
           <label style={labelStyle}>Projeto</label>
-          <input type="text" style={inputStyle} placeholder="Nome do projeto" value={form.projeto} onChange={(e) => handleChange("projeto", e.target.value)} />
+          <input type="text" className="field-control" placeholder="Nome do projeto" value={form.projeto} onChange={(e) => handleChange("projeto", e.target.value)} />
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
           <div>
             <label style={labelStyle}>% Assessment</label>
-            <input type="number" min={0} step={0.01} style={inputStyle} placeholder="0,00" value={form.perc_assessment} onChange={(e) => handleChange("perc_assessment", e.target.value)} />
+            <input type="number" min={0} step={0.01} className="field-control" placeholder="0,00" value={form.perc_assessment} onChange={(e) => handleChange("perc_assessment", e.target.value)} />
           </div>
           <div>
             <label style={labelStyle}>% MCC</label>
-            <input type="number" min={0} step={0.01} style={inputStyle} placeholder="0,00" value={form.perc_mcc} onChange={(e) => handleChange("perc_mcc", e.target.value)} />
+            <input type="number" min={0} step={0.01} className="field-control" placeholder="0,00" value={form.perc_mcc} onChange={(e) => handleChange("perc_mcc", e.target.value)} />
           </div>
           <div>
             <label style={labelStyle}>% PC ao Vivo</label>
-            <input type="number" min={0} step={0.01} style={inputStyle} placeholder="0,00" value={form.perc_pc_ao_vivo} onChange={(e) => handleChange("perc_pc_ao_vivo", e.target.value)} />
+            <input type="number" min={0} step={0.01} className="field-control" placeholder="0,00" value={form.perc_pc_ao_vivo} onChange={(e) => handleChange("perc_pc_ao_vivo", e.target.value)} />
           </div>
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <button
-            onClick={handleSave}
-            disabled={!canSave}
-            style={{ padding: "9px 24px", fontSize: 13, fontWeight: 600, borderRadius: "var(--radius-sm)", border: "none", background: canSave ? "#059669" : "var(--color-border)", color: canSave ? "#fff" : "var(--color-text-muted)", cursor: canSave ? "pointer" : "not-allowed", transition: "background 0.15s" }}
-          >
+          <button onClick={handleSave} disabled={!canSave} className="btn-primary">
             {saving ? "Salvando…" : "Salvar"}
           </button>
         </div>

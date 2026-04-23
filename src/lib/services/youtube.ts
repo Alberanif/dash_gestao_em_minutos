@@ -69,16 +69,23 @@ export async function collectYouTube(
   // 1. Tentar obter token OAuth; se indisponível, usar API key para Camada 1
   let accessToken: string | null = null;
   let auth: { bearer: string } | { key: string };
+  let oauthError: string | null = null;
 
   try {
     accessToken = await getValidAccessToken(account);
     auth = { bearer: accessToken };
-  } catch {
+  } catch (e) {
+    oauthError = e instanceof Error ? e.message : String(e);
     const apiKey = process.env.YOUTUBE_API_KEY;
-    if (!apiKey) throw new Error("OAuth indisponível e YOUTUBE_API_KEY não configurada");
+    if (!apiKey) {
+      throw new Error(
+        `OAuth indisponível para "${account.name}" e YOUTUBE_API_KEY não configurada. ` +
+        `Motivo: ${oauthError}. Reconecte a conta via Configurações → Editar → Reconectar com Google.`
+      );
+    }
     auth = { key: apiKey };
     console.warn(
-      `[youtube/collect] OAuth indisponível para "${account.name}" — usando API key para Data API (Analytics API será pulada)`
+      `[youtube/collect] OAuth falhou para "${account.name}" (${oauthError}) — tentando API key`
     );
   }
 

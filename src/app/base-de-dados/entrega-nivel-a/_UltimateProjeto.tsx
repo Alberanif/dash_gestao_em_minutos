@@ -1,23 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { FunilDestraveRow } from "@/types/base-de-dados";
+import type { EntregaNivelAUltimateProjetoRow } from "@/types/base-de-dados";
 import { labelStyle, cellStyle, thStyle } from "./_styles";
 
-const fmtFloat = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+const fmtPerc = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) + "%";
 
-const FLOAT_FIELDS = ["conv_produto_principal", "conv_downsell", "conv_upsell", "cac_geral"] as const;
+const FLOAT_FIELDS = ["perc_presenca_encontros_online_dia1", "perc_presenca_encontro_presencial"] as const;
 
-export default function FunilDestrave() {
-  const [rows, setRows] = useState<FunilDestraveRow[]>([]);
+export default function UltimateProjeto() {
+  const [rows, setRows] = useState<EntregaNivelAUltimateProjetoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
     projeto: "",
-    comparecimento: "",
-    conv_produto_principal: "",
-    conv_downsell: "",
-    conv_upsell: "",
-    cac_geral: "",
+    perc_presenca_encontros_online_dia1: "",
+    perc_presenca_encontro_presencial: "",
   });
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -25,7 +22,7 @@ export default function FunilDestrave() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/base-de-dados/convite/funil-destrave")
+    fetch("/api/base-de-dados/entrega-nivel-a/ultimate-projeto")
       .then((r) => r.json())
       .then((data) => setRows(Array.isArray(data) ? data : []))
       .catch(() => setRows([]))
@@ -42,25 +39,22 @@ export default function FunilDestrave() {
     setSaving(true);
     setError("");
     try {
-      const res = await fetch("/api/base-de-dados/convite/funil-destrave", {
+      const res = await fetch("/api/base-de-dados/entrega-nivel-a/ultimate-projeto", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           projeto: form.projeto,
-          comparecimento: parseInt(form.comparecimento, 10),
-          conv_produto_principal: parseFloat(form.conv_produto_principal),
-          conv_downsell: parseFloat(form.conv_downsell),
-          conv_upsell: parseFloat(form.conv_upsell),
-          cac_geral: parseFloat(form.cac_geral),
+          perc_presenca_encontros_online_dia1: parseFloat(form.perc_presenca_encontros_online_dia1),
+          perc_presenca_encontro_presencial: parseFloat(form.perc_presenca_encontro_presencial),
         }),
       });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error ?? "Erro ao salvar");
       }
-      const savedRow: FunilDestraveRow = await res.json();
+      const savedRow: EntregaNivelAUltimateProjetoRow = await res.json();
       setRows((prev) => [savedRow, ...prev]);
-      setForm({ projeto: "", comparecimento: "", conv_produto_principal: "", conv_downsell: "", conv_upsell: "", cac_geral: "" });
+      setForm({ projeto: "", perc_presenca_encontros_online_dia1: "", perc_presenca_encontro_presencial: "" });
       setDirty(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 3500);
@@ -75,15 +69,13 @@ export default function FunilDestrave() {
     dirty &&
     !saving &&
     form.projeto.trim() !== "" &&
-    form.comparecimento !== "" &&
-    !isNaN(parseInt(form.comparecimento, 10)) &&
     FLOAT_FIELDS.every((f) => form[f] !== "" && !isNaN(parseFloat(form[f])));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div className="bdd-section-label">
         <span className="bdd-section-label-bar" />
-        <span className="bdd-section-label-text">Métricas Funil Destrave</span>
+        <span className="bdd-section-label-text">Ultimate — Projeto</span>
       </div>
 
       {dirty && !saving && !saved && (
@@ -116,18 +108,15 @@ export default function FunilDestrave() {
           <thead>
             <tr style={{ background: "var(--color-bg)" }}>
               <th style={thStyle}>Projeto</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Comparec.</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Conv. PP</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Conv. Down</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Conv. Up</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>CAC Geral</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>% Presença — Encontros Online Dia 1</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>% Presença — Encontro Presencial</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               [0, 1, 2].map((i) => (
                 <tr key={i} style={{ borderTop: "1px solid var(--color-border)" }}>
-                  {[0, 1, 2, 3, 4, 5].map((j) => (
+                  {[0, 1, 2].map((j) => (
                     <td key={j} style={cellStyle}>
                       <div style={{ height: 14, width: j === 0 ? "60%" : 40, borderRadius: 4, background: "var(--color-bg)", animation: "pulse 1.5s ease-in-out infinite", marginLeft: j === 0 ? undefined : "auto" }} />
                     </td>
@@ -136,7 +125,7 @@ export default function FunilDestrave() {
               ))
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ ...cellStyle, textAlign: "center", color: "var(--color-text-muted)", padding: "32px 16px" }}>
+                <td colSpan={3} style={{ ...cellStyle, textAlign: "center", color: "var(--color-text-muted)", padding: "32px 16px" }}>
                   Nenhum registro ainda. Adicione o primeiro abaixo.
                 </td>
               </tr>
@@ -144,11 +133,8 @@ export default function FunilDestrave() {
               rows.map((row) => (
                 <tr key={row.id} style={{ borderTop: "1px solid var(--color-border)" }}>
                   <td style={cellStyle}>{row.projeto}</td>
-                  <td style={{ ...cellStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{row.comparecimento.toLocaleString("pt-BR")}</td>
-                  <td style={{ ...cellStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtFloat(row.conv_produto_principal)}</td>
-                  <td style={{ ...cellStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtFloat(row.conv_downsell)}</td>
-                  <td style={{ ...cellStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtFloat(row.conv_upsell)}</td>
-                  <td style={{ ...cellStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtFloat(row.cac_geral)}</td>
+                  <td style={{ ...cellStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtPerc(row.perc_presenca_encontros_online_dia1)}</td>
+                  <td style={{ ...cellStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtPerc(row.perc_presenca_encontro_presencial)}</td>
                 </tr>
               ))
             )}
@@ -166,29 +152,14 @@ export default function FunilDestrave() {
           <input type="text" className="field-control" placeholder="Nome do projeto" value={form.projeto} onChange={(e) => handleChange("projeto", e.target.value)} />
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-          <div>
-            <label style={labelStyle}>Comparecimento</label>
-            <input type="number" min={0} step={1} className="field-control" placeholder="0" value={form.comparecimento} onChange={(e) => handleChange("comparecimento", e.target.value)} />
-          </div>
-          <div>
-            <label style={labelStyle}>Conv. Produto Principal</label>
-            <input type="number" min={0} step={0.01} className="field-control" placeholder="0,00" value={form.conv_produto_principal} onChange={(e) => handleChange("conv_produto_principal", e.target.value)} />
-          </div>
-          <div>
-            <label style={labelStyle}>Conv. Downsell</label>
-            <input type="number" min={0} step={0.01} className="field-control" placeholder="0,00" value={form.conv_downsell} onChange={(e) => handleChange("conv_downsell", e.target.value)} />
-          </div>
-        </div>
-
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div>
-            <label style={labelStyle}>Conv. Upsell</label>
-            <input type="number" min={0} step={0.01} className="field-control" placeholder="0,00" value={form.conv_upsell} onChange={(e) => handleChange("conv_upsell", e.target.value)} />
+            <label style={labelStyle}>% Presença — Encontros Online Dia 1</label>
+            <input type="number" min={0} max={100} step={0.01} className="field-control" placeholder="0,00" value={form.perc_presenca_encontros_online_dia1} onChange={(e) => handleChange("perc_presenca_encontros_online_dia1", e.target.value)} />
           </div>
           <div>
-            <label style={labelStyle}>CAC Geral</label>
-            <input type="number" min={0} step={0.01} className="field-control" placeholder="0,00" value={form.cac_geral} onChange={(e) => handleChange("cac_geral", e.target.value)} />
+            <label style={labelStyle}>% Presença — Encontro Presencial</label>
+            <input type="number" min={0} max={100} step={0.01} className="field-control" placeholder="0,00" value={form.perc_presenca_encontro_presencial} onChange={(e) => handleChange("perc_presenca_encontro_presencial", e.target.value)} />
           </div>
         </div>
 

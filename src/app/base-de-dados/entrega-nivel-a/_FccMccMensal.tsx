@@ -1,31 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { FunilDestraveRow } from "@/types/base-de-dados";
+import type { EntregaNivelAFccMccMensalRow } from "@/types/base-de-dados";
 import { labelStyle, cellStyle, thStyle } from "./_styles";
 
-const fmtFloat = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+function fmtMonthYear(monthYear: string) {
+  return new Date(monthYear + "T12:00:00").toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+}
 
-const FLOAT_FIELDS = ["conv_produto_principal", "conv_downsell", "conv_upsell", "cac_geral"] as const;
-
-export default function FunilDestrave() {
-  const [rows, setRows] = useState<FunilDestraveRow[]>([]);
+export default function FccMccMensal() {
+  const [rows, setRows] = useState<EntregaNivelAFccMccMensalRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({
-    projeto: "",
-    comparecimento: "",
-    conv_produto_principal: "",
-    conv_downsell: "",
-    conv_upsell: "",
-    cac_geral: "",
-  });
+  const [form, setForm] = useState({ month_year: "", banco_formacoes_nao_realizadas_pago: "" });
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/base-de-dados/convite/funil-destrave")
+    fetch("/api/base-de-dados/entrega-nivel-a/fcc-mcc-mensal")
       .then((r) => r.json())
       .then((data) => setRows(Array.isArray(data) ? data : []))
       .catch(() => setRows([]))
@@ -42,25 +35,21 @@ export default function FunilDestrave() {
     setSaving(true);
     setError("");
     try {
-      const res = await fetch("/api/base-de-dados/convite/funil-destrave", {
+      const res = await fetch("/api/base-de-dados/entrega-nivel-a/fcc-mcc-mensal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          projeto: form.projeto,
-          comparecimento: parseInt(form.comparecimento, 10),
-          conv_produto_principal: parseFloat(form.conv_produto_principal),
-          conv_downsell: parseFloat(form.conv_downsell),
-          conv_upsell: parseFloat(form.conv_upsell),
-          cac_geral: parseFloat(form.cac_geral),
+          month_year: form.month_year,
+          banco_formacoes_nao_realizadas_pago: parseInt(form.banco_formacoes_nao_realizadas_pago, 10),
         }),
       });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error ?? "Erro ao salvar");
       }
-      const savedRow: FunilDestraveRow = await res.json();
+      const savedRow: EntregaNivelAFccMccMensalRow = await res.json();
       setRows((prev) => [savedRow, ...prev]);
-      setForm({ projeto: "", comparecimento: "", conv_produto_principal: "", conv_downsell: "", conv_upsell: "", cac_geral: "" });
+      setForm({ month_year: "", banco_formacoes_nao_realizadas_pago: "" });
       setDirty(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 3500);
@@ -74,16 +63,15 @@ export default function FunilDestrave() {
   const canSave =
     dirty &&
     !saving &&
-    form.projeto.trim() !== "" &&
-    form.comparecimento !== "" &&
-    !isNaN(parseInt(form.comparecimento, 10)) &&
-    FLOAT_FIELDS.every((f) => form[f] !== "" && !isNaN(parseFloat(form[f])));
+    form.month_year !== "" &&
+    form.banco_formacoes_nao_realizadas_pago !== "" &&
+    !isNaN(parseInt(form.banco_formacoes_nao_realizadas_pago, 10));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div className="bdd-section-label">
         <span className="bdd-section-label-bar" />
-        <span className="bdd-section-label-text">Métricas Funil Destrave</span>
+        <span className="bdd-section-label-text">FCC e MCC — Mensal</span>
       </div>
 
       {dirty && !saving && !saved && (
@@ -115,19 +103,15 @@ export default function FunilDestrave() {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "var(--color-bg)" }}>
-              <th style={thStyle}>Projeto</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Comparec.</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Conv. PP</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Conv. Down</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Conv. Up</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>CAC Geral</th>
+              <th style={thStyle}>Mês/Ano</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Banco de Formações Não Realizadas — Pago</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               [0, 1, 2].map((i) => (
                 <tr key={i} style={{ borderTop: "1px solid var(--color-border)" }}>
-                  {[0, 1, 2, 3, 4, 5].map((j) => (
+                  {[0, 1].map((j) => (
                     <td key={j} style={cellStyle}>
                       <div style={{ height: 14, width: j === 0 ? "60%" : 40, borderRadius: 4, background: "var(--color-bg)", animation: "pulse 1.5s ease-in-out infinite", marginLeft: j === 0 ? undefined : "auto" }} />
                     </td>
@@ -136,19 +120,15 @@ export default function FunilDestrave() {
               ))
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ ...cellStyle, textAlign: "center", color: "var(--color-text-muted)", padding: "32px 16px" }}>
+                <td colSpan={2} style={{ ...cellStyle, textAlign: "center", color: "var(--color-text-muted)", padding: "32px 16px" }}>
                   Nenhum registro ainda. Adicione o primeiro abaixo.
                 </td>
               </tr>
             ) : (
               rows.map((row) => (
                 <tr key={row.id} style={{ borderTop: "1px solid var(--color-border)" }}>
-                  <td style={cellStyle}>{row.projeto}</td>
-                  <td style={{ ...cellStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{row.comparecimento.toLocaleString("pt-BR")}</td>
-                  <td style={{ ...cellStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtFloat(row.conv_produto_principal)}</td>
-                  <td style={{ ...cellStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtFloat(row.conv_downsell)}</td>
-                  <td style={{ ...cellStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtFloat(row.conv_upsell)}</td>
-                  <td style={{ ...cellStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtFloat(row.cac_geral)}</td>
+                  <td style={cellStyle}>{fmtMonthYear(row.month_year)}</td>
+                  <td style={{ ...cellStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{row.banco_formacoes_nao_realizadas_pago.toLocaleString("pt-BR")}</td>
                 </tr>
               ))
             )}
@@ -161,34 +141,14 @@ export default function FunilDestrave() {
           Novo registro
         </p>
 
-        <div>
-          <label style={labelStyle}>Projeto</label>
-          <input type="text" className="field-control" placeholder="Nome do projeto" value={form.projeto} onChange={(e) => handleChange("projeto", e.target.value)} />
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-          <div>
-            <label style={labelStyle}>Comparecimento</label>
-            <input type="number" min={0} step={1} className="field-control" placeholder="0" value={form.comparecimento} onChange={(e) => handleChange("comparecimento", e.target.value)} />
-          </div>
-          <div>
-            <label style={labelStyle}>Conv. Produto Principal</label>
-            <input type="number" min={0} step={0.01} className="field-control" placeholder="0,00" value={form.conv_produto_principal} onChange={(e) => handleChange("conv_produto_principal", e.target.value)} />
-          </div>
-          <div>
-            <label style={labelStyle}>Conv. Downsell</label>
-            <input type="number" min={0} step={0.01} className="field-control" placeholder="0,00" value={form.conv_downsell} onChange={(e) => handleChange("conv_downsell", e.target.value)} />
-          </div>
-        </div>
-
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div>
-            <label style={labelStyle}>Conv. Upsell</label>
-            <input type="number" min={0} step={0.01} className="field-control" placeholder="0,00" value={form.conv_upsell} onChange={(e) => handleChange("conv_upsell", e.target.value)} />
+            <label style={labelStyle}>Mês/Ano</label>
+            <input type="month" className="field-control" value={form.month_year} onChange={(e) => handleChange("month_year", e.target.value)} />
           </div>
           <div>
-            <label style={labelStyle}>CAC Geral</label>
-            <input type="number" min={0} step={0.01} className="field-control" placeholder="0,00" value={form.cac_geral} onChange={(e) => handleChange("cac_geral", e.target.value)} />
+            <label style={labelStyle}>Banco de Formações Não Realizadas — Pago</label>
+            <input type="number" min={0} step={1} className="field-control" placeholder="0" value={form.banco_formacoes_nao_realizadas_pago} onChange={(e) => handleChange("banco_formacoes_nao_realizadas_pago", e.target.value)} />
           </div>
         </div>
 
