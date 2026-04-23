@@ -52,6 +52,9 @@ export interface ComparativoPeriod {
   metrics: IndicadoresMetrics | null;
   loading: boolean;
   error: boolean;
+  hotmartMetrics: HotmartMetrics | null;
+  hotmartLoading: boolean;
+  hotmartError: boolean;
 }
 
 export interface HotmartProductMetrics {
@@ -59,11 +62,11 @@ export interface HotmartProductMetrics {
   product_name: string;
   sales_count: number;
   revenue: number;
+  is_foreign_currency?: boolean;
 }
 
 export interface HotmartMetrics {
   products: HotmartProductMetrics[];
   total_sales: number;
   total_revenue: number;
-  has_non_brl: boolean;
 }
