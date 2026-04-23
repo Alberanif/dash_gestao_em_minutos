@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import type { IndicadoresMetrics, ComparativoPeriod } from "@/types/indicadores";
+import type { IndicadoresMetrics, ComparativoPeriod, HotmartMetrics } from "@/types/indicadores";
 import { PeriodDateModal } from "./period-date-modal";
 
 function fmtBRL(n: number | null | undefined): string {
@@ -100,43 +100,52 @@ export function ComparativoTab({ projectId, projectName }: ComparativoTabProps) 
           metrics: null,
           loading: true,
           error: false,
+          hotmartMetrics: null,
+          hotmartLoading: true,
+          hotmartError: false,
         };
         return next;
       });
-      try {
-        const params = new URLSearchParams({
-          start_date: start,
-          end_date: end,
-        });
-        const res = await fetch(
-          `/api/indicadores/projects/${projectId}/metrics?${params}`
-        );
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data: IndicadoresMetrics & { error?: string } = await res.json();
-        setPeriods((prev) => {
-          const next = [...prev];
-          next[index] = {
-            startDate: start,
-            endDate: end,
-            metrics: data.error ? null : data,
-            loading: false,
-            error: !!data.error,
-          };
-          return next;
-        });
-      } catch {
-        setPeriods((prev) => {
-          const next = [...prev];
-          next[index] = {
-            startDate: start,
-            endDate: end,
-            metrics: null,
-            loading: false,
-            error: true,
-          };
-          return next;
-        });
-      }
+
+      const params = new URLSearchParams({ start_date: start, end_date: end });
+
+      const [metricsResult, hotmartResult] = await Promise.allSettled([
+        fetch(`/api/indicadores/projects/${projectId}/metrics?${params}`)
+          .then((r) => (r.ok ? r.json() : Promise.reject(r.status))),
+        fetch(`/api/indicadores/projects/${projectId}/hotmart-metrics?${params}`)
+          .then((r) => (r.ok ? r.json() : Promise.reject(r.status))),
+      ]);
+
+      const metrics =
+        metricsResult.status === "fulfilled" && !metricsResult.value.error
+          ? (metricsResult.value as IndicadoresMetrics)
+          : null;
+      const metricsError =
+        metricsResult.status === "rejected" ||
+        !!metricsResult.value?.error;
+
+      const hotmartMetrics =
+        hotmartResult.status === "fulfilled" && !hotmartResult.value.error
+          ? (hotmartResult.value as HotmartMetrics)
+          : null;
+      const hotmartError =
+        hotmartResult.status === "rejected" ||
+        !!hotmartResult.value?.error;
+
+      setPeriods((prev) => {
+        const next = [...prev];
+        next[index] = {
+          startDate: start,
+          endDate: end,
+          metrics,
+          loading: false,
+          error: metricsError,
+          hotmartMetrics,
+          hotmartLoading: false,
+          hotmartError,
+        };
+        return next;
+      });
     },
     [projectId]
   );
