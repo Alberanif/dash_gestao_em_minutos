@@ -69,4 +69,5 @@ export interface HotmartMetrics {
   products: HotmartProductMetrics[];
   total_sales: number;
   total_revenue: number;
+  has_products: boolean;
 }

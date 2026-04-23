@@ -342,7 +342,8 @@ function FilledSlot({
       </div>
 
       {/* Body */}
-      <div style={{ padding: "12px 14px", flex: 1 }}>
+      <div style={{ padding: "12px 14px", flex: 1, display: "flex", flexDirection: "column", gap: 14 }}>
+        {/* Main metrics: error or KPI groups */}
         {period.error ? (
           <div
             style={{
@@ -446,103 +447,109 @@ function FilledSlot({
                 </div>
               </div>
             ))}
+          </div>
+        )}
 
-            {/* Seção Hotmart */}
-            {(period.hotmartLoading || period.hotmartError || period.hotmartMetrics) && (
-              <div>
-                <p
+        {/* Seção Hotmart — always shown independently of main metrics error */}
+        {(period.hotmartLoading || period.hotmartError || period.hotmartMetrics?.has_products) && (
+          <div>
+            <p
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: "#F04E23",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                marginBottom: 6,
+              }}
+            >
+              Hotmart
+            </p>
+
+            {period.hotmartError ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
+                <p style={{ fontSize: 12, color: "var(--color-danger)" }}>
+                  Erro ao carregar Hotmart
+                </p>
+                <button
+                  onClick={onRetryHotmart}
                   style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: "#F04E23",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    marginBottom: 6,
+                    fontSize: 12,
+                    color: "var(--color-primary)",
+                    background: "none",
+                    border: "1px solid var(--color-primary)",
+                    borderRadius: "var(--radius-sm)",
+                    padding: "4px 10px",
+                    cursor: "pointer",
+                    fontWeight: 600,
                   }}
                 >
-                  Hotmart
-                </p>
-
-                {period.hotmartError ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
-                    <p style={{ fontSize: 12, color: "var(--color-danger)" }}>
-                      Erro ao carregar Hotmart
-                    </p>
-                    <button
-                      onClick={onRetryHotmart}
+                  Tentar novamente
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {(() => {
+                  const computed = period.hotmartMetrics
+                    ? calcHotmartSales(period.hotmartMetrics)
+                    : null;
+                  const rows = [
+                    { label: "Vendas (BRL)", value: computed ? fmtNum(computed.brlSales) : "—" },
+                    { label: "Faturamento", value: computed ? fmtBRL(computed.totalRevenue) : "—" },
+                    { label: "Vendas Ext.", value: computed ? fmtNum(computed.foreignSales) : "—" },
+                  ];
+                  return rows.map(({ label, value }) => (
+                    <div
+                      key={label}
                       style={{
-                        fontSize: 12,
-                        color: "var(--color-primary)",
-                        background: "none",
-                        border: "1px solid var(--color-primary)",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "5px 8px",
                         borderRadius: "var(--radius-sm)",
-                        padding: "4px 10px",
-                        cursor: "pointer",
-                        fontWeight: 600,
+                        background: "var(--color-bg)",
+                        gap: 8,
                       }}
                     >
-                      Tentar novamente
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    {[
-                      { label: "Vendas (BRL)", getValue: (m: HotmartMetrics) => fmtNum(calcHotmartSales(m).brlSales) },
-                      { label: "Faturamento", getValue: (m: HotmartMetrics) => fmtBRL(calcHotmartSales(m).totalRevenue) },
-                      { label: "Vendas Ext.", getValue: (m: HotmartMetrics) => fmtNum(calcHotmartSales(m).foreignSales) },
-                    ].map(({ label, getValue }) => (
-                      <div
-                        key={label}
+                      <span
                         style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          padding: "5px 8px",
-                          borderRadius: "var(--radius-sm)",
-                          background: "var(--color-bg)",
-                          gap: 8,
+                          fontSize: 11,
+                          color: "var(--color-text-muted)",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          minWidth: 0,
                         }}
                       >
+                        {label}
+                      </span>
+                      {period.hotmartLoading ? (
+                        <div
+                          className="animate-pulse"
+                          style={{
+                            height: 12,
+                            width: 48,
+                            borderRadius: 4,
+                            background: "var(--color-border)",
+                            flexShrink: 0,
+                          }}
+                        />
+                      ) : (
                         <span
                           style={{
-                            fontSize: 11,
-                            color: "var(--color-text-muted)",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            minWidth: 0,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: "var(--color-text)",
+                            fontFamily: "monospace",
+                            flexShrink: 0,
                           }}
                         >
-                          {label}
+                          {value}
                         </span>
-                        {period.hotmartLoading ? (
-                          <div
-                            className="animate-pulse"
-                            style={{
-                              height: 12,
-                              width: 48,
-                              borderRadius: 4,
-                              background: "var(--color-border)",
-                              flexShrink: 0,
-                            }}
-                          />
-                        ) : (
-                          <span
-                            style={{
-                              fontSize: 12,
-                              fontWeight: 700,
-                              color: "var(--color-text)",
-                              fontFamily: "monospace",
-                              flexShrink: 0,
-                            }}
-                          >
-                            {period.hotmartMetrics ? getValue(period.hotmartMetrics) : "—"}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      )}
+                    </div>
+                  ));
+                })()}
               </div>
             )}
           </div>
