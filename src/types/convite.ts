@@ -68,12 +68,36 @@ export interface ConviteUltimateMetrics {
   }>;
 }
 
+export interface ConviteMccMetrics {
+  latest_perc_ultimate: number | null;
+  latest_perc_pc_ao_vivo: number | null;
+  history: Array<{
+    id: string;
+    perc_ultimate: number;
+    perc_pc_ao_vivo: number;
+    created_at: string;
+  }>;
+}
+
+export interface ConviteFccMetrics {
+  latest_perc_assessment: number | null;
+  latest_perc_mcc: number | null;
+  latest_perc_pc_ao_vivo: number | null;
+  history: Array<{
+    id: string;
+    perc_assessment: number;
+    perc_mcc: number;
+    perc_pc_ao_vivo: number;
+    created_at: string;
+  }>;
+}
+
 export interface ConviteProject {
   id: string;
   grupo: ConviteGroup;
   nome_projeto: string;
   data_inicio: string;
   data_fim: string;
-  metrics: ConviteFunilDestraveMetrics | ConviteAdsComercialMetrics | ConviteUltimateMetrics | null;
+  metrics: ConviteFunilDestraveMetrics | ConviteAdsComercialMetrics | ConviteUltimateMetrics | ConviteFccMetrics | ConviteMccMetrics | null;
   ads_comercial_config: ConviteAdsComercialConfig | null;
 }

@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateApiAuth } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 
+function normalizeProjectName(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("pt-BR");
+}
+
 export async function GET() {
   const { error } = await validateApiAuth();
   if (error) return error;
@@ -33,9 +37,35 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = createSupabaseServiceClient();
+  const normalizedProjectName = normalizeProjectName(projeto);
+  const { data: projectRows, error: projectError } = await supabase
+    .from("dash_gestao_convite_projetos")
+    .select("nome_projeto, grupo")
+    .eq("grupo", "fcc");
+
+  if (projectError) {
+    return NextResponse.json({ error: projectError.message }, { status: 500 });
+  }
+
+  const matchedProject = (projectRows ?? []).find(
+    (row) => normalizeProjectName(String(row.nome_projeto ?? "")) === normalizedProjectName
+  );
+
+  if (!matchedProject) {
+    return NextResponse.json(
+      { error: "Selecione um projeto válido do FCC" },
+      { status: 400 }
+    );
+  }
+
   const { data, error: dbError } = await supabase
     .from("dash_gestao_convite_fcc")
-    .insert({ projeto: projeto.trim(), perc_assessment, perc_mcc, perc_pc_ao_vivo })
+    .insert({
+      projeto: String(matchedProject.nome_projeto),
+      perc_assessment,
+      perc_mcc,
+      perc_pc_ao_vivo,
+    })
     .select()
     .single();
 

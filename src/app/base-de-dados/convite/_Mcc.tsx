@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { MccRow } from "@/types/base-de-dados";
+import type { ConviteProjectOption } from "@/types/convite";
 import { labelStyle, cellStyle, thStyle } from "./_styles";
 
 const fmtFloat = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
@@ -10,6 +11,7 @@ const FLOAT_FIELDS = ["perc_ultimate", "perc_pc_ao_vivo"] as const;
 
 export default function Mcc() {
   const [rows, setRows] = useState<MccRow[]>([]);
+  const [projectOptions, setProjectOptions] = useState<ConviteProjectOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ projeto: "", perc_ultimate: "", perc_pc_ao_vivo: "" });
   const [dirty, setDirty] = useState(false);
@@ -18,10 +20,18 @@ export default function Mcc() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/base-de-dados/convite/mcc")
-      .then((r) => r.json())
-      .then((data) => setRows(Array.isArray(data) ? data : []))
-      .catch(() => setRows([]))
+    Promise.all([
+      fetch("/api/base-de-dados/convite/mcc").then((r) => r.json()),
+      fetch("/api/convite/project-options?group=mcc").then((r) => r.json()),
+    ])
+      .then(([rowsData, optionsData]) => {
+        setRows(Array.isArray(rowsData) ? rowsData : []);
+        setProjectOptions(Array.isArray(optionsData) ? optionsData : []);
+      })
+      .catch(() => {
+        setRows([]);
+        setProjectOptions([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -64,7 +74,7 @@ export default function Mcc() {
   const canSave =
     dirty &&
     !saving &&
-    form.projeto.trim() !== "" &&
+    form.projeto !== "" &&
     FLOAT_FIELDS.every((f) => form[f] !== "" && !isNaN(parseFloat(form[f])));
 
   return (
@@ -145,17 +155,49 @@ export default function Mcc() {
 
         <div>
           <label style={labelStyle}>Projeto</label>
-          <input type="text" className="field-control" placeholder="Nome do projeto" value={form.projeto} onChange={(e) => handleChange("projeto", e.target.value)} />
+          <select
+            className="field-control"
+            value={form.projeto}
+            onChange={(e) => handleChange("projeto", e.target.value)}
+            disabled={projectOptions.length === 0}
+          >
+            <option value="">
+              {projectOptions.length === 0 ? "Nenhum projeto MCC cadastrado" : "Selecione um projeto"}
+            </option>
+            {projectOptions.map((opt) => (
+              <option key={opt.id} value={opt.nome_projeto}>
+                {opt.nome_projeto}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div>
             <label style={labelStyle}>% Ultimate</label>
-            <input type="number" min={0} step={0.01} className="field-control" placeholder="0,00" value={form.perc_ultimate} onChange={(e) => handleChange("perc_ultimate", e.target.value)} />
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              className="field-control"
+              placeholder="0,00"
+              value={form.perc_ultimate}
+              onChange={(e) => handleChange("perc_ultimate", e.target.value)}
+              disabled={projectOptions.length === 0}
+            />
           </div>
           <div>
             <label style={labelStyle}>% PC ao Vivo</label>
-            <input type="number" min={0} step={0.01} className="field-control" placeholder="0,00" value={form.perc_pc_ao_vivo} onChange={(e) => handleChange("perc_pc_ao_vivo", e.target.value)} />
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              className="field-control"
+              placeholder="0,00"
+              value={form.perc_pc_ao_vivo}
+              onChange={(e) => handleChange("perc_pc_ao_vivo", e.target.value)}
+              disabled={projectOptions.length === 0}
+            />
           </div>
         </div>
 

@@ -8,8 +8,10 @@ import {
 import {
   CONVITE_GROUP_OPTIONS,
   type ConviteAdsComercialConfig,
+  type ConviteFccMetrics,
   type ConviteFunilDestraveMetrics,
   type ConviteGroup,
+  type ConviteMccMetrics,
   type ConviteProject,
   type ConviteUltimateMetrics,
 } from "@/types/convite";
@@ -34,6 +36,23 @@ interface UltimatePercRow {
   projeto: string;
   perc_renovacao: number;
   perc_conv_pitch: number;
+}
+
+interface FccRow {
+  id: string;
+  projeto: string;
+  perc_assessment: number;
+  perc_mcc: number;
+  perc_pc_ao_vivo: number;
+  created_at: string;
+}
+
+interface MccRow {
+  id: string;
+  projeto: string;
+  perc_ultimate: number;
+  perc_pc_ao_vivo: number;
+  created_at: string;
 }
 
 const ALLOWED_GROUPS = new Set<ConviteGroup>(CONVITE_GROUP_OPTIONS.map((option) => option.value));
@@ -94,6 +113,8 @@ export async function GET(request: NextRequest) {
     { data: adsConfigRows, error: adsConfigError },
     { data: ultimateRows, error: ultimateError },
     { data: ultimatePercRows, error: ultimatePercError },
+    { data: fccRows, error: fccError },
+    { data: mccRows, error: mccError },
   ] = await Promise.all([
     projectsQuery,
     group === "funil_destrave" || group === null
@@ -119,6 +140,18 @@ export async function GET(request: NextRequest) {
           .select("id, projeto, perc_renovacao, perc_conv_pitch")
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: [], error: null }),
+    group === "fcc" || group === null
+      ? supabase
+          .from("dash_gestao_convite_fcc")
+          .select("id, projeto, perc_assessment, perc_mcc, perc_pc_ao_vivo, created_at")
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+    group === "mcc" || group === null
+      ? supabase
+          .from("dash_gestao_convite_mcc")
+          .select("id, projeto, perc_ultimate, perc_pc_ao_vivo, created_at")
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (projectsError) return NextResponse.json({ error: projectsError.message }, { status: 500 });
@@ -126,6 +159,8 @@ export async function GET(request: NextRequest) {
   if (adsConfigError) return NextResponse.json({ error: adsConfigError.message }, { status: 500 });
   if (ultimateError) return NextResponse.json({ error: ultimateError.message }, { status: 500 });
   if (ultimatePercError) return NextResponse.json({ error: ultimatePercError.message }, { status: 500 });
+  if (fccError) return NextResponse.json({ error: fccError.message }, { status: 500 });
+  if (mccError) return NextResponse.json({ error: mccError.message }, { status: 500 });
 
   // Funil Destrave: latest metric by project name
   const latestMetricsByProject = new Map<string, ConviteFunilDestraveMetrics>();
@@ -194,6 +229,64 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  // FCC: group rows by normalized project name
+  const fccByProject = new Map<string, FccRow[]>();
+  for (const row of (fccRows ?? []) as FccRow[]) {
+    const key = normalizeProjectName(row.projeto);
+    if (!fccByProject.has(key)) fccByProject.set(key, []);
+    fccByProject.get(key)!.push(row);
+  }
+
+  // Build ConviteFccMetrics per project id
+  const fccMetricsByProjectId = new Map<string, ConviteFccMetrics>();
+  for (const row of (projectRows ?? []) as ConviteProjectRow[]) {
+    if (row.grupo !== "fcc") continue;
+    const key = normalizeProjectName(row.nome_projeto);
+    const fccProjectRows = fccByProject.get(key) ?? [];
+    if (fccProjectRows.length === 0) continue;
+    const latest = fccProjectRows[0];
+    fccMetricsByProjectId.set(row.id, {
+      latest_perc_assessment: latest.perc_assessment,
+      latest_perc_mcc: latest.perc_mcc,
+      latest_perc_pc_ao_vivo: latest.perc_pc_ao_vivo,
+      history: fccProjectRows.map((r) => ({
+        id: r.id,
+        perc_assessment: r.perc_assessment,
+        perc_mcc: r.perc_mcc,
+        perc_pc_ao_vivo: r.perc_pc_ao_vivo,
+        created_at: r.created_at,
+      })),
+    });
+  }
+
+  // MCC: group rows by normalized project name
+  const mccByProject = new Map<string, MccRow[]>();
+  for (const row of (mccRows ?? []) as MccRow[]) {
+    const key = normalizeProjectName(row.projeto);
+    if (!mccByProject.has(key)) mccByProject.set(key, []);
+    mccByProject.get(key)!.push(row);
+  }
+
+  // Build ConviteMccMetrics per project id
+  const mccMetricsByProjectId = new Map<string, ConviteMccMetrics>();
+  for (const row of (projectRows ?? []) as ConviteProjectRow[]) {
+    if (row.grupo !== "mcc") continue;
+    const key = normalizeProjectName(row.nome_projeto);
+    const mccProjectRows = mccByProject.get(key) ?? [];
+    if (mccProjectRows.length === 0) continue;
+    const latest = mccProjectRows[0];
+    mccMetricsByProjectId.set(row.id, {
+      latest_perc_ultimate: latest.perc_ultimate,
+      latest_perc_pc_ao_vivo: latest.perc_pc_ao_vivo,
+      history: mccProjectRows.map((r) => ({
+        id: r.id,
+        perc_ultimate: r.perc_ultimate,
+        perc_pc_ao_vivo: r.perc_pc_ao_vivo,
+        created_at: r.created_at,
+      })),
+    });
+  }
+
   const rows = (projectRows ?? []) as ConviteProjectRow[];
   let adsMetricsEntries: ReadonlyArray<readonly [string, ConviteProject["metrics"]]>;
   try {
@@ -231,6 +324,10 @@ export async function GET(request: NextRequest) {
         ? adsMetricsByProject.get(row.id) ?? null
         : row.grupo === "ultimate"
         ? ultimateMetricsByProjectId.get(row.id) ?? null
+        : row.grupo === "fcc"
+        ? fccMetricsByProjectId.get(row.id) ?? null
+        : row.grupo === "mcc"
+        ? mccMetricsByProjectId.get(row.id) ?? null
         : null,
       row.grupo === "funil_ads_comercial" ? adsConfigByProject.get(row.id) ?? null : null
     )

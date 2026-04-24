@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ConviteAdsComercialConfigModal } from "@/components/convite/ads-comercial-config-modal";
+import { ConviteFccDetailModal } from "@/components/convite/fcc-detail-modal";
+import { ConviteMccDetailModal } from "@/components/convite/mcc-detail-modal";
 import { PageHeader } from "@/components/layout/page-header";
 import { ConviteProjectCard } from "@/components/convite/project-card";
 import { ConviteProjectDetailModal } from "@/components/convite/project-detail-modal";
@@ -76,6 +78,8 @@ export default function ConviteDashboardPage() {
   const [initialGroup, setInitialGroup] = useState<ConviteGroup>("funil_destrave");
   const [selectedProject, setSelectedProject] = useState<ConviteProject | null>(null);
   const [selectedUltimateProject, setSelectedUltimateProject] = useState<ConviteProject | null>(null);
+  const [selectedFccProject, setSelectedFccProject] = useState<ConviteProject | null>(null);
+  const [selectedMccProject, setSelectedMccProject] = useState<ConviteProject | null>(null);
   const [configProject, setConfigProject] = useState<ConviteProject | null>(null);
 
   const loadProjects = useCallback(async () => {
@@ -260,6 +264,10 @@ export default function ConviteDashboardPage() {
                       ? () => setSelectedProject(project)
                       : project.grupo === "ultimate"
                       ? () => setSelectedUltimateProject(project)
+                      : project.grupo === "fcc"
+                      ? () => setSelectedFccProject(project)
+                      : project.grupo === "mcc"
+                      ? () => setSelectedMccProject(project)
                       : undefined
                   }
                     onConfigureAdsComercial={
@@ -293,6 +301,18 @@ export default function ConviteDashboardPage() {
         open={!!selectedUltimateProject}
         project={selectedUltimateProject}
         onClose={() => setSelectedUltimateProject(null)}
+      />
+
+      <ConviteFccDetailModal
+        open={!!selectedFccProject}
+        project={selectedFccProject}
+        onClose={() => setSelectedFccProject(null)}
+      />
+
+      <ConviteMccDetailModal
+        open={!!selectedMccProject}
+        project={selectedMccProject}
+        onClose={() => setSelectedMccProject(null)}
       />
 
       <ConviteAdsComercialConfigModal

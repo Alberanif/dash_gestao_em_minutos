@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { FunilDestraveRow } from "@/types/base-de-dados";
+import type { ConviteProjectOption } from "@/types/convite";
 import { labelStyle, cellStyle, thStyle } from "./_styles";
 
 const fmtFloat = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
@@ -11,6 +12,8 @@ const FLOAT_FIELDS = ["conv_produto_principal", "conv_downsell", "conv_upsell", 
 export default function FunilDestrave() {
   const [rows, setRows] = useState<FunilDestraveRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [projectOptions, setProjectOptions] = useState<ConviteProjectOption[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
   const [form, setForm] = useState({
     projeto: "",
     comparecimento: "",
@@ -30,6 +33,14 @@ export default function FunilDestrave() {
       .then((data) => setRows(Array.isArray(data) ? data : []))
       .catch(() => setRows([]))
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/convite/project-options?group=funil_destrave")
+      .then((r) => r.json())
+      .then((data) => setProjectOptions(Array.isArray(data) ? data : []))
+      .catch(() => setProjectOptions([]))
+      .finally(() => setLoadingProjects(false));
   }, []);
 
   function handleChange(field: keyof typeof form, value: string) {
@@ -74,6 +85,8 @@ export default function FunilDestrave() {
   const canSave =
     dirty &&
     !saving &&
+    !loadingProjects &&
+    projectOptions.length > 0 &&
     form.projeto.trim() !== "" &&
     form.comparecimento !== "" &&
     !isNaN(parseInt(form.comparecimento, 10)) &&
@@ -163,7 +176,30 @@ export default function FunilDestrave() {
 
         <div>
           <label style={labelStyle}>Projeto</label>
-          <input type="text" className="field-control" placeholder="Nome do projeto" value={form.projeto} onChange={(e) => handleChange("projeto", e.target.value)} />
+          <select
+            className="field-control"
+            value={form.projeto}
+            disabled={loadingProjects || projectOptions.length === 0}
+            onChange={(e) => handleChange("projeto", e.target.value)}
+          >
+            <option value="">
+              {loadingProjects
+                ? "Carregando projetos..."
+                : projectOptions.length === 0
+                  ? "Nenhum projeto do Funil Destrave disponível"
+                  : "Selecione um projeto"}
+            </option>
+            {projectOptions.map((option) => (
+              <option key={option.id} value={option.nome_projeto}>
+                {option.nome_projeto}
+              </option>
+            ))}
+          </select>
+          {!loadingProjects && projectOptions.length === 0 && (
+            <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--color-text-muted)" }}>
+              Crie primeiro um projeto em Convite &gt; Funil Destrave para liberar o cadastro das métricas.
+            </p>
+          )}
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
