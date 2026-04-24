@@ -176,7 +176,7 @@ export async function GET(request: NextRequest) {
     const latestMonthly = monthly[0];
     const latestPerc = percs[0];
     ultimateMetricsByProjectId.set(row.id, {
-      latest_month_year: latestMonthly?.month_year ?? "",
+      latest_month_year: latestMonthly?.month_year ?? null,
       latest_numero_absoluto: latestMonthly?.numero_absoluto ?? 0,
       latest_perc_renovacao: latestPerc?.perc_renovacao ?? null,
       latest_perc_conv_pitch: latestPerc?.perc_conv_pitch ?? null,

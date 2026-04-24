@@ -51,7 +51,7 @@ export interface ConviteAdsComercialMetrics {
 }
 
 export interface ConviteUltimateMetrics {
-  latest_month_year: string;
+  latest_month_year: string | null;
   latest_numero_absoluto: number;
   latest_perc_renovacao: number | null;
   latest_perc_conv_pitch: number | null;
