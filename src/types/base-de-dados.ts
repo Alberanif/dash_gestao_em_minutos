@@ -32,6 +32,7 @@ export interface FunilDestraveRow {
 
 export interface UltimateRow {
   id: string;
+  projeto: string;
   month_year: string;
   numero_absoluto: number;
   created_at: string;
