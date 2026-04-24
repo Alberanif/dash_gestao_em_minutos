@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { UltimateRow } from "@/types/base-de-dados";
+import type { ConviteProjectOption } from "@/types/convite";
 import { labelStyle, cellStyle, thStyle } from "./_styles";
 
 function fmtMonthYear(isoDate: string) {
@@ -10,18 +11,27 @@ function fmtMonthYear(isoDate: string) {
 
 export default function Ultimate() {
   const [rows, setRows] = useState<UltimateRow[]>([]);
+  const [projectOptions, setProjectOptions] = useState<ConviteProjectOption[]>([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ month_year: "", numero_absoluto: "" });
+  const [form, setForm] = useState({ projeto: "", month_year: "", numero_absoluto: "" });
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/base-de-dados/convite/ultimate")
-      .then((r) => r.json())
-      .then((data) => setRows(Array.isArray(data) ? data : []))
-      .catch(() => setRows([]))
+    Promise.all([
+      fetch("/api/base-de-dados/convite/ultimate").then((r) => r.json()),
+      fetch("/api/convite/project-options?group=ultimate").then((r) => r.json()),
+    ])
+      .then(([rowsData, optionsData]) => {
+        setRows(Array.isArray(rowsData) ? rowsData : []);
+        setProjectOptions(Array.isArray(optionsData) ? optionsData : []);
+      })
+      .catch(() => {
+        setRows([]);
+        setProjectOptions([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -39,6 +49,7 @@ export default function Ultimate() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          projeto: form.projeto,
           month_year: form.month_year,
           numero_absoluto: parseInt(form.numero_absoluto, 10),
         }),
@@ -49,7 +60,7 @@ export default function Ultimate() {
       }
       const savedRow: UltimateRow = await res.json();
       setRows((prev) => [savedRow, ...prev]);
-      setForm({ month_year: "", numero_absoluto: "" });
+      setForm({ projeto: "", month_year: "", numero_absoluto: "" });
       setDirty(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 3500);
@@ -63,6 +74,7 @@ export default function Ultimate() {
   const canSave =
     dirty &&
     !saving &&
+    form.projeto !== "" &&
     form.month_year !== "" &&
     form.numero_absoluto !== "" &&
     !isNaN(parseInt(form.numero_absoluto, 10));
@@ -103,6 +115,7 @@ export default function Ultimate() {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "var(--color-bg)" }}>
+              <th style={thStyle}>Projeto</th>
               <th style={thStyle}>Mês/Ano</th>
               <th style={{ ...thStyle, textAlign: "right" }}>Nº Absoluto</th>
             </tr>
@@ -111,22 +124,23 @@ export default function Ultimate() {
             {loading ? (
               [0, 1, 2].map((i) => (
                 <tr key={i} style={{ borderTop: "1px solid var(--color-border)" }}>
-                  {[0, 1].map((j) => (
+                  {[0, 1, 2].map((j) => (
                     <td key={j} style={cellStyle}>
-                      <div style={{ height: 14, width: j === 0 ? "60%" : 40, borderRadius: 4, background: "var(--color-bg)", animation: "pulse 1.5s ease-in-out infinite", marginLeft: j === 0 ? undefined : "auto" }} />
+                      <div style={{ height: 14, width: j === 2 ? 40 : "60%", borderRadius: 4, background: "var(--color-bg)", animation: "pulse 1.5s ease-in-out infinite", marginLeft: j === 2 ? "auto" : undefined }} />
                     </td>
                   ))}
                 </tr>
               ))
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={2} style={{ ...cellStyle, textAlign: "center", color: "var(--color-text-muted)", padding: "32px 16px" }}>
+                <td colSpan={3} style={{ ...cellStyle, textAlign: "center", color: "var(--color-text-muted)", padding: "32px 16px" }}>
                   Nenhum registro ainda. Adicione o primeiro abaixo.
                 </td>
               </tr>
             ) : (
               rows.map((row) => (
                 <tr key={row.id} style={{ borderTop: "1px solid var(--color-border)" }}>
+                  <td style={cellStyle}>{row.projeto}</td>
                   <td style={cellStyle}>{fmtMonthYear(row.month_year)}</td>
                   <td style={{ ...cellStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{row.numero_absoluto.toLocaleString("pt-BR")}</td>
                 </tr>
@@ -141,14 +155,48 @@ export default function Ultimate() {
           Novo registro
         </p>
 
+        <div>
+          <label style={labelStyle}>Projeto</label>
+          <select
+            className="field-control"
+            value={form.projeto}
+            onChange={(e) => handleChange("projeto", e.target.value)}
+            disabled={projectOptions.length === 0}
+          >
+            <option value="">
+              {projectOptions.length === 0 ? "Nenhum projeto Ultimate cadastrado" : "Selecione um projeto"}
+            </option>
+            {projectOptions.map((opt) => (
+              <option key={opt.id} value={opt.nome_projeto}>
+                {opt.nome_projeto}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div>
             <label style={labelStyle}>Mês/Ano</label>
-            <input type="month" className="field-control" value={form.month_year} onChange={(e) => handleChange("month_year", e.target.value)} />
+            <input
+              type="month"
+              className="field-control"
+              value={form.month_year}
+              onChange={(e) => handleChange("month_year", e.target.value)}
+              disabled={projectOptions.length === 0}
+            />
           </div>
           <div>
             <label style={labelStyle}>Nº Absoluto</label>
-            <input type="number" min={0} step={1} className="field-control" placeholder="0" value={form.numero_absoluto} onChange={(e) => handleChange("numero_absoluto", e.target.value)} />
+            <input
+              type="number"
+              min={0}
+              step={1}
+              className="field-control"
+              placeholder="0"
+              value={form.numero_absoluto}
+              onChange={(e) => handleChange("numero_absoluto", e.target.value)}
+              disabled={projectOptions.length === 0}
+            />
           </div>
         </div>
 
