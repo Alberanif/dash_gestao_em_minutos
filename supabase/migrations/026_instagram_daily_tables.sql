@@ -1,7 +1,7 @@
 -- Create Instagram daily metrics tables for structured data collection
 
 -- Profile daily table: tracks account-level metrics per day
-CREATE TABLE public.dash_gestao_instagram_profile_daily (
+CREATE TABLE dash_gestao_instagram_profile_daily (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id UUID NOT NULL,
   date DATE NOT NULL,
@@ -20,15 +20,15 @@ CREATE TABLE public.dash_gestao_instagram_profile_daily (
 CREATE INDEX idx_profile_daily_account_date
   ON dash_gestao_instagram_profile_daily(account_id, date DESC);
 
-ALTER TABLE public.dash_gestao_instagram_profile_daily ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dash_gestao_instagram_profile_daily ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Authenticated users can read all profile_daily records"
-  ON public.dash_gestao_instagram_profile_daily
-  FOR SELECT
-  USING (TRUE);
+CREATE POLICY "auth_select_instagram_profile_daily"
+  ON dash_gestao_instagram_profile_daily
+  FOR SELECT TO authenticated
+  USING (true);
 
 -- Media daily table: tracks engagement metrics per media item per day
-CREATE TABLE public.dash_gestao_instagram_media_daily (
+CREATE TABLE dash_gestao_instagram_media_daily (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id UUID NOT NULL,
   media_id TEXT NOT NULL,
@@ -70,9 +70,9 @@ CREATE INDEX idx_media_daily_account_date
 CREATE INDEX idx_media_daily_media_id
   ON dash_gestao_instagram_media_daily(media_id);
 
-ALTER TABLE public.dash_gestao_instagram_media_daily ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dash_gestao_instagram_media_daily ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Authenticated users can read all media_daily records"
-  ON public.dash_gestao_instagram_media_daily
-  FOR SELECT
-  USING (TRUE);
+CREATE POLICY "auth_select_instagram_media_daily"
+  ON dash_gestao_instagram_media_daily
+  FOR SELECT TO authenticated
+  USING (true);
