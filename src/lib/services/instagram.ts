@@ -96,7 +96,7 @@ export async function collectInstagramDaily(account: Account): Promise<{
   // 4. Fetch recent media (last 5)
   const mediaList = await igGet(
     `${user_id}/media`,
-    { fields: "id,media_type,caption,permalink,timestamp,media_url,thumbnail_url,width,height", limit: "5" },
+    { fields: "id,media_type,caption,permalink,timestamp,media_url,thumbnail_url,width,height,media_duration,carousel_media", limit: "5" },
     access_token
   );
 
@@ -308,7 +308,7 @@ export async function collectInstagramBatch(
   // Fetch current media (last 5 - API doesn't support historical media)
   const mediaList = await igGet(
     `${user_id}/media`,
-    { fields: "id,media_type,caption,permalink,timestamp,media_url,thumbnail_url,width,height", limit: "5" },
+    { fields: "id,media_type,caption,permalink,timestamp,media_url,thumbnail_url,width,height,media_duration,carousel_media", limit: "5" },
     access_token
   );
 
