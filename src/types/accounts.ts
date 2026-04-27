@@ -159,3 +159,49 @@ export interface MediaSnapshot {
   collected_at: string;
   [key: string]: unknown;
 }
+
+// Instagram daily records (aggregated metrics per day)
+export interface ProfileDailyRecord {
+  id: string; // UUID
+  account_id: string; // UUID
+  date: string; // DATE format YYYY-MM-DD
+  followers_count: number;
+  follows_count: number;
+  media_count: number;
+  reach: number;
+  impressions: number;
+  created_at: string; // ISO timestamp
+}
+
+export interface MediaDailyRecord {
+  id: string; // UUID
+  account_id: string; // UUID
+  media_id: string;
+  date: string; // DATE format YYYY-MM-DD
+  media_type: "IMAGE" | "VIDEO" | "CAROUSEL" | "REEL";
+  caption: string | null;
+  permalink: string | null;
+
+  // Engagement metrics
+  like_count: number;
+  comments_count: number;
+  shares: number;
+  reach: number;
+  views: number;
+  saved: number;
+
+  // Calculated
+  engagement_rate: number;
+
+  // Technical metadata
+  image_url: string | null;
+  thumbnail_url: string | null;
+  width: number | null;
+  height: number | null;
+  duration_ms: number | null;
+  carousel_children_count: number | null;
+
+  // Timestamps
+  published_at: string | null; // ISO timestamp
+  created_at: string; // ISO timestamp
+}
