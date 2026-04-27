@@ -99,6 +99,15 @@ export default function DadosPage() {
   const [metaBatchResult, setMetaBatchResult] = useState<{ dailyRecords: number; campaignDailyRecords: number } | null>(null);
   const [metaBatchError, setMetaBatchError] = useState<string | null>(null);
 
+  // Instagram batch collect state
+  const [igAccounts, setIgAccounts] = useState<HotmartAccount[]>([]);
+  const [igBatchAccountId, setIgBatchAccountId] = useState("");
+  const [igBatchStart, setIgBatchStart] = useState("");
+  const [igBatchEnd, setIgBatchEnd] = useState("");
+  const [igBatchStatus, setIgBatchStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [igBatchResult, setIgBatchResult] = useState<{ profileRecords: number; mediaRecords: number } | null>(null);
+  const [igBatchError, setIgBatchError] = useState<string | null>(null);
+
   // YouTube batch collect state
   const [youtubeAccounts, setYoutubeAccounts] = useState<HotmartAccount[]>([]);
   const [ytBatchAccountId, setYtBatchAccountId] = useState("");
@@ -159,6 +168,17 @@ export default function DadosPage() {
       })
       .catch(() => setMetaAccounts([]));
   }, [activeTab, metaBatchAccountId]);
+
+  useEffect(() => {
+    if (activeTab !== "instagram") return;
+    fetch("/api/accounts?platform=instagram")
+      .then((r) => r.json())
+      .then((accs: HotmartAccount[]) => {
+        setIgAccounts(Array.isArray(accs) ? accs : []);
+        if (accs.length > 0 && !igBatchAccountId) setIgBatchAccountId(accs[0].id);
+      })
+      .catch(() => setIgAccounts([]));
+  }, [activeTab, igBatchAccountId]);
 
   async function handleSync() {
     setSyncing(true);
@@ -276,6 +296,37 @@ export default function DadosPage() {
     } catch {
       setMetaBatchStatus("error");
       setMetaBatchError("Falha na comunicação com o servidor");
+    }
+  }
+
+  async function handleInstagramBatchCollect() {
+    setIgBatchStatus("loading");
+    setIgBatchResult(null);
+    setIgBatchError(null);
+
+    try {
+      const res = await fetch("/api/instagram/batch-collect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          account_id: igBatchAccountId,
+          start_date: igBatchStart,
+          end_date: igBatchEnd,
+        }),
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        setIgBatchStatus("error");
+        setIgBatchError(json.error ?? "Erro desconhecido");
+      } else {
+        setIgBatchStatus("success");
+        setIgBatchResult({ profileRecords: json.profileRecords, mediaRecords: json.mediaRecords });
+        await fetchLogs(activeTab);
+      }
+    } catch {
+      setIgBatchStatus("error");
+      setIgBatchError("Falha na comunicação com o servidor");
     }
   }
 
@@ -398,6 +449,55 @@ export default function DadosPage() {
               ) : null}
               {metaBatchStatus === "error" && metaBatchError ? (
                 <div className="mt-4"><StatusBadge tone="error" label={metaBatchError} /></div>
+              ) : null}
+            </section>
+          ) : null}
+
+          {activeTab === "instagram" ? (
+            <section className="surface-card p-5">
+              <div className="mb-4">
+                <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text)" }}>Coleta em lote Instagram</h2>
+                <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+                  Coleta métricas diárias de insights para um intervalo específico.
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-4">
+                <div>
+                  <label className="mb-1 block text-[13px] font-medium" style={{ color: "var(--color-text-muted)" }}>Conta</label>
+                  <select value={igBatchAccountId} onChange={(e) => setIgBatchAccountId(e.target.value)} className="field-control">
+                    {igAccounts.map((account) => (
+                      <option key={account.id} value={account.id}>{account.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-[13px] font-medium" style={{ color: "var(--color-text-muted)" }}>Data inicial</label>
+                  <input type="date" value={igBatchStart} onChange={(e) => setIgBatchStart(e.target.value)} className="field-control" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[13px] font-medium" style={{ color: "var(--color-text-muted)" }}>Data final</label>
+                  <input type="date" value={igBatchEnd} onChange={(e) => setIgBatchEnd(e.target.value)} className="field-control" />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={handleInstagramBatchCollect}
+                    disabled={!igBatchAccountId || !igBatchStart || !igBatchEnd || igBatchStatus === "loading"}
+                    className="btn-primary w-full"
+                  >
+                    {igBatchStatus === "loading" ? "Coletando..." : "Executar batch"}
+                  </button>
+                </div>
+              </div>
+
+              {igBatchStatus === "success" && igBatchResult ? (
+                <div className="mt-4">
+                  <StatusBadge tone="success" label={`${igBatchResult.profileRecords} dias de insights + ${igBatchResult.mediaRecords} mídias coletados`} />
+                </div>
+              ) : null}
+              {igBatchStatus === "error" && igBatchError ? (
+                <div className="mt-4"><StatusBadge tone="error" label={igBatchError} /></div>
               ) : null}
             </section>
           ) : null}

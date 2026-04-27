@@ -186,3 +186,176 @@ export async function collectInstagram(account: Account): Promise<{
 
   return { profileRecords: 1, mediaRecords: mediaRows.length };
 }
+
+export async function collectInstagramBatch(
+  account: Account,
+  start_date: string,
+  end_date: string
+): Promise<{
+  profileRecords: number;
+  mediaRecords: number;
+}> {
+  const { access_token, user_id } = account.credentials as InstagramCredentials;
+  const supabase = createSupabaseServiceClient();
+
+  const startUnix = Math.floor(new Date(start_date).getTime() / 1000);
+  const endUnix = Math.floor(new Date(end_date).getTime() / 1000);
+
+  // Fetch daily insights (impressions, reach) for the date range
+  const insights = await igGet(
+    `${user_id}/insights`,
+    {
+      metric: "impressions,reach",
+      period: "day",
+      since: String(startUnix),
+      until: String(endUnix),
+    },
+    access_token
+  );
+
+  const dailyMap: Record<string, { impressions: number; reach: number }> = {};
+
+  for (const metric of insights.data) {
+    for (const value of metric.values) {
+      const dateStr = value.end_time.split("T")[0];
+      if (!dailyMap[dateStr]) {
+        dailyMap[dateStr] = { impressions: 0, reach: 0 };
+      }
+      if (metric.name === "impressions") dailyMap[dateStr].impressions = value.value;
+      if (metric.name === "reach") dailyMap[dateStr].reach = value.value;
+    }
+  }
+
+  // Insert daily profile snapshots
+  const profileRows = Object.entries(dailyMap).map(([date, metrics]) => ({
+    account_id: account.id,
+    followers_count: 0,
+    follows_count: 0,
+    media_count: 0,
+    impressions: metrics.impressions,
+    reach: metrics.reach,
+    collected_at: new Date(`${date}T00:00:00Z`).toISOString(),
+  }));
+
+  if (profileRows.length > 0) {
+    const { error: profileError } = await supabase
+      .from("dash_gestao_instagram_profile_snapshots")
+      .insert(profileRows);
+
+    if (profileError) {
+      throw new Error(`Profile insert error: ${profileError.message}`);
+    }
+  }
+
+  // Fetch current media (same as collectInstagram steps 3-5)
+  const mediaList = await igGet(
+    `${user_id}/media`,
+    { fields: "id,media_type,caption,permalink,timestamp", limit: "50" },
+    access_token
+  );
+
+  let storyItems: Array<{
+    id: string;
+    media_type: string;
+    caption?: string;
+    permalink?: string;
+    timestamp: string;
+  }> = [];
+  try {
+    const stories = await igGet(
+      `${user_id}/stories`,
+      { fields: "id,media_type,caption,permalink,timestamp" },
+      access_token
+    );
+    storyItems = (stories.data || []).map(
+      (s: { id: string; media_type: string; caption?: string; permalink?: string; timestamp: string }) => ({
+        ...s,
+        media_type: "STORY",
+      })
+    );
+  } catch {
+    // No active stories
+  }
+
+  const allMedia = [...(mediaList.data || []), ...storyItems];
+  const now = new Date().toISOString();
+
+  if (allMedia.length === 0) {
+    return { profileRecords: profileRows.length, mediaRecords: 0 };
+  }
+
+  const mediaRows = [];
+  for (const media of allMedia) {
+    let like_count = 0,
+      comments_count = 0,
+      reachVal = 0,
+      impressionsVal = 0,
+      saved = 0,
+      shares = 0,
+      plays = 0;
+
+    try {
+      let metrics = "reach";
+      if (media.media_type === "STORY") {
+        metrics = "reach,replies";
+      } else if (media.media_type === "REEL") {
+        metrics = "reach,saved,shares,likes,comments,views";
+      } else {
+        metrics = "reach,saved,likes,comments,shares,views";
+      }
+
+      const insightsData = await igGet(
+        `${media.id}/insights`,
+        { metric: metrics },
+        access_token
+      );
+
+      for (const m of insightsData.data) {
+        const val = m.values[0]?.value || 0;
+        if (m.name === "reach") reachVal = val;
+        if (m.name === "saved") saved = val;
+        if (m.name === "shares") shares = val;
+        if (m.name === "views") impressionsVal = val;
+        if (m.name === "plays") plays = val;
+        if (m.name === "likes") like_count = val;
+        if (m.name === "comments") comments_count = val;
+      }
+    } catch {
+      // Insights may not be available
+    }
+
+    const normalizedType =
+      media.media_type === "IMAGE" ? "IMAGE" :
+      media.media_type === "VIDEO" ? "VIDEO" :
+      media.media_type === "CAROUSEL_ALBUM" ? "CAROUSEL" :
+      media.media_type === "REEL" ? "REEL" :
+      media.media_type === "STORY" ? "STORY" : "IMAGE";
+
+    mediaRows.push({
+      account_id: account.id,
+      media_id: media.id,
+      media_type: normalizedType,
+      caption: media.caption || null,
+      permalink: media.permalink || null,
+      like_count,
+      comments_count,
+      reach: reachVal,
+      impressions: impressionsVal,
+      saved,
+      shares,
+      plays,
+      published_at: media.timestamp,
+      collected_at: now,
+    });
+  }
+
+  const { error: mediaError } = await supabase
+    .from("dash_gestao_instagram_media_snapshots")
+    .insert(mediaRows);
+
+  if (mediaError) {
+    throw new Error(`Media insert error: ${mediaError.message}`);
+  }
+
+  return { profileRecords: profileRows.length, mediaRecords: mediaRows.length };
+}
