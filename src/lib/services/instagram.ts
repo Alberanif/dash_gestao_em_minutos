@@ -124,13 +124,13 @@ export async function collectInstagram(account: Account): Promise<{
       plays = 0;
 
     try {
-      let metrics = "impressions,reach";
+      let metrics = "reach";
       if (media.media_type === "STORY") {
-        metrics = "impressions,reach,replies";
+        metrics = "reach,replies";
       } else if (media.media_type === "REEL") {
-        metrics = "impressions,reach,saved,shares,plays,likes,comments";
+        metrics = "reach,saved,shares,likes,comments,views";
       } else {
-        metrics = "impressions,reach,saved,likes,comments,shares";
+        metrics = "reach,saved,likes,comments,shares,views";
       }
 
       const insightsData = await igGet(
@@ -141,10 +141,10 @@ export async function collectInstagram(account: Account): Promise<{
 
       for (const m of insightsData.data) {
         const val = m.values[0]?.value || 0;
-        if (m.name === "impressions") impressionsVal = val;
         if (m.name === "reach") reachVal = val;
         if (m.name === "saved") saved = val;
         if (m.name === "shares") shares = val;
+        if (m.name === "views") impressionsVal = val;
         if (m.name === "plays") plays = val;
         if (m.name === "likes") like_count = val;
         if (m.name === "comments") comments_count = val;
