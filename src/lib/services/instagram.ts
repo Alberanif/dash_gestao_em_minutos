@@ -35,14 +35,13 @@ export async function collectInstagram(account: Account): Promise<{
     access_token
   );
 
-  // 2. Fetch profile insights (impressions, reach) — last 28 days
-  let impressions = 0;
+  // 2. Fetch profile insights (reach only) — last 28 days
   let reach = 0;
   try {
     const insights = await igGet(
       `${user_id}/insights`,
       {
-        metric: "impressions,reach",
+        metric: "reach",
         period: "day",
         since: String(Math.floor(Date.now() / 1000) - 28 * 86400),
         until: String(Math.floor(Date.now() / 1000)),
@@ -54,7 +53,6 @@ export async function collectInstagram(account: Account): Promise<{
         (sum: number, v: { value: number }) => sum + v.value,
         0
       );
-      if (metric.name === "impressions") impressions = total;
       if (metric.name === "reach") reach = total;
     }
   } catch {
@@ -68,7 +66,7 @@ export async function collectInstagram(account: Account): Promise<{
       followers_count: profile.followers_count,
       follows_count: profile.follows_count,
       media_count: profile.media_count,
-      impressions,
+      impressions: 0,
       reach,
       collected_at: now,
     });
