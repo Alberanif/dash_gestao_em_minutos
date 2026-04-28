@@ -20,6 +20,71 @@ async function igGet(
   return res.json();
 }
 
+interface RawMediaItem {
+  id: string;
+  media_type: string;
+  caption?: string;
+  permalink?: string;
+  timestamp: string;
+  media_url?: string;
+  thumbnail_url?: string;
+  width?: number;
+  height?: number;
+  media_duration?: number;
+  carousel_media?: any[];
+}
+
+async function paginateMediaSince(
+  userId: string,
+  since: Date,
+  until: Date,
+  maxPosts: number,
+  accessToken: string
+): Promise<RawMediaItem[]> {
+  const collected: RawMediaItem[] = [];
+  let cursor: string | null = null;
+
+  while (true) {
+    const params: Record<string, string> = {
+      fields: "id,media_type,caption,permalink,timestamp,media_url,thumbnail_url,width,height,media_duration,carousel_media",
+      limit: "25",
+    };
+
+    if (cursor) {
+      params.after = cursor;
+    }
+
+    const page = await igGet(`${userId}/media`, params, accessToken);
+    const mediaList = page.data || [];
+
+    for (const media of mediaList) {
+      const mediaTimestamp = new Date(media.timestamp);
+
+      // If media is older than since, stop (all following are older too)
+      if (mediaTimestamp < since) {
+        return collected;
+      }
+
+      // If media is within range [since, until], collect it
+      if (mediaTimestamp <= until) {
+        collected.push(media);
+      }
+
+      // Stop if we've collected enough
+      if (collected.length >= maxPosts) {
+        return collected;
+      }
+    }
+
+    // Stop if no next page
+    if (!page.paging?.cursors?.after) {
+      return collected;
+    }
+
+    cursor = page.paging.cursors.after;
+  }
+}
+
 export async function collectInstagramDaily(account: Account): Promise<{
   profileRecords: number;
   mediaRecords: number;
