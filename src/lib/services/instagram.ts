@@ -257,7 +257,7 @@ export async function collectInstagramDaily(account: Account): Promise<{
       thumbnail_url: media.thumbnail_url || null,
       width: media.width || null,
       height: media.height || null,
-      duration_ms: media.media_type === "REEL" ? (media.media_duration * 1000) : null,
+      duration_ms: media.media_type === "REEL" ? ((media.media_duration || 0) * 1000) : null,
       carousel_children_count: media.media_type === "CAROUSEL_ALBUM" ? (media.carousel_media?.length || 0) : null,
       published_at: media.timestamp,
     });
@@ -305,7 +305,8 @@ export async function collectInstagramDaily(account: Account): Promise<{
 export async function collectInstagramBatch(
   account: Account,
   start_date: string,
-  end_date: string
+  end_date: string,
+  max_posts: number = 500
 ): Promise<{
   profileRecords: number;
   mediaRecords: number;
@@ -382,14 +383,14 @@ export async function collectInstagramBatch(
     }
   }
 
-  // Fetch current media (last 5 - API doesn't support historical media)
-  const mediaList = await igGet(
-    `${user_id}/media`,
-    { fields: "id,media_type,caption,permalink,timestamp,media_url,thumbnail_url,width,height,media_duration,carousel_media", limit: "5" },
+  // Fetch media within date range
+  const allMedia = await paginateMediaSince(
+    user_id,
+    new Date(start_date),
+    new Date(end_date),
+    max_posts,
     access_token
   );
-
-  const allMedia = mediaList.data || [];
   const now = new Date().toISOString();
   const today = now.split('T')[0];
 
@@ -453,7 +454,7 @@ export async function collectInstagramBatch(
     mediaRows.push({
       account_id: account.id,
       media_id: media.id,
-      date: today, // Use today since API doesn't provide historical media
+      last_collected_at: today,
       media_type: normalizedType,
       caption: media.caption || null,
       permalink: media.permalink || null,
@@ -468,7 +469,7 @@ export async function collectInstagramBatch(
       thumbnail_url: media.thumbnail_url || null,
       width: media.width || null,
       height: media.height || null,
-      duration_ms: media.media_type === "REEL" ? (media.media_duration * 1000) : null,
+      duration_ms: media.media_type === "REEL" ? ((media.media_duration || 0) * 1000) : null,
       carousel_children_count: media.media_type === "CAROUSEL_ALBUM" ? (media.carousel_media?.length || 0) : null,
       published_at: media.timestamp,
     });
@@ -496,7 +497,7 @@ export async function collectInstagramBatch(
   if (mediaRows.length > 0) {
     const { error: mediaError } = await supabase
       .from("dash_gestao_instagram_media_daily")
-      .upsert(mediaRows, { onConflict: "account_id,media_id,date" });
+      .upsert(mediaRows, { onConflict: "account_id,media_id" });
 
     if (mediaError) {
       throw new Error(`Media daily batch upsert error: ${mediaError.message}`);
