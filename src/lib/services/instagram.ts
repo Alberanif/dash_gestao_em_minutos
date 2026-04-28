@@ -175,14 +175,10 @@ export async function collectInstagramDaily(account: Account): Promise<{
 
   if (profileLegacyError) throw new Error(`Profile snapshot insert error: ${profileLegacyError.message}`);
 
-  // 4. Fetch recent media (last 5)
-  const mediaList = await igGet(
-    `${user_id}/media`,
-    { fields: "id,media_type,caption,permalink,timestamp,media_url,thumbnail_url,width,height,media_duration,carousel_media", limit: "5" },
-    access_token
-  );
-
-  const allMedia = mediaList.data || [];
+  // 4. Fetch media from last 24 hours
+  const oneDayAgo = new Date(today);
+  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+  const allMedia = await paginateMediaSince(user_id, oneDayAgo, new Date(), Infinity, access_token);
 
   if (allMedia.length === 0) {
     return { profileRecords: 1, mediaRecords: 0 };
@@ -246,7 +242,7 @@ export async function collectInstagramDaily(account: Account): Promise<{
     mediaRows.push({
       account_id: account.id,
       media_id: media.id,
-      date: today,
+      last_collected_at: today,
       media_type: normalizedType,
       caption: media.caption || null,
       permalink: media.permalink || null,
@@ -289,7 +285,7 @@ export async function collectInstagramDaily(account: Account): Promise<{
   if (mediaRows.length > 0) {
     const { error: mediaError } = await supabase
       .from("dash_gestao_instagram_media_daily")
-      .upsert(mediaRows, { onConflict: "account_id,media_id,date" });
+      .upsert(mediaRows, { onConflict: "account_id,media_id" });
 
     if (mediaError) throw new Error(`Media daily upsert error: ${mediaError.message}`);
   }
