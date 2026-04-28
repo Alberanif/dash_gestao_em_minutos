@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
   if (error) return error;
 
   const body = await request.json().catch(() => null);
-  const { account_id, start_date, end_date } = body ?? {};
+  const { account_id, start_date, end_date, max_posts } = body ?? {};
 
   if (!account_id || !start_date || !end_date) {
     return NextResponse.json(
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
   const startedAt = new Date().toISOString();
 
   try {
-    const result = await collectInstagramBatch(account as Account, start_date, end_date);
+    const result = await collectInstagramBatch(account as Account, start_date, end_date, max_posts);
 
     await supabase.from("dash_gestao_cron_logs").insert({
       account_id,
