@@ -2,6 +2,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import type { Account, InstagramCredentials } from "@/types/accounts";
 
 const IG_API_BASE = "https://graph.facebook.com/v21.0";
+const MAX_ITERATIONS = 1000;
 
 async function igGet(
   endpoint: string,
@@ -43,8 +44,11 @@ async function paginateMediaSince(
 ): Promise<RawMediaItem[]> {
   const collected: RawMediaItem[] = [];
   let cursor: string | null = null;
+  let iterations = 0;
 
-  while (true) {
+  while (iterations < MAX_ITERATIONS) {
+    iterations++;
+
     const params: Record<string, string> = {
       fields: "id,media_type,caption,permalink,timestamp,media_url,thumbnail_url,width,height,media_duration,carousel_media",
       limit: "25",
@@ -54,11 +58,23 @@ async function paginateMediaSince(
       params.after = cursor;
     }
 
-    const page = await igGet(`${userId}/media`, params, accessToken);
+    let page;
+    try {
+      page = await igGet(`${userId}/media`, params, accessToken);
+    } catch {
+      // API call failed — return what we've collected so far (graceful degradation)
+      return collected;
+    }
+
     const mediaList = page.data || [];
 
     for (const media of mediaList) {
       const mediaTimestamp = new Date(media.timestamp);
+
+      // Skip media with invalid timestamps
+      if (isNaN(mediaTimestamp.getTime())) {
+        continue;
+      }
 
       // If media is older than since, stop (all following are older too)
       if (mediaTimestamp < since) {
@@ -83,6 +99,9 @@ async function paginateMediaSince(
 
     cursor = page.paging.cursors.after;
   }
+
+  // Max iterations reached — return what we've collected
+  return collected;
 }
 
 export async function collectInstagramDaily(account: Account): Promise<{
