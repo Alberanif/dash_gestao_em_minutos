@@ -177,7 +177,7 @@ export interface MediaDailyRecord {
   id: string; // UUID
   account_id: string; // UUID
   media_id: string;
-  date: string; // DATE format YYYY-MM-DD
+  last_collected_at: string; // DATE format YYYY-MM-DD — most recent collection date for this post
   media_type: "IMAGE" | "VIDEO" | "CAROUSEL" | "REEL";
   caption: string | null;
   permalink: string | null;
