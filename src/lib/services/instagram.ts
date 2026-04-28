@@ -35,14 +35,13 @@ export async function collectInstagramDaily(account: Account): Promise<{
     access_token
   );
 
-  // 2. Fetch profile insights (reach, impressions) for today
+  // 2. Fetch profile insights (reach) for today
   let reach = 0;
-  let impressions = 0;
   try {
     const insights = await igGet(
       `${user_id}/insights`,
       {
-        metric: "reach,impressions",
+        metric: "reach",
         period: "day",
         since: String(Math.floor(new Date(today).getTime() / 1000)),
         until: String(Math.floor(new Date(today).getTime() / 1000 + 86400)),
@@ -55,7 +54,6 @@ export async function collectInstagramDaily(account: Account): Promise<{
         0
       );
       if (metric.name === "reach") reach = total;
-      if (metric.name === "impressions") impressions = total;
     }
   } catch {
     // Insights may not be available — continue with zeros
@@ -69,7 +67,7 @@ export async function collectInstagramDaily(account: Account): Promise<{
     follows_count: profile.follows_count,
     media_count: profile.media_count,
     reach,
-    impressions,
+    impressions: 0,
   };
 
   const { error: profileError } = await supabase
@@ -86,7 +84,7 @@ export async function collectInstagramDaily(account: Account): Promise<{
       followers_count: profile.followers_count,
       follows_count: profile.follows_count,
       media_count: profile.media_count,
-      impressions,
+      impressions: 0,
       reach,
       collected_at: new Date().toISOString(),
     });
@@ -238,11 +236,11 @@ export async function collectInstagramBatch(
   const startUnix = Math.floor(new Date(start_date).getTime() / 1000);
   const endUnix = Math.floor(new Date(end_date).getTime() / 1000);
 
-  // Fetch daily insights (reach, impressions) for the date range
+  // Fetch daily insights (reach) for the date range
   const insights = await igGet(
     `${user_id}/insights`,
     {
-      metric: "reach,impressions",
+      metric: "reach",
       period: "day",
       since: String(startUnix),
       until: String(endUnix),
@@ -250,16 +248,15 @@ export async function collectInstagramBatch(
     access_token
   );
 
-  const dailyMap: Record<string, { reach: number; impressions: number }> = {};
+  const dailyMap: Record<string, { reach: number }> = {};
 
   for (const metric of insights.data) {
     for (const value of metric.values) {
       const dateStr = value.end_time.split("T")[0];
       if (!dailyMap[dateStr]) {
-        dailyMap[dateStr] = { reach: 0, impressions: 0 };
+        dailyMap[dateStr] = { reach: 0 };
       }
       if (metric.name === "reach") dailyMap[dateStr].reach = value.value;
-      if (metric.name === "impressions") dailyMap[dateStr].impressions = value.value;
     }
   }
 
@@ -271,7 +268,7 @@ export async function collectInstagramBatch(
     follows_count: 0,
     media_count: 0,
     reach: metrics.reach,
-    impressions: metrics.impressions,
+    impressions: 0,
   }));
 
   if (profileRows.length > 0) {
@@ -290,7 +287,7 @@ export async function collectInstagramBatch(
     followers_count: 0,
     follows_count: 0,
     media_count: 0,
-    impressions: metrics.impressions,
+    impressions: 0,
     reach: metrics.reach,
     collected_at: new Date(`${date}T00:00:00Z`).toISOString(),
   }));
