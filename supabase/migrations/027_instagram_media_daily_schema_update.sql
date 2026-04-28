@@ -9,7 +9,7 @@ RENAME COLUMN date TO last_collected_at;
 
 -- Drop the old unique constraint
 ALTER TABLE dash_gestao_instagram_media_daily
-DROP CONSTRAINT dash_gestao_instagram_media_daily_account_id_media_id_date_key;
+DROP CONSTRAINT uq_media_daily_account_media_date;
 
 -- Add new unique constraint on (account_id, media_id)
 ALTER TABLE dash_gestao_instagram_media_daily
