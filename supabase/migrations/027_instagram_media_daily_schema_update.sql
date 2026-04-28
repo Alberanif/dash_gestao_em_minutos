@@ -1,5 +1,8 @@
 -- supabase/migrations/027_instagram_media_daily_schema_update.sql
 
+-- Note: Column type remains DATE (not TIMESTAMP) to preserve original schema.
+-- last_collected_at stores the collection date with day granularity only.
+
 -- Rename column date → last_collected_at
 ALTER TABLE dash_gestao_instagram_media_daily
 RENAME COLUMN date TO last_collected_at;
