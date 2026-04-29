@@ -274,6 +274,13 @@ export async function collectInstagramBatch(
   const startUnix = Math.floor(new Date(start_date).getTime() / 1000);
   const endUnix = Math.floor(new Date(end_date).getTime() / 1000);
 
+  // Fetch current profile data (snapshot of followers/follows/media_count)
+  const profile = await igGet(
+    user_id,
+    { fields: "followers_count,follows_count,media_count" },
+    access_token
+  );
+
   // Fetch daily insights (reach) for the date range
   const insights = await igGet(
     `${user_id}/insights`,
@@ -302,9 +309,9 @@ export async function collectInstagramBatch(
   const profileRows = Object.entries(dailyMap).map(([date, metrics]) => ({
     account_id: account.id,
     date,
-    followers_count: 0, // Not available from insights endpoint
-    follows_count: 0,
-    media_count: 0,
+    followers_count: profile.followers_count,
+    follows_count: profile.follows_count,
+    media_count: profile.media_count,
     reach: metrics.reach,
     impressions: 0,
   }));
