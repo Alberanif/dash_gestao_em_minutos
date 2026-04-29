@@ -10,5 +10,5 @@ export interface SocialSellerWeek {
 }
 
 export interface CachedWeekSelection {
-  weekId: string;
+  week_id: string;
 }
