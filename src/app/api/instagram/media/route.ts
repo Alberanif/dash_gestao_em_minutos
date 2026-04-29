@@ -6,20 +6,35 @@ export async function GET(request: NextRequest) {
   const { error } = await validateApiAuth();
   if (error) return error;
 
-  const accountId = request.nextUrl.searchParams.get("account_id");
+  const supabase = await createSupabaseServerClient();
+
+  let accountId = request.nextUrl.searchParams.get("account_id");
+
+  // If no account_id provided, get the first Instagram account
   if (!accountId) {
-    return NextResponse.json({ error: "account_id é obrigatório" }, { status: 400 });
+    const { data: accounts, error: accountError } = await supabase
+      .from("dash_gestao_accounts")
+      .select("id")
+      .eq("platform", "instagram")
+      .eq("is_active", true)
+      .limit(1)
+      .single();
+
+    if (accountError || !accounts) {
+      return NextResponse.json({ error: "Nenhuma conta Instagram encontrada" }, { status: 404 });
+    }
+
+    accountId = accounts.id;
   }
 
-  const supabase = await createSupabaseServerClient();
   const limit = parseInt(request.nextUrl.searchParams.get("limit") || "50");
   const type = request.nextUrl.searchParams.get("type");
 
   let query = supabase
-    .from("dash_gestao_instagram_media_snapshots")
+    .from("dash_gestao_instagram_media_daily")
     .select("*")
     .eq("account_id", accountId)
-    .order("collected_at", { ascending: false })
+    .order("last_collected_at", { ascending: false })
     .limit(limit);
 
   if (type) {
@@ -32,7 +47,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: dbError.message }, { status: 500 });
   }
 
-  // Deduplicate by media_id (keep most recent snapshot per media)
+  // Deduplicate by media_id (keep most recent record per media)
   const seen = new Set<string>();
   const deduplicated = (data || []).filter((row) => {
     if (seen.has(row.media_id)) return false;
