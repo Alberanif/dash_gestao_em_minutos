@@ -160,21 +160,6 @@ export async function collectInstagramDaily(account: Account): Promise<{
 
   if (profileError) throw new Error(`Profile daily upsert error: ${profileError.message}`);
 
-  // Also insert into old table for parallel period
-  const { error: profileLegacyError } = await supabase
-    .from("dash_gestao_instagram_profile_snapshots")
-    .insert({
-      account_id: account.id,
-      followers_count: profile.followers_count,
-      follows_count: profile.follows_count,
-      media_count: profile.media_count,
-      impressions: 0,
-      reach,
-      collected_at: new Date().toISOString(),
-    });
-
-  if (profileLegacyError) throw new Error(`Profile snapshot insert error: ${profileLegacyError.message}`);
-
   // 4. Fetch media from last 24 hours
   const oneDayAgo = new Date(today);
   oneDayAgo.setDate(oneDayAgo.getDate() - 1);
@@ -186,7 +171,6 @@ export async function collectInstagramDaily(account: Account): Promise<{
 
   // 5. Fetch insights for each media item
   const mediaRows: any[] = [];
-  const mediaLegacyRows: any[] = [];
 
   for (const media of allMedia) {
     let like_count = 0,
@@ -261,24 +245,6 @@ export async function collectInstagramDaily(account: Account): Promise<{
       carousel_children_count: media.media_type === "CAROUSEL_ALBUM" ? (media.carousel_media?.length || 0) : null,
       published_at: media.timestamp,
     });
-
-    // Legacy snapshot record (for parallel period)
-    mediaLegacyRows.push({
-      account_id: account.id,
-      media_id: media.id,
-      media_type: normalizedType,
-      caption: media.caption || null,
-      permalink: media.permalink || null,
-      like_count,
-      comments_count,
-      reach: reachVal,
-      impressions: views,
-      saved,
-      shares,
-      plays: media.media_type === "REEL" ? views : null,
-      published_at: media.timestamp,
-      collected_at: new Date().toISOString(),
-    });
   }
 
   // Insert daily records
@@ -288,15 +254,6 @@ export async function collectInstagramDaily(account: Account): Promise<{
       .upsert(mediaRows, { onConflict: "account_id,media_id" });
 
     if (mediaError) throw new Error(`Media daily upsert error: ${mediaError.message}`);
-  }
-
-  // Insert legacy records (parallel period)
-  if (mediaLegacyRows.length > 0) {
-    const { error: mediaLegacyError } = await supabase
-      .from("dash_gestao_instagram_media_snapshots")
-      .insert(mediaLegacyRows);
-
-    if (mediaLegacyError) throw new Error(`Media snapshot insert error: ${mediaLegacyError.message}`);
   }
 
   return { profileRecords: 1, mediaRecords: mediaRows.length };
@@ -362,27 +319,6 @@ export async function collectInstagramBatch(
     }
   }
 
-  // Also insert into legacy table
-  const profileLegacyRows = Object.entries(dailyMap).map(([date, metrics]) => ({
-    account_id: account.id,
-    followers_count: 0,
-    follows_count: 0,
-    media_count: 0,
-    impressions: 0,
-    reach: metrics.reach,
-    collected_at: new Date(`${date}T00:00:00Z`).toISOString(),
-  }));
-
-  if (profileLegacyRows.length > 0) {
-    const { error: profileLegacyError } = await supabase
-      .from("dash_gestao_instagram_profile_snapshots")
-      .insert(profileLegacyRows);
-
-    if (profileLegacyError) {
-      throw new Error(`Profile snapshot batch insert error: ${profileLegacyError.message}`);
-    }
-  }
-
   // Fetch media within date range
   const allMedia = await paginateMediaSince(
     user_id,
@@ -399,7 +335,6 @@ export async function collectInstagramBatch(
   }
 
   const mediaRows: any[] = [];
-  const mediaLegacyRows: any[] = [];
 
   for (const media of allMedia) {
     let like_count = 0,
@@ -473,24 +408,6 @@ export async function collectInstagramBatch(
       carousel_children_count: media.media_type === "CAROUSEL_ALBUM" ? (media.carousel_media?.length || 0) : null,
       published_at: media.timestamp,
     });
-
-    // Legacy snapshot
-    mediaLegacyRows.push({
-      account_id: account.id,
-      media_id: media.id,
-      media_type: normalizedType,
-      caption: media.caption || null,
-      permalink: media.permalink || null,
-      like_count,
-      comments_count,
-      reach: reachVal,
-      impressions: views,
-      saved,
-      shares,
-      plays: media.media_type === "REEL" ? views : null,
-      published_at: media.timestamp,
-      collected_at: now,
-    });
   }
 
   // Insert daily records
@@ -501,17 +418,6 @@ export async function collectInstagramBatch(
 
     if (mediaError) {
       throw new Error(`Media daily batch upsert error: ${mediaError.message}`);
-    }
-  }
-
-  // Insert legacy records
-  if (mediaLegacyRows.length > 0) {
-    const { error: mediaLegacyError } = await supabase
-      .from("dash_gestao_instagram_media_snapshots")
-      .insert(mediaLegacyRows);
-
-    if (mediaLegacyError) {
-      throw new Error(`Media snapshot batch insert error: ${mediaLegacyError.message}`);
     }
   }
 
