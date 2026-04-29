@@ -184,7 +184,7 @@ export default function PosicionamentoPage() {
       />
 
       <div style={{ padding: "24px" }}>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6">
           <PositioningCard
             platform="youtube"
             label="Inscritos (Total)"
@@ -211,17 +211,6 @@ export default function PosicionamentoPage() {
             selectedAccountId={igSelectedId}
             onAccountChange={setIgSelectedId}
             explorePath="/dashboard/instagram"
-          />
-
-          <PositioningCard
-            platform="spotify"
-            label="Pos. Ranking (Posição Geral)"
-            value={0}
-            weekDelta={null}
-            sparklineData={[]}
-            seriesLabel="Ranking"
-            loading={false}
-            noData
           />
         </div>
       </div>

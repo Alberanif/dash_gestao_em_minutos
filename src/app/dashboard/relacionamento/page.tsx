@@ -205,7 +205,7 @@ export default function RelacionamentoPage() {
       />
 
       <div style={{ padding: "24px" }}>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6">
           <PositioningCard
             platform="youtube"
             label="Views (Período)"
@@ -232,17 +232,6 @@ export default function RelacionamentoPage() {
             selectedAccountId={igSelectedId}
             onAccountChange={setIgSelectedId}
             explorePath="/dashboard/instagram"
-          />
-
-          <PositioningCard
-            platform="spotify"
-            label="Seguidores e Retenção (Posição Geral)"
-            value={0}
-            weekDelta={null}
-            sparklineData={[]}
-            seriesLabel="Seguidores"
-            loading={false}
-            noData
           />
         </div>
       </div>
