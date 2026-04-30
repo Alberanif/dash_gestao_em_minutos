@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { UserRole } from "@/types/auth";
 
 const MODULES = [
   {
@@ -17,6 +18,7 @@ const MODULES = [
     ),
     accent: "var(--color-primary)",
     accentBg: "var(--color-primary-light)",
+    restrictedTo: ["analista", "comum"] as UserRole[],
   },
   {
     href: "/indicadores",
@@ -29,6 +31,7 @@ const MODULES = [
     ),
     accent: "#7c3aed",
     accentBg: "#f5f3ff",
+    restrictedTo: ["analista", "comum"] as UserRole[],
   },
   {
     href: "/base-de-dados",
@@ -43,10 +46,15 @@ const MODULES = [
     ),
     accent: "#059669",
     accentBg: "#ecfdf5",
+    restrictedTo: [] as UserRole[],
   },
 ];
 
-export function SelectionCards() {
+interface SelectionCardsProps {
+  role: UserRole;
+}
+
+export function SelectionCards({ role }: SelectionCardsProps) {
   return (
     <div
       style={{
@@ -96,69 +104,128 @@ export function SelectionCards() {
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%" }}>
-        {MODULES.map(({ href, label, description, icon, accent, accentBg }) => (
-          <Link
-            key={href}
-            href={href}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 16,
-              padding: "16px 20px",
-              borderRadius: "var(--radius-card)",
-              border: "1px solid var(--color-border)",
-              background: "var(--color-surface)",
-              boxShadow: "var(--shadow-card)",
-              textDecoration: "none",
-              transition: "box-shadow 0.15s, border-color 0.15s, transform 0.1s",
-              cursor: "pointer",
-            }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget as HTMLElement;
-              el.style.boxShadow = "var(--shadow-md)";
-              el.style.borderColor = accent;
-              el.style.transform = "translateY(-1px)";
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget as HTMLElement;
-              el.style.boxShadow = "var(--shadow-card)";
-              el.style.borderColor = "var(--color-border)";
-              el.style.transform = "translateY(0)";
-            }}
-          >
+        {MODULES.map(({ href, label, description, icon, accent, accentBg, restrictedTo }) => {
+          const isDisabled = restrictedTo.includes(role);
+
+          return isDisabled ? (
             <div
+              key={href}
               style={{
-                width: 44,
-                height: 44,
-                borderRadius: 11,
-                background: accentBg,
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-                color: accent,
+                gap: 16,
+                padding: "16px 20px",
+                borderRadius: "var(--radius-card)",
+                border: "1px solid var(--color-border)",
+                background: "var(--color-surface)",
+                opacity: 0.5,
+                cursor: "not-allowed",
               }}
             >
-              {icon}
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 11,
+                  background: accentBg,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  color: accent,
+                }}
+              >
+                {icon}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", marginBottom: 2 }}>
+                  {label}
+                </p>
+                <p style={{ fontSize: 13, color: "var(--color-text-muted)", lineHeight: 1.4 }}>
+                  {description}
+                </p>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  flexShrink: 0,
+                  padding: "4px 8px",
+                  background: "var(--color-danger-light)",
+                  color: "var(--color-danger)",
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
+              >
+                Acesso restrito
+              </div>
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", marginBottom: 2 }}>
-                {label}
-              </p>
-              <p style={{ fontSize: 13, color: "var(--color-text-muted)", lineHeight: 1.4 }}>
-                {description}
-              </p>
-            </div>
-            <svg
-              width="16" height="16" viewBox="0 0 24 24" fill="none"
-              stroke="var(--color-text-muted)" strokeWidth="2"
-              strokeLinecap="round" strokeLinejoin="round"
-              style={{ flexShrink: 0 }}
+          ) : (
+            <Link
+              key={href}
+              href={href}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+                padding: "16px 20px",
+                borderRadius: "var(--radius-card)",
+                border: "1px solid var(--color-border)",
+                background: "var(--color-surface)",
+                boxShadow: "var(--shadow-card)",
+                textDecoration: "none",
+                transition: "box-shadow 0.15s, border-color 0.15s, transform 0.1s",
+                cursor: "pointer",
+              }}
+              onMouseEnter={(e) => {
+                const el = e.currentTarget as HTMLElement;
+                el.style.boxShadow = "var(--shadow-md)";
+                el.style.borderColor = accent;
+                el.style.transform = "translateY(-1px)";
+              }}
+              onMouseLeave={(e) => {
+                const el = e.currentTarget as HTMLElement;
+                el.style.boxShadow = "var(--shadow-card)";
+                el.style.borderColor = "var(--color-border)";
+                el.style.transform = "translateY(0)";
+              }}
             >
-              <path d="M9 18l6-6-6-6" />
-            </svg>
-          </Link>
-        ))}
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 11,
+                  background: accentBg,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  color: accent,
+                }}
+              >
+                {icon}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", marginBottom: 2 }}>
+                  {label}
+                </p>
+                <p style={{ fontSize: 13, color: "var(--color-text-muted)", lineHeight: 1.4 }}>
+                  {description}
+                </p>
+              </div>
+              <svg
+                width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="var(--color-text-muted)" strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round"
+                style={{ flexShrink: 0 }}
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

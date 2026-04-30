@@ -4,12 +4,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { NavLinks } from "@/components/layout/nav-links";
+import type { UserRole } from "@/types/auth";
 
 interface DashboardSidebarProps {
   userEmail: string;
+  role: UserRole;
 }
 
-export function DashboardSidebar({ userEmail }: DashboardSidebarProps) {
+export function DashboardSidebar({ userEmail, role }: DashboardSidebarProps) {
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("sidebar-collapsed") === "true";
@@ -44,7 +46,7 @@ export function DashboardSidebar({ userEmail }: DashboardSidebarProps) {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-0 py-4">
-        <NavLinks collapsed={collapsed} />
+        <NavLinks collapsed={collapsed} role={role} />
       </nav>
 
       <div

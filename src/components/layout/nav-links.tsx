@@ -2,8 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { UserRole } from "@/types/auth";
 
-const LINKS = [
+interface NavLink {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  restrictedTo?: UserRole[];
+}
+
+const LINKS: NavLink[] = [
   {
     href: "/dashboard/eqa",
     label: "EQA",
@@ -58,26 +66,6 @@ const LINKS = [
     ),
   },
   {
-    href: "/dashboard/meta-ads",
-    label: "Meta Ads",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-      </svg>
-    ),
-  },
-  {
-    href: "/dashboard/hotmart",
-    label: "Hotmart",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2L2 7l10 5 10-5-10-5z" />
-        <path d="M2 17l10 5 10-5" />
-        <path d="M2 12l10 5 10-5" />
-      </svg>
-    ),
-  },
-  {
     href: "/dashboard/dados",
     label: "Dados",
     icon: (
@@ -98,19 +86,26 @@ const LINKS = [
         <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
       </svg>
     ),
+    restrictedTo: ["analista", "comum"],
   },
 ];
 
 interface NavLinksProps {
   collapsed?: boolean;
+  role: UserRole;
 }
 
-export function NavLinks({ collapsed = false }: NavLinksProps) {
+export function NavLinks({ collapsed = false, role }: NavLinksProps) {
   const pathname = usePathname();
+
+  const visibleLinks = LINKS.filter((link) => {
+    if (!link.restrictedTo) return true;
+    return !link.restrictedTo.includes(role);
+  });
 
   return (
     <div className="flex flex-col gap-1 px-2">
-      {LINKS.map(({ href, label, icon }) => {
+      {visibleLinks.map(({ href, label, icon }) => {
         const isActive = pathname.startsWith(href);
         return (
           <div key={href} className="group relative">

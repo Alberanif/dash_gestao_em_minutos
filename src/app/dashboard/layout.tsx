@@ -27,7 +27,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex min-h-screen" style={{ background: "var(--color-bg)" }}>
-      <DashboardSidebar userEmail={user.email ?? "usuario@igt"} userRole={role} />
+      <DashboardSidebar userEmail={user.email ?? "usuario@igt"} role={role} />
       <main className="flex-1 overflow-y-auto" style={{ background: "var(--color-bg)" }}>
         {children}
       </main>
