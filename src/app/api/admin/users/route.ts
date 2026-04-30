@@ -26,15 +26,23 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const { error } = await validateApiAuth();
+  const { error } = await requireRole(["gestor"]);
   if (error) return error;
 
   const body = await request.json();
-  const { email, password } = body;
+  const { email, password, role = "comum" } = body;
 
   if (!email || !password) {
     return NextResponse.json(
       { error: "email e password são obrigatórios" },
+      { status: 400 }
+    );
+  }
+
+  const validRoles: UserRole[] = ["gestor", "analista", "comum"];
+  if (!validRoles.includes(role)) {
+    return NextResponse.json(
+      { error: `role deve ser um de: ${validRoles.join(", ")}` },
       { status: 400 }
     );
   }
@@ -44,6 +52,7 @@ export async function POST(request: NextRequest) {
     email,
     password,
     email_confirm: true,
+    app_metadata: { role },
   });
 
   if (adminError) {
@@ -51,7 +60,11 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json(
-    { id: data.user.id, email: data.user.email },
+    {
+      id: data.user.id,
+      email: data.user.email,
+      role: (data.user.app_metadata?.role as UserRole) ?? "comum",
+    },
     { status: 201 }
   );
 }
