@@ -1,11 +1,22 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { AccountList } from "@/components/settings/account-list";
 import { UserManagement } from "@/components/settings/user-management";
 import type { Account } from "@/types/accounts";
+import type { UserRole } from "@/types/auth";
 
 export default async function SettingsPage() {
   const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
+  const role = (user.app_metadata?.role as UserRole) ?? "gestor";
+  if (role !== "gestor") redirect("/dashboard");
+
   const { data: accounts } = await supabase
     .from("dash_gestao_accounts")
     .select("*")
@@ -20,7 +31,7 @@ export default async function SettingsPage() {
           <AccountList initialAccounts={(accounts as Account[]) ?? []} />
         </section>
         <section className="surface-card p-6">
-          <UserManagement />
+          <UserManagement currentUserId={user.id} />
         </section>
       </div>
     </div>
