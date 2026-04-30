@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { EntregaNivelAUltimateMensalRow } from "@/types/base-de-dados";
+import { MonthYearPicker } from "@/components/MonthYearPicker";
 import { labelStyle, cellStyle, thStyle } from "./_styles";
 
 const fmtFloat = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
@@ -158,18 +159,17 @@ export default function UltimateMensal() {
           Novo registro
         </p>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-          <div>
-            <label style={labelStyle}>Mês/Ano</label>
-            <input type="month" className="field-control" value={form.month_year} onChange={(e) => handleChange("month_year", e.target.value)} />
-          </div>
-          <div>
-            <label style={labelStyle}>NPS Médio Entregas</label>
-            <input type="number" min={0} max={100} step={0.01} className="field-control" placeholder="0,00" value={form.nps_medio_entregas} onChange={(e) => handleChange("nps_medio_entregas", e.target.value)} />
-          </div>
-          <div>
-            <label style={labelStyle}>% Presença — Sessão de Feedback</label>
-            <input type="number" min={0} max={100} step={0.01} className="field-control" placeholder="0,00" value={form.perc_presenca_sessao_feedback} onChange={(e) => handleChange("perc_presenca_sessao_feedback", e.target.value)} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <MonthYearPicker value={form.month_year} onChange={(value) => handleChange("month_year", value)} label="Mês/Ano" />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={labelStyle}>NPS Médio Entregas</label>
+              <input type="number" min={0} max={100} step={0.01} className="field-control" placeholder="0,00" value={form.nps_medio_entregas} onChange={(e) => handleChange("nps_medio_entregas", e.target.value)} />
+            </div>
+            <div>
+              <label style={labelStyle}>% Presença — Sessão de Feedback</label>
+              <input type="number" min={0} max={100} step={0.01} className="field-control" placeholder="0,00" value={form.perc_presenca_sessao_feedback} onChange={(e) => handleChange("perc_presenca_sessao_feedback", e.target.value)} />
+            </div>
           </div>
         </div>
 

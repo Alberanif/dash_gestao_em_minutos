@@ -167,26 +167,52 @@ export function UserManagement() {
               {roleLabels[user.role]}
             </div>
 
-            <div style={{ display: "flex", gap: 2 }}>
+            <div style={{ display: "flex", gap: 8 }}>
               {user.id !== currentUserId && (
                 <button
                   onClick={() => {
                     setShowChangeRole(user.id);
                     setNewRole(user.role);
                   }}
-                  className="text-sm"
-                  style={{ color: "var(--color-primary)" }}
+                  className="text-sm font-medium transition-colors"
+                  style={{
+                    padding: "6px 12px",
+                    color: "var(--color-primary)",
+                    border: "1px solid var(--color-primary)",
+                    borderRadius: 6,
+                    background: "transparent",
+                    cursor: "pointer",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(59, 130, 246, 0.1)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
                 >
-                  alterar função
+                  Alterar função
                 </button>
               )}
               {user.id !== currentUserId && (
                 <button
                   onClick={() => handleDelete(user)}
-                  className="text-sm"
-                  style={{ color: "var(--color-danger)" }}
+                  className="text-sm font-medium transition-colors"
+                  style={{
+                    padding: "6px 12px",
+                    color: "var(--color-danger)",
+                    border: "1px solid var(--color-danger)",
+                    borderRadius: 6,
+                    background: "transparent",
+                    cursor: "pointer",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(239, 68, 68, 0.1)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
                 >
-                  remover
+                  Remover
                 </button>
               )}
             </div>

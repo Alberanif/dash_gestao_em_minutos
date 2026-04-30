@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { EntregaNivelAFccMccMensalRow } from "@/types/base-de-dados";
+import { MonthYearPicker } from "@/components/MonthYearPicker";
 import { labelStyle, cellStyle, thStyle } from "./_styles";
 
 function fmtMonthYear(monthYear: string) {
@@ -143,8 +144,7 @@ export default function FccMccMensal() {
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div>
-            <label style={labelStyle}>Mês/Ano</label>
-            <input type="month" className="field-control" value={form.month_year} onChange={(e) => handleChange("month_year", e.target.value)} />
+            <MonthYearPicker value={form.month_year} onChange={(value) => handleChange("month_year", value)} label="Mês/Ano" />
           </div>
           <div>
             <label style={labelStyle}>Banco de Formações Não Realizadas — Pago</label>
