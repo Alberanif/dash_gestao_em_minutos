@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { validateApiAuth } from "@/lib/utils/api-auth";
+import { requireRole, validateApiAuth } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import type { UserRole } from "@/types/auth";
 
 export async function GET() {
-  const { error } = await validateApiAuth();
+  const { error, userId } = await requireRole(["gestor"]);
   if (error) return error;
 
   const supabase = createSupabaseServiceClient();
@@ -16,6 +17,7 @@ export async function GET() {
   const users = data.users.map((u) => ({
     id: u.id,
     email: u.email,
+    role: (u.app_metadata?.role as UserRole) ?? "gestor",
     created_at: u.created_at,
     last_sign_in_at: u.last_sign_in_at,
   }));
