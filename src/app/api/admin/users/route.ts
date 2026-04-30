@@ -70,16 +70,23 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const { error } = await validateApiAuth();
+  const { error, userId } = await requireRole(["gestor"]);
   if (error) return error;
 
-  const userId = request.nextUrl.searchParams.get("id");
-  if (!userId) {
+  const targetUserId = request.nextUrl.searchParams.get("id");
+  if (!targetUserId) {
     return NextResponse.json({ error: "id é obrigatório" }, { status: 400 });
   }
 
+  if (userId === targetUserId) {
+    return NextResponse.json(
+      { error: "Não é possível deletar sua própria conta" },
+      { status: 403 }
+    );
+  }
+
   const supabase = createSupabaseServiceClient();
-  const { error: adminError } = await supabase.auth.admin.deleteUser(userId);
+  const { error: adminError } = await supabase.auth.admin.deleteUser(targetUserId);
 
   if (adminError) {
     return NextResponse.json({ error: adminError.message }, { status: 500 });
