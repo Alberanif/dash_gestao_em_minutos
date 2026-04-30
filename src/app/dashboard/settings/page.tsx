@@ -31,7 +31,7 @@ export default async function SettingsPage() {
           <AccountList initialAccounts={(accounts as Account[]) ?? []} />
         </section>
         <section className="surface-card p-6">
-          <UserManagement currentUserId={user.id} />
+          <UserManagement />
         </section>
       </div>
     </div>

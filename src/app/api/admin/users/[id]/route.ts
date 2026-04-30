@@ -5,12 +5,13 @@ import type { UserRole } from "@/types/auth";
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const { error, userId } = await requireRole(["gestor"]);
   if (error) return error;
 
-  const targetUserId = params.id;
+  const { id } = await params;
+  const targetUserId = id;
 
   if (userId === targetUserId) {
     return NextResponse.json(
