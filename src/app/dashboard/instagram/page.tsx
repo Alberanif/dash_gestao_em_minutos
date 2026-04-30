@@ -213,10 +213,9 @@ export default function InstagramPage() {
               </>
             ) : (
               <>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                   <KpiCard title="Seguidores" value={latest?.followers_count ?? 0} format="compact" previousValue={previous?.followers_count} currentValue={latest?.followers_count} icon={IconUsers} sparklineData={profileData.map((d) => d.followers_count)} />
                   <KpiCard title="Alcance" value={latest?.reach ?? 0} format="compact" previousValue={previous?.reach} currentValue={latest?.reach} icon={IconTrending} sparklineData={profileData.map((d) => d.reach)} />
-                  <KpiCard title="Impressões" value={latest?.impressions ?? 0} format="compact" previousValue={previous?.impressions} currentValue={latest?.impressions} icon={IconEye} sparklineData={profileData.map((d) => d.impressions)} />
                   <KpiCard title="Interações" value={formatCompact(totalInteractions)} icon={IconHeart} />
                 </div>
 
@@ -227,11 +226,10 @@ export default function InstagramPage() {
                     lines={[
                       { key: "followers_count", color: "var(--color-primary)", label: "Seguidores" },
                       { key: "reach", color: "#F5A623", label: "Alcance" },
-                      { key: "impressions", color: "#16A34A", label: "Impressões" },
                     ]}
                     height={320}
                     title="Evolução do perfil"
-                    subtitle="Seguidores, alcance e impressões ao longo do período"
+                    subtitle="Seguidores e alcance ao longo do período"
                     hideRangeSelector
                   />
                 ) : (

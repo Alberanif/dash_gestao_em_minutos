@@ -55,7 +55,7 @@ export function InstagramOverview() {
     <section>
       <h3 className="text-lg font-semibold mb-3">Instagram</h3>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         {latest && (
           <>
             <KpiCard
@@ -71,13 +71,6 @@ export function InstagramOverview() {
               format="compact"
               currentValue={latest.reach}
               previousValue={previous?.reach}
-            />
-            <KpiCard
-              title="Impressoes (28d)"
-              value={latest.impressions}
-              format="compact"
-              currentValue={latest.impressions}
-              previousValue={previous?.impressions}
             />
           </>
         )}
