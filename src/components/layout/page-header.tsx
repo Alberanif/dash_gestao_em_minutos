@@ -1,12 +1,14 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 interface PageHeaderProps {
   title: string;
   subtitle?: string;
   actions?: ReactNode;
+  back?: string;
 }
 
-export function PageHeader({ title, subtitle, actions }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, actions, back }: PageHeaderProps) {
   return (
     <header
       className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"
@@ -17,6 +19,25 @@ export function PageHeader({ title, subtitle, actions }: PageHeaderProps) {
       }}
     >
       <div className="min-w-0">
+        {back ? (
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <Link
+              href={back}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 13,
+                fontWeight: 600,
+                color: "var(--color-text-muted)",
+                textDecoration: "none",
+              }}
+            >
+              <span>←</span>
+              Voltar
+            </Link>
+          </div>
+        ) : null}
         <h1
           className="truncate"
           style={{ fontSize: 20, fontWeight: 600, color: "var(--color-text)" }}
