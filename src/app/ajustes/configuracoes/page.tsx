@@ -21,19 +21,21 @@ export default async function ConfiguracoesPage() {
     .order("created_at", { ascending: true });
 
   return (
-    <div className="min-h-full" style={{ width: "100%" }}>
+    <div className="min-h-full">
       <PageHeader
         title="Configurações"
         subtitle="Gerencie contas conectadas e acessos ao painel"
         back="/ajustes"
       />
-      <div className="mx-auto max-w-5xl space-y-6 p-6">
-        <section className="surface-card p-6">
-          <AccountList initialAccounts={(accounts as Account[]) ?? []} />
-        </section>
-        <section className="surface-card p-6">
-          <UserManagement />
-        </section>
+      <div style={{ padding: "24px" }}>
+        <div className="mx-auto max-w-5xl space-y-6">
+          <section className="surface-card p-6">
+            <AccountList initialAccounts={(accounts as Account[]) ?? []} />
+          </section>
+          <section className="surface-card p-6">
+            <UserManagement />
+          </section>
+        </div>
       </div>
     </div>
   );
