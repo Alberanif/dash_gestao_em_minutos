@@ -88,8 +88,10 @@ export function YouTubeSummaryCard({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return "Data indisponível";
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "Data indisponível";
     return date.toLocaleDateString("pt-BR");
   };
 

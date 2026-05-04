@@ -43,7 +43,8 @@ export async function GET(request: NextRequest) {
     .from("dash_gestao_youtube_videos")
     .select("video_id, title, published_at, thumbnail_url, duration")
     .eq("account_id", accountId)
-    .in("video_id", videoIds);
+    .in("video_id", videoIds)
+    .not("published_at", "is", null);
 
   if (startDate) metaQuery = metaQuery.gte("published_at", startDate);
   if (endDate) metaQuery = metaQuery.lte("published_at", endDate);
@@ -106,6 +107,7 @@ export async function GET(request: NextRequest) {
   }
 
   const videos = Array.from(videoMap.values())
+    .filter((v) => v.published_at && v.published_at !== "")
     .map((v) => ({
       video_id: v.video_id,
       title: v.title,
