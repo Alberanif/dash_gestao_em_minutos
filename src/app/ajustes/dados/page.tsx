@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { SectionTabs } from "@/components/dashboard/section-tabs";
 import { DataTable } from "@/components/ui/data-table";
@@ -342,27 +341,11 @@ export default function DadosPage() {
 
   return (
     <div className="min-h-full">
-      <div style={{ padding: "24px 24px 0" }}>
-        <Link
-          href="/ajustes"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            fontSize: 13,
-            fontWeight: 600,
-            color: "var(--color-text-muted)",
-            textDecoration: "none",
-            marginBottom: 16,
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-          Voltar
-        </Link>
-      </div>
-      <PageHeader title="Dados & Sincronização" subtitle="Histórico de coletas, execução manual e monitoramento por plataforma" />
+      <PageHeader
+        title="Dados & Sincronização"
+        subtitle="Histórico de coletas, execução manual e monitoramento por plataforma"
+        back="/ajustes"
+      />
 
       <div style={{ padding: "24px" }}>
         <SectionTabs sections={sectionLabels} selected={activeLabel} onSelect={handleTabSelect} />
