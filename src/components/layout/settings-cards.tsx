@@ -5,7 +5,7 @@ import Link from "next/link";
 export function SettingsCards() {
   const cards = [
     {
-      href: "/dashboard/settings",
+      href: "/ajustes/configuracoes",
       label: "Configurações",
       description: "Gerencie perfil, preferências e integrações",
       icon: (
@@ -19,7 +19,7 @@ export function SettingsCards() {
       accentBg: "var(--color-primary-light)",
     },
     {
-      href: "/dashboard/dados",
+      href: "/ajustes/dados",
       label: "Dados",
       description: "Acesse e gerencie seus dados de campanha",
       icon: (

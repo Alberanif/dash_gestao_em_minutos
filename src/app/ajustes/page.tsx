@@ -13,6 +13,7 @@ export default function AjustesPage() {
         gap: 24,
         width: "100%",
         maxWidth: 480,
+        margin: "auto",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
