@@ -39,11 +39,16 @@ export async function GET(request: NextRequest) {
 
   // Fetch metadata for the video_ids that appear in the period
   const videoIds = [...new Set(dailyRows.map((r) => r.video_id))];
-  const { data: metaRows, error: metaError } = await supabase
+  let metaQuery = supabase
     .from("dash_gestao_youtube_videos")
     .select("video_id, title, published_at, thumbnail_url, duration")
     .eq("account_id", accountId)
     .in("video_id", videoIds);
+
+  if (startDate) metaQuery = metaQuery.gte("published_at", startDate);
+  if (endDate) metaQuery = metaQuery.lte("published_at", endDate);
+
+  const { data: metaRows, error: metaError } = await metaQuery;
 
   if (metaError) {
     return NextResponse.json({ error: metaError.message }, { status: 500 });
