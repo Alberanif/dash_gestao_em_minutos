@@ -48,6 +48,21 @@ const MODULES = [
     accentBg: "#ecfdf5",
     restrictedTo: [] as UserRole[],
   },
+  {
+    href: "/ajustes",
+    label: "Ajustes",
+    description: "Configurações e gerenciamento de dados",
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14" />
+        <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+      </svg>
+    ),
+    accent: "var(--color-primary)",
+    accentBg: "var(--color-primary-light)",
+    restrictedTo: ["comum"] as UserRole[],
+  },
 ];
 
 interface SelectionCardsProps {
