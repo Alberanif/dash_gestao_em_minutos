@@ -104,7 +104,6 @@ export interface ChannelDailyRow extends Record<string, unknown> {
   comments: number;
   shares: number;
   impressions: number;
-  ctr: number;
 }
 
 export interface VideoMetadata {

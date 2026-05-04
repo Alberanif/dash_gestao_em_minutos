@@ -52,8 +52,6 @@ export function YouTubeSummaryCard({
 
   // Cálculos
   const totalImpressions = data.reduce((sum, row) => sum + (row.impressions || 0), 0);
-  const validCtrRows = data.filter((row) => (row.ctr || 0) > 0);
-  const avgCtr = validCtrRows.length > 0 ? validCtrRows.reduce((sum, row) => sum + row.ctr, 0) / validCtrRows.length : 0;
   const avgRetention = data.length > 0 ? data.reduce((sum, row) => sum + (row.average_view_percentage || 0), 0) / data.length : 0;
   const avgDuration = data.length > 0 ? data.reduce((sum, row) => sum + (row.average_view_duration || 0), 0) / data.length : 0;
   const totalViews = data.reduce((sum, row) => sum + (row.views || 0), 0);
@@ -90,11 +88,13 @@ export function YouTubeSummaryCard({
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <KpiCard
-            title="CTR"
-            value={avgCtr === 0 ? "—" : `${(avgCtr * 100).toFixed(2)}%`}
+            title="Impressões Totais"
+            value={totalImpressions.toLocaleString("pt-BR")}
+            format="compact"
             icon={
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M3 12c0 7 9 11 9 11s9-4 9-11-4-9-9-9-9 2-9 9z" />
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
               </svg>
             }
             accentColor="#3b82f6"
