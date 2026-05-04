@@ -1,0 +1,3 @@
+ALTER TABLE dash_gestao_youtube_channel_daily
+  ADD COLUMN IF NOT EXISTS impressions BIGINT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS ctr NUMERIC(6,4) DEFAULT 0;

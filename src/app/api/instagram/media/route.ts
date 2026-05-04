@@ -29,16 +29,32 @@ export async function GET(request: NextRequest) {
 
   const limit = parseInt(request.nextUrl.searchParams.get("limit") || "50");
   const type = request.nextUrl.searchParams.get("type");
+  const sortBy = request.nextUrl.searchParams.get("sort_by") || "last_collected_at";
+  const startDate = request.nextUrl.searchParams.get("start_date");
+  const endDate = request.nextUrl.searchParams.get("end_date");
 
   let query = supabase
     .from("dash_gestao_instagram_media_daily")
     .select("*")
     .eq("account_id", accountId)
-    .order("last_collected_at", { ascending: false })
     .limit(limit);
 
   if (type) {
     query = query.eq("media_type", type);
+  }
+
+  if (startDate) {
+    query = query.gte("published_at", startDate);
+  }
+
+  if (endDate) {
+    query = query.lte("published_at", endDate);
+  }
+
+  if (sortBy === "engagement_rate") {
+    query = query.order("engagement_rate", { ascending: false });
+  } else {
+    query = query.order("last_collected_at", { ascending: false });
   }
 
   const { data, error: dbError } = await query;

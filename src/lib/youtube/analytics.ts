@@ -69,6 +69,8 @@ export interface ChannelDailyApiRow {
   likes: number;
   comments: number;
   shares: number;
+  impressions: number;
+  ctr: number;
 }
 
 export async function queryChannelDaily(
@@ -95,7 +97,7 @@ export async function queryChannelDaily(
         endDate: chunk.end,
         metrics:
           "views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage," +
-          "likes,comments,shares",
+          "likes,comments,shares,impressions,impressionClickThroughRate",
         dimensions: "day",
         filters: "creatorContentType==VIDEO_ON_DEMAND",
       });
@@ -107,7 +109,7 @@ export async function queryChannelDaily(
         endDate: chunk.end,
         metrics:
           "views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage," +
-          "likes,comments,shares",
+          "likes,comments,shares,impressions,impressionClickThroughRate",
         dimensions: "day",
       });
     }
@@ -190,6 +192,8 @@ export async function queryChannelDaily(
         likes: Number(video?.likes ?? 0),
         comments: Number(video?.comments ?? 0),
         shares: Number(video?.shares ?? 0),
+        impressions: Number(video?.impressions ?? 0),
+        ctr: Number(video?.impressionClickThroughRate ?? 0),
       });
     }
 
