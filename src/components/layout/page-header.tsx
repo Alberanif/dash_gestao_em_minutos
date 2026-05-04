@@ -11,16 +11,16 @@ interface PageHeaderProps {
 export function PageHeader({ title, subtitle, actions, back }: PageHeaderProps) {
   return (
     <header
-      className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"
+      className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between"
       style={{
         background: "var(--color-surface)",
         borderBottom: "1px solid var(--color-border)",
-        padding: "20px 24px",
+        padding: "12px 24px",
       }}
     >
       <div className="min-w-0">
         {back ? (
-          <div className="mb-3">
+          <div className="mb-2">
             <Link
               href={back}
               className="inline-flex items-center gap-2 rounded-[8px] px-3.5 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90 focus-visible:outline outline-2 outline-offset-2"
