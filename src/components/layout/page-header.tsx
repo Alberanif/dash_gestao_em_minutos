@@ -20,20 +20,17 @@ export function PageHeader({ title, subtitle, actions, back }: PageHeaderProps) 
     >
       <div className="min-w-0">
         {back ? (
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <div className="flex gap-2 mb-3">
             <Link
               href={back}
+              className="flex items-center gap-1.5 text-sm font-semibold text-muted hover:opacity-70 focus-visible:outline outline-2 outline-offset-2 transition-opacity"
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                fontSize: 13,
-                fontWeight: 600,
                 color: "var(--color-text-muted)",
                 textDecoration: "none",
+                outlineColor: "var(--color-text-muted)",
               }}
             >
-              <span>←</span>
+              <span aria-hidden="true">←</span>
               Voltar
             </Link>
           </div>
