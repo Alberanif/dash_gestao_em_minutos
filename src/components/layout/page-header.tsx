@@ -20,14 +20,15 @@ export function PageHeader({ title, subtitle, actions, back }: PageHeaderProps) 
     >
       <div className="min-w-0">
         {back ? (
-          <div className="flex gap-2 mb-3">
+          <div className="mb-3">
             <Link
               href={back}
-              className="flex items-center gap-1.5 text-sm font-semibold text-muted hover:opacity-70 focus-visible:outline outline-2 outline-offset-2 transition-opacity"
+              className="inline-flex items-center gap-2 rounded-[8px] px-3.5 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90 focus-visible:outline outline-2 outline-offset-2"
               style={{
-                color: "var(--color-text-muted)",
+                background: "var(--color-primary)",
+                border: "1px solid var(--color-primary)",
                 textDecoration: "none",
-                outlineColor: "var(--color-text-muted)",
+                outlineColor: "var(--color-primary)",
               }}
             >
               <span aria-hidden="true">←</span>
