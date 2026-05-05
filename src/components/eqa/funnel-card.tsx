@@ -243,6 +243,56 @@ export function FunnelCard({
             </div>
           </div>
 
+          {/* Vendas Faltando */}
+          {metrics.sales_remaining !== undefined && funnel.goal_sales > 0 ? (
+            funnel.goal_sales <= metrics.total_sales ? (
+              // Meta atingida
+              <div className="mb-2">
+                <p style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 8 }}>
+                  Meta atingida
+                </p>
+                <div
+                  style={{
+                    height: 6,
+                    borderRadius: 99,
+                    background: "var(--color-success)",
+                    overflow: "hidden",
+                  }}
+                />
+              </div>
+            ) : (
+              // Meta em aberto
+              <div className="mb-2">
+                <div className="flex justify-between mb-1">
+                  <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                    Faltam
+                  </span>
+                  <span style={{ fontSize: 12, color: "var(--color-text)", fontWeight: 600 }}>
+                    {metrics.sales_remaining} / {funnel.goal_sales}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    height: 6,
+                    borderRadius: 99,
+                    background: "var(--color-bg)",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      height: "100%",
+                      width: `${(metrics.total_sales / funnel.goal_sales) * 100}%`,
+                      borderRadius: 99,
+                      background: getProgressColor((metrics.total_sales / funnel.goal_sales) * 100),
+                      transition: "width 0.4s ease",
+                    }}
+                  />
+                </div>
+              </div>
+            )
+          ) : null}
+
           {/* Pace e CAC */}
           <div className="flex gap-4 mt-3">
             <div>
