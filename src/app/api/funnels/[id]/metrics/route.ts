@@ -99,6 +99,7 @@ export async function GET(
   const cac = total_sales > 0 ? total_spend / total_sales : 0;
   const pace_diario = Math.round(total_sales / totalDays);
   const pace_ideal = Math.round(goal_sales / totalDays);
+  const sales_remaining = Math.max(0, goal_sales - total_sales);
 
-  return NextResponse.json({ total_sales, total_sales_brl, total_sales_other_currencies, total_spend, cac, pace_diario, pace_ideal });
+  return NextResponse.json({ total_sales, total_sales_brl, total_sales_other_currencies, total_spend, cac, pace_diario, pace_ideal, sales_remaining });
 }
