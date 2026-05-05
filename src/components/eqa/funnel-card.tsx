@@ -17,6 +17,12 @@ function formatDate(dateStr: string): string {
   return `${day}/${month}/${year}`;
 }
 
+function getProgressColor(progress: number): string {
+  if (progress < 50) return "var(--color-danger)";
+  if (progress < 75) return "var(--color-warning)";
+  return "var(--color-success)";
+}
+
 const FUNNEL_TYPE_LABELS: Record<string, string> = {
   destrave: "Destrave",
 };
