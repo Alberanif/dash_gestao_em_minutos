@@ -32,7 +32,8 @@ export async function GET(
     Math.round(
       (new Date(end_date).getTime() - new Date(start_date).getTime()) / 86_400_000
     ) + 1;
-  const pace_diario = Math.round(goal_sales / totalDays);
+  // Note: pace_diario will be calculated after total_sales is determined
+  // pace_ideal = goal_sales / totalDays (target average per day)
 
   // ─── Vendas Hotmart ───────────────────────────────────────────
   const salesPromise =
@@ -96,6 +97,8 @@ export async function GET(
   const spendRows = (spendResult.data as { spend: number }[] | null) ?? [];
   const total_spend = spendRows.reduce((sum, r) => sum + (r.spend ?? 0), 0);
   const cac = total_sales > 0 ? total_spend / total_sales : 0;
+  const pace_diario = Math.round(total_sales / totalDays);
+  const pace_ideal = Math.round(goal_sales / totalDays);
 
-  return NextResponse.json({ total_sales, total_sales_brl, total_sales_other_currencies, total_spend, cac, pace_diario });
+  return NextResponse.json({ total_sales, total_sales_brl, total_sales_other_currencies, total_spend, cac, pace_diario, pace_ideal });
 }
