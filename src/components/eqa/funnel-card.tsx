@@ -243,7 +243,12 @@ export function FunnelCard({
                 Pace
               </p>
               <p style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text)" }}>
-                {metrics.pace_diario}/dia
+                <span style={{ color: "var(--color-primary)" }}>
+                  {metrics.pace_diario}/dia
+                </span>
+                <span style={{ color: "var(--color-text-muted)", fontWeight: 400, fontSize: 12 }}>
+                  {" "}| Meta: {metrics.pace_ideal}/dia
+                </span>
               </p>
             </div>
             {!funnel.config.inactive_ads && (
