@@ -17,9 +17,10 @@ function formatDate(dateStr: string): string {
   return `${day}/${month}/${year}`;
 }
 
+// Returns color CSS variable based on progress toward goal (0-100%)
 function getProgressColor(progress: number): string {
-  if (progress < 50) return "var(--color-danger)";
-  if (progress < 75) return "var(--color-warning)";
+  if (progress <= 50) return "var(--color-danger)";
+  if (progress <= 75) return "var(--color-warning)";
   return "var(--color-success)";
 }
 
