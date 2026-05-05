@@ -236,7 +236,7 @@ export default function EQAPage() {
           </div>
         ) : (
           <>
-            {/* Seção Destrave */}
+            {/* Seção Funis Ativos */}
             <section className="mb-8">
               <div className="flex items-center gap-3 mb-4">
                 <h2
@@ -246,7 +246,7 @@ export default function EQAPage() {
                     color: "var(--color-text)",
                   }}
                 >
-                  Funis Destrave
+                  Funis Ativos
                 </h2>
                 <span
                   style={{
@@ -273,7 +273,7 @@ export default function EQAPage() {
                   }}
                 >
                   <p style={{ fontSize: 14, color: "var(--color-text-muted)", marginBottom: 12 }}>
-                    Nenhum funil Destrave criado ainda
+                    Nenhum funil ativo criado ainda
                   </p>
                   <button
                     onClick={openCreate}
