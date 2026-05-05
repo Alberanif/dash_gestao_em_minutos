@@ -24,6 +24,7 @@ export interface FunnelMetrics {
   total_spend: number;
   cac: number;
   pace_diario: number;
+  pace_ideal: number;
 }
 
 export interface HotmartProduct {
