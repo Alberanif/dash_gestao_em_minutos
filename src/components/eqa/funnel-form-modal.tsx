@@ -6,7 +6,6 @@ import type { Account } from "@/types/accounts";
 
 interface FunnelFormData {
   name: string;
-  type: "destrave";
   start_date: string;
   end_date: string;
   goal_sales: string;
@@ -25,7 +24,6 @@ interface FunnelFormModalProps {
 
 const EMPTY_FORM: FunnelFormData = {
   name: "",
-  type: "destrave",
   start_date: "",
   end_date: "",
   goal_sales: "",
@@ -38,7 +36,6 @@ const EMPTY_FORM: FunnelFormData = {
 function funnelToForm(f: Funnel): FunnelFormData {
   return {
     name: f.name,
-    type: f.type,
     start_date: f.start_date,
     end_date: f.end_date,
     goal_sales: String(f.goal_sales),
@@ -214,7 +211,7 @@ export function FunnelFormModal({ funnel, open, onClose, onSave }: FunnelFormMod
     try {
       await onSave({
         name: form.name.trim(),
-        type: form.type,
+        type: "destrave",
         start_date: form.start_date,
         end_date: form.end_date,
         goal_sales: goalNum,
@@ -334,20 +331,6 @@ export function FunnelFormModal({ funnel, open, onClose, onSave }: FunnelFormMod
               value={form.name}
               onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
             />
-          </div>
-
-          {/* Tipo */}
-          <div>
-            <label style={labelStyle}>Tipo</label>
-            <select
-              style={inputStyle}
-              value={form.type}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, type: e.target.value as "destrave" }))
-              }
-            >
-              <option value="destrave">Destrave</option>
-            </select>
           </div>
 
           {/* Período */}
