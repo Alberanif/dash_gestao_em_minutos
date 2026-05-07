@@ -176,7 +176,6 @@ export default function EQAPage() {
     setEventoFormOpen(true);
   }
 
-  const destraveFunnels = funnels.filter((f) => f.type === "destrave");
 
   return (
     <div className="min-h-full">
@@ -259,11 +258,11 @@ export default function EQAPage() {
                     padding: "2px 10px",
                   }}
                 >
-                  {destraveFunnels.length}
+                  {funnels.length}
                 </span>
               </div>
 
-              {destraveFunnels.length === 0 ? (
+              {funnels.length === 0 ? (
                 <div
                   style={{
                     border: "2px dashed var(--color-border)",
@@ -293,7 +292,7 @@ export default function EQAPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {destraveFunnels.map((funnel) => (
+                  {funnels.map((funnel) => (
                     <FunnelCard
                       key={funnel.id}
                       funnel={funnel}
