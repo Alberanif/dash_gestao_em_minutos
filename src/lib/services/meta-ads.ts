@@ -2,6 +2,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import type { Account, MetaAdsCredentials } from "@/types/accounts";
 
 const META_API_BASE = "https://graph.facebook.com/v21.0";
+const META_API_CAMPAIGNS_LIMIT = "100";
 
 const CONVERSION_ACTION_TYPES = new Set([
   "purchase",
@@ -292,45 +293,47 @@ export async function collectMetaAdsCampaignsList(
     `${ad_account_id}/campaigns`,
     {
       fields: "id,name,status,objective",
-      limit: "100",
+      limit: META_API_CAMPAIGNS_LIMIT,
     },
     access_token
   );
 
-  // Transform to table format
-  const campaignRows = campaignsData.map((campaign) => ({
-    account_id: account.id,
-    campaign_id: campaign.id,
-    campaign_name: campaign.name,
-    status: campaign.status,
-    objective: campaign.objective,
-    spend: 0,
-    impressions: 0,
-    reach: 0,
-    clicks: 0,
-    ctr: 0,
-    cpc: 0,
-    conversions: 0,
-    conversion_value: 0,
-    collected_date: new Date().toISOString().split("T")[0],
-  }));
+  // Transform to table format with validation
+  const campaignRows = campaignsData
+    .filter((campaign) => {
+      if (!campaign.id || !campaign.name || !campaign.status || !campaign.objective) {
+        console.warn(
+          `Skipping campaign with missing required fields: ${campaign.id || "unknown"}`
+        );
+        return false;
+      }
+      return true;
+    })
+    .map((campaign) => ({
+      account_id: account.id,
+      campaign_id: campaign.id,
+      campaign_name: campaign.name,
+      status: campaign.status,
+      objective: campaign.objective,
+      spend: 0,
+      impressions: 0,
+      reach: 0,
+      clicks: 0,
+      ctr: 0,
+      cpc: 0,
+      conversions: 0,
+      conversion_value: 0,
+      collected_date: today(),
+    }));
 
-  // Upsert: replace old snapshots for this account on collected_date
+  // Upsert: atomically replace old snapshots for this account on collected_date
   if (campaignRows.length > 0) {
-    // First, delete old records for today to avoid duplicates
-    const today = new Date().toISOString().split("T")[0];
-    await supabase
-      .from("dash_gestao_meta_ads_campaigns")
-      .delete()
-      .eq("account_id", account.id)
-      .eq("collected_date", today);
-
     const { error } = await supabase
       .from("dash_gestao_meta_ads_campaigns")
-      .insert(campaignRows);
+      .upsert(campaignRows, { onConflict: "account_id,campaign_id,collected_date" });
 
     if (error) {
-      throw new Error(`Campaigns insert error: ${error.message}`);
+      throw new Error(`Campaigns upsert error: ${error.message}`);
     }
   }
 
