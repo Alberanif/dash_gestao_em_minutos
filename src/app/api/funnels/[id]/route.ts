@@ -11,11 +11,11 @@ export async function PUT(
 
   const { id } = await params;
   const body = await request.json();
-  const { name, type, start_date, end_date, goal_sales, config } = body;
+  const { name, start_date, end_date, goal_sales, config } = body;
 
-  if (!name || !type || !start_date || !end_date || !goal_sales || !config) {
+  if (!name || !start_date || !end_date || !goal_sales || !config) {
     return NextResponse.json(
-      { error: "name, type, start_date, end_date, goal_sales e config são obrigatórios" },
+      { error: "name, start_date, end_date, goal_sales e config são obrigatórios" },
       { status: 400 }
     );
   }
@@ -32,7 +32,7 @@ export async function PUT(
     .from("dash_gestao_funnels")
     .update({
       name,
-      type,
+      type: "destrave",
       start_date,
       end_date,
       goal_sales,
