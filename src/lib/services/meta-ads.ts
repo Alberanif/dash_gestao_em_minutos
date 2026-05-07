@@ -275,3 +275,64 @@ export async function collectMetaAds(
 
   return { dailyRecords, campaignDailyRecords };
 }
+
+export async function collectMetaAdsCampaignsList(
+  account: Account
+): Promise<{ campaignsCollected: number }> {
+  const { access_token, ad_account_id } = account.credentials as MetaAdsCredentials;
+  const supabase = createSupabaseServiceClient();
+
+  // Fetch all active campaigns from Meta API
+  const campaignsData = await metaGetAllPages<{
+    id: string;
+    name: string;
+    status: string;
+    objective: string;
+  }>(
+    `${ad_account_id}/campaigns`,
+    {
+      fields: "id,name,status,objective",
+      limit: "100",
+    },
+    access_token
+  );
+
+  // Transform to table format
+  const campaignRows = campaignsData.map((campaign) => ({
+    account_id: account.id,
+    campaign_id: campaign.id,
+    campaign_name: campaign.name,
+    status: campaign.status,
+    objective: campaign.objective,
+    spend: 0,
+    impressions: 0,
+    reach: 0,
+    clicks: 0,
+    ctr: 0,
+    cpc: 0,
+    conversions: 0,
+    conversion_value: 0,
+    collected_date: new Date().toISOString().split("T")[0],
+  }));
+
+  // Upsert: replace old snapshots for this account on collected_date
+  if (campaignRows.length > 0) {
+    // First, delete old records for today to avoid duplicates
+    const today = new Date().toISOString().split("T")[0];
+    await supabase
+      .from("dash_gestao_meta_ads_campaigns")
+      .delete()
+      .eq("account_id", account.id)
+      .eq("collected_date", today);
+
+    const { error } = await supabase
+      .from("dash_gestao_meta_ads_campaigns")
+      .insert(campaignRows);
+
+    if (error) {
+      throw new Error(`Campaigns insert error: ${error.message}`);
+    }
+  }
+
+  return { campaignsCollected: campaignRows.length };
+}
