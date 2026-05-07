@@ -326,7 +326,7 @@ export async function collectMetaAdsCampaignsList(
       collected_date: today(),
     }));
 
-  // Upsert: atomically replace old snapshots for this account on collected_date
+  // Upsert to campaigns table (snapshot of campaign metadata)
   if (campaignRows.length > 0) {
     const { error } = await supabase
       .from("dash_gestao_meta_ads_campaigns")
@@ -334,6 +334,39 @@ export async function collectMetaAdsCampaignsList(
 
     if (error) {
       throw new Error(`Campaigns upsert error: ${error.message}`);
+    }
+  }
+
+  // Also upsert to campaigns_daily table so campaigns appear in the funnel picker
+  // (campaigns_daily is what the campaign picker queries from)
+  const dailyRows = campaignRows.map((row) => ({
+    account_id: row.account_id,
+    campaign_id: row.campaign_id,
+    campaign_name: row.campaign_name,
+    date: row.collected_date,
+    spend: row.spend,
+    impressions: row.impressions,
+    reach: row.reach,
+    clicks: row.clicks,
+    ctr: row.ctr,
+    cpm: 0,
+    conversions: row.conversions,
+    link_clicks: 0,
+    outbound_clicks: 0,
+    link_ctr: 0,
+    outbound_ctr: 0,
+    leads_pixel: 0,
+    leads_all: 0,
+    page_views: 0,
+  }));
+
+  if (dailyRows.length > 0) {
+    const { error } = await supabase
+      .from("dash_gestao_meta_ads_campaigns_daily")
+      .upsert(dailyRows, { onConflict: "account_id,campaign_id,date" });
+
+    if (error) {
+      throw new Error(`Campaigns daily upsert error: ${error.message}`);
     }
   }
 
