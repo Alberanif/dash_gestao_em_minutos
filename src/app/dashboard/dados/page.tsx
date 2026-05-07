@@ -6,6 +6,7 @@ import { SectionTabs } from "@/components/dashboard/section-tabs";
 import { DataTable } from "@/components/ui/data-table";
 import { SkeletonTable } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { MetaAdsSettingsModal } from "@/components/dashboard/meta-ads-settings-modal";
 
 type Platform = "youtube" | "instagram" | "hotmart" | "meta-ads";
 
@@ -98,6 +99,7 @@ export default function DadosPage() {
   const [metaBatchStatus, setMetaBatchStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [metaBatchResult, setMetaBatchResult] = useState<{ dailyRecords: number; campaignDailyRecords: number } | null>(null);
   const [metaBatchError, setMetaBatchError] = useState<string | null>(null);
+  const [metaSettingsModalOpen, setMetaSettingsModalOpen] = useState(false);
 
   // Instagram batch collect state
   const [igAccounts, setIgAccounts] = useState<HotmartAccount[]>([]);
@@ -406,11 +408,21 @@ export default function DadosPage() {
 
           {activeTab === "meta-ads" ? (
             <section className="surface-card p-5">
-              <div className="mb-4">
-                <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text)" }}>Coleta em lote Meta Ads</h2>
-                <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-                  Coleta métricas diárias e snapshots de campanhas para um intervalo específico.
-                </p>
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text)" }}>Coleta em lote Meta Ads</h2>
+                  <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+                    Coleta métricas diárias e snapshots de campanhas para um intervalo específico.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMetaSettingsModalOpen(true)}
+                  className="btn-secondary"
+                  style={{ whiteSpace: "nowrap" }}
+                >
+                  ⚙️ Ajustes
+                </button>
               </div>
 
               <div className="grid gap-4 md:grid-cols-4">
@@ -451,6 +463,14 @@ export default function DadosPage() {
                 <div className="mt-4"><StatusBadge tone="error" label={metaBatchError} /></div>
               ) : null}
             </section>
+          ) : null}
+
+          {activeTab === "meta-ads" ? (
+            <MetaAdsSettingsModal
+              isOpen={metaSettingsModalOpen}
+              onClose={() => setMetaSettingsModalOpen(false)}
+              accounts={metaAccounts}
+            />
           ) : null}
 
           {activeTab === "instagram" ? (
