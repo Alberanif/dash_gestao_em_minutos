@@ -1,4 +1,6 @@
-import { useState } from "react";
+"use client";
+
+import { useState, useEffect } from "react";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 interface Account {
@@ -21,6 +23,36 @@ export function MetaAdsSettingsModal({
   const [syncStatus, setSyncStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [syncResult, setSyncResult] = useState<{ campaignsCollected: number } | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    if (isOpen) document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [isOpen, onClose]);
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
+
+  // Clean up sync state when modal reopens
+  useEffect(() => {
+    if (isOpen) {
+      setSyncError(null);
+      setSyncResult(null);
+      setSyncStatus("idle");
+    }
+  }, [isOpen]);
 
   async function handleCampaignsSyncCollect() {
     if (!selectedAccountId) return;
@@ -71,6 +103,10 @@ export function MetaAdsSettingsModal({
     >
       <div
         className="surface-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        aria-describedby="modal-description"
         style={{
           maxWidth: "500px",
           width: "90%",
@@ -81,19 +117,20 @@ export function MetaAdsSettingsModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ marginBottom: "20px" }}>
-          <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--color-text)", margin: 0 }}>
+          <h2 id="modal-title" style={{ fontSize: 18, fontWeight: 600, color: "var(--color-text)", margin: 0 }}>
             Ajustes Meta Ads
           </h2>
-          <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: "8px 0 0 0" }}>
+          <p id="modal-description" style={{ fontSize: 13, color: "var(--color-text-muted)", margin: "8px 0 0 0" }}>
             Sincronize a lista completa de campanhas ativas da sua conta Meta.
           </p>
         </div>
 
         <div style={{ marginBottom: "20px" }}>
-          <label className="mb-2 block text-[13px] font-medium" style={{ color: "var(--color-text-muted)" }}>
+          <label htmlFor="account-select" className="mb-2 block text-[13px] font-medium" style={{ color: "var(--color-text-muted)" }}>
             Conta
           </label>
           <select
+            id="account-select"
             value={selectedAccountId}
             onChange={(e) => setSelectedAccountId(e.target.value)}
             className="field-control"
