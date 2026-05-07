@@ -8,6 +8,7 @@ interface PeriodCardProps {
   metricLabel: string;
   sparklineData: MiniChartPoint[];
   variant: "positive" | "negative" | "neutral";
+  periodType: "current" | "previous";
 }
 
 const VARIANT = {
@@ -20,7 +21,7 @@ function formatValue(v: number): string {
   return Intl.NumberFormat("pt-BR").format(v);
 }
 
-export function PeriodCard({ periodLabel, value, metricLabel, sparklineData, variant }: PeriodCardProps) {
+export function PeriodCard({ periodLabel, value, metricLabel, sparklineData, variant, periodType }: PeriodCardProps) {
   const v = VARIANT[variant];
 
   return (
@@ -34,9 +35,26 @@ export function PeriodCard({ periodLabel, value, metricLabel, sparklineData, var
         background: v.bg,
       }}
     >
-      <p style={{ fontSize: 11, fontWeight: 500, color: "var(--color-text-muted)" }}>
-        {periodLabel}
-      </p>
+      <div className="flex items-center justify-between gap-2">
+        <p style={{ fontSize: 11, fontWeight: 500, color: "var(--color-text-muted)" }}>
+          {periodLabel}
+        </p>
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 600,
+            letterSpacing: "0.04em",
+            padding: "2px 6px",
+            borderRadius: 4,
+            background: periodType === "current" ? "rgba(59,130,246,0.12)" : "var(--color-accent)",
+            color: periodType === "current" ? "#3B82F6" : "var(--color-text-muted)",
+            textTransform: "uppercase",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {periodType === "current" ? "Atual" : "Anterior"}
+        </span>
+      </div>
 
       <div>
         <p

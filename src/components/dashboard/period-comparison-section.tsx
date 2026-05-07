@@ -150,6 +150,7 @@ export function PeriodComparisonSection({
             metricLabel={metricLabel}
             sparklineData={previousPeriod.sparklineData}
             variant={previousVariant}
+            periodType="previous"
           />
           <PeriodCard
             periodLabel={currentPeriod.label}
@@ -157,6 +158,7 @@ export function PeriodComparisonSection({
             metricLabel={metricLabel}
             sparklineData={currentPeriod.sparklineData}
             variant={currentVariant}
+            periodType="current"
           />
         </div>
       </div>
