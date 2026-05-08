@@ -87,8 +87,8 @@ export function useSocialSellerWeeks(): UseSocialSellerWeeksReturn {
       if (cachedWeek) {
         setSelectedWeek(cachedWeek);
       } else {
-        // Fall back to first (most recent) week
-        setSelectedWeek(weeksList[0]);
+        // Fall back to last (most recent) week
+        setSelectedWeek(weeksList[weeksList.length - 1]);
         clearCachedWeekId();
       }
 
