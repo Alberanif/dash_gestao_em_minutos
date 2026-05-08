@@ -368,6 +368,9 @@ export default function EQAPage() {
                     <EventosCard
                       key={project.id}
                       project={project}
+                      metrics={null}
+                      loading={false}
+                      onDateChange={() => {}}
                       onClick={() => setViewingEvento(project)}
                       onEdit={() => openEditEvento(project)}
                       onDelete={() => handleDeleteEvento(project)}

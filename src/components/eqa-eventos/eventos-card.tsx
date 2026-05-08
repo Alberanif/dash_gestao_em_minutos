@@ -1,10 +1,21 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import type { EqaEventosProject } from "@/types/eqa-eventos";
+import type { EqaEventosProject, EqaEventosMetrics } from "@/types/eqa-eventos";
+
+function formatBRL(n: number): string {
+  return Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 2,
+  }).format(n);
+}
 
 interface EventosCardProps {
   project: EqaEventosProject;
+  metrics: EqaEventosMetrics | null;
+  loading: boolean;
+  onDateChange: (start: string, end: string) => void;
   onClick: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -12,13 +23,61 @@ interface EventosCardProps {
 
 export function EventosCard({
   project,
+  metrics,
+  loading,
+  onDateChange,
   onClick,
   onEdit,
   onDelete,
 }: EventosCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [localLoading, setLocalLoading] = useState(false);
+  const [fetchError, setFetchError] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // localStorage helpers
+  const CACHE_KEY = "eqa-eventos-date-range";
+
+  function getCachedDates(): { startDate: string; endDate: string } | null {
+    if (typeof window === "undefined") return null;
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function setCachedDates(start: string, end: string): void {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ startDate: start, endDate: end }));
+    } catch {
+      // localStorage may be unavailable
+    }
+  }
+
+  // useEffect to initialize dates from cache or defaults
+  useEffect(() => {
+    const cached = getCachedDates();
+    if (cached?.startDate && cached?.endDate) {
+      setStartDate(cached.startDate);
+      setEndDate(cached.endDate);
+    } else {
+      // Set default: today - 7 days
+      const end = new Date().toISOString().split("T")[0];
+      const start = new Date(new Date().setDate(new Date().getDate() - 7))
+        .toISOString()
+        .split("T")[0];
+      setStartDate(start);
+      setEndDate(end);
+    }
+  }, []);
+
+  // Keep existing click-outside handler for menu
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
