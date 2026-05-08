@@ -29,20 +29,25 @@ export default function LtvPage() {
     setLoadingMatriz(true);
     setLoadingSolides(true);
 
-    const [matrizRes, solidesRes] = await Promise.all([
-      fetch(`/api/ltv/matriz-humana/metrics?start=${s}&end=${e}`),
-      fetch(`/api/ltv/solides/metrics?start=${s}&end=${e}`),
-    ]);
+    try {
+      const [matrizRes, solidesRes] = await Promise.all([
+        fetch(`/api/ltv/matriz-humana/metrics?start=${s}&end=${e}`),
+        fetch(`/api/ltv/solides/metrics?start=${s}&end=${e}`),
+      ]);
 
-    const [matrizData, solidesData] = await Promise.all([
-      matrizRes.json(),
-      solidesRes.json(),
-    ]);
+      const matrizData = matrizRes.ok ? await matrizRes.json() : null;
+      const solidesData = solidesRes.ok ? await solidesRes.json() : null;
 
-    setMatrizMetrics(matrizData?.error ? null : matrizData);
-    setSolidesMetrics(solidesData?.error ? null : solidesData);
-    setLoadingMatriz(false);
-    setLoadingSolides(false);
+      setMatrizMetrics(matrizData?.error ? null : matrizData);
+      setSolidesMetrics(solidesData?.error ? null : solidesData);
+    } catch (err) {
+      console.error("Erro ao carregar métricas LTV:", err);
+      setMatrizMetrics(null);
+      setSolidesMetrics(null);
+    } finally {
+      setLoadingMatriz(false);
+      setLoadingSolides(false);
+    }
   }, []);
 
   useEffect(() => {
