@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { SkeletonCard } from "@/components/ui/skeleton";
-import type { Funnel, FunnelMetrics } from "@/types/funnels";
+import type { Funnel, FunnelMetrics, LancamentoPagoConfig } from "@/types/funnels";
 
 function formatBRL(n: number): string {
   return Intl.NumberFormat("pt-BR", {
@@ -26,6 +26,8 @@ function getProgressColor(progress: number): string {
 
 const FUNNEL_TYPE_LABELS: Record<string, string> = {
   destrave: "Destrave",
+  lancamento_pago: "Lançamento Pago",
+  lancamento: "Lançamento",
 };
 
 interface FunnelCardProps {
@@ -62,7 +64,9 @@ export function FunnelCard({
 
   const progress =
     metrics && funnel.goal_sales > 0
-      ? Math.min((metrics.total_sales / funnel.goal_sales) * 100, 100)
+      ? metrics.type === "lancamento"
+        ? Math.min((metrics.total_leads / funnel.goal_sales) * 100, 100)
+        : Math.min((metrics.total_sales / funnel.goal_sales) * 100, 100)
       : 0;
 
   return (
@@ -205,70 +209,24 @@ export function FunnelCard({
       {/* Métricas */}
       {metrics ? (
         <>
-          {/* Barra de progresso */}
-          <div className="mb-2">
-            <div className="flex justify-between mb-1">
-              <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-                Vendas
-              </span>
-              <span style={{ fontSize: 12, color: "var(--color-text)", fontWeight: 600 }}>
-                {metrics.total_sales} / {funnel.goal_sales}{" "}
-                <span style={{ color: "var(--color-text-muted)", fontWeight: 400 }}>
-                  ({Math.round(progress)}%)
-                </span>
-                {metrics.total_sales_other_currencies > 0 && (
-                  <span style={{ color: "var(--color-text-muted)", fontWeight: 400, fontSize: 11 }}>
-                    {" "}· {metrics.total_sales_brl} BRL + {metrics.total_sales_other_currencies} ext.
-                  </span>
-                )}
-              </span>
-            </div>
-            <div
-              style={{
-                height: 6,
-                borderRadius: 99,
-                background: "var(--color-bg)",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  height: "100%",
-                  width: `${progress}%`,
-                  borderRadius: 99,
-                  background: "var(--color-primary)",
-                  transition: "width 0.4s ease",
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Vendas Faltando */}
-          {metrics.sales_remaining !== undefined && funnel.goal_sales > 0 ? (
-            funnel.goal_sales <= metrics.total_sales ? (
-              // Meta atingida
-              <div className="mb-2">
-                <p style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 8 }}>
-                  Meta atingida
-                </p>
-                <div
-                  style={{
-                    height: 6,
-                    borderRadius: 99,
-                    background: "var(--color-success)",
-                    overflow: "hidden",
-                  }}
-                />
-              </div>
-            ) : (
-              // Meta em aberto
+          {metrics.type === "lancamento_pago" ? (
+            <>
+              {/* Lançamento Pago: Vendas */}
               <div className="mb-2">
                 <div className="flex justify-between mb-1">
                   <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-                    Faltam
+                    Vendas
                   </span>
                   <span style={{ fontSize: 12, color: "var(--color-text)", fontWeight: 600 }}>
-                    {metrics.sales_remaining} / {funnel.goal_sales}
+                    {metrics.total_sales} / {funnel.goal_sales}{" "}
+                    <span style={{ color: "var(--color-text-muted)", fontWeight: 400 }}>
+                      ({Math.round(progress)}%)
+                    </span>
+                    {metrics.total_sales_other_currencies > 0 && (
+                      <span style={{ color: "var(--color-text-muted)", fontWeight: 400, fontSize: 11 }}>
+                        {" "}· {metrics.total_sales_brl} BRL + {metrics.total_sales_other_currencies} ext.
+                      </span>
+                    )}
                   </span>
                 </div>
                 <div
@@ -282,34 +240,199 @@ export function FunnelCard({
                   <div
                     style={{
                       height: "100%",
-                      width: `${(metrics.total_sales / funnel.goal_sales) * 100}%`,
+                      width: `${progress}%`,
                       borderRadius: 99,
-                      background: getProgressColor((metrics.total_sales / funnel.goal_sales) * 100),
+                      background: "var(--color-primary)",
                       transition: "width 0.4s ease",
                     }}
                   />
                 </div>
               </div>
-            )
-          ) : null}
 
-          {/* Pace e CAC */}
-          <div className="flex gap-4 mt-3">
-            <div>
-              <p style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-                Pace
-              </p>
-              <p style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text)" }}>
-                <span style={{ color: "var(--color-primary)" }}>
-                  {metrics.pace_diario}/dia
-                </span>
-                <span style={{ color: "var(--color-text-muted)", fontWeight: 400, fontSize: 12 }}>
-                  {" "}| Meta: {metrics.pace_ideal}/dia
-                </span>
-              </p>
-            </div>
-            {!funnel.config.inactive_ads && (
-              <>
+              {/* Vendas Faltando */}
+              {funnel.goal_sales > 0 ? (
+                funnel.goal_sales <= metrics.total_sales ? (
+                  // Meta atingida
+                  <div className="mb-2">
+                    <p style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 8 }}>
+                      Meta atingida
+                    </p>
+                    <div
+                      style={{
+                        height: 6,
+                        borderRadius: 99,
+                        background: "var(--color-success)",
+                        overflow: "hidden",
+                      }}
+                    />
+                  </div>
+                ) : (
+                  // Meta em aberto
+                  <div className="mb-2">
+                    <div className="flex justify-between mb-1">
+                      <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                        Faltam
+                      </span>
+                      <span style={{ fontSize: 12, color: "var(--color-text)", fontWeight: 600 }}>
+                        {metrics.sales_remaining} / {funnel.goal_sales}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        height: 6,
+                        borderRadius: 99,
+                        background: "var(--color-bg)",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: "100%",
+                          width: `${(metrics.total_sales / funnel.goal_sales) * 100}%`,
+                          borderRadius: 99,
+                          background: getProgressColor((metrics.total_sales / funnel.goal_sales) * 100),
+                          transition: "width 0.4s ease",
+                        }}
+                      />
+                    </div>
+                  </div>
+                )
+              ) : null}
+
+              {/* Pace e CAC */}
+              <div className="flex gap-4 mt-3">
+                <div>
+                  <p style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+                    Pace
+                  </p>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text)" }}>
+                    <span style={{ color: "var(--color-primary)" }}>
+                      {metrics.pace_diario}/dia
+                    </span>
+                    <span style={{ color: "var(--color-text-muted)", fontWeight: 400, fontSize: 12 }}>
+                      {" "}| Meta: {metrics.pace_ideal}/dia
+                    </span>
+                  </p>
+                </div>
+                {funnel.type === "lancamento_pago" && !(funnel.config as LancamentoPagoConfig).inactive_ads && (
+                  <>
+                    <div
+                      style={{
+                        width: 1,
+                        background: "var(--color-border)",
+                        margin: "0 4px",
+                      }}
+                    />
+                    <div>
+                      <p style={{ fontSize: 11, color: "var(--color-text-muted)" }}>CAC</p>
+                      <p style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text)" }}>
+                        {metrics.cac > 0 ? formatBRL(metrics.cac) : "—"}
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Lançamento: Leads */}
+              <div className="mb-2">
+                <div className="flex justify-between mb-1">
+                  <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                    Leads
+                  </span>
+                  <span style={{ fontSize: 12, color: "var(--color-text)", fontWeight: 600 }}>
+                    {metrics.total_leads} / {funnel.goal_sales}{" "}
+                    <span style={{ color: "var(--color-text-muted)", fontWeight: 400 }}>
+                      ({Math.round(progress)}%)
+                    </span>
+                  </span>
+                </div>
+                <div
+                  style={{
+                    height: 6,
+                    borderRadius: 99,
+                    background: "var(--color-bg)",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      height: "100%",
+                      width: `${progress}%`,
+                      borderRadius: 99,
+                      background: "var(--color-primary)",
+                      transition: "width 0.4s ease",
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Leads Faltando */}
+              {funnel.goal_sales > 0 ? (
+                funnel.goal_sales <= metrics.total_leads ? (
+                  // Meta atingida
+                  <div className="mb-2">
+                    <p style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 8 }}>
+                      Meta atingida
+                    </p>
+                    <div
+                      style={{
+                        height: 6,
+                        borderRadius: 99,
+                        background: "var(--color-success)",
+                        overflow: "hidden",
+                      }}
+                    />
+                  </div>
+                ) : (
+                  // Meta em aberto
+                  <div className="mb-2">
+                    <div className="flex justify-between mb-1">
+                      <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                        Faltam
+                      </span>
+                      <span style={{ fontSize: 12, color: "var(--color-text)", fontWeight: 600 }}>
+                        {metrics.leads_remaining} / {funnel.goal_sales}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        height: 6,
+                        borderRadius: 99,
+                        background: "var(--color-bg)",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: "100%",
+                          width: `${(metrics.total_leads / funnel.goal_sales) * 100}%`,
+                          borderRadius: 99,
+                          background: getProgressColor((metrics.total_leads / funnel.goal_sales) * 100),
+                          transition: "width 0.4s ease",
+                        }}
+                      />
+                    </div>
+                  </div>
+                )
+              ) : null}
+
+              {/* Pace e CPL */}
+              <div className="flex gap-4 mt-3">
+                <div>
+                  <p style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+                    Pace
+                  </p>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text)" }}>
+                    <span style={{ color: "var(--color-primary)" }}>
+                      {metrics.pace_diario_leads}/dia
+                    </span>
+                    <span style={{ color: "var(--color-text-muted)", fontWeight: 400, fontSize: 12 }}>
+                      {" "}| Meta: {metrics.pace_ideal_leads}/dia
+                    </span>
+                  </p>
+                </div>
                 <div
                   style={{
                     width: 1,
@@ -318,14 +441,14 @@ export function FunnelCard({
                   }}
                 />
                 <div>
-                  <p style={{ fontSize: 11, color: "var(--color-text-muted)" }}>CAC</p>
+                  <p style={{ fontSize: 11, color: "var(--color-text-muted)" }}>CPL</p>
                   <p style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text)" }}>
-                    {metrics.cac > 0 ? formatBRL(metrics.cac) : "—"}
+                    {metrics.cpl > 0 ? formatBRL(metrics.cpl) : "—"}
                   </p>
                 </div>
-              </>
-            )}
-          </div>
+              </div>
+            </>
+          )}
         </>
       ) : (
         <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>

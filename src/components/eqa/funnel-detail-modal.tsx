@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import type { Funnel, FunnelMetrics } from "@/types/funnels";
+import type { Funnel, FunnelMetrics, LancamentoPagoConfig } from "@/types/funnels";
 
 function formatBRL(n: number): string {
   return Intl.NumberFormat("pt-BR", {
@@ -18,6 +18,8 @@ function formatDate(dateStr: string): string {
 
 const FUNNEL_TYPE_LABELS: Record<string, string> = {
   destrave: "Destrave",
+  lancamento_pago: "Lançamento Pago",
+  lancamento: "Lançamento",
 };
 
 interface FunnelDetailModalProps {
@@ -45,7 +47,9 @@ export function FunnelDetailModal({
 
   const progress =
     funnel.goal_sales > 0
-      ? Math.min((metrics.total_sales / funnel.goal_sales) * 100, 100)
+      ? metrics.type === "lancamento"
+        ? Math.min((metrics.total_leads / funnel.goal_sales) * 100, 100)
+        : Math.min((metrics.total_sales / funnel.goal_sales) * 100, 100)
       : 0;
 
   return (
@@ -120,76 +124,167 @@ export function FunnelDetailModal({
         />
 
         {/* KPIs */}
-        <div
-          className={`grid gap-4 mb-6 ${funnel.config.inactive_ads ? "grid-cols-2" : "grid-cols-3"}`}
-        >
-          <div
-            style={{
-              background: "var(--color-bg)",
-              borderRadius: "var(--radius-sm)",
-              padding: "12px 14px",
-              textAlign: "center",
-            }}
-          >
-            <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 4 }}>
-              Total de Vendas
-            </p>
-            <p style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text)" }}>
-              {metrics.total_sales}
-            </p>
-            {metrics.total_sales_other_currencies > 0 && (
-              <p style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 3, lineHeight: 1.4 }}>
-                BRL: {metrics.total_sales_brl} · Outras: {metrics.total_sales_other_currencies}
-              </p>
-            )}
-          </div>
-          {!funnel.config.inactive_ads && (
+        {metrics.type === "lancamento_pago" ? (
+          <>
             <div
-              style={{
-                background: "var(--color-bg)",
-                borderRadius: "var(--radius-sm)",
-                padding: "12px 14px",
-                textAlign: "center",
-              }}
+              className={`grid gap-4 mb-6 ${(funnel.config as LancamentoPagoConfig).inactive_ads ? "grid-cols-2" : "grid-cols-3"}`}
             >
-              <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 4 }}>
-                CAC
-              </p>
-              <p style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text)" }}>
-                {metrics.cac > 0 ? formatBRL(metrics.cac) : "—"}
-              </p>
+              <div
+                style={{
+                  background: "var(--color-bg)",
+                  borderRadius: "var(--radius-sm)",
+                  padding: "12px 14px",
+                  textAlign: "center",
+                }}
+              >
+                <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 4 }}>
+                  Total de Vendas
+                </p>
+                <p style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text)" }}>
+                  {metrics.total_sales}
+                </p>
+                {metrics.total_sales_other_currencies > 0 && (
+                  <p style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 3, lineHeight: 1.4 }}>
+                    BRL: {metrics.total_sales_brl} · Outras: {metrics.total_sales_other_currencies}
+                  </p>
+                )}
+              </div>
+              {!(funnel.config as LancamentoPagoConfig).inactive_ads && (
+                <div
+                  style={{
+                    background: "var(--color-bg)",
+                    borderRadius: "var(--radius-sm)",
+                    padding: "12px 14px",
+                    textAlign: "center",
+                  }}
+                >
+                  <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 4 }}>
+                    CAC
+                  </p>
+                  <p style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text)" }}>
+                    {metrics.cac > 0 ? formatBRL(metrics.cac) : "—"}
+                  </p>
+                </div>
+              )}
+              <div
+                style={{
+                  background: "var(--color-bg)",
+                  borderRadius: "var(--radius-sm)",
+                  padding: "12px 14px",
+                  textAlign: "center",
+                }}
+              >
+                <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 4 }}>
+                  Pace Diário
+                </p>
+                <p style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text)" }}>
+                  {metrics.pace_diario}
+                  <span style={{ fontSize: 13, fontWeight: 400, color: "var(--color-text-muted)" }}>
+                    /dia
+                  </span>
+                </p>
+              </div>
             </div>
-          )}
-          <div
-            style={{
-              background: "var(--color-bg)",
-              borderRadius: "var(--radius-sm)",
-              padding: "12px 14px",
-              textAlign: "center",
-            }}
-          >
-            <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 4 }}>
-              Pace Diário
-            </p>
-            <p style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text)" }}>
-              {metrics.pace_diario}
-              <span style={{ fontSize: 13, fontWeight: 400, color: "var(--color-text-muted)" }}>
-                /dia
-              </span>
-            </p>
-          </div>
-        </div>
 
-        {/* Progresso */}
+            {/* Progresso */}
+            <div>
+              <div className="flex justify-between mb-2">
+                <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+                  Progresso do objetivo
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)" }}>
+                  {metrics.total_sales} de {funnel.goal_sales} vendas ({Math.round(progress)}%)
+                </span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="grid gap-4 mb-6 grid-cols-3">
+              <div
+                style={{
+                  background: "var(--color-bg)",
+                  borderRadius: "var(--radius-sm)",
+                  padding: "12px 14px",
+                  textAlign: "center",
+                }}
+              >
+                <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 4 }}>
+                  Total de Leads
+                </p>
+                <p style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text)" }}>
+                  {metrics.total_leads}
+                </p>
+              </div>
+              <div
+                style={{
+                  background: "var(--color-bg)",
+                  borderRadius: "var(--radius-sm)",
+                  padding: "12px 14px",
+                  textAlign: "center",
+                }}
+              >
+                <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 4 }}>
+                  CPL
+                </p>
+                <p style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text)" }}>
+                  {metrics.cpl > 0 ? formatBRL(metrics.cpl) : "—"}
+                </p>
+              </div>
+              <div
+                style={{
+                  background: "var(--color-bg)",
+                  borderRadius: "var(--radius-sm)",
+                  padding: "12px 14px",
+                  textAlign: "center",
+                }}
+              >
+                <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 4 }}>
+                  Pace Diário
+                </p>
+                <p style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text)" }}>
+                  {metrics.pace_diario_leads}
+                  <span style={{ fontSize: 13, fontWeight: 400, color: "var(--color-text-muted)" }}>
+                    /dia
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            {/* Progresso */}
+            <div>
+              <div className="flex justify-between mb-2">
+                <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+                  Progresso do objetivo
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)" }}>
+                  {metrics.total_leads} de {funnel.goal_sales} leads ({Math.round(progress)}%)
+                </span>
+              </div>
+              <div
+                style={{
+                  height: 10,
+                  borderRadius: 99,
+                  background: "var(--color-bg)",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${progress}%`,
+                    borderRadius: 99,
+                    background: "var(--color-primary)",
+                    transition: "width 0.4s ease",
+                  }}
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Progress bar compartilhada — ambos os tipos */}
         <div>
-          <div className="flex justify-between mb-2">
-            <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-              Progresso do objetivo
-            </span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)" }}>
-              {metrics.total_sales} de {funnel.goal_sales} vendas ({Math.round(progress)}%)
-            </span>
-          </div>
           <div
             style={{
               height: 10,
