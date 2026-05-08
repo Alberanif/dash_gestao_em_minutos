@@ -10,7 +10,8 @@ import { EventosDetailModal } from "@/components/eqa-eventos/eventos-detail-moda
 import { EventosFormModal } from "@/components/eqa-eventos/eventos-form-modal";
 import { SocialSellerSection } from "@/components/social-seller/social-seller-section";
 import type { Funnel, FunnelMetrics } from "@/types/funnels";
-import type { EqaEventosProject } from "@/types/eqa-eventos";
+import type { EqaEventosProject, EqaEventosMetrics } from "@/types/eqa-eventos";
+import { today, dateSubtractDays } from "@/lib/date-utils";
 
 export default function EQAPage() {
   const [funnels, setFunnels] = useState<Funnel[]>([]);
@@ -31,6 +32,10 @@ export default function EQAPage() {
   const [viewingEvento, setViewingEvento] = useState<EqaEventosProject | null>(null);
   const [eventoFormOpen, setEventoFormOpen] = useState(false);
   const [editingEvento, setEditingEvento] = useState<EqaEventosProject | undefined>(undefined);
+
+  // Eventos Comercial Metrics
+  const [eventosMetricsMap, setEventosMetricsMap] = useState<Record<string, EqaEventosMetrics>>({});
+  const [loadingEventosMetrics, setLoadingEventosMetrics] = useState(false);
 
   const fetchMetrics = useCallback(async (funnelList: Funnel[]) => {
     if (funnelList.length === 0) return;
@@ -54,6 +59,48 @@ export default function EQAPage() {
     setLoadingMetrics(false);
   }, []);
 
+  const fetchEventosMetrics = useCallback(
+    async (
+      eventosList: EqaEventosProject[],
+      startDate?: string,
+      endDate?: string
+    ) => {
+      if (eventosList.length === 0) return;
+
+      setLoadingEventosMetrics(true);
+
+      // If no dates provided, use default: today - 7 days
+      let start = startDate;
+      let end = endDate;
+      if (!start || !end) {
+        end = today();
+        start = dateSubtractDays(end, 7);
+      }
+
+      const results = await Promise.all(
+        eventosList.map((e) =>
+          fetch(
+            `/api/eqa-eventos/${e.id}/metrics?start_date=${start}&end_date=${end}`
+          )
+            .then((r) => r.json())
+            .then((data): [string, EqaEventosMetrics | null] => {
+              if (data.error) return [e.id, null];
+              return [e.id, data as EqaEventosMetrics];
+            })
+            .catch((): [string, null] => [e.id, null])
+        )
+      );
+
+      const map: Record<string, EqaEventosMetrics> = {};
+      for (const [id, m] of results) {
+        if (m) map[id] = m;
+      }
+
+      setEventosMetricsMap(map);
+      setLoadingEventosMetrics(false);
+    },
+    []
+  );
 
   const loadFunnels = useCallback(async () => {
     setLoadingFunnels(true);
@@ -77,12 +124,13 @@ export default function EQAPage() {
       const data = await res.json();
       const list: EqaEventosProject[] = Array.isArray(data) ? data : [];
       setEventosProjects(list);
+      await fetchEventosMetrics(list);  // NEW: auto-fetch with default 7 days
     } catch {
       setEventosProjects([]);
     } finally {
       setLoadingEventos(false);
     }
-  }, []);
+  }, [fetchEventosMetrics]);
 
   useEffect(() => {
     loadFunnels();
@@ -122,6 +170,30 @@ export default function EQAPage() {
         delete next[funnel.id];
         return next;
       });
+    }
+  }
+
+  async function handleEventosDateChange(
+    eventoId: string,
+    start: string,
+    end: string
+  ) {
+    try {
+      const res = await fetch(
+        `/api/eqa-eventos/${eventoId}/metrics?start_date=${start}&end_date=${end}`
+      );
+      if (!res.ok) {
+        const error = await res.json();
+        console.error("Erro ao buscar métricas:", error);
+        return;
+      }
+      const data = await res.json();
+      setEventosMetricsMap((prev) => ({
+        ...prev,
+        [eventoId]: data,
+      }));
+    } catch (err) {
+      console.error("Erro ao buscar métricas do evento:", err);
     }
   }
 
