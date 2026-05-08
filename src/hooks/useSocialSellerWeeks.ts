@@ -78,18 +78,24 @@ export function useSocialSellerWeeks(): UseSocialSellerWeeksReturn {
         return;
       }
 
-      // Try to load cached week ID
+      // Get the last (most recent) week
+      const lastWeek = weeksList[weeksList.length - 1];
+
+      // Try to load cached week ID, but validate it still exists
       const cachedId = getCachedWeekId();
       const cachedWeek = cachedId
         ? weeksList.find((w) => w.id === cachedId)
         : null;
 
-      if (cachedWeek) {
+      // Always use the last week if it's different from cached week
+      // This ensures new weeks are automatically displayed
+      if (cachedWeek && cachedWeek.id === lastWeek.id) {
+        // Cached week is still the latest, use it
         setSelectedWeek(cachedWeek);
       } else {
-        // Fall back to last (most recent) week
-        setSelectedWeek(weeksList[weeksList.length - 1]);
-        clearCachedWeekId();
+        // Either no cache or cached week is not the latest, use last week
+        setSelectedWeek(lastWeek);
+        setCachedWeekId(lastWeek.id);
       }
 
       setLoading(false);
