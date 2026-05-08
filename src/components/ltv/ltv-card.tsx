@@ -67,16 +67,6 @@ export function LtvCard({ title, start, end, metrics, loading }: LtvCardProps) {
       {/* Métricas */}
       {metrics ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {/* Assinaturas Ativas */}
-          <div>
-            <p style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 2 }}>
-              Assinaturas Ativas
-            </p>
-            <p style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text)", lineHeight: 1 }}>
-              {metrics.assinaturas_ativas}
-            </p>
-          </div>
-
           {/* Total de Assinaturas Ativas */}
           {metrics.total_assinaturas_ativas !== undefined && (
             <div
@@ -94,6 +84,16 @@ export function LtvCard({ title, start, end, metrics, loading }: LtvCardProps) {
               </p>
             </div>
           )}
+
+          {/* Assinaturas Ativas */}
+          <div>
+            <p style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 2 }}>
+              Assinaturas Ativas
+            </p>
+            <p style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text)", lineHeight: 1 }}>
+              {metrics.assinaturas_ativas}
+            </p>
+          </div>
 
           {/* Assinaturas Canceladas */}
           <div>
