@@ -32,7 +32,6 @@ export async function PUT(
     .from("dash_gestao_funnels")
     .update({
       name,
-      type: "destrave",
       start_date,
       end_date,
       goal_sales,

@@ -24,11 +24,18 @@ export async function POST(request: NextRequest) {
   if (error) return error;
 
   const body = await request.json();
-  const { name, start_date, end_date, goal_sales, config } = body;
+  const { name, type, start_date, end_date, goal_sales, config } = body;
 
-  if (!name || !start_date || !end_date || !goal_sales || !config) {
+  if (!name || !type || !start_date || !end_date || !goal_sales || !config) {
     return NextResponse.json(
-      { error: "name, start_date, end_date, goal_sales e config são obrigatórios" },
+      { error: "name, type, start_date, end_date, goal_sales e config são obrigatórios" },
+      { status: 400 }
+    );
+  }
+
+  if (!["lancamento_pago", "lancamento"].includes(type)) {
+    return NextResponse.json(
+      { error: "type deve ser 'lancamento_pago' ou 'lancamento'" },
       { status: 400 }
     );
   }
@@ -43,7 +50,7 @@ export async function POST(request: NextRequest) {
   const supabase = createSupabaseServiceClient();
   const { data, error: dbError } = await supabase
     .from("dash_gestao_funnels")
-    .insert({ name, type: "destrave", start_date, end_date, goal_sales, config })
+    .insert({ name, type, start_date, end_date, goal_sales, config })
     .select()
     .single();
 
