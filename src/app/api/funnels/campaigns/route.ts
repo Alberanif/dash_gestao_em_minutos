@@ -27,24 +27,13 @@ export async function GET(request: NextRequest) {
 
   const supabase = createSupabaseServiceClient();
 
-  let query = supabase
-    .from("dash_gestao_meta_ads_campaigns")
-    .select("campaign_id, campaign_name, account_id, collected_date")
+  // Buscar de dash_gestao_meta_ads_campaigns_daily (tem leads_pixel + dados diários)
+  const query = supabase
+    .from("dash_gestao_meta_ads_campaigns_daily")
+    .select("campaign_id, campaign_name, account_id, date")
     .in("account_id", accountIds)
-    .order("collected_date", { ascending: false })
-    .limit(500);
-
-  // Filtrar por termos ILIKE (OR entre termos)
-  if (terms.length > 0) {
-    const ilikeClauses = terms
-      .map((t) => t.replace(/[(),%]/g, ""))
-      .filter(Boolean)
-      .map((t) => `campaign_name.ilike.%${t}%`)
-      .join(",");
-    if (ilikeClauses) {
-      query = query.or(ilikeClauses);
-    }
-  }
+    .order("date", { ascending: false })
+    .limit(1000);
 
   const { data, error: dbError } = await query;
 
@@ -52,18 +41,29 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: dbError.message }, { status: 500 });
   }
 
-  // Deduplicar por campaign_id (mantém snapshot mais recente — já ordenado DESC)
+  // Deduplicar por campaign_id e filtrar por termos
   const seen = new Set<string>();
   const unique: CampaignOption[] = [];
+
   for (const row of data ?? []) {
-    if (!seen.has(row.campaign_id)) {
-      seen.add(row.campaign_id);
-      unique.push({
-        campaign_id: row.campaign_id,
-        campaign_name: row.campaign_name,
-        account_id: row.account_id,
+    if (seen.has(row.campaign_id)) continue;
+
+    // Se há termos, filtrar por ILIKE (todos os termos devem estar presentes)
+    if (terms.length > 0) {
+      const cleanName = row.campaign_name.toLowerCase();
+      const allTermsMatch = terms.every((term) => {
+        const cleanTerm = term.toLowerCase();
+        return cleanName.includes(cleanTerm);
       });
+      if (!allTermsMatch) continue;
     }
+
+    seen.add(row.campaign_id);
+    unique.push({
+      campaign_id: row.campaign_id,
+      campaign_name: row.campaign_name,
+      account_id: row.account_id,
+    });
   }
 
   // Ordenar alfabeticamente por nome

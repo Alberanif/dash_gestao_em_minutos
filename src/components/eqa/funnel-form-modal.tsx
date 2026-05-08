@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { Funnel, HotmartProduct, CampaignOption } from "@/types/funnels";
+import type { Funnel, HotmartProduct, CampaignOption, LancamentoPagoConfig, LancamentoConfig } from "@/types/funnels";
 import type { Account } from "@/types/accounts";
 
 interface FunnelFormData {
+  type: "lancamento_pago" | "lancamento";
   name: string;
   start_date: string;
   end_date: string;
@@ -23,6 +24,7 @@ interface FunnelFormModalProps {
 }
 
 const EMPTY_FORM: FunnelFormData = {
+  type: "lancamento_pago",
   name: "",
   start_date: "",
   end_date: "",
@@ -34,15 +36,18 @@ const EMPTY_FORM: FunnelFormData = {
 };
 
 function funnelToForm(f: Funnel): FunnelFormData {
+  const isLancamentoPago = f.type === "lancamento_pago";
+  const config = f.config as LancamentoPagoConfig | LancamentoConfig;
   return {
+    type: f.type,
     name: f.name,
     start_date: f.start_date,
     end_date: f.end_date,
     goal_sales: String(f.goal_sales),
-    product_ids: f.config.product_ids ?? [],
-    ad_account_ids: f.config.ad_account_ids ?? [],
-    campaign_ids: f.config.campaign_ids ?? [],
-    inactive_ads: f.config.inactive_ads ?? false,
+    product_ids: isLancamentoPago && "product_ids" in config ? config.product_ids : [],
+    ad_account_ids: config.ad_account_ids,
+    campaign_ids: config.campaign_ids,
+    inactive_ads: isLancamentoPago && "inactive_ads" in config ? (config.inactive_ads ?? false) : false,
   };
 }
 
@@ -117,7 +122,6 @@ export function FunnelFormModal({ funnel, open, onClose, onSave }: FunnelFormMod
   }, [productSearch, open, fetchProducts]);
 
   // Buscar campanhas quando termos ou contas mudam
-  // Usar string key para evitar re-renders por nova referência de array
   const adAccountIdsKey = form.ad_account_ids.join(",");
   useEffect(() => {
     if (!open || !adAccountIdsKey || campaignTerms.length === 0) {
@@ -136,7 +140,6 @@ export function FunnelFormModal({ funnel, open, onClose, onSave }: FunnelFormMod
       .catch((err) => { if (err.name !== "AbortError") setCampaigns([]); })
       .finally(() => setLoadingCampaigns(false));
     return () => controller.abort();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, adAccountIdsKey, campaignTerms]);
 
   function toggleProductId(pid: string) {
@@ -203,27 +206,38 @@ export function FunnelFormModal({ funnel, open, onClose, onSave }: FunnelFormMod
     }
     const goalNum = parseInt(form.goal_sales, 10);
     if (!goalNum || goalNum < 1) {
-      setError("Objetivo de vendas deve ser maior que zero");
+      setError("Objetivo deve ser maior que zero");
       return;
     }
 
     setSaving(true);
     try {
-      await onSave({
+      const config: LancamentoPagoConfig | LancamentoConfig = form.type === "lancamento_pago"
+        ? {
+            product_ids: form.product_ids,
+            ad_account_ids: form.ad_account_ids,
+            campaign_ids: form.campaign_ids,
+            inactive_ads: form.inactive_ads,
+          }
+        : {
+            ad_account_ids: form.ad_account_ids,
+            campaign_ids: form.campaign_ids,
+          };
+
+      const payload = {
         name: form.name.trim(),
-        type: "destrave",
+        type: form.type,
         start_date: form.start_date,
         end_date: form.end_date,
         goal_sales: goalNum,
-        config: {
-          product_ids: form.product_ids,
-          ad_account_ids: form.ad_account_ids,
-          campaign_ids: form.campaign_ids,
-          inactive_ads: form.inactive_ads,
-        },
-      });
+        config,
+      };
+
+      console.log("Enviando payload:", payload);
+      await onSave(payload);
       onClose();
     } catch (err) {
+      console.error("Erro ao salvar:", err);
       setError(err instanceof Error ? err.message : "Erro ao salvar funil");
     } finally {
       setSaving(false);
@@ -232,7 +246,7 @@ export function FunnelFormModal({ funnel, open, onClose, onSave }: FunnelFormMod
 
   if (!open) return null;
 
-  // Lista de produtos para exibir: selecionados no topo + resultado da busca
+  // Lista de produtos para exibir
   const selectedProducts = products.filter((p) => form.product_ids.includes(p.product_id));
   const otherProducts = products.filter((p) => !form.product_ids.includes(p.product_id));
   const displayProducts = [...selectedProducts, ...otherProducts];
@@ -321,6 +335,72 @@ export function FunnelFormModal({ funnel, open, onClose, onSave }: FunnelFormMod
         </h2>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          {/* Seletor de tipo — só em create mode */}
+          {!funnel && (
+            <div>
+              <label style={labelStyle}>Tipo de Funil</label>
+              <div className="flex gap-3 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setForm((p) => ({ ...p, type: "lancamento_pago" }))}
+                  style={{
+                    flex: 1,
+                    padding: "12px",
+                    borderRadius: "var(--radius-sm)",
+                    border: form.type === "lancamento_pago" ? "2px solid var(--color-primary)" : "1px solid var(--color-border)",
+                    background: form.type === "lancamento_pago" ? "var(--color-primary-light)" : "var(--color-bg)",
+                    cursor: "pointer",
+                    textAlign: "center",
+                  }}
+                >
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)", marginBottom: 2 }}>
+                    Lançamento Pago
+                  </p>
+                  <p style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+                    Vendas + Meta Ads
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm((p) => ({ ...p, type: "lancamento" }))}
+                  style={{
+                    flex: 1,
+                    padding: "12px",
+                    borderRadius: "var(--radius-sm)",
+                    border: form.type === "lancamento" ? "2px solid var(--color-primary)" : "1px solid var(--color-border)",
+                    background: form.type === "lancamento" ? "var(--color-primary-light)" : "var(--color-bg)",
+                    cursor: "pointer",
+                    textAlign: "center",
+                  }}
+                >
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)", marginBottom: 2 }}>
+                    Lançamento
+                  </p>
+                  <p style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+                    Leads via Pixel
+                  </p>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Badge de tipo — só em edit mode */}
+          {funnel && (
+            <div style={{ marginBottom: 12 }}>
+              <span style={{
+                display: "inline-block",
+                padding: "4px 10px",
+                borderRadius: "99px",
+                background: "var(--color-primary-light)",
+                color: "var(--color-primary)",
+                fontSize: 11,
+                fontWeight: 600,
+              }}>
+                {form.type === "lancamento_pago" ? "Lançamento Pago" : "Lançamento"}
+              </span>
+            </div>
+          )}
+
           {/* Nome */}
           <div>
             <label style={labelStyle}>Nome do funil</label>
@@ -357,90 +437,94 @@ export function FunnelFormModal({ funnel, open, onClose, onSave }: FunnelFormMod
 
           {/* Objetivo */}
           <div>
-            <label style={labelStyle}>Objetivo de vendas</label>
+            <label style={labelStyle}>
+              {form.type === "lancamento" ? "Objetivo de leads" : "Objetivo de vendas"}
+            </label>
             <input
               style={inputStyle}
               type="number"
               min={1}
-              placeholder="Ex: 120"
+              placeholder={form.type === "lancamento" ? "Ex: 50" : "Ex: 120"}
               value={form.goal_sales}
               onChange={(e) => setForm((p) => ({ ...p, goal_sales: e.target.value }))}
             />
           </div>
 
-          {/* Produtos Hotmart */}
-          <div>
-            <label style={labelStyle}>
-              Produtos Hotmart{" "}
-              {form.product_ids.length > 0 && (
-                <span style={{ color: "var(--color-primary)", fontWeight: 400, textTransform: "none" }}>
-                  ({form.product_ids.length} selecionado{form.product_ids.length > 1 ? "s" : ""})
-                </span>
-              )}
-            </label>
-            <input
-              style={{ ...inputStyle, marginBottom: 8 }}
-              type="text"
-              placeholder="Buscar por nome ou ID..."
-              value={productSearch}
-              onChange={(e) => setProductSearch(e.target.value)}
-            />
-            <div
-              style={{
-                maxHeight: 180,
-                overflowY: "auto",
-                border: "1px solid var(--color-border)",
-                borderRadius: "var(--radius-sm)",
-                background: "var(--color-bg)",
-              }}
-            >
-              {loadingProducts ? (
-                <p style={{ padding: "10px 12px", fontSize: 12, color: "var(--color-text-muted)" }}>
-                  Buscando...
-                </p>
-              ) : displayProducts.length === 0 ? (
-                <p style={{ padding: "10px 12px", fontSize: 12, color: "var(--color-text-muted)" }}>
-                  {productSearch ? "Nenhum produto encontrado" : "Digite para buscar produtos"}
-                </p>
-              ) : (
-                displayProducts.map((p) => {
-                  const checked = form.product_ids.includes(p.product_id);
-                  return (
-                    <label
-                      key={p.product_id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                        padding: "8px 12px",
-                        cursor: "pointer",
-                        background: checked ? "var(--color-primary-light)" : "transparent",
-                        borderBottom: "1px solid var(--color-border)",
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleProductId(p.product_id)}
-                        style={{ accentColor: "var(--color-primary)", flexShrink: 0 }}
-                      />
-                      <div style={{ minWidth: 0 }}>
-                        <p
-                          className="truncate"
-                          style={{ fontSize: 12, color: "var(--color-text)", fontWeight: checked ? 600 : 400 }}
-                        >
-                          {p.product_name}
-                        </p>
-                        <p style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-                          ID: {p.product_id}
-                        </p>
-                      </div>
-                    </label>
-                  );
-                })
-              )}
+          {/* Produtos Hotmart — só Lançamento Pago */}
+          {form.type === "lancamento_pago" && (
+            <div>
+              <label style={labelStyle}>
+                Produtos Hotmart{" "}
+                {form.product_ids.length > 0 && (
+                  <span style={{ color: "var(--color-primary)", fontWeight: 400, textTransform: "none" }}>
+                    ({form.product_ids.length} selecionado{form.product_ids.length > 1 ? "s" : ""})
+                  </span>
+                )}
+              </label>
+              <input
+                style={{ ...inputStyle, marginBottom: 8 }}
+                type="text"
+                placeholder="Buscar por nome ou ID..."
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+              />
+              <div
+                style={{
+                  maxHeight: 180,
+                  overflowY: "auto",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "var(--radius-sm)",
+                  background: "var(--color-bg)",
+                }}
+              >
+                {loadingProducts ? (
+                  <p style={{ padding: "10px 12px", fontSize: 12, color: "var(--color-text-muted)" }}>
+                    Buscando...
+                  </p>
+                ) : displayProducts.length === 0 ? (
+                  <p style={{ padding: "10px 12px", fontSize: 12, color: "var(--color-text-muted)" }}>
+                    {productSearch ? "Nenhum produto encontrado" : "Digite para buscar produtos"}
+                  </p>
+                ) : (
+                  displayProducts.map((p) => {
+                    const checked = form.product_ids.includes(p.product_id);
+                    return (
+                      <label
+                        key={p.product_id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          padding: "8px 12px",
+                          cursor: "pointer",
+                          background: checked ? "var(--color-primary-light)" : "transparent",
+                          borderBottom: "1px solid var(--color-border)",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleProductId(p.product_id)}
+                          style={{ accentColor: "var(--color-primary)", flexShrink: 0 }}
+                        />
+                        <div style={{ minWidth: 0 }}>
+                          <p
+                            className="truncate"
+                            style={{ fontSize: 12, color: "var(--color-text)", fontWeight: checked ? 600 : 400 }}
+                          >
+                            {p.product_name}
+                          </p>
+                          <p style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+                            ID: {p.product_id}
+                          </p>
+                        </div>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Contas Meta Ads */}
           <div>
@@ -502,32 +586,34 @@ export function FunnelFormModal({ funnel, open, onClose, onSave }: FunnelFormMod
             )}
           </div>
 
-          {/* Anúncios Inativos */}
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              cursor: "pointer",
-              userSelect: "none",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={form.inactive_ads}
-              onChange={(e) => setForm((p) => ({ ...p, inactive_ads: e.target.checked }))}
-              style={{ accentColor: "var(--color-primary)", width: 15, height: 15, flexShrink: 0 }}
-            />
-            <span style={{ fontSize: 13, color: "var(--color-text)" }}>
-              Anúncios Inativos
-            </span>
-            <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-              — sem cálculo de CAC
-            </span>
-          </label>
+          {/* Anúncios Inativos — só Lançamento Pago */}
+          {form.type === "lancamento_pago" && (
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                cursor: "pointer",
+                userSelect: "none",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={form.inactive_ads}
+                onChange={(e) => setForm((p) => ({ ...p, inactive_ads: e.target.checked }))}
+                style={{ accentColor: "var(--color-primary)", width: 15, height: 15, flexShrink: 0 }}
+              />
+              <span style={{ fontSize: 13, color: "var(--color-text)" }}>
+                Anúncios Inativos
+              </span>
+              <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                — sem cálculo de CAC
+              </span>
+            </label>
+          )}
 
-          {/* Filtro de campanhas — só aparece se houver contas selecionadas e anúncios ativos */}
-          {form.ad_account_ids.length > 0 && !form.inactive_ads && (
+          {/* Filtro de campanhas — sempre, mas sem gate de inactive_ads para lancamento */}
+          {form.ad_account_ids.length > 0 && (form.type === "lancamento" || !form.inactive_ads) && (
             <div>
               <label style={labelStyle}>
                 Campanhas Meta Ads{" "}
@@ -538,7 +624,7 @@ export function FunnelFormModal({ funnel, open, onClose, onSave }: FunnelFormMod
                 )}
                 {form.campaign_ids.length === 0 && (
                   <span style={{ color: "var(--color-text-muted)", fontWeight: 400, textTransform: "none" }}>
-                    — usando gasto total das contas
+                    {form.type === "lancamento_pago" ? "— usando gasto total das contas" : "— usando leads totais das contas"}
                   </span>
                 )}
               </label>
