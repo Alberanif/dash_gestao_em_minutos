@@ -77,6 +77,24 @@ export function LtvCard({ title, start, end, metrics, loading }: LtvCardProps) {
             </p>
           </div>
 
+          {/* Total de Assinaturas Ativas */}
+          {metrics.total_assinaturas_ativas !== undefined && (
+            <div
+              style={{
+                background: "var(--color-bg)",
+                borderRadius: "var(--radius-sm)",
+                padding: "10px 12px",
+              }}
+            >
+              <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 4 }}>
+                Total de Assinaturas Ativas
+              </p>
+              <p style={{ fontSize: 18, fontWeight: 700, color: "var(--color-primary)" }}>
+                {metrics.total_assinaturas_ativas}
+              </p>
+            </div>
+          )}
+
           {/* Assinaturas Canceladas */}
           <div>
             <div className="flex items-center justify-between">

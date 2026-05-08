@@ -52,12 +52,14 @@ export async function GET(request: NextRequest) {
   const { prevStart, prevEnd } = getPreviousPeriod(start, end);
 
   try {
-    const [ativas, canceladas, canceladasPrev, novas, novasPrev] = await Promise.all([
+    const [ativas, canceladas, canceladasPrev, novas, novasPrev, totalAtivas] = await Promise.all([
       countSales(supabase, STATUS_APPROVED, start, end),
       countSales(supabase, STATUS_CANCELLED, start, end),
       countSales(supabase, STATUS_CANCELLED, prevStart, prevEnd),
       countSales(supabase, STATUS_APPROVED, start, end),
       countSales(supabase, STATUS_APPROVED, prevStart, prevEnd),
+      // Count total active subscriptions (all time)
+      countSales(supabase, STATUS_APPROVED, "1900-01-01", "2999-12-31"),
     ]);
 
     const metrics: LtvMetrics = {
@@ -66,6 +68,7 @@ export async function GET(request: NextRequest) {
       assinaturas_canceladas_delta: canceladas - canceladasPrev,
       novas_assinaturas: novas,
       novas_assinaturas_delta: novas - novasPrev,
+      total_assinaturas_ativas: totalAtivas,
     };
 
     return NextResponse.json(metrics);

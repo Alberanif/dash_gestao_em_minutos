@@ -15,4 +15,5 @@ export interface LtvMetrics {
   assinaturas_canceladas_delta: number;
   novas_assinaturas: number;
   novas_assinaturas_delta: number;
+  total_assinaturas_ativas?: number;  // Total acumulado de assinaturas ativas
 }

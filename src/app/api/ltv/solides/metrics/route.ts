@@ -55,9 +55,16 @@ export async function GET(request: NextRequest) {
   const { prevStart, prevEnd } = getPreviousPeriod(start, end);
 
   try {
-    const [current, previous] = await Promise.all([
+    const [current, previous, latest] = await Promise.all([
       aggregateForPeriod(supabase, start, end),
       aggregateForPeriod(supabase, prevStart, prevEnd),
+      // Get the latest total (most recent period record)
+      supabase
+        .from("dash_gestao_ltv_solides")
+        .select("assinaturas_ativas")
+        .order("period_end", { ascending: false })
+        .limit(1)
+        .single(),
     ]);
 
     if (!current) {
@@ -70,6 +77,7 @@ export async function GET(request: NextRequest) {
       assinaturas_canceladas_delta: current.assinaturas_canceladas - (previous?.assinaturas_canceladas ?? 0),
       novas_assinaturas: current.novas_assinaturas,
       novas_assinaturas_delta: current.novas_assinaturas - (previous?.novas_assinaturas ?? 0),
+      total_assinaturas_ativas: latest.data?.assinaturas_ativas,
     };
 
     return NextResponse.json(metrics);
