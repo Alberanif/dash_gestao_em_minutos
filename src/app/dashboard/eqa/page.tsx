@@ -185,7 +185,7 @@ export default function EQAPage() {
       if (!res.ok) {
         const error = await res.json();
         console.error("Erro ao buscar métricas:", error);
-        return;
+        throw new Error(error?.error ?? "Falha na requisição");
       }
       const data = await res.json();
       setEventosMetricsMap((prev) => ({
@@ -194,6 +194,7 @@ export default function EQAPage() {
       }));
     } catch (err) {
       console.error("Erro ao buscar métricas do evento:", err);
+      throw err;
     }
   }
 

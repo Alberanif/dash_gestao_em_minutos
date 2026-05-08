@@ -106,8 +106,14 @@ export function EventosCard({
     setFetchError("");
     setCachedDates(startDate, endDate);
     setLocalLoading(true);
-    onDateChange(startDate, endDate);
-    setLocalLoading(false);
+    try {
+      await onDateChange(startDate, endDate);
+    } catch (err) {
+      setFetchError("Erro ao buscar métricas. Tente novamente.");
+      console.error("Erro durante busca de métricas:", err);
+    } finally {
+      setLocalLoading(false);
+    }
   }
 
   return (
