@@ -33,15 +33,15 @@ export async function GET(
   const typedProject = project as EqaEventosProject;
   const { lead_events, campaign_ids } = typedProject;
 
-  // Total leads from captacao_leads
+  // Total leads from meta_ads_campaigns_daily
   let leadsQuery = supabase
-    .from("dash_gestao_captacao_leads")
-    .select("id", { count: "exact", head: true })
-    .gte("data_cadastro", `${start_date}T00:00:00`)
-    .lte("data_cadastro", `${end_date}T23:59:59`);
+    .from("dash_gestao_meta_ads_campaigns_daily")
+    .select("leads_all")
+    .gte("date", start_date)
+    .lte("date", end_date);
 
-  if ((lead_events ?? []).length > 0) {
-    leadsQuery = leadsQuery.in("evento", lead_events);
+  if ((campaign_ids ?? []).length > 0) {
+    leadsQuery = leadsQuery.in("campaign_id", campaign_ids);
   }
 
   // Total spend from meta_ads_campaigns_daily filtered by campaign_ids
@@ -67,7 +67,7 @@ export async function GET(
     return NextResponse.json({ error: spendResult.error.message }, { status: 500 });
   }
 
-  const total_leads = leadsResult.count ?? 0;
+  const total_leads = (leadsResult.data as { leads_all: number }[] | null)?.reduce((sum, r) => sum + (r.leads_all ?? 0), 0) ?? 0;
   const spendRows = (spendResult.data as { spend: number }[] | null) ?? [];
   const total_spend = spendRows.reduce((sum, r) => sum + (r.spend ?? 0), 0);
   const cpl = total_leads > 0 ? total_spend / total_leads : null;
