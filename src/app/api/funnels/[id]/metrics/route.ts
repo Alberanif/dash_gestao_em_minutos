@@ -132,14 +132,14 @@ export async function GET(
       (config.campaign_ids ?? []).length > 0
         ? supabase
             .from("dash_gestao_meta_ads_campaigns_daily")
-            .select("leads_pixel, spend")
+            .select("leads_all, spend")
             .in("campaign_id", config.campaign_ids ?? [])
             .gte("date", start_date)
             .lte("date", end_date)
         : (config.ad_account_ids ?? []).length > 0
         ? supabase
             .from("dash_gestao_meta_ads_campaigns_daily")
-            .select("leads_pixel, spend")
+            .select("leads_all, spend")
             .in("account_id", config.ad_account_ids ?? [])
             .gte("date", start_date)
             .lte("date", end_date)
@@ -151,8 +151,8 @@ export async function GET(
       return NextResponse.json({ error: leadsSpendError.message }, { status: 500 });
     }
 
-    const rows = (leadsSpendData as { leads_pixel: number; spend: number }[] | null) ?? [];
-    const total_leads = rows.reduce((sum, r) => sum + (r.leads_pixel ?? 0), 0);
+    const rows = (leadsSpendData as { leads_all: number; spend: number }[] | null) ?? [];
+    const total_leads = rows.reduce((sum, r) => sum + (r.leads_all ?? 0), 0);
     const total_spend = rows.reduce((sum, r) => sum + (r.spend ?? 0), 0);
     const cpl = total_leads > 0 ? total_spend / total_leads : 0;
     const pace_diario_leads = Math.round(total_leads / totalDays);
