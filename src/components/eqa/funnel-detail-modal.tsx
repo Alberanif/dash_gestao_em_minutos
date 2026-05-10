@@ -187,15 +187,94 @@ export function FunnelDetailModal({
             </div>
 
             {/* Progresso */}
-            <div>
-              <div className="flex justify-between mb-2">
-                <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+            <div style={{ marginBottom: 20 }}>
+              <div className="flex justify-between mb-4">
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)" }}>
                   Progresso do objetivo
                 </span>
                 <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)" }}>
-                  {metrics.total_sales} de {funnel.goal_sales} vendas ({Math.round(progress)}%)
+                  {Math.round(progress)}%
                 </span>
               </div>
+
+              {/* Stacked Progress Bar */}
+              <div
+                style={{
+                  display: "flex",
+                  height: 32,
+                  borderRadius: 6,
+                  overflow: "hidden",
+                  gap: 1,
+                  background: "#f0f0f0",
+                  marginBottom: 12,
+                }}
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${progress}%`,
+                    background: "var(--color-primary)",
+                    borderRadius: "6px 0 0 6px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#fff",
+                    minWidth: progress > 15 ? "auto" : 0,
+                    overflow: "hidden",
+                    paddingLeft: progress > 15 ? 8 : 0,
+                    paddingRight: progress > 15 ? 8 : 0,
+                  }}
+                >
+                  {progress > 15 && `${Math.round(progress)}%`}
+                </div>
+                <div
+                  style={{
+                    height: "100%",
+                    flex: 1,
+                    background: "#e8e8e8",
+                    borderRadius: "0 6px 6px 0",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#666",
+                    minWidth: 100 - progress > 15 ? "auto" : 0,
+                    overflow: "hidden",
+                    paddingLeft: 100 - progress > 15 ? 8 : 0,
+                    paddingRight: 100 - progress > 15 ? 8 : 0,
+                  }}
+                >
+                  {100 - progress > 15 && `${Math.round(100 - progress)}%`}
+                </div>
+              </div>
+
+              {/* Labels below bar */}
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 8 }}>
+                <div style={{ textAlign: "left" }}>
+                  <p style={{ color: "var(--color-text-muted)", fontSize: 11, margin: "0 0 2px 0" }}>
+                    Atingido
+                  </p>
+                  <p style={{ color: "var(--color-text)", fontWeight: 600, margin: 0 }}>
+                    {metrics.total_sales} vendas
+                  </p>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <p style={{ color: "var(--color-text-muted)", fontSize: 11, margin: "0 0 2px 0" }}>
+                    Falta para meta
+                  </p>
+                  <p style={{ color: "var(--color-text)", fontWeight: 600, margin: 0 }}>
+                    {funnel.goal_sales - metrics.total_sales} vendas
+                  </p>
+                </div>
+              </div>
+
+              {/* Meta total */}
+              <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0, textAlign: "center" }}>
+                Meta: {funnel.goal_sales} vendas
+              </p>
             </div>
           </>
         ) : (
@@ -252,58 +331,98 @@ export function FunnelDetailModal({
             </div>
 
             {/* Progresso */}
-            <div>
-              <div className="flex justify-between mb-2">
-                <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+            <div style={{ marginBottom: 20 }}>
+              <div className="flex justify-between mb-4">
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)" }}>
                   Progresso do objetivo
                 </span>
                 <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)" }}>
-                  {metrics.total_leads} de {funnel.goal_sales} leads ({Math.round(progress)}%)
+                  {Math.round(progress)}%
                 </span>
               </div>
+
+              {/* Stacked Progress Bar */}
               <div
                 style={{
-                  height: 10,
-                  borderRadius: 99,
-                  background: "var(--color-bg)",
+                  display: "flex",
+                  height: 32,
+                  borderRadius: 6,
                   overflow: "hidden",
+                  gap: 1,
+                  background: "#f0f0f0",
+                  marginBottom: 12,
                 }}
               >
                 <div
                   style={{
                     height: "100%",
                     width: `${progress}%`,
-                    borderRadius: 99,
                     background: "var(--color-primary)",
-                    transition: "width 0.4s ease",
+                    borderRadius: "6px 0 0 6px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#fff",
+                    minWidth: progress > 15 ? "auto" : 0,
+                    overflow: "hidden",
+                    paddingLeft: progress > 15 ? 8 : 0,
+                    paddingRight: progress > 15 ? 8 : 0,
                   }}
-                />
+                >
+                  {progress > 15 && `${Math.round(progress)}%`}
+                </div>
+                <div
+                  style={{
+                    height: "100%",
+                    flex: 1,
+                    background: "#e8e8e8",
+                    borderRadius: "0 6px 6px 0",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#666",
+                    minWidth: 100 - progress > 15 ? "auto" : 0,
+                    overflow: "hidden",
+                    paddingLeft: 100 - progress > 15 ? 8 : 0,
+                    paddingRight: 100 - progress > 15 ? 8 : 0,
+                  }}
+                >
+                  {100 - progress > 15 && `${Math.round(100 - progress)}%`}
+                </div>
               </div>
+
+              {/* Labels below bar */}
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 8 }}>
+                <div style={{ textAlign: "left" }}>
+                  <p style={{ color: "var(--color-text-muted)", fontSize: 11, margin: "0 0 2px 0" }}>
+                    Atingido
+                  </p>
+                  <p style={{ color: "var(--color-text)", fontWeight: 600, margin: 0 }}>
+                    {metrics.total_leads} leads
+                  </p>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <p style={{ color: "var(--color-text-muted)", fontSize: 11, margin: "0 0 2px 0" }}>
+                    Falta para meta
+                  </p>
+                  <p style={{ color: "var(--color-text)", fontWeight: 600, margin: 0 }}>
+                    {funnel.goal_sales - metrics.total_leads} leads
+                  </p>
+                </div>
+              </div>
+
+              {/* Meta total */}
+              <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0, textAlign: "center" }}>
+                Meta: {funnel.goal_sales} leads
+              </p>
             </div>
           </>
         )}
 
-        {/* Progress bar compartilhada — ambos os tipos */}
-        <div>
-          <div
-            style={{
-              height: 10,
-              borderRadius: 99,
-              background: "var(--color-bg)",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                height: "100%",
-                width: `${progress}%`,
-                borderRadius: 99,
-                background: "var(--color-primary)",
-                transition: "width 0.4s ease",
-              }}
-            />
-          </div>
-        </div>
       </div>
     </div>
   );
