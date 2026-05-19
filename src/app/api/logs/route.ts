@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error: dbError } = await supabase
     .from("dash_gestao_cron_logs")
-    .select("id, job_name, status, records_collected, error_message, started_at, finished_at, account_id, dash_gestao_accounts(name)")
+    .select("id, job_name, status, records_collected, error_message, warning_message, started_at, finished_at, account_id, dash_gestao_accounts(name)")
     .eq("job_name", platform)
     .order("started_at", { ascending: false })
     .limit(100);
@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
       duration_s: durationS,
       records_collected: row.records_collected,
       error_message: row.error_message,
+      warning_message: row.warning_message,
     };
   });
 

@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
         job_name: account.platform,
         status: "success",
         records_collected: records,
+        warning_message: analyticsError ?? null,
         started_at: startedAt,
         finished_at: new Date().toISOString(),
       });
