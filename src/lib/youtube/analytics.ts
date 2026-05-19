@@ -96,7 +96,7 @@ export async function queryChannelDaily(
         endDate: chunk.end,
         metrics:
           "views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage," +
-          "likes,comments,shares,impressions",
+          "likes,comments,shares",
         dimensions: "day",
         filters: "creatorContentType==VIDEO_ON_DEMAND",
       });
@@ -108,7 +108,7 @@ export async function queryChannelDaily(
         endDate: chunk.end,
         metrics:
           "views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage," +
-          "likes,comments,shares,impressions",
+          "likes,comments,shares",
         dimensions: "day",
       });
     }
@@ -144,9 +144,28 @@ export async function queryChannelDaily(
       dimensions: "day",
     });
 
+    await sleep(100);
+
+    // Chamada 4: impressions — best-effort, canal pode não expor essa métrica.
+    // Retorna 400 com "Unknown identifier (impressions)" nesses casos.
+    let impressionsData: Record<string, unknown> = {};
+    try {
+      impressionsData = await analyticsGet(accessToken, {
+        ids: `channel==${channelId}`,
+        startDate: chunk.start,
+        endDate: chunk.end,
+        metrics: "impressions",
+        dimensions: "day",
+        filters: "creatorContentType==VIDEO_ON_DEMAND",
+      });
+    } catch {
+      // Canal não suporta impressions — todos os dias ficam com impressions: 0
+    }
+
     const viewVideoRows = columnarToObjects(viewVideoData);
     const viewShortsRows = columnarToObjects(viewShortsData);
     const subsRows = columnarToObjects(subsData);
+    const impressionsRows = columnarToObjects(impressionsData);
 
     // Indexa cada dataset por data para merge O(1)
     const videoByDate = new Map<string, Record<string, unknown>>(
@@ -157,6 +176,9 @@ export async function queryChannelDaily(
     );
     const subsByDate = new Map<string, Record<string, unknown>>(
       subsRows.map((r) => [r.day as string, r])
+    );
+    const impressionsByDate = new Map<string, Record<string, unknown>>(
+      impressionsRows.map((r) => [r.day as string, r])
     );
 
     // Âncora: união de datas das 3 chamadas.
@@ -191,7 +213,7 @@ export async function queryChannelDaily(
         likes: Number(video?.likes ?? 0),
         comments: Number(video?.comments ?? 0),
         shares: Number(video?.shares ?? 0),
-        impressions: Number(video?.impressions ?? 0),
+        impressions: Number(impressionsByDate.get(date)?.impressions ?? 0),
       });
     }
 
