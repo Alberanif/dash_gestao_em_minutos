@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
       job_name: "youtube",
       status: "success",
       records_collected: result.channelRecords + result.videoRecords,
+      warning_message: result.analyticsError ?? null,
       started_at: startedAt,
       finished_at: new Date().toISOString(),
     });
