@@ -37,10 +37,12 @@ export async function POST(request: NextRequest) {
 
     try {
       let records = 0;
+      let warningMessage: string | undefined;
 
       if (account.platform === "youtube") {
         const result = await collectYouTube(account);
         records = result.channelRecords + result.videoRecords;
+        warningMessage = result.analyticsError;
       } else if (account.platform === "instagram") {
         const result = await collectInstagramDaily(account);
         records = result.profileRecords + result.mediaRecords;
@@ -57,6 +59,7 @@ export async function POST(request: NextRequest) {
         job_name: account.platform,
         status: "success",
         records_collected: records,
+        warning_message: warningMessage ?? null,
         started_at: startedAt,
         finished_at: new Date().toISOString(),
       });
