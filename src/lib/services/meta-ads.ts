@@ -1,5 +1,6 @@
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import type { Account, MetaAdsCredentials } from "@/types/accounts";
+import { extractPurchases, extractCheckout } from "@/lib/utils/meta-ads-events";
 
 const META_API_BASE = "https://graph.facebook.com/v21.0";
 const META_API_CAMPAIGNS_LIMIT = "100";
@@ -242,6 +243,8 @@ export async function collectMetaAds(
         .filter((a) => a.action_type === "landing_page_view")
         .reduce((s, a) => s + (parseFloat(a.value) || 0), 0)
     );
+    const purchases = extractPurchases(row.actions);
+    const checkout = extractCheckout(row.actions);
 
     return {
       account_id: account.id,
@@ -262,6 +265,8 @@ export async function collectMetaAds(
       leads_pixel,
       leads_all,
       page_views,
+      purchases,
+      checkout,
     };
   });
 
@@ -358,6 +363,8 @@ export async function collectMetaAdsCampaignsList(
     leads_pixel: 0,
     leads_all: 0,
     page_views: 0,
+    purchases: 0,
+    checkout: 0,
   }));
 
   if (dailyRows.length > 0) {

@@ -1,3 +1,8 @@
+// NOTE (issue #9 — paid launch model): After running migration
+// src/lib/migrations/add-purchases-checkout-to-meta-ads.sql,
+// historical re-collection is needed for the period 2026-02-21 to 2026-05-27.
+// To do so, POST this endpoint with { account_id, start_date: "2026-02-21", end_date: "2026-05-27" }
+// for each Meta Ads account. DO NOT trigger this automatically.
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiAuth } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";

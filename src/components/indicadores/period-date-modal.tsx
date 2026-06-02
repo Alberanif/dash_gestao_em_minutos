@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { calcPresetDates, getActivePreset, type PresetKey } from "@/lib/utils/period-presets";
 
 interface PeriodDateModalProps {
   initialStart?: string;
@@ -18,6 +19,14 @@ export function PeriodDateModal({
   const [start, setStart] = useState(initialStart);
   const [end, setEnd] = useState(initialEnd);
   const [error, setError] = useState("");
+
+  function todayStr(): string {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  }
+
+  const today = todayStr();
+  const activePreset: PresetKey | null = getActivePreset(start, end, today);
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -76,6 +85,50 @@ export function PeriodDateModal({
         >
           Selecionar período
         </p>
+
+        {/* Preset shortcuts */}
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+          {(
+            [
+              { key: "7d", label: "7d" },
+              { key: "28d", label: "28d" },
+              { key: "90d", label: "90d" },
+              { key: "mes-atual", label: "Mês atual" },
+              { key: "mes-anterior", label: "Mês anterior" },
+            ] as { key: PresetKey; label: string }[]
+          ).map(({ key, label }) => {
+            const isActive = activePreset === key;
+            return (
+              <button
+                key={key}
+                onClick={() => {
+                  const { startDate: s, endDate: e } = calcPresetDates(key, today);
+                  setStart(s);
+                  setEnd(e);
+                  setError("");
+                }}
+                style={{
+                  padding: "4px 10px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  borderRadius: 20,
+                  border: isActive
+                    ? "1.5px solid var(--color-primary)"
+                    : "1.5px solid var(--color-border)",
+                  background: isActive
+                    ? "var(--color-primary)"
+                    : "var(--color-bg)",
+                  color: isActive ? "#fff" : "var(--color-text-muted)",
+                  cursor: "pointer",
+                  transition: "background 0.15s, color 0.15s, border-color 0.15s",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>

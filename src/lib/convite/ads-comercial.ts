@@ -135,8 +135,9 @@ export async function calculateAdsComercialMetrics(
       .eq("account_id", config.hotmart_account_id)
       .in("product_id", config.hotmart_product_ids)
       .in("status", HOTMART_STATUS_APPROVED)
-      .gte("purchase_date", startUTC)
-      .lte("purchase_date", endUTC),
+      .gte("approved_date", startUTC)
+      .lte("approved_date", endUTC)
+      .limit(10000),
     supabase
       .from("dash_gestao_meta_ads_campaigns_daily")
       .select("campaign_name, leads_all")
