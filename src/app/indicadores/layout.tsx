@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { IndicadoresSidebar } from "@/components/indicadores/indicadores-sidebar";
 import type { UserRole } from "@/types/auth";
 
 export const metadata: Metadata = {
@@ -23,12 +22,5 @@ export default async function IndicadoresLayout({
   const role = (user.app_metadata?.role as UserRole) ?? "gestor";
   if (role === "comum") redirect("/base-de-dados");
 
-  return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "var(--color-bg)" }}>
-      <IndicadoresSidebar userEmail={user.email ?? ""} />
-      <main style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>
-        {children}
-      </main>
-    </div>
-  );
+  return <main style={{ minHeight: "100vh", background: "var(--color-bg)" }}>{children}</main>;
 }
