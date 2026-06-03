@@ -11,6 +11,8 @@ import {
   LineChart,
   BarChart,
   CartesianGrid,
+  AreaChart,
+  Area,
 } from "recharts";
 import type { DailyPoint } from "@/types/indicadores";
 
@@ -38,7 +40,7 @@ export function ChartSkeleton() {
       style={{
         height: 180,
         borderRadius: 8,
-        background: "var(--color-bg)",
+        background: "var(--surface-2)",
         animation: "pulse 1.5s ease-in-out infinite",
         marginTop: 16,
       }}
@@ -54,14 +56,14 @@ function EmptyChart() {
       style={{
         height: 180,
         borderRadius: 8,
-        border: "1px dashed var(--color-border)",
+        border: "1px dashed var(--border-vis)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         marginTop: 16,
       }}
     >
-      <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+      <p style={{ fontSize: 13, color: "var(--text-3)" }}>
         Sem dados no período
       </p>
     </div>
@@ -76,7 +78,7 @@ function ChartLabel({ children }: { children: React.ReactNode }) {
       style={{
         fontSize: 11,
         fontWeight: 600,
-        color: "var(--color-text-muted)",
+        color: "var(--text-3)",
         textTransform: "uppercase",
         letterSpacing: "0.06em",
         marginTop: 20,
@@ -113,19 +115,19 @@ export function MetaAdsInvestimentoLeadsChart({
   return (
     <>
       <ChartLabel>Investimento × Leads por dia</ChartLabel>
-      <ResponsiveContainer width="100%" height={180}>
+      <ResponsiveContainer width="100%" height={260}>
         <ComposedChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-vis)" vertical={false} />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 10, fill: "var(--color-text-muted)" }}
+            tick={{ fontSize: 10, fill: "var(--text-3)" }}
             axisLine={false}
             tickLine={false}
             interval="preserveStartEnd"
           />
           <YAxis
             yAxisId="left"
-            tick={{ fontSize: 10, fill: "var(--color-text-muted)" }}
+            tick={{ fontSize: 10, fill: "var(--text-3)" }}
             axisLine={false}
             tickLine={false}
             tickFormatter={(v) => fmtBRL(v)}
@@ -134,7 +136,7 @@ export function MetaAdsInvestimentoLeadsChart({
           <YAxis
             yAxisId="right"
             orientation="right"
-            tick={{ fontSize: 10, fill: "var(--color-text-muted)" }}
+            tick={{ fontSize: 10, fill: "var(--text-3)" }}
             axisLine={false}
             tickLine={false}
             allowDecimals={false}
@@ -142,8 +144,8 @@ export function MetaAdsInvestimentoLeadsChart({
           />
           <Tooltip
             contentStyle={{
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
+              background: "var(--surface)",
+              border: "1px solid var(--border-vis)",
               borderRadius: 6,
               fontSize: 12,
             }}
@@ -185,16 +187,16 @@ export function MetaAdsCplChart({
       <ChartLabel>CPL diário</ChartLabel>
       <ResponsiveContainer width="100%" height={140}>
         <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-vis)" vertical={false} />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 10, fill: "var(--color-text-muted)" }}
+            tick={{ fontSize: 10, fill: "var(--text-3)" }}
             axisLine={false}
             tickLine={false}
             interval="preserveStartEnd"
           />
           <YAxis
-            tick={{ fontSize: 10, fill: "var(--color-text-muted)" }}
+            tick={{ fontSize: 10, fill: "var(--text-3)" }}
             axisLine={false}
             tickLine={false}
             tickFormatter={(v) => fmtBRL(v)}
@@ -202,8 +204,8 @@ export function MetaAdsCplChart({
           />
           <Tooltip
             contentStyle={{
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
+              background: "var(--surface)",
+              border: "1px solid var(--border-vis)",
               borderRadius: 6,
               fontSize: 12,
             }}
@@ -241,16 +243,16 @@ export function HotmartVendasChart({
       <ChartLabel>Vendas diárias</ChartLabel>
       <ResponsiveContainer width="100%" height={160}>
         <BarChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-vis)" vertical={false} />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 10, fill: "var(--color-text-muted)" }}
+            tick={{ fontSize: 10, fill: "var(--text-3)" }}
             axisLine={false}
             tickLine={false}
             interval="preserveStartEnd"
           />
           <YAxis
-            tick={{ fontSize: 10, fill: "var(--color-text-muted)" }}
+            tick={{ fontSize: 10, fill: "var(--text-3)" }}
             axisLine={false}
             tickLine={false}
             allowDecimals={false}
@@ -258,8 +260,8 @@ export function HotmartVendasChart({
           />
           <Tooltip
             contentStyle={{
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
+              background: "var(--surface)",
+              border: "1px solid var(--border-vis)",
               borderRadius: 6,
               fontSize: 12,
             }}
@@ -267,6 +269,76 @@ export function HotmartVendasChart({
           />
           <Bar dataKey="sales" name="Vendas" fill="#f97316" opacity={0.85} radius={[3, 3, 0, 0]} maxBarSize={32} />
         </BarChart>
+      </ResponsiveContainer>
+    </>
+  );
+}
+
+// ── 4. Captações de leads diárias ────────────────────────────────────────────
+
+export function LeadsCaptacoesChart({
+  data,
+  loading,
+}: {
+  data: DailyPoint[];
+  loading: boolean;
+}) {
+  if (loading) return <><ChartLabel>Captações diárias</ChartLabel><ChartSkeleton /></>;
+
+  const chartData = data
+    .filter((d) => d.lead_captacoes > 0)
+    .map((d) => ({
+      date: fmtDate(d.date),
+      captacoes: d.lead_captacoes,
+    }));
+
+  if (chartData.length === 0) return <><ChartLabel>Captações diárias</ChartLabel><EmptyChart /></>;
+
+  return (
+    <>
+      <ChartLabel>Captações diárias</ChartLabel>
+      <ResponsiveContainer width="100%" height={160}>
+        <AreaChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="leadGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#0891b2" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#0891b2" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-vis)" vertical={false} />
+          <XAxis
+            dataKey="date"
+            tick={{ fontSize: 10, fill: "var(--text-3)" }}
+            axisLine={false}
+            tickLine={false}
+            interval="preserveStartEnd"
+          />
+          <YAxis
+            tick={{ fontSize: 10, fill: "var(--text-3)" }}
+            axisLine={false}
+            tickLine={false}
+            allowDecimals={false}
+            width={32}
+          />
+          <Tooltip
+            contentStyle={{
+              background: "var(--surface)",
+              border: "1px solid var(--border-vis)",
+              borderRadius: 6,
+              fontSize: 12,
+            }}
+            formatter={(value) => [value, "Captações"]}
+          />
+          <Area
+            dataKey="captacoes"
+            name="Captações"
+            stroke="#0891b2"
+            strokeWidth={2}
+            fill="url(#leadGradient)"
+            dot={false}
+            activeDot={{ r: 4 }}
+          />
+        </AreaChart>
       </ResponsiveContainer>
     </>
   );

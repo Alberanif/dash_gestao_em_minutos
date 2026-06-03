@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
 
     await supabase.from("dash_gestao_cron_logs").insert({
       account_id,
-      job_name: "hotmart_batch",
+      job_name: "hotmart",
       status: "success",
       records_collected: result.salesRecords,
       started_at: startedAt,
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     await supabase.from("dash_gestao_cron_logs").insert({
       account_id,
-      job_name: "hotmart_batch",
+      job_name: "hotmart",
       status: "error",
       error_message: message,
       started_at: startedAt,

@@ -51,34 +51,11 @@ interface HotmartSalesResponse {
 
 export async function collectHotmart(
   account: Account,
-  options?: { startDate?: Date; endDate?: Date }
+  { startDate, endDate }: { startDate: Date; endDate: Date }
 ): Promise<{ salesRecords: number }> {
   const { client_id, client_secret } = account.credentials as HotmartCredentials;
   const supabase = createSupabaseServiceClient();
   const now = new Date();
-
-  let startDate: Date;
-  let endDate: Date = options?.endDate ?? now;
-
-  if (options?.startDate) {
-    startDate = options.startDate;
-  } else {
-    const today = now.toISOString().split("T")[0];
-    const { data: activeFunnels } = await supabase
-      .from("dash_gestao_funnels")
-      .select("start_date")
-      .gte("end_date", today);
-
-    const earliest = (activeFunnels ?? []).reduce<Date | null>((min, f) => {
-      const d = new Date(f.start_date);
-      return min === null || d < min ? d : min;
-    }, null);
-
-    startDate =
-      earliest !== null && earliest < now
-        ? earliest
-        : new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-  }
 
   const startMs = startDate.getTime();
   const endMs = endDate.getTime();

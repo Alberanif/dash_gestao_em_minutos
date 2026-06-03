@@ -22,5 +22,5 @@ export default async function IndicadoresLayout({
   const role = (user.app_metadata?.role as UserRole) ?? "gestor";
   if (role === "comum") redirect("/base-de-dados");
 
-  return <main style={{ minHeight: "100vh", background: "var(--color-bg)" }}>{children}</main>;
+  return <main style={{ minHeight: "100vh", background: "#07101f" }}>{children}</main>;
 }

@@ -23,6 +23,8 @@ export interface HotmartProductMetrics {
 export interface GlobalHotmartMetrics {
   products: HotmartProductMetrics[];
   total_sales: number;
+  total_sales_brl: number;
+  total_sales_foreign: number;
   total_revenue: number;
 }
 

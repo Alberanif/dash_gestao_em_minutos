@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateCronSecret } from "@/lib/utils/cron-auth";
 import { collectYouTube } from "@/lib/services/youtube";
 import { collectInstagramDaily } from "@/lib/services/instagram";
-import { collectHotmart } from "@/lib/services/hotmart";
 import { collectMetaAds } from "@/lib/services/meta-ads";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import type { Account } from "@/types/accounts";
@@ -46,9 +45,6 @@ export async function POST(request: NextRequest) {
       } else if (account.platform === "instagram") {
         const result = await collectInstagramDaily(account);
         records = result.profileRecords + result.mediaRecords;
-      } else if (account.platform === "hotmart") {
-        const result = await collectHotmart(account);
-        records = result.salesRecords;
       } else if (account.platform === "meta-ads") {
         const result = await collectMetaAds(account);
         records = result.dailyRecords + result.campaignDailyRecords;

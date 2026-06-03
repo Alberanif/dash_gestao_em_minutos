@@ -43,8 +43,8 @@ export async function GET(
             .select("id", { count: "exact", head: true })
             .in("product_id", config.product_ids ?? [])
             .in("status", STATUS_APPROVED)
-            .gte("approved_date", start_date)
-            .lte("approved_date", end_date + "T23:59:59")
+            .gte("purchase_date", start_date)
+            .lte("purchase_date", end_date + "T23:59:59")
         : Promise.resolve({ count: 0, error: null });
 
     const salesBrlPromise =
@@ -54,8 +54,8 @@ export async function GET(
             .select("id", { count: "exact", head: true })
             .in("product_id", config.product_ids ?? [])
             .in("status", STATUS_APPROVED)
-            .gte("approved_date", start_date)
-            .lte("approved_date", end_date + "T23:59:59")
+            .gte("purchase_date", start_date)
+            .lte("purchase_date", end_date + "T23:59:59")
             .eq("currency", "BRL")
         : Promise.resolve({ count: 0, error: null });
 

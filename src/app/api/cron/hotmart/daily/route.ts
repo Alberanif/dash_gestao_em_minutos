@@ -1,31 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { validateCronApiKey } from "@/lib/utils/api-auth";
+import { validateCronSecret } from "@/lib/utils/cron-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import { collectYouTube } from "@/lib/services/youtube";
-import { collectInstagramDaily } from "@/lib/services/instagram";
-import { collectMetaAds } from "@/lib/services/meta-ads";
+import { collectHotmart } from "@/lib/services/hotmart";
 import type { Account } from "@/types/accounts";
 
+// Coleta os últimos 3 dias para capturar novas vendas e confirmações de PIX/boleto.
 export async function POST(request: NextRequest) {
-  const authError = await validateCronApiKey(request);
-  if (authError.error) return authError.error;
-
-  const body = await request.json().catch(() => null);
-  const platform = body?.platform;
-
-  if (!platform || !["youtube", "instagram", "hotmart", "meta-ads"].includes(platform)) {
-    return NextResponse.json(
-      { error: "platform must be youtube, instagram, hotmart or meta-ads" },
-      { status: 400 }
-    );
-  }
+  const authError = validateCronSecret(request);
+  if (authError) return authError;
 
   const supabase = createSupabaseServiceClient();
 
   const { data: accounts, error: accountsError } = await supabase
     .from("dash_gestao_accounts")
     .select("*")
-    .eq("platform", platform)
+    .eq("platform", "hotmart")
     .eq("is_active", true);
 
   if (accountsError) {
@@ -34,10 +23,13 @@ export async function POST(request: NextRequest) {
 
   if (!accounts || accounts.length === 0) {
     return NextResponse.json(
-      { error: "Nenhuma conta ativa encontrada para esta plataforma" },
+      { error: "Nenhuma conta Hotmart ativa encontrada" },
       { status: 404 }
     );
   }
+
+  const endDate = new Date();
+  const startDate = new Date(endDate.getTime() - 3 * 24 * 60 * 60 * 1000);
 
   const results: Array<{
     account_id: string;
@@ -45,34 +37,19 @@ export async function POST(request: NextRequest) {
     status: "success" | "error";
     records?: number;
     error?: string;
-    analytics_error?: string;
   }> = [];
 
   for (const account of accounts as Account[]) {
     const startedAt = new Date().toISOString();
 
     try {
-      let records = 0;
-      let analyticsError: string | undefined;
-
-      if (account.platform === "youtube") {
-        const result = await collectYouTube(account);
-        records = result.channelRecords + result.videoRecords;
-        analyticsError = result.analyticsError;
-      } else if (account.platform === "instagram") {
-        const result = await collectInstagramDaily(account);
-        records = result.profileRecords + result.mediaRecords;
-      } else if (account.platform === "meta-ads") {
-        const result = await collectMetaAds(account);
-        records = result.dailyRecords + result.campaignDailyRecords;
-      }
+      const result = await collectHotmart(account, { startDate, endDate });
 
       await supabase.from("dash_gestao_cron_logs").insert({
         account_id: account.id,
-        job_name: account.platform,
+        job_name: "hotmart",
         status: "success",
-        records_collected: records,
-        warning_message: analyticsError ?? null,
+        records_collected: result.salesRecords,
         started_at: startedAt,
         finished_at: new Date().toISOString(),
       });
@@ -81,15 +58,14 @@ export async function POST(request: NextRequest) {
         account_id: account.id,
         account_name: account.name,
         status: "success",
-        records,
-        ...(analyticsError && { analytics_error: analyticsError }),
+        records: result.salesRecords,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
 
       await supabase.from("dash_gestao_cron_logs").insert({
         account_id: account.id,
-        job_name: account.platform,
+        job_name: "hotmart",
         status: "error",
         error_message: message,
         started_at: startedAt,
