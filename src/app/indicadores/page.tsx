@@ -1,9 +1,17 @@
 "use client";
 
+import "./indicadores.css";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { calcPresetDates, getActivePreset, type PresetKey } from "@/lib/utils/period-presets";
+import { calcROAS, calcCPA, calcConversionRate } from "@/lib/utils/cross-metrics";
+import { calcFunnelStages, calcConversionRates } from "@/lib/utils/funnel-metrics";
 import type { GlobalMetrics, GlobalHotmartMetrics, GlobalLeadsMetrics, DailyPoint } from "@/types/indicadores";
+import { HeroKpiCard } from "@/components/indicadores/hero-kpi-card";
+import { HorizontalFunnelFlow } from "@/components/indicadores/horizontal-funnel-flow";
+import { MetaAdsCard } from "@/components/indicadores/meta-ads-card";
+import { HotmartCard } from "@/components/indicadores/hotmart-card";
+import { LeadsSection } from "@/components/indicadores/leads-section";
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -17,46 +25,35 @@ const PRESETS: { key: PresetKey; label: string }[] = [
   { key: "mes-anterior", label: "Mês anterior" },
 ];
 
-// ── Section skeleton ──────────────────────────────────────────────────────────
+// ── Formatters ────────────────────────────────────────────────────────────────
 
-function SectionSkeleton({ title, accent }: { title: string; accent: string }) {
-  return (
-    <section
-      style={{
-        background: "var(--color-surface)",
-        border: "1px solid var(--color-border)",
-        borderRadius: "var(--radius-card)",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          padding: "16px 20px",
-          borderBottom: "1px solid var(--color-border)",
-          borderLeft: `3px solid ${accent}`,
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-        }}
-      >
-        <span style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text)" }}>{title}</span>
-      </div>
-      <div style={{ padding: "24px 20px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
-        {[1, 2, 3, 4].map((i) => (
-          <div
-            key={i}
-            style={{
-              height: 72,
-              borderRadius: "var(--radius-card)",
-              background: "var(--color-bg)",
-              border: "1px solid var(--color-border)",
-              animation: "pulse 1.5s ease-in-out infinite",
-            }}
-          />
-        ))}
-      </div>
-    </section>
-  );
+function fmtBRL(n: number): string {
+  return Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 0,
+  }).format(n);
+}
+
+function fmtNum(n: number): string {
+  return Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(n);
+}
+
+function fmtDecimal(n: number | null, digits = 2): string {
+  if (n === null || n === undefined) return "—";
+  return n.toFixed(digits);
+}
+
+// ── Section state ─────────────────────────────────────────────────────────────
+
+interface SectionState<T> {
+  data: T | null;
+  loading: boolean;
+  error: boolean;
+}
+
+function initialSection<T>(): SectionState<T> {
+  return { data: null, loading: true, error: false };
 }
 
 // ── Period controls ───────────────────────────────────────────────────────────
@@ -73,59 +70,93 @@ interface PeriodControlsProps {
 function PeriodControls({ startDate, endDate, activePreset, onPreset, onStartDate, onEndDate }: PeriodControlsProps) {
   return (
     <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-      <div style={{ display: "flex", gap: 4 }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 2,
+          background: "var(--surface)",
+          border: "1px solid var(--border-vis)",
+          borderRadius: 8,
+          padding: 3,
+        }}
+      >
         {PRESETS.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => onPreset(key)}
             style={{
-              padding: "5px 12px",
-              fontSize: 12,
+              padding: "4px 11px",
+              fontSize: 11,
               fontWeight: 600,
+              fontFamily: "inherit",
               borderRadius: 6,
-              border: "1px solid",
+              border: "none",
               cursor: "pointer",
-              background: activePreset === key ? "var(--color-primary)" : "var(--color-surface)",
-              color: activePreset === key ? "#fff" : "var(--color-text-muted)",
-              borderColor: activePreset === key ? "var(--color-primary)" : "var(--color-border)",
+              background: activePreset === key ? "var(--blue)" : "transparent",
+              color: activePreset === key ? "#fff" : "var(--text-3)",
+              transition: "background 150ms ease, color 150ms ease",
             }}
           >
             {label}
           </button>
         ))}
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <input
           type="date"
           value={startDate}
           onChange={(e) => onStartDate(e.target.value)}
-          className="field-control"
-          style={{ fontSize: 12, padding: "4px 8px", width: 130 }}
+          style={{
+            fontSize: 12,
+            padding: "5px 8px",
+            width: 130,
+            background: "var(--surface)",
+            border: "1px solid var(--border-vis)",
+            borderRadius: 6,
+            color: "var(--text)",
+            outline: "none",
+          }}
         />
-        <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>até</span>
+        <span style={{ fontSize: 12, color: "var(--text-3)" }}>até</span>
         <input
           type="date"
           value={endDate}
           onChange={(e) => onEndDate(e.target.value)}
-          className="field-control"
-          style={{ fontSize: 12, padding: "4px 8px", width: 130 }}
+          style={{
+            fontSize: 12,
+            padding: "5px 8px",
+            width: 130,
+            background: "var(--surface)",
+            border: "1px solid var(--border-vis)",
+            borderRadius: 6,
+            color: "var(--text)",
+            outline: "none",
+          }}
         />
       </div>
     </div>
   );
 }
 
+// ── Section narrative ─────────────────────────────────────────────────────────
+
+function SectionNarrative({ step, label, desc }: { step: string; label: string; desc: string }) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 2 }}>
+        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "var(--text-3)", letterSpacing: "0.05em" }}>
+          {step}
+        </span>
+        <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-2)" }}>
+          {label}
+        </span>
+      </div>
+      <span style={{ fontSize: 11, color: "var(--text-3)" }}>{desc}</span>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
-
-interface SectionState<T> {
-  data: T | null;
-  loading: boolean;
-  error: boolean;
-}
-
-function initialSection<T>(): SectionState<T> {
-  return { data: null, loading: true, error: false };
-}
 
 export default function IndicadoresPage() {
   const today = todayStr();
@@ -198,9 +229,32 @@ export default function IndicadoresPage() {
     setActivePreset(getActivePreset(startDate, v, today));
   }
 
+  // ── Derived data for Z-1 and Z-2 ──────────────────────────────────────────
+
+  const metaData = metaState.data;
+  const hotmartData = hotmartState.data;
+
+  const roas = calcROAS({
+    metaSpend: metaData?.meta_spend ?? null,
+    hotmartTotalRevenue: hotmartData?.total_revenue ?? null,
+  });
+  const cpa = calcCPA({
+    metaSpend: metaData?.meta_spend ?? null,
+    hotmartTotalSales: hotmartData?.total_sales ?? null,
+  });
+  const convRate = calcConversionRate({
+    metaLeads: metaData?.meta_leads ?? null,
+    hotmartTotalSales: hotmartData?.total_sales ?? null,
+  });
+
+  const funnelStages = calcFunnelStages(metaData, hotmartData);
+  const funnelRates = funnelStages ? calcConversionRates(funnelStages) : null;
+
+  const heroLoading = metaState.loading || hotmartState.loading;
+
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px 48px" }}>
-      {/* Header */}
+    <div className="ind-dark" style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px 48px" }}>
+      {/* Dark header */}
       <header
         style={{
           display: "flex",
@@ -209,16 +263,16 @@ export default function IndicadoresPage() {
           flexWrap: "wrap",
           gap: 12,
           padding: "20px 0",
-          borderBottom: "1px solid var(--color-border)",
-          marginBottom: 28,
+          borderBottom: "1px solid var(--border-vis)",
+          marginBottom: 32,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <Link
             href="/"
             style={{
               fontSize: 13,
-              color: "var(--color-text-muted)",
+              color: "var(--text-3)",
               textDecoration: "none",
               display: "flex",
               alignItems: "center",
@@ -230,7 +284,8 @@ export default function IndicadoresPage() {
             </svg>
             Módulos
           </Link>
-          <h1 style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text)", margin: 0 }}>
+          <div style={{ width: 1, height: 16, background: "var(--border-vis)" }} />
+          <h1 style={{ fontSize: 17, fontWeight: 600, letterSpacing: "-0.015em", color: "var(--text)", margin: 0 }}>
             Indicadores
           </h1>
         </div>
@@ -245,91 +300,72 @@ export default function IndicadoresPage() {
         />
       </header>
 
-      {/* Dashboard sections */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-        {/* 1. Desempenho Geral */}
-        {(metaState.loading || hotmartState.loading) ? (
-          <SectionSkeleton title="Desempenho Geral" accent="#7c3aed" />
-        ) : (
-          <section
-            style={{
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              borderRadius: "var(--radius-card)",
-              overflow: "hidden",
-            }}
-          >
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--color-border)", borderLeft: "3px solid #7c3aed" }}>
-              <span style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text)" }}>Desempenho Geral</span>
+      {/* Z-layout */}
+      <div className="z-layout">
+
+        {/* Z-1: Hero KPIs — 3 columns */}
+        <div>
+          <SectionNarrative step="01" label="Resultado" desc="Desempenho consolidado do período selecionado" />
+          <div className="z-row-3col">
+            <HeroKpiCard
+              label="ROAS"
+              value={roas !== null ? `${fmtDecimal(roas, 2)}×` : "—"}
+              subtitle="Receita ÷ Investimento"
+              accent="var(--violet)"
+              loading={heroLoading}
+            />
+            <HeroKpiCard
+              label="Receita BRL"
+              value={hotmartData ? fmtBRL(hotmartData.total_revenue) : "—"}
+              subtitle="via Hotmart"
+              accent="var(--emerald)"
+              loading={heroLoading}
+            />
+            <HeroKpiCard
+              label="Total de Vendas"
+              value={hotmartData ? fmtNum(hotmartData.total_sales) : "—"}
+              subtitle="total de conversões"
+              accent="var(--orange)"
+              loading={heroLoading}
+            />
+          </div>
+        </div>
+
+        {/* Z-2: Horizontal funnel — full width */}
+        {funnelStages && funnelRates && (
+          <div>
+            <SectionNarrative step="02" label="Jornada de Conversão" desc="Do investimento até a venda" />
+            <div className="z-row">
+              <HorizontalFunnelFlow
+                stages={funnelStages}
+                rates={funnelRates}
+                metaSpend={metaData?.meta_spend ?? null}
+                metaCpl={metaData?.meta_cpl_traffic ?? null}
+                metaCpm={metaData?.meta_cpm ?? null}
+                metaConvRate={convRate}
+                cpa={cpa}
+              />
             </div>
-            <div style={{ padding: "24px 20px", color: "var(--color-text-muted)", fontSize: 13 }}>
-              {metaState.error && hotmartState.error ? "Erro ao carregar dados." : "KPIs e funil de conversão disponíveis em breve."}
-            </div>
-          </section>
+          </div>
         )}
 
-        {/* 2. Meta Ads */}
-        {metaState.loading ? (
-          <SectionSkeleton title="Meta Ads" accent="#2563eb" />
-        ) : (
-          <section
-            style={{
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              borderRadius: "var(--radius-card)",
-              overflow: "hidden",
-            }}
-          >
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--color-border)", borderLeft: "3px solid #2563eb" }}>
-              <span style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text)" }}>Meta Ads</span>
-            </div>
-            <div style={{ padding: "24px 20px", color: "var(--color-text-muted)", fontSize: 13 }}>
-              {metaState.error ? "Erro ao carregar dados de Meta Ads." : "Métricas e gráfico de investimento disponíveis em breve."}
-            </div>
-          </section>
-        )}
+        {/* Z-3: Meta Ads + Hotmart — 2 columns */}
+        <div>
+          <SectionNarrative step="03" label="Plataformas" desc="Detalhe por fonte de dados" />
+          <div className="z-row-2col">
+            <MetaAdsCard metaState={metaState} dailyState={dailyState} />
+            <HotmartCard hotmartState={hotmartState} dailyState={dailyState} />
+          </div>
+        </div>
 
-        {/* 3. Hotmart */}
-        {hotmartState.loading ? (
-          <SectionSkeleton title="Hotmart" accent="#ea580c" />
-        ) : (
-          <section
-            style={{
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              borderRadius: "var(--radius-card)",
-              overflow: "hidden",
-            }}
-          >
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--color-border)", borderLeft: "3px solid #ea580c" }}>
-              <span style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text)" }}>Hotmart</span>
-            </div>
-            <div style={{ padding: "24px 20px", color: "var(--color-text-muted)", fontSize: 13 }}>
-              {hotmartState.error ? "Erro ao carregar dados Hotmart." : "Vendas e gráfico diário disponíveis em breve."}
-            </div>
-          </section>
-        )}
+        {/* Z-4: Captação de Leads — full width */}
+        <div>
+          <SectionNarrative step="04" label="Captação de Leads" desc="Novos leads que entraram no funil" />
+          <div className="z-row">
+            <LeadsSection leadsState={leadsState} dailyState={dailyState} />
+          </div>
+        </div>
 
-        {/* 4. Coleta de Leads */}
-        {leadsState.loading ? (
-          <SectionSkeleton title="Coleta de Leads" accent="#0891b2" />
-        ) : (
-          <section
-            style={{
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              borderRadius: "var(--radius-card)",
-              overflow: "hidden",
-            }}
-          >
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--color-border)", borderLeft: "3px solid #0891b2" }}>
-              <span style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text)" }}>Coleta de Leads</span>
-            </div>
-            <div style={{ padding: "24px 20px", color: "var(--color-text-muted)", fontSize: 13 }}>
-              {leadsState.error ? "Erro ao carregar dados de captação de leads." : "Total de captações e breakdown por evento disponíveis em breve."}
-            </div>
-          </section>
-        )}
       </div>
     </div>
   );
