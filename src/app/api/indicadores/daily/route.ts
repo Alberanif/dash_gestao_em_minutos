@@ -23,20 +23,35 @@ export async function GET(request: NextRequest) {
   const startUtc = brtToUtc(start_date, false);
   const endUtc = brtToUtc(end_date, true);
 
+  const metaTerms = searchParams.getAll("meta_terms[]").filter(Boolean);
+  const productIds = searchParams.getAll("product_ids[]").filter(Boolean);
+
   const supabase = createSupabaseServiceClient();
 
+  let metaQuery = supabase
+    .from("dash_gestao_meta_ads_campaigns_daily")
+    .select("date, spend, leads_all, checkout")
+    .gte("date", start_date)
+    .lte("date", end_date);
+
+  if (metaTerms.length > 0) {
+    metaQuery = metaQuery.or(metaTerms.map(t => `campaign_name.ilike.%${t}%`).join(','));
+  }
+
+  let hotmartQuery = supabase
+    .from("dash_gestao_hotmart_sales")
+    .select("purchase_date")
+    .in("status", ["COMPLETE", "APPROVED"])
+    .gte("purchase_date", startUtc)
+    .lte("purchase_date", endUtc);
+
+  if (productIds.length > 0) {
+    hotmartQuery = hotmartQuery.in("product_id", productIds);
+  }
+
   const [metaResult, hotmartResult, leadsResult] = await Promise.all([
-    supabase
-      .from("dash_gestao_meta_ads_campaigns_daily")
-      .select("date, spend, leads_all, checkout")
-      .gte("date", start_date)
-      .lte("date", end_date),
-    supabase
-      .from("dash_gestao_hotmart_sales")
-      .select("purchase_date")
-      .in("status", ["COMPLETE", "APPROVED"])
-      .gte("purchase_date", startUtc)
-      .lte("purchase_date", endUtc),
+    metaQuery,
+    hotmartQuery,
     supabase
       .from("dash_gestao_captacao_leads")
       .select("data_cadastro")

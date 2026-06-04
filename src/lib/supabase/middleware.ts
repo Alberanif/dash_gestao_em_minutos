@@ -26,9 +26,13 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch {
+    // Network error (e.g. Supabase unreachable) — treat as unauthenticated
+  }
 
   const pathname = request.nextUrl.pathname;
 

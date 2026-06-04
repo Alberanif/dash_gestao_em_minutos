@@ -15,13 +15,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "start_date and end_date are required" }, { status: 400 });
   }
 
+  const rawTerms = searchParams.getAll("meta_terms[]").filter((t) => t.trim() !== "");
+
   const supabase = createSupabaseServiceClient();
 
-  const { data, error: dbError } = await supabase
+  let query = supabase
     .from("dash_gestao_meta_ads_campaigns_daily")
     .select("spend, impressions, link_clicks, leads_all, page_views, checkout")
     .gte("date", start_date)
     .lte("date", end_date);
+
+  if (rawTerms.length > 0) {
+    query = query.or(rawTerms.map((t) => `campaign_name.ilike.%${t}%`).join(","));
+  }
+
+  const { data, error: dbError } = await query;
 
   if (dbError) {
     return NextResponse.json({ error: dbError.message }, { status: 500 });

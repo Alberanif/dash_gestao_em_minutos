@@ -10,7 +10,7 @@ export default async function ConfiguracoesPage() {
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) redirect("/auth/login");
+  if (!user) redirect("/login");
 
   const role = (user.app_metadata?.role as UserRole) ?? "gestor";
   if (role !== "gestor" && role !== "analista") redirect("/ajustes");

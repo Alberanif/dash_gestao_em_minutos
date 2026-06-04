@@ -43,28 +43,39 @@ export async function GET(request: NextRequest) {
   const startUtc = brtToUtc(start_date, false);
   const endUtc = brtToUtc(end_date, true);
 
+  const productIds = searchParams.getAll("product_ids[]").filter(Boolean);
+
   const supabase = createSupabaseServiceClient();
 
-  // Tenta via RPC (mais eficiente — sem limite de linhas)
-  const { data: rpcData, error: rpcError } = await supabase.rpc("get_hotmart_metrics", {
-    p_start_date: startUtc,
-    p_end_date: endUtc,
-  });
+  // When product_ids[] is present, skip RPC (it doesn't support product filtering)
+  // and go straight to manual pagination with product filter applied.
+  if (productIds.length === 0) {
+    // Tenta via RPC (mais eficiente — sem limite de linhas)
+    const { data: rpcData, error: rpcError } = await supabase.rpc("get_hotmart_metrics", {
+      p_start_date: startUtc,
+      p_end_date: endUtc,
+    });
 
-  if (!rpcError && rpcData) {
-    const d = rpcData as Omit<GlobalHotmartMetrics, "total_sales">;
-    return NextResponse.json({
-      ...d,
-      total_sales: (d.total_sales_brl ?? 0) + (d.total_sales_foreign ?? 0),
-    } as GlobalHotmartMetrics);
+    if (!rpcError && rpcData) {
+      const d = rpcData as Omit<GlobalHotmartMetrics, "total_sales">;
+      return NextResponse.json({
+        ...d,
+        total_sales: (d.total_sales_brl ?? 0) + (d.total_sales_foreign ?? 0),
+      } as GlobalHotmartMetrics);
+    }
   }
 
-  // Fallback: paginação manual (enquanto a migration 035 não for aplicada)
-  const baseFilters = (q: any) =>
-    q
+  // Manual pagination (fallback when RPC fails, or when product_ids[] filter is present)
+  const baseFilters = (q: any) => {
+    let query = q
       .in("status", STATUS_APPROVED)
       .gte("purchase_date", startUtc)
       .lte("purchase_date", endUtc);
+    if (productIds.length > 0) {
+      query = query.in("product_id", productIds);
+    }
+    return query;
+  };
 
   const [brlRows, foreignRows] = await Promise.all([
     (async () => {

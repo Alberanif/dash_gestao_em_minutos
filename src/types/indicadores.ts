@@ -33,6 +33,16 @@ export interface GlobalLeadsMetrics {
   by_event: Array<{ evento: string; count: number }>;
 }
 
+export interface FilterRecord {
+  id: string;
+  account_id: string;
+  name: string;
+  hotmart_products: Array<{ product_id: string; product_name: string }>;
+  meta_ads_terms: string[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DailyPoint {
   date: string;
   meta_spend: number;

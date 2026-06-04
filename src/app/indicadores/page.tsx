@@ -1,17 +1,21 @@
 "use client";
 
 import "./indicadores.css";
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { calcPresetDates, getActivePreset, type PresetKey } from "@/lib/utils/period-presets";
 import { calcROAS, calcCPA, calcConversionRate } from "@/lib/utils/cross-metrics";
 import { calcFunnelStages, calcConversionRates } from "@/lib/utils/funnel-metrics";
-import type { GlobalMetrics, GlobalHotmartMetrics, GlobalLeadsMetrics, DailyPoint } from "@/types/indicadores";
+import type { GlobalMetrics, GlobalHotmartMetrics, GlobalLeadsMetrics, DailyPoint, FilterRecord } from "@/types/indicadores";
 import { HeroKpiCard } from "@/components/indicadores/hero-kpi-card";
 import { HorizontalFunnelFlow } from "@/components/indicadores/horizontal-funnel-flow";
 import { MetaAdsCard } from "@/components/indicadores/meta-ads-card";
 import { HotmartCard } from "@/components/indicadores/hotmart-card";
 import { LeadsSection } from "@/components/indicadores/leads-section";
+import { FilterDropdown } from "@/components/indicadores/filter-dropdown";
+import { FilterModal } from "@/components/indicadores/filter-modal";
+
+const LS_FILTER_ID = "indicadores_active_filter_id";
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -140,7 +144,7 @@ function PeriodControls({ startDate, endDate, activePreset, onPreset, onStartDat
 
 // ── Section narrative ─────────────────────────────────────────────────────────
 
-function SectionNarrative({ step, label, desc }: { step: string; label: string; desc: string }) {
+function SectionNarrative({ step, label, desc }: { step: string; label: string; desc: string | React.ReactNode }) {
   return (
     <div style={{ marginBottom: 12 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 2 }}>
@@ -171,18 +175,52 @@ export default function IndicadoresPage() {
   const [leadsState, setLeadsState] = useState<SectionState<GlobalLeadsMetrics>>(initialSection());
   const [dailyState, setDailyState] = useState<SectionState<DailyPoint[]>>(initialSection());
 
-  const fetchAll = useCallback(async (start: string, end: string) => {
+  const [accountId, setAccountId] = useState<string>("");
+  const [filters, setFilters] = useState<FilterRecord[]>([]);
+  const [activeFilter, setActiveFilter] = useState<FilterRecord | null>(null);
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
+  const [filterEditTarget, setFilterEditTarget] = useState<FilterRecord | null>(null);
+
+  // Bootstrap: fetch account_id + filters, restore active filter from localStorage
+  useEffect(() => {
+    fetch("/api/accounts")
+      .then((r) => r.json())
+      .then((accounts: { id: string }[]) => {
+        if (!Array.isArray(accounts) || accounts.length === 0) return;
+        const id = accounts[0].id;
+        setAccountId(id);
+        return fetch(`/api/indicadores/filters?account_id=${id}`)
+          .then((r) => r.json())
+          .then((data: FilterRecord[]) => {
+            if (!Array.isArray(data)) return;
+            setFilters(data);
+            const savedId = localStorage.getItem(LS_FILTER_ID);
+            if (savedId) {
+              const match = data.find((f) => f.id === savedId);
+              if (match) setActiveFilter(match);
+              else localStorage.removeItem(LS_FILTER_ID); // deleted by another user
+            }
+          });
+      })
+      .catch(() => {});
+  }, []);
+
+  const fetchAll = useCallback(async (start: string, end: string, filter: FilterRecord | null) => {
     setMetaState(initialSection());
     setHotmartState(initialSection());
     setLeadsState(initialSection());
     setDailyState(initialSection());
 
-    const params = `?start_date=${start}&end_date=${end}`;
+    let params = `?start_date=${start}&end_date=${end}`;
+    if (filter) {
+      filter.meta_ads_terms.forEach((t) => { params += `&meta_terms[]=${encodeURIComponent(t)}`; });
+      filter.hotmart_products.forEach((p) => { params += `&product_ids[]=${encodeURIComponent(p.product_id)}`; });
+    }
 
     const [metaRes, hotmartRes, leadsRes, dailyRes] = await Promise.allSettled([
       fetch(`/api/indicadores/metrics${params}`).then((r) => r.json()),
       fetch(`/api/indicadores/hotmart${params}`).then((r) => r.json()),
-      fetch(`/api/indicadores/leads${params}`).then((r) => r.json()),
+      fetch(`/api/indicadores/leads?start_date=${start}&end_date=${end}`).then((r) => r.json()),
       fetch(`/api/indicadores/daily${params}`).then((r) => r.json()),
     ]);
 
@@ -209,8 +247,30 @@ export default function IndicadoresPage() {
   }, []);
 
   useEffect(() => {
-    fetchAll(startDate, endDate);
-  }, [startDate, endDate, fetchAll]);
+    fetchAll(startDate, endDate, activeFilter);
+  }, [startDate, endDate, activeFilter, fetchAll]);
+
+  function handleSelectFilter(filter: FilterRecord | null) {
+    setActiveFilter(filter);
+    if (filter) localStorage.setItem(LS_FILTER_ID, filter.id);
+    else localStorage.removeItem(LS_FILTER_ID);
+  }
+
+  function handleFilterSaved(saved: FilterRecord) {
+    setFilters((prev) => {
+      const idx = prev.findIndex((f) => f.id === saved.id);
+      return idx >= 0 ? prev.map((f) => (f.id === saved.id ? saved : f)) : [...prev, saved];
+    });
+    handleSelectFilter(saved);
+    setFilterModalOpen(false);
+    setFilterEditTarget(null);
+  }
+
+  async function handleDeleteFilter(filter: FilterRecord) {
+    await fetch(`/api/indicadores/filters/${filter.id}`, { method: "DELETE" });
+    setFilters((prev) => prev.filter((f) => f.id !== filter.id));
+    if (activeFilter?.id === filter.id) handleSelectFilter(null);
+  }
 
   function handlePreset(key: PresetKey) {
     const dates = calcPresetDates(key, today);
@@ -290,15 +350,36 @@ export default function IndicadoresPage() {
           </h1>
         </div>
 
-        <PeriodControls
-          startDate={startDate}
-          endDate={endDate}
-          activePreset={activePreset}
-          onPreset={handlePreset}
-          onStartDate={handleStartDate}
-          onEndDate={handleEndDate}
-        />
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <PeriodControls
+            startDate={startDate}
+            endDate={endDate}
+            activePreset={activePreset}
+            onPreset={handlePreset}
+            onStartDate={handleStartDate}
+            onEndDate={handleEndDate}
+          />
+          {accountId && (
+            <FilterDropdown
+              filters={filters}
+              activeFilter={activeFilter}
+              onSelect={handleSelectFilter}
+              onNew={() => { setFilterEditTarget(null); setFilterModalOpen(true); }}
+              onEdit={(f) => { setFilterEditTarget(f); setFilterModalOpen(true); }}
+              onDelete={handleDeleteFilter}
+            />
+          )}
+        </div>
       </header>
+
+      {filterModalOpen && accountId && (
+        <FilterModal
+          accountId={accountId}
+          editTarget={filterEditTarget}
+          onSave={handleFilterSaved}
+          onCancel={() => { setFilterModalOpen(false); setFilterEditTarget(null); }}
+        />
+      )}
 
       {/* Z-layout */}
       <div className="z-layout">
@@ -360,7 +441,15 @@ export default function IndicadoresPage() {
 
         {/* Z-4: Captação de Leads — full width */}
         <div>
-          <SectionNarrative step="04" label="Captação de Leads" desc="Novos leads que entraram no funil" />
+          <SectionNarrative
+            step="04"
+            label="Captação de Leads"
+            desc={
+              activeFilter
+                ? "Novos leads que entraram no funil · Dados não filtrados"
+                : "Novos leads que entraram no funil"
+            }
+          />
           <div className="z-row">
             <LeadsSection leadsState={leadsState} dailyState={dailyState} />
           </div>

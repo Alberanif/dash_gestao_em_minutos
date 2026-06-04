@@ -10,7 +10,7 @@ export default async function SelectionPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/auth/login");
+    redirect("/login");
   }
 
   const role = (user.app_metadata?.role as UserRole) ?? "gestor";
