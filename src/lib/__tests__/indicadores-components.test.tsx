@@ -3,7 +3,11 @@ import { HeroKpiCard } from "@/components/indicadores/hero-kpi-card";
 import { KpiCell } from "@/components/indicadores/kpi-cell";
 import { HorizontalFunnelFlow } from "@/components/indicadores/horizontal-funnel-flow";
 import { LeadsSection } from "@/components/indicadores/leads-section";
+import { FilterDropdownList } from "@/components/indicadores/filter-dropdown";
+import { IndicadoresEmptyState } from "@/components/indicadores/indicadores-empty-state";
+import { getPartialFilterWarning } from "@/components/indicadores/filter-modal";
 import type { FunnelStage, ConversionRate } from "@/lib/utils/funnel-metrics";
+import type { FilterRecord } from "@/types/indicadores";
 
 jest.mock("@/components/indicadores/trend-charts", () => ({
   LeadsCaptacoesChart: () => null,
@@ -229,6 +233,35 @@ describe("HorizontalFunnelFlow", () => {
   });
 });
 
+// ── getPartialFilterWarning ───────────────────────────────────────────────────
+
+describe("getPartialFilterWarning", () => {
+  it("warns about Hotmart when only Meta terms are provided", () => {
+    const result = getPartialFilterWarning([], ["lançamento"]);
+    expect(result).not.toBeNull();
+    expect(result).toContain("Hotmart");
+  });
+
+  it("warns about Meta Ads when only Hotmart products are provided", () => {
+    const result = getPartialFilterWarning([{ product_id: "1", product_name: "Curso" }], []);
+    expect(result).not.toBeNull();
+    expect(result).toContain("Meta Ads");
+  });
+
+  it("returns null when both sources are configured", () => {
+    const result = getPartialFilterWarning(
+      [{ product_id: "1", product_name: "Curso" }],
+      ["lançamento"]
+    );
+    expect(result).toBeNull();
+  });
+
+  it("returns null when both sources are empty (existing validation handles this)", () => {
+    const result = getPartialFilterWarning([], []);
+    expect(result).toBeNull();
+  });
+});
+
 // ── LeadsSection ──────────────────────────────────────────────────────────────
 
 describe("LeadsSection", () => {
@@ -265,3 +298,92 @@ describe("LeadsSection", () => {
     expect(html).toContain("pulse");
   });
 });
+
+// ── FilterDropdownList ────────────────────────────────────────────────────────
+
+const sampleFilters: FilterRecord[] = [
+  {
+    id: "f1",
+    account_id: "acc1",
+    name: "Filtro Alpha",
+    hotmart_products: [],
+    meta_ads_terms: [],
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-01T00:00:00Z",
+  },
+];
+
+const noop = () => {};
+
+describe("FilterDropdownList", () => {
+  it("does not render 'Sem filtro' option", () => {
+    const html = render(
+      FilterDropdownList({
+        filters: sampleFilters,
+        activeFilter: null,
+        onSelect: noop,
+        onNew: noop,
+        onEdit: noop,
+        onDelete: noop,
+      })
+    );
+    expect(html).not.toContain("Sem filtro");
+  });
+
+  it("renders '+ Novo filtro' button", () => {
+    const html = render(
+      FilterDropdownList({
+        filters: sampleFilters,
+        activeFilter: null,
+        onSelect: noop,
+        onNew: noop,
+        onEdit: noop,
+        onDelete: noop,
+      })
+    );
+    expect(html).toContain("+ Novo filtro");
+  });
+
+  it("renders filter names from the list", () => {
+    const html = render(
+      FilterDropdownList({
+        filters: sampleFilters,
+        activeFilter: null,
+        onSelect: noop,
+        onNew: noop,
+        onEdit: noop,
+        onDelete: noop,
+      })
+    );
+    expect(html).toContain("Filtro Alpha");
+  });
+
+  it("renders 'Nenhum filtro salvo' when filters list is empty", () => {
+    const html = render(
+      FilterDropdownList({
+        filters: [],
+        activeFilter: null,
+        onSelect: noop,
+        onNew: noop,
+        onEdit: noop,
+        onDelete: noop,
+      })
+    );
+    expect(html).toContain("Nenhum filtro salvo");
+  });
+});
+
+// ── IndicadoresEmptyState ─────────────────────────────────────────────────────
+
+describe("IndicadoresEmptyState", () => {
+  it("renders an orientative message guiding the user to select or create a filter", () => {
+    const html = render(IndicadoresEmptyState({ onOpenFilter: noop }));
+    expect(html.toLowerCase()).toMatch(/filtro|selecione|crie/);
+  });
+
+  it("renders a call-to-action button", () => {
+    const html = render(IndicadoresEmptyState({ onOpenFilter: noop }));
+    expect(html).toMatch(/<button/i);
+  });
+});
+

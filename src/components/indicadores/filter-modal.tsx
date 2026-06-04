@@ -1,11 +1,31 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { FilterRecord } from "@/types/indicadores";
 
 interface HotmartProduct {
   product_id: string;
   product_name: string;
+}
+
+/**
+ * Returns a warning message when only one data source is configured, or null
+ * when both are configured (no warning needed) or both are empty (the existing
+ * required-field validation already handles that case).
+ */
+export function getPartialFilterWarning(
+  hotmartProducts: HotmartProduct[],
+  cleanTerms: string[]
+): string | null {
+  const hasHotmart = hotmartProducts.length > 0;
+  const hasMeta = cleanTerms.length > 0;
+  if (hasHotmart && !hasMeta) {
+    return "Sem termos do Meta Ads configurados — dados de Meta Ads serão zerados no dashboard.";
+  }
+  if (!hasHotmart && hasMeta) {
+    return "Sem produtos Hotmart configurados — dados de Hotmart serão zerados no dashboard.";
+  }
+  return null;
 }
 
 interface FilterModalProps {
@@ -26,17 +46,37 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
   const [productOptions, setProductOptions] = useState<HotmartProduct[]>([]);
   const [productSearch, setProductSearch] = useState("");
   const [productDropOpen, setProductDropOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [partialWarning, setPartialWarning] = useState("");
+  const [partialWarningShown, setPartialWarningShown] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Server-side search: fires on every keystroke (debounced 300ms).
+  // Uses /api/funnels/products which searches by both name and product_id
+  // without requiring account_id — fixing the cross-platform account mismatch bug.
   useEffect(() => {
-    fetch(`/api/hotmart/products?account_id=${accountId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setProductOptions(data);
-      })
-      .catch(() => {});
-  }, [accountId]);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const q = productSearch.trim();
+        const res = await fetch(`/api/funnels/products?q=${encodeURIComponent(q)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) setProductOptions(data);
+        }
+      } catch {
+        // network error — keep previous results
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [productSearch]);
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -47,11 +87,7 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
   }, [onCancel]);
 
   const selectedIds = new Set(hotmartProducts.map((p) => p.product_id));
-  const filteredOptions = productOptions.filter(
-    (p) =>
-      !selectedIds.has(p.product_id) &&
-      p.product_name.toLowerCase().includes(productSearch.toLowerCase())
-  );
+  const filteredOptions = productOptions.filter((p) => !selectedIds.has(p.product_id));
 
   function toggleProduct(p: HotmartProduct) {
     setHotmartProducts((prev) =>
@@ -83,6 +119,16 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
       setError("Selecione pelo menos um produto ou adicione um termo de campanha.");
       return;
     }
+    // Show partial-source warning once before proceeding; second click confirms
+    if (!partialWarningShown) {
+      const warning = getPartialFilterWarning(hotmartProducts, cleanTerms);
+      if (warning) {
+        setPartialWarning(warning);
+        setPartialWarningShown(true);
+        return;
+      }
+    }
+    setPartialWarning("");
     setError("");
     setSaving(true);
     try {
@@ -190,7 +236,7 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
                 boxSizing: "border-box",
               }}
             />
-            {productDropOpen && filteredOptions.length > 0 && (
+            {productDropOpen && (searching || filteredOptions.length > 0 || productSearch.trim().length > 0) && (
               <div
                 style={{
                   position: "absolute",
@@ -205,7 +251,17 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
                   zIndex: 300,
                 }}
               >
-                {filteredOptions.map((p) => (
+                {searching && (
+                  <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--text-3)" }}>
+                    Buscando...
+                  </div>
+                )}
+                {!searching && filteredOptions.length === 0 && (
+                  <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--text-3)" }}>
+                    {productSearch.trim() ? "Nenhum produto encontrado." : "Digite para buscar um produto."}
+                  </div>
+                )}
+                {!searching && filteredOptions.map((p) => (
                   <button
                     key={p.product_id}
                     onMouseDown={() => { toggleProduct(p); setProductSearch(""); }}
@@ -221,7 +277,8 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
                       cursor: "pointer",
                     }}
                   >
-                    {p.product_name}
+                    <span>{p.product_name}</span>
+                    <span style={{ marginLeft: 6, fontSize: 10, color: "var(--text-3)" }}>#{p.product_id}</span>
                   </button>
                 ))}
               </div>
@@ -314,6 +371,24 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
             + Adicionar termo
           </button>
         </div>
+
+        {partialWarning && (
+          <p
+            role="status"
+            style={{
+              fontSize: 12,
+              color: "var(--orange)",
+              margin: 0,
+              padding: "8px 10px",
+              borderRadius: 6,
+              border: "1px solid color-mix(in srgb, var(--orange) 30%, transparent)",
+              background: "color-mix(in srgb, var(--orange) 8%, transparent)",
+              lineHeight: 1.5,
+            }}
+          >
+            ⚠ {partialWarning} Clique em Salvar novamente para confirmar.
+          </p>
+        )}
 
         {error && (
           <p style={{ fontSize: 12, color: "var(--red)", margin: 0 }}>{error}</p>
