@@ -5,6 +5,7 @@ import { collectHotmart } from "@/lib/services/hotmart";
 import type { Account } from "@/types/accounts";
 
 export async function POST(request: NextRequest) {
+  try {
   const { error } = await validateApiAuth();
   if (error) return error;
 
@@ -86,6 +87,10 @@ export async function POST(request: NextRequest) {
       finished_at: finishedAt,
     });
 
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Erro interno do servidor";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

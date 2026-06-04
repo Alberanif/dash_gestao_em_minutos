@@ -88,16 +88,73 @@ describe("POST /api/indicadores/filters", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns 400 when both hotmart_products and meta_ads_terms empty", async () => {
+  it("returns 400 when all three sources are empty", async () => {
     const { POST } = await import("../route");
     const req = makeRequest("POST", "http://localhost/api/indicadores/filters", {
       account_id: "acc",
       name: "Test",
       hotmart_products: [],
       meta_ads_terms: [],
+      captacao_leads_eventos: [],
     });
     const res = await POST(req);
     expect(res.status).toBe(400);
+  });
+
+  it("creates filter when only captacao_leads_eventos is provided", async () => {
+    const created = {
+      id: "new-id",
+      account_id: "acc",
+      name: "Leads Test",
+      hotmart_products: [],
+      meta_ads_terms: [],
+      captacao_leads_eventos: ["Inscricao Webinar"],
+      created_at: "2025-01-01T00:00:00Z",
+      updated_at: "2025-01-01T00:00:00Z",
+    };
+    mockSingle.mockResolvedValueOnce({ data: created, error: null });
+
+    const { POST } = await import("../route");
+    const req = makeRequest("POST", "http://localhost/api/indicadores/filters", {
+      account_id: "acc",
+      name: "Leads Test",
+      hotmart_products: [],
+      meta_ads_terms: [],
+      captacao_leads_eventos: ["Inscricao Webinar"],
+    });
+    const res = await POST(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(body).toEqual(created);
+  });
+
+  it("persists captacao_leads_eventos in the insert call", async () => {
+    const created = {
+      id: "x",
+      account_id: "acc",
+      name: "Leads Only",
+      hotmart_products: [],
+      meta_ads_terms: [],
+      captacao_leads_eventos: ["Evento A"],
+      created_at: "",
+      updated_at: "",
+    };
+    mockSingle.mockResolvedValueOnce({ data: created, error: null });
+
+    const { POST } = await import("../route");
+    const req = makeRequest("POST", "http://localhost/api/indicadores/filters", {
+      account_id: "acc",
+      name: "Leads Only",
+      hotmart_products: [],
+      meta_ads_terms: [],
+      captacao_leads_eventos: ["Evento A"],
+    });
+    await POST(req);
+
+    expect(mockInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ captacao_leads_eventos: ["Evento A"] })
+    );
   });
 
   it("creates filter and returns 201 with created record", async () => {

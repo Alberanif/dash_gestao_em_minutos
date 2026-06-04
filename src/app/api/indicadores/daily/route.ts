@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
 
   const metaTerms = searchParams.getAll("meta_terms[]").filter(Boolean);
   const productIds = searchParams.getAll("product_ids[]").filter(Boolean);
+  const eventosFilter = searchParams.getAll("eventos[]").filter(Boolean);
 
   const supabase = createSupabaseServiceClient();
 
@@ -52,12 +53,11 @@ export async function GET(request: NextRequest) {
   const [metaResult, hotmartResult, leadsResult] = await Promise.all([
     metaQuery,
     hotmartQuery,
-    supabase
-      .from("dash_gestao_captacao_leads")
-      .select("data_cadastro")
-      .gte("data_cadastro", `${start_date}T00:00:00`)
-      .lte("data_cadastro", `${end_date}T23:59:59`)
-      .limit(10_000),
+    supabase.rpc("dash_gestao_leads_daily_counts", {
+      p_start_date: start_date,
+      p_end_date: end_date,
+      p_eventos: eventosFilter.length > 0 ? eventosFilter : null,
+    }),
   ]);
 
   if (metaResult.error) {
@@ -94,11 +94,10 @@ export async function GET(request: NextRequest) {
     hotmartByDate.set(brtDate, (hotmartByDate.get(brtDate) ?? 0) + 1);
   }
 
-  // Aggregate leads by date
+  // Leads already aggregated by date in the DB function — no row limit applies
   const leadsByDate = new Map<string, number>();
-  for (const row of (leadsResult.data ?? []) as { data_cadastro: string }[]) {
-    const d = row.data_cadastro.slice(0, 10);
-    leadsByDate.set(d, (leadsByDate.get(d) ?? 0) + 1);
+  for (const row of (leadsResult.data ?? []) as { date: string; count: number }[]) {
+    leadsByDate.set(row.date, Number(row.count));
   }
 
   // Build complete date range

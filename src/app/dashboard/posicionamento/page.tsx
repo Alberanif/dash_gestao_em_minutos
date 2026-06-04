@@ -1,24 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PageHeader } from "@/components/layout/page-header";
-import { DateRangeControls } from "@/components/layout/date-range-controls";
-import { PeriodComparisonSection } from "@/components/dashboard/period-comparison-section";
+import { useRouter, useSearchParams } from "next/navigation";
+import { GvPageHeader } from "@/components/gv/gv-page-header";
+import { GvDateControls } from "@/components/gv/gv-date-controls";
+import { PulseBanner } from "@/components/gv/pulse-banner";
+import { NarrLabel } from "@/components/gv/narr-label";
+import { CompareCard } from "@/components/gv/compare-card";
+import { AccountSectionHeader } from "@/components/dashboard/account-section-header";
+import { calcPulseBanner, calcVerdict, calcPlatformStatus } from "./logic";
+import { calcPresetDates, getActivePreset } from "@/lib/utils/period-presets";
+import type { PresetKey } from "@/lib/utils/period-presets";
 import type { Account, ChannelDailyRow, ProfileSnapshot } from "@/types/accounts";
 
-const YT_ICON = (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z" />
-  </svg>
-);
-
-const IG_ICON = (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z" />
-  </svg>
-);
-
-function today(): string {
+function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
@@ -49,13 +44,14 @@ function formatPeriodLabel(start: string, end: string): string {
 }
 
 export default function PosicionamentoPage() {
-  const [startDate, setStartDate] = useState(daysAgo(30));
-  const [endDate, setEndDate] = useState(today());
-  const [appliedStart, setAppliedStart] = useState(daysAgo(30));
-  const [appliedEnd, setAppliedEnd] = useState(today());
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [ytAccounts, setYtAccounts] = useState<Account[]>([]);
-  const [igAccounts, setIgAccounts] = useState<Account[]>([]);
+  const [startDate, setStartDate] = useState(daysAgo(30));
+  const [endDate, setEndDate] = useState(todayStr());
+
+  const [ytAccounts, setYtAccounts] = useState<Account[] | null>(null);
+  const [igAccounts, setIgAccounts] = useState<Account[] | null>(null);
   const [ytSelectedId, setYtSelectedId] = useState("");
   const [igSelectedId, setIgSelectedId] = useState("");
   const [ytLoading, setYtLoading] = useState(true);
@@ -63,9 +59,26 @@ export default function PosicionamentoPage() {
   const [ytDailyRows, setYtDailyRows] = useState<ChannelDailyRow[]>([]);
   const [igSnapshots, setIgSnapshots] = useState<ProfileSnapshot[]>([]);
 
-  function applyDateFilter() {
-    setAppliedStart(startDate);
-    setAppliedEnd(endDate);
+  const activePreset = getActivePreset(startDate, endDate, todayStr());
+
+  function handlePreset(key: PresetKey) {
+    const { startDate: s, endDate: e } = calcPresetDates(key, todayStr());
+    setStartDate(s);
+    setEndDate(e);
+  }
+
+  function selectYt(id: string) {
+    setYtSelectedId(id);
+    const p = new URLSearchParams(searchParams.toString());
+    p.set("yt", id);
+    router.replace(`?${p.toString()}`);
+  }
+
+  function selectIg(id: string) {
+    setIgSelectedId(id);
+    const p = new URLSearchParams(searchParams.toString());
+    p.set("ig", id);
+    router.replace(`?${p.toString()}`);
   }
 
   useEffect(() => {
@@ -77,18 +90,31 @@ export default function PosicionamentoPage() {
       const igList = Array.isArray(ig) ? ig : [];
       setYtAccounts(ytList);
       setIgAccounts(igList);
-      if (ytList.length > 0) setYtSelectedId(ytList[0].id);
-      if (igList.length > 0) setIgSelectedId(igList[0].id);
+      const ytParam = searchParams.get("yt");
+      const igParam = searchParams.get("ig");
+      const ytId = ytList.find((a) => a.id === ytParam)?.id ?? ytList[0]?.id ?? "";
+      const igId = igList.find((a) => a.id === igParam)?.id ?? igList[0]?.id ?? "";
+      if (ytId) {
+        setYtSelectedId(ytId);
+        if (!ytParam || ytParam !== ytId) {
+          const p = new URLSearchParams(searchParams.toString());
+          p.set("yt", ytId);
+          if (igId) p.set("ig", igId);
+          router.replace(`?${p.toString()}`);
+        }
+      }
+      if (igId) setIgSelectedId(igId);
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!ytSelectedId) { setYtLoading(false); return; }
     let cancelled = false;
     setYtLoading(true);
-    const periodDays = daysBetween(appliedStart, appliedEnd);
-    const fetchStart = shiftDateBack(appliedStart, periodDays);
-    fetch(`/api/youtube/channel?account_id=${ytSelectedId}&start_date=${fetchStart}&end_date=${appliedEnd}`)
+    const periodDays = daysBetween(startDate, endDate);
+    const fetchStart = shiftDateBack(startDate, periodDays);
+    fetch(`/api/youtube/channel?account_id=${ytSelectedId}&start_date=${fetchStart}&end_date=${endDate}`)
       .then((r) => r.json()).catch(() => [])
       .then((daily) => {
         if (cancelled) return;
@@ -96,15 +122,15 @@ export default function PosicionamentoPage() {
         setYtLoading(false);
       });
     return () => { cancelled = true; };
-  }, [ytSelectedId, appliedStart, appliedEnd]);
+  }, [ytSelectedId, startDate, endDate]);
 
   useEffect(() => {
     if (!igSelectedId) { setIgLoading(false); return; }
     let cancelled = false;
     setIgLoading(true);
-    const periodDays = daysBetween(appliedStart, appliedEnd);
-    const fetchStart = shiftDateBack(appliedStart, periodDays);
-    fetch(`/api/instagram/profile?account_id=${igSelectedId}&start_date=${fetchStart}&end_date=${appliedEnd}`)
+    const periodDays = daysBetween(startDate, endDate);
+    const fetchStart = shiftDateBack(startDate, periodDays);
+    fetch(`/api/instagram/profile?account_id=${igSelectedId}&start_date=${fetchStart}&end_date=${endDate}`)
       .then((r) => r.json()).catch(() => [])
       .then((snaps) => {
         if (cancelled) return;
@@ -112,77 +138,131 @@ export default function PosicionamentoPage() {
         setIgLoading(false);
       });
     return () => { cancelled = true; };
-  }, [igSelectedId, appliedStart, appliedEnd]);
+  }, [igSelectedId, startDate, endDate]);
 
-  // Period boundaries
-  const periodDays = daysBetween(appliedStart, appliedEnd);
-  const previousStart = shiftDateBack(appliedStart, periodDays);
-  const previousEnd = shiftDateBack(appliedStart, 1);
+  const periodDays = daysBetween(startDate, endDate);
+  const previousStart = shiftDateBack(startDate, periodDays);
+  const previousEnd = shiftDateBack(startDate, 1);
   const previousLabel = formatPeriodLabel(previousStart, previousEnd);
-  const currentLabel = formatPeriodLabel(appliedStart, appliedEnd);
+  const currentLabel = formatPeriodLabel(startDate, endDate);
 
-  // YouTube derivados
   const ytPrevRows = ytDailyRows.filter((r) => r.date >= previousStart && r.date <= previousEnd);
-  const ytCurrRows = ytDailyRows.filter((r) => r.date >= appliedStart && r.date <= appliedEnd);
+  const ytCurrRows = ytDailyRows.filter((r) => r.date >= startDate && r.date <= endDate);
   const ytPrevValue = ytPrevRows.length > 0 ? (ytPrevRows[ytPrevRows.length - 1].subscriber_count ?? 0) : 0;
   const ytCurrValue = ytCurrRows.length > 0 ? (ytCurrRows[ytCurrRows.length - 1].subscriber_count ?? 0) : 0;
-  const ytPrevSparkline = ytPrevRows.map((r) => ({ date: r.date, value: r.subscribers_gained - r.subscribers_lost }));
-  const ytCurrSparkline = ytCurrRows.map((r) => ({ date: r.date, value: r.subscribers_gained - r.subscribers_lost }));
+  const ytPrevSpark = ytPrevRows.map((r) => r.subscribers_gained - r.subscribers_lost);
+  const ytCurrSpark = ytCurrRows.map((r) => r.subscribers_gained - r.subscribers_lost);
 
-  // Instagram derivados
-  const igPrevSnaps = igSnapshots.filter((s) => s.collected_at.slice(0, 10) < appliedStart);
-  const igCurrSnaps = igSnapshots.filter((s) => s.collected_at.slice(0, 10) >= appliedStart);
+  const igPrevSnaps = igSnapshots.filter((s) => s.collected_at.slice(0, 10) < startDate);
+  const igCurrSnaps = igSnapshots.filter((s) => s.collected_at.slice(0, 10) >= startDate);
   const igPrevValue = igPrevSnaps.length > 0 ? igPrevSnaps[igPrevSnaps.length - 1].followers_count : 0;
   const igCurrValue = igCurrSnaps.length > 0 ? igCurrSnaps[igCurrSnaps.length - 1].followers_count : 0;
-  const igPrevSparkline = igPrevSnaps.map((s) => ({ date: s.collected_at.slice(0, 10), value: s.followers_count }));
-  const igCurrSparkline = igCurrSnaps.map((s) => ({ date: s.collected_at.slice(0, 10), value: s.followers_count }));
+  const igPrevSpark = igPrevSnaps.map((s) => s.followers_count);
+  const igCurrSpark = igCurrSnaps.map((s) => s.followers_count);
+
+  const ytPct = ytPrevValue > 0 ? ((ytCurrValue - ytPrevValue) / ytPrevValue) * 100 : 0;
+  const igPct = igPrevValue > 0 ? ((igCurrValue - igPrevValue) / igPrevValue) * 100 : 0;
+
+  const { status: bannerStatus, headline: bannerHeadline, chips } = calcPulseBanner({ ytPct, igPct });
+
+  const ytStatus = calcPlatformStatus(ytPct);
+  const igStatus = calcPlatformStatus(igPct);
+
+  const ytVerdict = calcVerdict(ytStatus, ytPrevValue, ytCurrValue);
+  const igVerdict = calcVerdict(igStatus, igPrevValue, igCurrValue);
+
+  const ytAccountName = (ytAccounts ?? []).find((a) => a.id === ytSelectedId)?.name ?? "YouTube";
+  const igAccountName = (igAccounts ?? []).find((a) => a.id === igSelectedId)?.name ?? "Instagram";
+
+  const isLoading = ytLoading || igLoading;
+
+  const pctLabel = (pct: number) => {
+    const sign = pct >= 0 ? "+" : "";
+    return `${sign}${pct.toFixed(1)}% vs período anterior`;
+  };
+
+  const showYt = ytAccounts === null || ytAccounts.length > 0;
+  const showIg = igAccounts === null || igAccounts.length > 0;
 
   return (
-    <div className="min-h-full">
-      <PageHeader
+    <div className="main">
+      <GvPageHeader
+        eyebrow="Gestão à Vista · Gestão em 4 Minutos"
         title="Posicionamento"
-        subtitle="Métricas de alcance nas redes sociais"
-        actions={
-          <DateRangeControls
-            startDate={startDate}
-            endDate={endDate}
-            onStartDateChange={setStartDate}
-            onEndDateChange={setEndDate}
-            onApply={applyDateFilter}
-          />
-        }
-      />
+        sub="O quanto a marca está sendo encontrada nas redes sociais"
+      >
+        <GvDateControls
+          startDate={startDate}
+          endDate={endDate}
+          activePreset={activePreset}
+          onPreset={handlePreset}
+          onStartDate={setStartDate}
+          onEndDate={setEndDate}
+        />
+      </GvPageHeader>
 
-      <div style={{ padding: "24px" }}>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <PeriodComparisonSection
-            platformName="YouTube"
-            platformColor="#FF0000"
-            platformIcon={YT_ICON}
-            exploreHref="/dashboard/youtube"
-            metricLabel="Inscritos (Total)"
-            loading={ytLoading}
-            accounts={ytAccounts}
-            selectedAccountId={ytSelectedId}
-            onAccountChange={setYtSelectedId}
-            previousPeriod={{ label: previousLabel, value: ytPrevValue, sparklineData: ytPrevSparkline }}
-            currentPeriod={{ label: currentLabel, value: ytCurrValue, sparklineData: ytCurrSparkline }}
-          />
+      <div className="section">
+        <NarrLabel step="01" label="Status do Período" desc="Audiência acumulada vs. período anterior" />
+        <PulseBanner
+          status={isLoading ? "amber" : bannerStatus}
+          headline={isLoading ? "Carregando dados…" : bannerHeadline}
+          sub={isLoading ? "Aguardando resposta das APIs." : pctLabel((ytPct + igPct) / 2)}
+          chips={isLoading ? [{ label: "carregando", status: "muted" }] : chips}
+        />
 
-          <PeriodComparisonSection
-            platformName="Instagram"
-            platformColor="#E1306C"
-            platformIcon={IG_ICON}
-            exploreHref="/dashboard/instagram"
-            metricLabel="Seguidores (Total)"
-            loading={igLoading}
-            accounts={igAccounts}
-            selectedAccountId={igSelectedId}
-            onAccountChange={setIgSelectedId}
-            previousPeriod={{ label: previousLabel, value: igPrevValue, sparklineData: igPrevSparkline }}
-            currentPeriod={{ label: currentLabel, value: igCurrValue, sparklineData: igCurrSparkline }}
-          />
+        <NarrLabel step="02" label="Comparativo por Canal" desc="Período atual vs. período anterior" />
+        <div className="grid g2">
+          {showYt && (
+            <div>
+              <AccountSectionHeader
+                title="YouTube"
+                accounts={ytAccounts}
+                selectedId={ytSelectedId}
+                onSelect={selectYt}
+              />
+              <CompareCard
+                platform="yt"
+                name={ytAccountName}
+                metric="Inscritos no canal"
+                prevLabel={previousLabel}
+                currLabel={currentLabel}
+                prevValue={ytPrevValue}
+                currValue={ytCurrValue}
+                prevSpark={ytPrevSpark}
+                currSpark={ytCurrSpark}
+                status={ytStatus}
+                verdict={ytVerdict}
+              />
+            </div>
+          )}
+          {showIg && (
+            <div>
+              <AccountSectionHeader
+                title="Instagram"
+                accounts={igAccounts}
+                selectedId={igSelectedId}
+                onSelect={selectIg}
+              />
+              <CompareCard
+                platform="ig"
+                name={igAccountName}
+                metric="Seguidores do perfil"
+                prevLabel={previousLabel}
+                currLabel={currentLabel}
+                prevValue={igPrevValue}
+                currValue={igCurrValue}
+                prevSpark={igPrevSpark}
+                currSpark={igCurrSpark}
+                status={igStatus}
+                verdict={igVerdict}
+              />
+            </div>
+          )}
         </div>
+
+        <p className="tip">
+          Leia os números de cima para baixo: primeiro o status geral, depois cada canal. Compare sempre o período atual com o anterior de mesmo tamanho.
+        </p>
       </div>
     </div>
   );

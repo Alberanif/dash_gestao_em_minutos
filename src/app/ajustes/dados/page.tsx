@@ -89,6 +89,12 @@ export default function DadosPage() {
   const [batchStatus, setBatchStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [batchResult, setBatchResult] = useState<{ salesRecords: number } | null>(null);
   const [batchError, setBatchError] = useState<string | null>(null);
+  const [batchChunks, setBatchChunks] = useState<Array<{
+    start: string; end: string;
+    status: "pending" | "loading" | "success" | "error";
+    records?: number; error?: string;
+  }> | null>(null);
+  const [batchTotalRecords, setBatchTotalRecords] = useState(0);
 
   // Hotmart sync products state
   const [syncProductsAccountId, setSyncProductsAccountId] = useState("");
@@ -213,35 +219,85 @@ export default function DadosPage() {
     }
   }
 
+  function splitIntoMonthlyChunks(start: string, end: string) {
+    const chunks: Array<{ start: string; end: string }> = [];
+    const cur = new Date(`${start}T00:00:00`);
+    const endDate = new Date(`${end}T00:00:00`);
+
+    while (cur <= endDate) {
+      const chunkStart = cur.toISOString().slice(0, 10);
+      const lastOfMonth = new Date(cur.getFullYear(), cur.getMonth() + 1, 0);
+      const chunkEnd = lastOfMonth <= endDate
+        ? lastOfMonth.toISOString().slice(0, 10)
+        : end;
+      chunks.push({ start: chunkStart, end: chunkEnd });
+      cur.setMonth(cur.getMonth() + 1);
+      cur.setDate(1);
+    }
+    return chunks;
+  }
+
   async function handleBatchCollect() {
     setBatchStatus("loading");
     setBatchResult(null);
     setBatchError(null);
+    setBatchTotalRecords(0);
 
-    try {
-      const res = await fetch("/api/hotmart/batch-collect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          account_id: batchAccountId,
-          start_date: batchStart,
-          end_date: batchEnd,
-        }),
-      });
-      const json = await res.json();
+    const chunks = splitIntoMonthlyChunks(batchStart, batchEnd).map((c) => ({
+      ...c, status: "pending" as const,
+    }));
+    setBatchChunks(chunks);
 
-      if (!res.ok) {
+    let total = 0;
+
+    for (let i = 0; i < chunks.length; i++) {
+      setBatchChunks((prev) =>
+        prev ? prev.map((c, idx) => idx === i ? { ...c, status: "loading" } : c) : prev
+      );
+
+      try {
+        const res = await fetch("/api/hotmart/batch-collect", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            account_id: batchAccountId,
+            start_date: chunks[i].start,
+            end_date: chunks[i].end,
+          }),
+        });
+        const json = await res.json();
+
+        if (!res.ok) {
+          setBatchChunks((prev) =>
+            prev ? prev.map((c, idx) => idx === i ? { ...c, status: "error", error: json.error ?? "Erro" } : c) : prev
+          );
+          setBatchStatus("error");
+          setBatchError(`Falha no chunk ${chunks[i].start}→${chunks[i].end}: ${json.error ?? "Erro desconhecido"}`);
+          return;
+        }
+
+        total += json.salesRecords ?? 0;
+        setBatchTotalRecords(total);
+        setBatchChunks((prev) =>
+          prev ? prev.map((c, idx) => idx === i ? { ...c, status: "success", records: json.salesRecords } : c) : prev
+        );
+
+        if (i < chunks.length - 1) {
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+      } catch {
+        setBatchChunks((prev) =>
+          prev ? prev.map((c, idx) => idx === i ? { ...c, status: "error", error: "Falha de rede" } : c) : prev
+        );
         setBatchStatus("error");
-        setBatchError(json.error ?? "Erro desconhecido");
-      } else {
-        setBatchStatus("success");
-        setBatchResult({ salesRecords: json.salesRecords });
-        await fetchLogs(activeTab);
+        setBatchError("Falha na comunicação com o servidor");
+        return;
       }
-    } catch {
-      setBatchStatus("error");
-      setBatchError("Falha na comunicação com o servidor");
     }
+
+    setBatchStatus("success");
+    setBatchResult({ salesRecords: total });
+    await fetchLogs(activeTab);
   }
 
   async function handleYouTubeBatchCollect() {
@@ -365,6 +421,19 @@ export default function DadosPage() {
   const sectionLabels = PLATFORM_TABS.map((p) => PLATFORM_LABELS[p]);
   const activeLabel = PLATFORM_LABELS[activeTab];
   const batchCanSubmit = !!batchAccountId && !!batchStart && !!batchEnd && batchStatus !== "loading";
+
+  const CHUNK_STATUS_ICON: Record<string, string> = {
+    pending: "○",
+    loading: "◌",
+    success: "●",
+    error: "✕",
+  };
+  const CHUNK_STATUS_COLOR: Record<string, string> = {
+    pending: "var(--color-text-muted)",
+    loading: "var(--orange)",
+    success: "var(--emerald)",
+    error: "var(--color-danger)",
+  };
 
   function handleTabSelect(label: string) {
     const platform = PLATFORM_TABS.find((p) => PLATFORM_LABELS[p] === label);
@@ -558,11 +627,11 @@ export default function DadosPage() {
                 </div>
                 <div>
                   <label className="mb-1 block text-[13px] font-medium" style={{ color: "var(--color-text-muted)" }}>Data inicial</label>
-                  <input type="date" value={batchStart} onChange={(e) => setBatchStart(e.target.value)} className="field-control" />
+                  <input type="date" value={batchStart} onChange={(e) => { setBatchStart(e.target.value); setBatchChunks(null); setBatchStatus("idle"); }} className="field-control" />
                 </div>
                 <div>
                   <label className="mb-1 block text-[13px] font-medium" style={{ color: "var(--color-text-muted)" }}>Data final</label>
-                  <input type="date" value={batchEnd} onChange={(e) => setBatchEnd(e.target.value)} className="field-control" />
+                  <input type="date" value={batchEnd} onChange={(e) => { setBatchEnd(e.target.value); setBatchChunks(null); setBatchStatus("idle"); }} className="field-control" />
                 </div>
                 <div className="flex items-end">
                   <button type="button" onClick={handleBatchCollect} disabled={!batchCanSubmit} className="btn-primary w-full">
@@ -571,8 +640,39 @@ export default function DadosPage() {
                 </div>
               </div>
 
+              {batchChunks && batchChunks.length > 0 ? (
+                <div className="mt-4" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Progresso — {batchChunks.filter((c) => c.status === "success").length}/{batchChunks.length} lotes
+                    {batchStatus === "loading" ? ` · ${batchTotalRecords.toLocaleString("pt-BR")} registros acumulados` : ""}
+                  </p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    {batchChunks.map((chunk, i) => (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                        <span style={{ color: CHUNK_STATUS_COLOR[chunk.status], fontFamily: "monospace", minWidth: 14 }}>
+                          {CHUNK_STATUS_ICON[chunk.status]}
+                        </span>
+                        <span style={{ color: "var(--color-text)", fontFamily: "monospace" }}>
+                          {chunk.start} → {chunk.end}
+                        </span>
+                        {chunk.status === "success" && (
+                          <span style={{ color: "var(--emerald)", marginLeft: 4 }}>
+                            {(chunk.records ?? 0).toLocaleString("pt-BR")} registros
+                          </span>
+                        )}
+                        {chunk.status === "error" && (
+                          <span style={{ color: "var(--color-danger)", marginLeft: 4 }}>{chunk.error}</span>
+                        )}
+                        {chunk.status === "loading" && (
+                          <span style={{ color: "var(--orange)", marginLeft: 4 }}>coletando...</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               {batchStatus === "success" && batchResult ? (
-                <div className="mt-4"><StatusBadge tone="success" label={`${batchResult.salesRecords} registros coletados`} /></div>
+                <div className="mt-4"><StatusBadge tone="success" label={`${batchResult.salesRecords.toLocaleString("pt-BR")} registros coletados em ${batchChunks?.length ?? 1} lotes`} /></div>
               ) : null}
               {batchStatus === "error" && batchError ? (
                 <div className="mt-4"><StatusBadge tone="error" label={batchError} /></div>

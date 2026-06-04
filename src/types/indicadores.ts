@@ -39,6 +39,7 @@ export interface FilterRecord {
   name: string;
   hotmart_products: Array<{ product_id: string; product_name: string }>;
   meta_ads_terms: string[];
+  captacao_leads_eventos: string[];
   created_at: string;
   updated_at: string;
 }

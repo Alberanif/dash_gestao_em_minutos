@@ -241,28 +241,42 @@ describe("HorizontalFunnelFlow", () => {
 // ── getPartialFilterWarning ───────────────────────────────────────────────────
 
 describe("getPartialFilterWarning", () => {
-  it("warns about Hotmart when only Meta terms are provided", () => {
-    const result = getPartialFilterWarning([], ["lançamento"]);
+  const product = { product_id: "1", product_name: "Curso" };
+
+  it("warns about Hotmart and Leads when only Meta terms are provided", () => {
+    const result = getPartialFilterWarning([], ["lançamento"], []);
     expect(result).not.toBeNull();
     expect(result).toContain("Hotmart");
+    expect(result).toContain("Leads");
   });
 
-  it("warns about Meta Ads when only Hotmart products are provided", () => {
-    const result = getPartialFilterWarning([{ product_id: "1", product_name: "Curso" }], []);
+  it("warns about Meta Ads and Leads when only Hotmart products are provided", () => {
+    const result = getPartialFilterWarning([product], [], []);
     expect(result).not.toBeNull();
+    expect(result).toContain("Meta Ads");
+    expect(result).toContain("Leads");
+  });
+
+  it("warns about Leads when only Hotmart and Meta are configured", () => {
+    const result = getPartialFilterWarning([product], ["lançamento"], []);
+    expect(result).not.toBeNull();
+    expect(result).toContain("Leads");
+  });
+
+  it("warns about Hotmart and Meta when only leads events are configured", () => {
+    const result = getPartialFilterWarning([], [], ["Inscricao Webinar"]);
+    expect(result).not.toBeNull();
+    expect(result).toContain("Hotmart");
     expect(result).toContain("Meta Ads");
   });
 
-  it("returns null when both sources are configured", () => {
-    const result = getPartialFilterWarning(
-      [{ product_id: "1", product_name: "Curso" }],
-      ["lançamento"]
-    );
+  it("returns null when all three sources are configured", () => {
+    const result = getPartialFilterWarning([product], ["lançamento"], ["Inscricao Webinar"]);
     expect(result).toBeNull();
   });
 
-  it("returns null when both sources are empty (existing validation handles this)", () => {
-    const result = getPartialFilterWarning([], []);
+  it("returns null when all sources are empty (existing validation handles this)", () => {
+    const result = getPartialFilterWarning([], [], []);
     expect(result).toBeNull();
   });
 });
@@ -332,48 +346,39 @@ describe("IndicadoresEmptyState", () => {
 import { deriveSourceFlags } from "@/app/indicadores/source-flags";
 
 describe("deriveSourceFlags", () => {
-  it("only meta terms → hasMetaFilter true, hasHotmartFilter false", () => {
-    const filter: FilterRecord = {
-      id: "f1", account_id: "acc1", name: "Meta only",
+  const base: FilterRecord = {
+    id: "f1", account_id: "acc1", name: "test",
+    meta_ads_terms: [], hotmart_products: [], captacao_leads_eventos: [],
+    created_at: "2024-01-01T00:00:00Z", updated_at: "2024-01-01T00:00:00Z",
+  };
+
+  it("only meta terms → hasMetaFilter true, others false", () => {
+    const filter = { ...base, meta_ads_terms: ["lançamento"] };
+    expect(deriveSourceFlags(filter)).toEqual({ hasMetaFilter: true, hasHotmartFilter: false, hasLeadsFilter: false });
+  });
+
+  it("only hotmart products → hasHotmartFilter true, others false", () => {
+    const filter = { ...base, hotmart_products: [{ product_id: "p1", product_name: "Curso" }] };
+    expect(deriveSourceFlags(filter)).toEqual({ hasMetaFilter: false, hasHotmartFilter: true, hasLeadsFilter: false });
+  });
+
+  it("only leads eventos → hasLeadsFilter true, others false", () => {
+    const filter = { ...base, captacao_leads_eventos: ["Inscricao Webinar"] };
+    expect(deriveSourceFlags(filter)).toEqual({ hasMetaFilter: false, hasHotmartFilter: false, hasLeadsFilter: true });
+  });
+
+  it("all three configured → all flags true", () => {
+    const filter = {
+      ...base,
       meta_ads_terms: ["lançamento"],
-      hotmart_products: [],
-      created_at: "2024-01-01T00:00:00Z",
-      updated_at: "2024-01-01T00:00:00Z",
-    };
-    expect(deriveSourceFlags(filter)).toEqual({ hasMetaFilter: true, hasHotmartFilter: false });
-  });
-
-  it("only hotmart products → hasMetaFilter false, hasHotmartFilter true", () => {
-    const filter: FilterRecord = {
-      id: "f2", account_id: "acc1", name: "Hotmart only",
-      meta_ads_terms: [],
       hotmart_products: [{ product_id: "p1", product_name: "Curso" }],
-      created_at: "2024-01-01T00:00:00Z",
-      updated_at: "2024-01-01T00:00:00Z",
+      captacao_leads_eventos: ["Inscricao Webinar"],
     };
-    expect(deriveSourceFlags(filter)).toEqual({ hasMetaFilter: false, hasHotmartFilter: true });
+    expect(deriveSourceFlags(filter)).toEqual({ hasMetaFilter: true, hasHotmartFilter: true, hasLeadsFilter: true });
   });
 
-  it("both configured → hasMetaFilter true, hasHotmartFilter true", () => {
-    const filter: FilterRecord = {
-      id: "f3", account_id: "acc1", name: "Both",
-      meta_ads_terms: ["lançamento"],
-      hotmart_products: [{ product_id: "p1", product_name: "Curso" }],
-      created_at: "2024-01-01T00:00:00Z",
-      updated_at: "2024-01-01T00:00:00Z",
-    };
-    expect(deriveSourceFlags(filter)).toEqual({ hasMetaFilter: true, hasHotmartFilter: true });
-  });
-
-  it("neither configured → hasMetaFilter false, hasHotmartFilter false", () => {
-    const filter: FilterRecord = {
-      id: "f4", account_id: "acc1", name: "Neither",
-      meta_ads_terms: [],
-      hotmart_products: [],
-      created_at: "2024-01-01T00:00:00Z",
-      updated_at: "2024-01-01T00:00:00Z",
-    };
-    expect(deriveSourceFlags(filter)).toEqual({ hasMetaFilter: false, hasHotmartFilter: false });
+  it("neither configured → all flags false", () => {
+    expect(deriveSourceFlags(base)).toEqual({ hasMetaFilter: false, hasHotmartFilter: false, hasLeadsFilter: false });
   });
 });
 
@@ -386,6 +391,7 @@ const sampleFilters: FilterRecord[] = [
     name: "Filtro Alpha",
     hotmart_products: [],
     meta_ads_terms: [],
+    captacao_leads_eventos: [],
     created_at: "2024-01-01T00:00:00Z",
     updated_at: "2024-01-01T00:00:00Z",
   },

@@ -11,12 +11,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<Pa
 
   const { id } = await params;
   const body = await request.json();
-  const { name, hotmart_products, meta_ads_terms } = body ?? {};
+  const { name, hotmart_products, meta_ads_terms, captacao_leads_eventos } = body ?? {};
 
   const supabase = createSupabaseServiceClient();
   const { data, error: dbError } = await supabase
     .from("dash_gestao_filters")
-    .update({ name, hotmart_products, meta_ads_terms, updated_at: new Date().toISOString() })
+    .update({ name, hotmart_products, meta_ads_terms, captacao_leads_eventos, updated_at: new Date().toISOString() })
     .eq("id", id)
     .select()
     .single();

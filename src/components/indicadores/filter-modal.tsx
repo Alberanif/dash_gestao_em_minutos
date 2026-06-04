@@ -8,24 +8,24 @@ interface HotmartProduct {
   product_name: string;
 }
 
-/**
- * Returns a warning message when only one data source is configured, or null
- * when both are configured (no warning needed) or both are empty (the existing
- * required-field validation already handles that case).
- */
 export function getPartialFilterWarning(
   hotmartProducts: HotmartProduct[],
-  cleanTerms: string[]
+  cleanTerms: string[],
+  captacaoLeadsEventos: string[]
 ): string | null {
   const hasHotmart = hotmartProducts.length > 0;
   const hasMeta = cleanTerms.length > 0;
-  if (hasHotmart && !hasMeta) {
-    return "Sem termos do Meta Ads configurados — dados de Meta Ads serão zerados no dashboard.";
-  }
-  if (!hasHotmart && hasMeta) {
-    return "Sem produtos Hotmart configurados — dados de Hotmart serão zerados no dashboard.";
-  }
-  return null;
+  const hasLeads = captacaoLeadsEventos.length > 0;
+
+  const configuredCount = [hasHotmart, hasMeta, hasLeads].filter(Boolean).length;
+  if (configuredCount === 0 || configuredCount === 3) return null;
+
+  const missing: string[] = [];
+  if (!hasHotmart) missing.push("dados de Hotmart");
+  if (!hasMeta) missing.push("dados de Meta Ads");
+  if (!hasLeads) missing.push("Captação de Leads");
+
+  return `${missing.join(" e ")} serão zerados no dashboard.`;
 }
 
 interface FilterModalProps {
@@ -43,6 +43,11 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
   const [metaTerms, setMetaTerms] = useState<string[]>(
     editTarget?.meta_ads_terms?.length ? editTarget.meta_ads_terms : [""]
   );
+  const [captacaoLeadsEventos, setCaptacaoLeadsEventos] = useState<string[]>(
+    editTarget?.captacao_leads_eventos ?? []
+  );
+  const [availableEventos, setAvailableEventos] = useState<string[]>([]);
+  const [loadingEventos, setLoadingEventos] = useState(false);
   const [productOptions, setProductOptions] = useState<HotmartProduct[]>([]);
   const [productSearch, setProductSearch] = useState("");
   const [productDropOpen, setProductDropOpen] = useState(false);
@@ -52,6 +57,15 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
   const [partialWarning, setPartialWarning] = useState("");
   const [partialWarningShown, setPartialWarningShown] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setLoadingEventos(true);
+    fetch("/api/indicadores/leads/events")
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setAvailableEventos(data); })
+      .catch(() => {})
+      .finally(() => setLoadingEventos(false));
+  }, []);
 
   // Server-side search: fires on every keystroke (debounced 300ms).
   // Uses /api/funnels/products which searches by both name and product_id
@@ -86,12 +100,12 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
     return () => document.removeEventListener("keydown", handleKey);
   }, [onCancel]);
 
-  // Reset the "already warned" flag whenever the user edits either source,
+  // Reset the "already warned" flag whenever the user edits any source,
   // so the two-step save protection fires correctly after subsequent changes.
   useEffect(() => {
     setPartialWarning("");
     setPartialWarningShown(false);
-  }, [hotmartProducts, metaTerms]);
+  }, [hotmartProducts, metaTerms, captacaoLeadsEventos]);
 
   const selectedIds = new Set(hotmartProducts.map((p) => p.product_id));
   const filteredOptions = productOptions.filter((p) => !selectedIds.has(p.product_id));
@@ -122,13 +136,13 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
       setError("Nome é obrigatório.");
       return;
     }
-    if (hotmartProducts.length === 0 && cleanTerms.length === 0) {
-      setError("Selecione pelo menos um produto ou adicione um termo de campanha.");
+    if (hotmartProducts.length === 0 && cleanTerms.length === 0 && captacaoLeadsEventos.length === 0) {
+      setError("Selecione pelo menos um produto, termo de campanha ou evento de Captação de Leads.");
       return;
     }
     // Show partial-source warning once before proceeding; second click confirms
     if (!partialWarningShown) {
-      const warning = getPartialFilterWarning(hotmartProducts, cleanTerms);
+      const warning = getPartialFilterWarning(hotmartProducts, cleanTerms, captacaoLeadsEventos);
       if (warning) {
         setPartialWarning(warning);
         setPartialWarningShown(true);
@@ -144,8 +158,8 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
         : "/api/indicadores/filters";
       const method = editTarget ? "PUT" : "POST";
       const body = editTarget
-        ? { name: name.trim(), hotmart_products: hotmartProducts, meta_ads_terms: cleanTerms }
-        : { account_id: accountId, name: name.trim(), hotmart_products: hotmartProducts, meta_ads_terms: cleanTerms };
+        ? { name: name.trim(), hotmart_products: hotmartProducts, meta_ads_terms: cleanTerms, captacao_leads_eventos: captacaoLeadsEventos }
+        : { account_id: accountId, name: name.trim(), hotmart_products: hotmartProducts, meta_ads_terms: cleanTerms, captacao_leads_eventos: captacaoLeadsEventos };
 
       const res = await fetch(url, {
         method,
@@ -377,6 +391,49 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
           >
             + Adicionar termo
           </button>
+        </div>
+
+        {/* Captação de Leads events */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-2)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Captação de Leads
+          </label>
+          {loadingEventos ? (
+            <p style={{ fontSize: 12, color: "var(--text-3)", margin: 0 }}>Carregando eventos...</p>
+          ) : availableEventos.length === 0 ? (
+            <p style={{ fontSize: 12, color: "var(--text-3)", margin: 0 }}>Nenhum evento encontrado.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {availableEventos.map((ev) => {
+                const checked = captacaoLeadsEventos.includes(ev);
+                return (
+                  <label
+                    key={ev}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      fontSize: 13,
+                      color: "var(--text)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() =>
+                        setCaptacaoLeadsEventos((prev) =>
+                          checked ? prev.filter((e) => e !== ev) : [...prev, ev]
+                        )
+                      }
+                      style={{ accentColor: "var(--violet)", width: 14, height: 14 }}
+                    />
+                    {ev}
+                  </label>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {partialWarning && (

@@ -102,15 +102,6 @@ export async function GET(
     const pace_ideal = Math.round(goal_sales / totalDays);
     const sales_remaining = Math.max(0, goal_sales - total_sales);
 
-    console.log(`[Metrics] lancamento_pago ${id}:`, {
-      total_sales,
-      total_spend,
-      spendRows: spendRows.length,
-      cac,
-      campaign_ids: config.campaign_ids,
-      ad_account_ids: config.ad_account_ids,
-    });
-
     const metrics: FunnelMetrics = {
       type: "lancamento_pago",
       total_sales,

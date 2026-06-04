@@ -242,39 +242,54 @@ export default function IndicadoresPage() {
     offerCode: string | null = null,
   ) => {
     // Derive which sources are actually configured in this filter
-    const { hasMetaFilter, hasHotmartFilter } = filter
+    const { hasMetaFilter, hasHotmartFilter, hasLeadsFilter } = filter
       ? deriveSourceFlags(filter)
-      : { hasMetaFilter: false, hasHotmartFilter: false };
+      : { hasMetaFilter: false, hasHotmartFilter: false, hasLeadsFilter: false };
+
+    const ZEROED_LEADS: GlobalLeadsMetrics = { total: 0, by_event: [] };
 
     // Immediately zero out states for unconfigured sources (no loading spinner)
     setMetaState(hasMetaFilter ? initialSection() : { data: ZEROED_META, loading: false, error: false });
     setHotmartState(hasHotmartFilter ? initialSection() : { data: ZEROED_HOTMART, loading: false, error: false });
-    setLeadsState(initialSection());
+    setLeadsState(hasLeadsFilter ? initialSection() : { data: ZEROED_LEADS, loading: false, error: false });
     setDailyState(initialSection());
 
     let params = `?start_date=${start}&end_date=${end}`;
     if (filter) {
       filter.meta_ads_terms.forEach((t) => { params += `&meta_terms[]=${encodeURIComponent(t)}`; });
       filter.hotmart_products.forEach((p) => { params += `&product_ids[]=${encodeURIComponent(p.product_id)}`; });
+      (filter.captacao_leads_eventos ?? []).forEach((e) => { params += `&eventos[]=${encodeURIComponent(e)}`; });
     }
     if (offerCode) {
       params += `&offer_code=${encodeURIComponent(offerCode)}`;
     }
 
-    // Fetch all four sources in parallel; skip meta/hotmart with Promise.resolve(null) when unconfigured
+    let leadsParams = `?start_date=${start}&end_date=${end}`;
+    if (filter) {
+      (filter.captacao_leads_eventos ?? []).forEach((e) => { leadsParams += `&eventos[]=${encodeURIComponent(e)}`; });
+    }
+
+    // Fetch all four sources in parallel; skip unconfigured sources with Promise.resolve(null)
+    const jsonOrThrow = (r: Response) => {
+      if (!r.ok) throw new Error(`API error ${r.status}`);
+      return r.json();
+    };
+
     const [leadsRes, dailyRes, metaRes, hotmartRes] = await Promise.allSettled([
-      fetch(`/api/indicadores/leads?start_date=${start}&end_date=${end}`).then((r) => r.json()),
-      fetch(`/api/indicadores/daily${params}`).then((r) => r.json()),
+      hasLeadsFilter
+        ? fetch(`/api/indicadores/leads${leadsParams}`).then(jsonOrThrow)
+        : Promise.resolve(null),
+      fetch(`/api/indicadores/daily${params}`).then(jsonOrThrow),
       hasMetaFilter
-        ? fetch(`/api/indicadores/metrics${params}`).then((r) => r.json())
+        ? fetch(`/api/indicadores/metrics${params}`).then(jsonOrThrow)
         : Promise.resolve(null),
       hasHotmartFilter
-        ? fetch(`/api/indicadores/hotmart${params}`).then((r) => r.json())
+        ? fetch(`/api/indicadores/hotmart${params}`).then(jsonOrThrow)
         : Promise.resolve(null),
     ]);
 
     setLeadsState({
-      data: leadsRes.status === "fulfilled" ? leadsRes.value : null,
+      data: leadsRes.status === "fulfilled" && leadsRes.value !== null ? leadsRes.value : ZEROED_LEADS,
       loading: false,
       error: leadsRes.status === "rejected",
     });

@@ -52,12 +52,6 @@ export async function GET(request: NextRequest) {
     query = query.lte("date", endDateOnly);
   }
 
-  console.log("[Instagram Profile API] Query parameters:", {
-    accountId,
-    startDateOnly,
-    endDateOnly,
-  });
-
   const { data, error: dbError } = await query.order("date", { ascending: true });
 
   if (dbError) {
@@ -75,14 +69,6 @@ export async function GET(request: NextRequest) {
     ...row,
     collected_at: row.date,
   }));
-
-  console.log("[Instagram Profile API] Returning data:", {
-    accountId,
-    startDate: startDateStr,
-    endDate: endDateStr,
-    recordCount: transformed.length,
-    hasData: transformed.length > 0,
-  });
 
   return NextResponse.json(transformed);
 }

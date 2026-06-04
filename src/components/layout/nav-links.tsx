@@ -2,21 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { UserRole } from "@/types/auth";
 
-interface NavLink {
+interface NavItem {
   href: string;
   label: string;
-  icon: React.ReactNode;
-  restrictedTo?: UserRole[];
+  icon: React.ReactElement;
 }
 
-const LINKS: NavLink[] = [
+const LINKS: NavItem[] = [
   {
     href: "/dashboard/posicionamento",
     label: "Posicionamento",
     icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
         <circle cx="12" cy="9" r="2.5" />
       </svg>
@@ -26,7 +24,7 @@ const LINKS: NavLink[] = [
     href: "/dashboard/relacionamento",
     label: "Relacionamento",
     icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
         <circle cx="9" cy="7" r="4" />
         <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
@@ -38,7 +36,7 @@ const LINKS: NavLink[] = [
     href: "/dashboard/prestar-atencao",
     label: "Prestar Atenção",
     icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
         <circle cx="12" cy="12" r="3" />
       </svg>
@@ -48,7 +46,7 @@ const LINKS: NavLink[] = [
     href: "/dashboard/eqa",
     label: "EQA",
     icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 3h18v4H3z" />
         <path d="M3 9h12v4H3z" />
         <path d="M3 15h7v4H3z" />
@@ -59,7 +57,7 @@ const LINKS: NavLink[] = [
     href: "/dashboard/convite",
     label: "Convite",
     icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M22 12h-4l-3 8-6-16-3 8H2" />
       </svg>
     ),
@@ -68,7 +66,7 @@ const LINKS: NavLink[] = [
     href: "/dashboard/entrega-nivel-a",
     label: "Entrega Nível A",
     icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2L2 7l10 5 10-5-10-5z" />
         <polyline points="2 12 12 17 22 12" />
         <polyline points="2 17 12 22 22 17" />
@@ -79,7 +77,7 @@ const LINKS: NavLink[] = [
     href: "/dashboard/ltv",
     label: "LTV",
     icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <line x1="18" y1="20" x2="18" y2="10" />
         <line x1="12" y1="20" x2="12" y2="4" />
         <line x1="6" y1="20" x2="6" y2="14" />
@@ -88,58 +86,24 @@ const LINKS: NavLink[] = [
   },
 ];
 
-interface NavLinksProps {
-  collapsed?: boolean;
-  role: UserRole;
-}
-
-export function NavLinks({ collapsed = false, role }: NavLinksProps) {
+export function NavLinks() {
   const pathname = usePathname();
 
-  const visibleLinks = LINKS.filter((link) => {
-    if (!link.restrictedTo) return true;
-    return !link.restrictedTo.includes(role);
-  });
-
   return (
-    <div className="flex flex-col gap-1 px-2">
-      {visibleLinks.map(({ href, label, icon }) => {
+    <>
+      {LINKS.map(({ href, label, icon }) => {
         const isActive = pathname.startsWith(href);
         return (
-          <div key={href} className="group relative">
-            <Link
-              href={href}
-              className={`flex rounded-r-[10px] text-sm font-medium transition-colors ${
-                collapsed
-                  ? "justify-center px-0 py-2.5 hover:bg-slate-50 hover:text-slate-900"
-                  : "items-center gap-3 px-4 py-2.5 hover:bg-slate-50 hover:text-slate-900"
-              }`}
-              style={
-                isActive
-                  ? {
-                      background: "var(--color-primary-light)",
-                      color: "var(--color-primary)",
-                      borderLeft: "3px solid var(--color-primary)",
-                    }
-                  : {
-                      color: "var(--color-text-muted)",
-                    }
-              }
-            >
-              <span className="flex h-[18px] w-[18px] items-center justify-center">{icon}</span>
-              {!collapsed ? <span>{label}</span> : null}
-            </Link>
-            {collapsed ? (
-              <span
-                className="pointer-events-none absolute left-[calc(100%+12px)] top-1/2 z-30 hidden -translate-y-1/2 whitespace-nowrap rounded-md px-2 py-1 text-xs font-medium text-white shadow-md group-hover:block"
-                style={{ background: "var(--color-text)" }}
-              >
-                {label}
-              </span>
-            ) : null}
-          </div>
+          <Link
+            key={href}
+            href={href}
+            className={isActive ? "nav-link active" : "nav-link"}
+          >
+            {icon}
+            <span>{label}</span>
+          </Link>
         );
       })}
-    </div>
+    </>
   );
 }

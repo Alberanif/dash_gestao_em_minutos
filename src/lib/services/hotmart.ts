@@ -3,7 +3,7 @@ import type { Account, HotmartCredentials } from "@/types/accounts";
 
 const HOTMART_TOKEN_URL = "https://api-sec-vlc.hotmart.com/security/oauth/token";
 const HOTMART_SALES_URL = "https://developers.hotmart.com/payments/api/v1/sales/history";
-const HOTMART_PRODUCTS_URL = "https://developers.hotmart.com/product/rest/v1/products";
+const HOTMART_PRODUCTS_URL = "https://developers.hotmart.com/products/api/v1/products";
 
 async function fetchHotmartToken(clientId: string, clientSecret: string): Promise<string> {
   const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
@@ -117,6 +117,38 @@ export async function collectHotmart(
     collected_at: now.toISOString(),
   }));
 
+  // Garantir que todos os offer_codes referenciados existam em hotmart_offers
+  // antes do upsert de vendas (evita violação de FK com ofertas históricas).
+  const offerMap = new Map<string, { product_id: string; offer_name: string }>();
+  for (const item of allItems) {
+    const code = item.purchase.offer?.code;
+    if (code && !offerMap.has(code)) {
+      offerMap.set(code, {
+        product_id: String(item.product.id),
+        offer_name: item.purchase.offer?.name ?? code,
+      });
+    }
+  }
+
+  if (offerMap.size > 0) {
+    const placeholderOffers = Array.from(offerMap.entries()).map(([code, meta]) => ({
+      account_id: account.id,
+      product_id: meta.product_id,
+      offer_code: code,
+      offer_name: meta.offer_name,
+      price: null,
+      currency: null,
+      is_main_offer: false,
+      updated_at: now.toISOString(),
+    }));
+
+    const { error: offersErr } = await supabase
+      .from("dash_gestao_hotmart_offers")
+      .upsert(placeholderOffers, { onConflict: "offer_code", ignoreDuplicates: true });
+
+    if (offersErr) throw new Error(`Hotmart offers pre-upsert error: ${offersErr.message}`);
+  }
+
   const { error } = await supabase
     .from("dash_gestao_hotmart_sales")
     .upsert(rows, { onConflict: "transaction_code" });
@@ -129,14 +161,16 @@ export async function collectHotmart(
 // ── Products & Offers sync ───────────────────────────────────────────────────
 
 interface HotmartProductApiItem {
-  product: { id: number; name: string };
+  id: number;
+  name: string;
+  ucode: string; // UUID usado no endpoint de ofertas
 }
 interface HotmartProductsApiResponse {
   items: HotmartProductApiItem[];
   page_info?: { next_page_token?: string };
 }
 interface HotmartOfferApiItem {
-  offer_code: string;
+  code: string;
   name: string;
   price?: { value: number; currency_code: string };
   is_main_offer?: boolean;
@@ -167,11 +201,18 @@ export async function syncHotmartProducts(
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
+    const resText = await res.text();
+
     if (!res.ok) {
-      throw new Error(`Hotmart products API error: ${res.status} ${await res.text()}`);
+      throw new Error(`Hotmart products API error: ${res.status} ${resText.slice(0, 500)}`);
     }
 
-    const data: HotmartProductsApiResponse = await res.json();
+    let data: HotmartProductsApiResponse;
+    try {
+      data = JSON.parse(resText);
+    } catch {
+      throw new Error(`Hotmart products API retornou não-JSON. Status: ${res.status}. Corpo: ${resText.slice(0, 500)}`);
+    }
     allProducts.push(...(data.items ?? []));
     pageToken = data.page_info?.next_page_token;
   } while (pageToken);
@@ -180,8 +221,8 @@ export async function syncHotmartProducts(
   if (allProducts.length > 0) {
     const productRows = allProducts.map((item) => ({
       account_id: account.id,
-      product_id: String(item.product.id),
-      product_name: item.product.name,
+      product_id: String(item.id),
+      product_name: item.name,
       is_active: true,
       updated_at: now,
     }));
@@ -197,7 +238,7 @@ export async function syncHotmartProducts(
   let totalOffersRecords = 0;
 
   for (const item of allProducts) {
-    const offersUrl = `${HOTMART_PRODUCTS_URL}/${item.product.id}/offers`;
+    const offersUrl = `${HOTMART_PRODUCTS_URL}/${item.ucode}/offers`;
     const offersRes = await fetch(offersUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
@@ -212,8 +253,8 @@ export async function syncHotmartProducts(
     if (offerItems.length > 0) {
       const offerRows = offerItems.map((offer) => ({
         account_id: account.id,
-        product_id: String(item.product.id),
-        offer_code: offer.offer_code,
+        product_id: String(item.id),
+        offer_code: offer.code,
         offer_name: offer.name,
         price: offer.price?.value ?? null,
         currency: offer.price?.currency_code ?? null,
@@ -232,24 +273,28 @@ export async function syncHotmartProducts(
   }
 
   // 4. Soft-delete products present in DB but absent from the API response
-  const apiProductIds = allProducts.map((item) => String(item.product.id));
+  const apiProductIds = allProducts.map((item) => String(item.id));
 
-  const { data: existingRows } = await supabase
-    .from("dash_gestao_hotmart_products")
-    .select("product_id")
-    .eq("account_id", account.id)
-    .not("product_id", "in", `(${apiProductIds.join(",")})`);
-
-  if (existingRows && existingRows.length > 0) {
-    const removedIds = existingRows.map((r: { product_id: string }) => r.product_id);
-
-    const { error: deactivateError } = await supabase
+  if (apiProductIds.length > 0) {
+    const { data: existingRows, error: selectError } = await supabase
       .from("dash_gestao_hotmart_products")
-      .update({ is_active: false, updated_at: now })
+      .select("product_id")
       .eq("account_id", account.id)
-      .in("product_id", removedIds);
+      .not("product_id", "in", `(${apiProductIds.join(",")})`);
 
-    if (deactivateError) throw new Error(`Hotmart soft-delete error: ${deactivateError.message}`);
+    if (selectError) throw new Error(`Hotmart soft-delete select error: ${selectError.message}`);
+
+    if (existingRows && existingRows.length > 0) {
+      const removedIds = existingRows.map((r: { product_id: string }) => r.product_id);
+
+      const { error: deactivateError } = await supabase
+        .from("dash_gestao_hotmart_products")
+        .update({ is_active: false, updated_at: now })
+        .eq("account_id", account.id)
+        .in("product_id", removedIds);
+
+      if (deactivateError) throw new Error(`Hotmart soft-delete error: ${deactivateError.message}`);
+    }
   }
 
   return { productsRecords: allProducts.length, offersRecords: totalOffersRecords };

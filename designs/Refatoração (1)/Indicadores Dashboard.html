@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Indicadores — IGT</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#07101f;
+  --sf:#0d1829;
+  --s2:#121e32;
+  --br:#1c2b40;
+  --bv:#253852;
+  --tx:#ddeaf6;
+  --t2:#7b9ab6;
+  --t3:#3c566f;
+  --t4:#253648;
+  --vi:#9070e8;
+  --em:#0daa7c;
+  --or:#e87220;
+  --bl:#3d84f5;
+  --gn:#1ab96c;
+  --cy:#0899c0;
+  --am:#d99512;
+  --rd:#e04242;
+}
+body{background:var(--bg);color:var(--tx);font-family:'DM Sans',system-ui,sans-serif;line-height:1.5;min-height:100vh;}
+.w{max-width:1200px;margin:0 auto;padding:0 24px 60px;}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.hdr{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:20px 0;border-bottom:1px solid var(--bv);margin-bottom:32px;}
+.hl{display:flex;align-items:center;gap:12px;}
+.back{font-size:13px;color:var(--t3);text-decoration:none;display:flex;align-items:center;gap:5px;transition:color 150ms;}
+.back:hover{color:var(--t2);}
+.hdiv{width:1px;height:16px;background:var(--bv);}
+.ptit{font-size:17px;font-weight:600;color:var(--tx);letter-spacing:-.015em;}
+.per{display:flex;align-items:center;flex-wrap:wrap;gap:8px;}
+.pset{display:flex;gap:2px;background:var(--sf);border:1px solid var(--bv);border-radius:8px;padding:3px;}
+.pb{padding:4px 11px;font-size:11px;font-weight:600;border-radius:6px;border:none;cursor:pointer;background:transparent;color:var(--t3);font-family:inherit;transition:background 150ms,color 150ms;}
+.pb:hover{color:var(--t2);}
+.pb.on{background:var(--bl);color:#fff;}
+.dp{display:flex;align-items:center;gap:6px;}
+.di{font-size:12px;padding:5px 8px;width:126px;background:var(--sf);border:1px solid var(--bv);border-radius:6px;color:var(--tx);outline:none;font-family:inherit;}
+.di:focus{border-color:var(--bl);}
+.ds{font-size:12px;color:var(--t3);}
+
+/* ── Z layout ────────────────────────────────────────────────────────────── */
+.z{display:flex;flex-direction:column;gap:28px;}
+.row{width:100%;}
+.r3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.r2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;}
+@media(max-width:1024px){.r2{grid-template-columns:1fr;}}
+@media(max-width:760px){.r3{grid-template-columns:repeat(2,1fr);}.w{padding:0 16px 60px;}}
+@media(max-width:480px){.r3{grid-template-columns:1fr;}}
+
+/* ── Narrative label ─────────────────────────────────────────────────────── */
+.narr{display:flex;align-items:center;gap:9px;margin-bottom:12px;}
+.ns{font-family:'DM Mono',monospace;font-size:10px;color:var(--t4);letter-spacing:.05em;}
+.nl{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;}
+.nd{width:3px;height:3px;border-radius:50%;background:var(--t4);flex-shrink:0;}
+.ndesc{font-size:12px;color:var(--t3);}
+
+/* ── Hero KPI ────────────────────────────────────────────────────────────── */
+.hkpi{background:var(--sf);border:1px solid var(--bv);border-radius:10px;padding:22px 22px 20px;position:relative;overflow:hidden;}
+.hkpi-t{position:absolute;top:0;left:0;right:0;height:2px;}
+.hkpi-l{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);margin-bottom:14px;}
+.hkpi-v{font-family:'DM Mono',monospace;font-size:40px;font-weight:500;line-height:1;letter-spacing:-.02em;margin-bottom:8px;}
+.hkpi-s{font-size:12px;color:var(--t3);}
+.hkpi-delta{display:flex;align-items:center;gap:7px;margin-top:10px;padding-top:10px;border-top:1px solid var(--br);}
+.dbadge{display:inline-flex;align-items:center;gap:3px;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;border-radius:4px;padding:2px 7px;flex-shrink:0;}
+.dbadge.pos{color:var(--gn);background:rgba(26,185,108,.1);border:1px solid rgba(26,185,108,.2);}
+.dbadge.neg{color:var(--rd);background:rgba(224,66,66,.1);border:1px solid rgba(224,66,66,.2);}
+.dlbl{font-size:11px;color:var(--t3);}
+
+/* ── Card ────────────────────────────────────────────────────────────────── */
+.card{background:var(--sf);border:1px solid var(--bv);border-radius:10px;overflow:hidden;}
+.chead{display:flex;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--bv);}
+.cicon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+.ctit{font-size:13px;font-weight:600;color:var(--tx);}
+.cbadge{font-size:10px;border-radius:4px;padding:2px 7px;margin-left:2px;}
+.cbody{padding:20px;}
+
+/* ── KPI cells ───────────────────────────────────────────────────────────── */
+.kg{display:grid;gap:8px;}
+.g2{grid-template-columns:repeat(2,1fr);}
+.g3{grid-template-columns:repeat(3,1fr);}
+.g4{grid-template-columns:repeat(4,1fr);}
+@media(max-width:600px){.g4{grid-template-columns:repeat(2,1fr);}.g3{grid-template-columns:repeat(2,1fr);}}
+.kc{background:var(--s2);border:1px solid var(--br);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:5px;min-width:0;}
+.kl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);}
+.kv{font-family:'DM Mono',monospace;font-size:14px;font-weight:500;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.kv.lg{font-size:22px;}
+.ksep{height:1px;background:var(--br);margin:12px 0;}
+
+/* ── Funnel ──────────────────────────────────────────────────────────────── */
+.fstages{display:flex;align-items:stretch;gap:4px;}
+.fst{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;background:var(--s2);border:1px solid var(--bv);border-radius:8px;padding:14px 8px 0;overflow:hidden;}
+.fic{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.fv{font-family:'DM Mono',monospace;font-size:16px;font-weight:600;line-height:1;}
+.fl{font-size:9px;text-transform:uppercase;color:var(--t3);letter-spacing:.06em;text-align:center;padding-bottom:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;line-height:1.3;}
+.fb{position:absolute;bottom:0;left:0;right:0;height:2px;}
+.fconn{display:flex;flex-direction:column;align-items:center;gap:5px;padding:0 2px;flex-shrink:0;justify-content:center;}
+.fr{font-family:'DM Mono',monospace;font-size:9px;border-radius:4px;padding:2px 5px;white-space:nowrap;}
+.rate-ok{color:var(--gn);background:rgba(26,185,108,.12);border:1px solid rgba(26,185,108,.25);}
+.rate-warn{color:var(--am);background:rgba(217,149,18,.12);border:1px solid rgba(217,149,18,.25);}
+.rate-low{color:var(--rd);background:rgba(224,66,66,.12);border:1px solid rgba(224,66,66,.25);}
+.ffoot{border-top:1px solid var(--bv);margin-top:16px;padding-top:14px;display:flex;}
+.fm{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:0 12px;}
+.fm+.fm{border-left:1px solid var(--bv);}
+.fml{font-size:9px;text-transform:uppercase;color:var(--t3);letter-spacing:.07em;text-align:center;line-height:1.3;}
+.fmv{font-family:'DM Mono',monospace;font-size:14px;font-weight:500;color:var(--t2);}
+
+/* ── Charts ──────────────────────────────────────────────────────────────── */
+.clbl{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-top:18px;margin-bottom:6px;}
+
+/* ── Products table ──────────────────────────────────────────────────────── */
+.ptbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px;}
+.ptbl th{text-align:left;padding:6px 8px;color:var(--t3);font-weight:600;font-size:9px;text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--bv);}
+.ptbl td{padding:9px 8px;border-bottom:1px solid var(--br);color:var(--tx);}
+.ptbl .mn{font-family:'DM Mono',monospace;}
+.ptbl .r{text-align:right;}
+.ptbl tfoot td{border-top:2px solid var(--bv);border-bottom:none;font-weight:700;}
+
+/* ── Leads ───────────────────────────────────────────────────────────────── */
+.lgrid{display:grid;grid-template-columns:180px 1fr 1fr;gap:20px;align-items:start;}
+@media(max-width:860px){.lgrid{grid-template-columns:180px 1fr;}}
+@media(max-width:560px){.lgrid{grid-template-columns:1fr;}}
+.ltot{background:var(--s2);border:1px solid var(--br);border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:8px;}
+.ltl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);}
+.ltv{font-family:'DM Mono',monospace;font-size:36px;font-weight:500;color:var(--gn);line-height:1;}
+.lts{font-size:12px;color:var(--t3);}
+.etbl{width:100%;border-collapse:collapse;font-size:12px;}
+.etbl th{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);border-bottom:1px solid var(--bv);padding-bottom:8px;text-align:left;}
+.etbl th.r{text-align:right;}
+.etbl td{padding:9px 0;border-bottom:1px solid var(--br);}
+.etbl .ev{font-family:'DM Mono',monospace;color:var(--cy);font-size:11px;}
+.etbl .ct{text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:var(--tx);}
+
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+</style>
+</head>
+<body>
+<div class="w">
+
+<!-- ── Header ──────────────────────────────────────────────────────────────── -->
+<header class="hdr">
+  <div class="hl">
+    <a class="back" href="#">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      Módulos
+    </a>
+    <div class="hdiv"></div>
+    <h1 class="ptit">Indicadores</h1>
+  </div>
+  <div class="per">
+    <div class="pset">
+      <button class="pb">7d</button>
+      <button class="pb on">28d</button>
+      <button class="pb">90d</button>
+      <button class="pb">Mês atual</button>
+      <button class="pb">Mês anterior</button>
+    </div>
+    <div class="dp">
+      <input class="di" type="date" value="2026-05-05">
+      <span class="ds">até</span>
+      <input class="di" type="date" value="2026-06-01">
+    </div>
+  </div>
+</header>
+
+<!-- ── Z Layout ────────────────────────────────────────────────────────────── -->
+<div class="z">
+
+  <!-- ── 01 RESULTADO ──────────────────────────────────────────────────────── -->
+  <div class="row">
+    <div class="narr">
+      <span class="ns">01</span>
+      <span class="nl">Resultado</span>
+      <span class="nd"></span>
+      <span class="ndesc">Desempenho consolidado do período selecionado</span>
+    </div>
+    <div class="r3">
+
+      <div class="hkpi">
+        <div class="hkpi-t" style="background:var(--vi)"></div>
+        <div class="hkpi-l">ROAS</div>
+        <div class="hkpi-v" style="color:var(--vi)">4.21×</div>
+        <div class="hkpi-s">Receita ÷ Investimento</div>
+        <div class="hkpi-delta">
+          <span class="dbadge pos"><svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M4 6.5V1.5M1.5 4L4 1.5 6.5 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> +18.4%</span>
+          <span class="dlbl">vs. período anterior</span>
+        </div>
+      </div>
+
+      <div class="hkpi">
+        <div class="hkpi-t" style="background:var(--em)"></div>
+        <div class="hkpi-l">Receita BRL</div>
+        <div class="hkpi-v" style="color:var(--em)">R$&thinsp;287k</div>
+        <div class="hkpi-s">via Hotmart</div>
+        <div class="hkpi-delta">
+          <span class="dbadge pos"><svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M4 6.5V1.5M1.5 4L4 1.5 6.5 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> +22.1%</span>
+          <span class="dlbl">vs. período anterior</span>
+        </div>
+      </div>
+
+      <div class="hkpi">
+        <div class="hkpi-t" style="background:var(--or)"></div>
+        <div class="hkpi-l">Total de Vendas</div>
+        <div class="hkpi-v" style="color:var(--or)">142</div>
+        <div class="hkpi-s">total de conversões</div>
+        <div class="hkpi-delta">
+          <span class="dbadge pos"><svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M4 6.5V1.5M1.5 4L4 1.5 6.5 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> +15.4%</span>
+          <span class="dlbl">vs. período anterior</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── 02 JORNADA DE CONVERSÃO ───────────────────────────────────────────── -->
+  <div class="row">
+    <div class="narr">
+      <span class="ns">02</span>
+      <span class="nl">Jornada de Conversão</span>
+      <span class="nd"></span>
+      <span class="ndesc">Do investimento até a venda</span>
+    </div>
+    <div class="card" style="padding:20px;">
+
+      <div class="fstages">
+
+        <!-- Impressões -->
+        <div class="fst">
+          <div class="fic" style="background:rgba(123,154,182,.1);border:1px solid rgba(123,154,182,.2);color:var(--t2)">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1 8C1 8 3.5 3 8 3C12.5 3 15 8 15 8C15 8 12.5 13 8 13C3.5 13 1 8 1 8Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.4"/></svg>
+          </div>
+          <span class="fv" style="color:var(--t2)">245k</span>
+          <span class="fl">Impressões</span>
+          <div class="fb" style="background:var(--t2)"></div>
+        </div>
+
+        <div class="fconn">
+          <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M1 5h8M5.5 1.5l3.5 3.5-3.5 3.5" stroke="var(--t4)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="fr rate-ok">2.40%</span>
+        </div>
+
+        <!-- Cliques -->
+        <div class="fst">
+          <div class="fic" style="background:rgba(61,132,245,.1);border:1px solid rgba(61,132,245,.2);color:var(--bl)">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 2L4 11L6.5 8.5L8.5 13L10 12.3L8 7.5L11.5 7.5L4 2Z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <span class="fv" style="color:var(--bl)">5.880</span>
+          <span class="fl">Cliques</span>
+          <div class="fb" style="background:var(--bl)"></div>
+        </div>
+
+        <div class="fconn">
+          <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M1 5h8M5.5 1.5l3.5 3.5-3.5 3.5" stroke="var(--t4)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="fr rate-ok">55.1%</span>
+        </div>
+
+        <!-- Views LP -->
+        <div class="fst">
+          <div class="fic" style="background:rgba(8,153,192,.1);border:1px solid rgba(8,153,192,.2);color:var(--cy)">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2.5" width="13" height="9" rx="1.2" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 13.5H10.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M8 11.5V13.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          </div>
+          <span class="fv" style="color:var(--cy)">3.240</span>
+          <span class="fl">Views LP</span>
+          <div class="fb" style="background:var(--cy)"></div>
+        </div>
+
+        <div class="fconn">
+          <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M1 5h8M5.5 1.5l3.5 3.5-3.5 3.5" stroke="var(--t4)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="fr rate-ok">57.0%</span>
+        </div>
+
+        <!-- Leads -->
+        <div class="fst">
+          <div class="fic" style="background:rgba(26,185,108,.1);border:1px solid rgba(26,185,108,.2);color:var(--gn)">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.4"/><path d="M2.5 13.5C2.5 10.7 5 8.5 8 8.5C11 8.5 13.5 10.7 13.5 13.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          </div>
+          <span class="fv" style="color:var(--gn)">1.847</span>
+          <span class="fl">Leads</span>
+          <div class="fb" style="background:var(--gn)"></div>
+        </div>
+
+        <div class="fconn">
+          <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M1 5h8M5.5 1.5l3.5 3.5-3.5 3.5" stroke="var(--t4)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="fr rate-low">7.69%</span>
+        </div>
+
+        <!-- Vendas -->
+        <div class="fst">
+          <div class="fic" style="background:rgba(232,114,32,.1);border:1px solid rgba(232,114,32,.2);color:var(--or)">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M5.5 6.5V4.5C5.5 3.12 6.62 2 8 2C9.38 2 10.5 3.12 10.5 4.5V6.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><rect x="2.5" y="6.5" width="11" height="8" rx="1.2" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 9.5L7.3 11.3L10.5 8.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <span class="fv" style="color:var(--or)">142</span>
+          <span class="fl">Vendas</span>
+          <div class="fb" style="background:var(--or)"></div>
+        </div>
+
+      </div>
+
+      <!-- Funnel footer: cross-metrics -->
+      <div class="ffoot">
+        <div class="fm"><span class="fml">CPA</span><span class="fmv">R$&thinsp;480</span></div>
+        <div class="fm"><span class="fml">CPL Tráfego</span><span class="fmv">R$&thinsp;36,90</span></div>
+        <div class="fm"><span class="fml">Conv. Ads→Vendas</span><span class="fmv">7.69%</span></div>
+        <div class="fm"><span class="fml">CPM</span><span class="fmv">R$&thinsp;32,50</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── 03 PLATAFORMAS ─────────────────────────────────────────────────────── -->
+  <div class="row">
+    <div class="narr">
+      <span class="ns">03</span>
+      <span class="nl">Plataformas</span>
+      <span class="nd"></span>
+      <span class="ndesc">Detalhe por fonte de dados</span>
+    </div>
+    <div class="r2">
+
+      <!-- META ADS -->
+      <div class="card">
+        <div class="chead">
+          <div class="cicon" style="background:rgba(61,132,245,.15);border:1px solid rgba(61,132,245,.2);color:var(--bl)">M</div>
+          <span class="ctit">Meta Ads</span>
+          <span class="cbadge" style="background:rgba(61,132,245,.1);border:1px solid rgba(61,132,245,.2);color:var(--bl)">Tráfego Pago</span>
+        </div>
+        <div class="cbody">
+
+          <!-- Primary metrics -->
+          <div class="kg g2">
+            <div class="kc">
+              <span class="kl">Investimento</span>
+              <span class="kv lg" style="color:var(--bl)">R$&thinsp;68.200</span>
+            </div>
+            <div class="kc">
+              <span class="kl">Leads Gerados</span>
+              <span class="kv lg" style="color:var(--bl)">1.847</span>
+            </div>
+          </div>
+
+          <div class="ksep"></div>
+
+          <!-- Secondary metrics -->
+          <div class="kg g3">
+            <div class="kc"><span class="kl">CPM</span><span class="kv">R$&thinsp;32,50</span></div>
+            <div class="kc"><span class="kl">CTR</span><span class="kv">2.40%</span></div>
+            <div class="kc"><span class="kl">CPL Tráfego</span><span class="kv">R$&thinsp;36,90</span></div>
+            <div class="kc"><span class="kl">Connect Rate</span><span class="kv">17.2%</span></div>
+            <div class="kc"><span class="kl">Conv. LP</span><span class="kv">34.8%</span></div>
+            <div class="kc"><span class="kl">Checkout</span><span class="kv">318</span></div>
+          </div>
+
+          <div class="clbl">Investimento × Leads por dia</div>
+          <canvas id="c-meta" height="155" style="width:100%;display:block;"></canvas>
+
+        </div>
+      </div>
+
+      <!-- HOTMART -->
+      <div class="card">
+        <div class="chead">
+          <div class="cicon" style="background:rgba(232,114,32,.15);border:1px solid rgba(232,114,32,.2);color:var(--or)">H</div>
+          <span class="ctit">Hotmart</span>
+          <span class="cbadge" style="background:rgba(232,114,32,.1);border:1px solid rgba(232,114,32,.2);color:var(--or)">Vendas</span>
+        </div>
+        <div class="cbody">
+
+          <!-- Primary -->
+          <div class="kg g3">
+            <div class="kc">
+              <span class="kl">Receita BRL</span>
+              <span class="kv lg" style="color:var(--em)">R$&thinsp;287.450</span>
+            </div>
+            <div class="kc">
+              <span class="kl">Vendas BRL</span>
+              <span class="kv lg" style="color:var(--or)">127</span>
+            </div>
+            <div class="kc">
+              <span class="kl">Vendas Ext.</span>
+              <span class="kv lg" style="color:var(--t2)">15</span>
+            </div>
+          </div>
+
+          <div class="ksep" style="margin-bottom:0;"></div>
+
+          <table class="ptbl">
+            <thead>
+              <tr>
+                <th>Produto</th>
+                <th class="r">Vendas</th>
+                <th class="r">Receita (BRL)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Programa Avançado</td><td class="mn r">89</td><td class="mn r">R$&thinsp;213.600</td></tr>
+              <tr><td>Mentoria Básica</td><td class="mn r">38</td><td class="mn r">R$&thinsp;64.600</td></tr>
+              <tr><td>Workshop Prático <span style="margin-left:5px;font-size:10px;background:rgba(255,255,255,.04);border:1px solid var(--bv);color:var(--t3);border-radius:3px;padding:1px 5px;">moeda ext.</span></td><td class="mn r">15</td><td class="mn r" style="color:var(--t3)">—</td></tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>Total</td>
+                <td class="mn r">142</td>
+                <td class="mn r">R$&thinsp;287.450</td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div class="clbl">Vendas diárias</div>
+          <canvas id="c-hot" height="130" style="width:100%;display:block;"></canvas>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── 04 CAPTAÇÃO ────────────────────────────────────────────────────────── -->
+  <div class="row">
+    <div class="narr">
+      <span class="ns">04</span>
+      <span class="nl">Captação de Leads</span>
+      <span class="nd"></span>
+      <span class="ndesc">Novos leads que entraram no funil</span>
+    </div>
+    <div class="card">
+      <div class="chead">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gn)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span class="ctit">Coleta de Leads</span>
+        <span class="cbadge" style="background:rgba(26,185,108,.1);border:1px solid rgba(26,185,108,.2);color:var(--gn)">Orgânico + Pago</span>
+      </div>
+      <div class="cbody">
+        <div class="lgrid">
+
+          <div class="ltot">
+            <span class="ltl">Total de Captações</span>
+            <span class="ltv">1.847</span>
+            <span class="lts">no período</span>
+          </div>
+
+          <div>
+            <div class="clbl" style="margin-top:0">Captações diárias</div>
+            <canvas id="c-leads" height="148" style="width:100%;display:block;"></canvas>
+          </div>
+
+          <table class="etbl">
+            <thead>
+              <tr><th>Evento</th><th class="r">Captações</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="ev">cadastro_landing</td><td class="ct">1.243</td></tr>
+              <tr><td class="ev">webinar_inscricao</td><td class="ct">412</td></tr>
+              <tr><td class="ev">ebook_download</td><td class="ct">192</td></tr>
+            </tbody>
+          </table>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- .z -->
+</div><!-- .w -->
+
+<script>
+// ── Mock data (28 days) ───────────────────────────────────────────────────────
+const N = 28;
+const D = Array.from({length: N}, (_, i) => {
+  const isW = (i % 7 === 5 || i % 7 === 6);
+  const f = isW ? 0.18 : 1;
+  const trend = 1 + i * 0.013;
+  return {
+    spend:  f * (2100 + Math.sin(i * 0.85) * 360 + i * 24) * trend,
+    leads:  Math.round(f * (66 + Math.sin(i * 0.85) * 18 + i * 0.5) * trend),
+    sales:  Math.round(f * (4.5 + Math.sin(i * 1.3) * 2.5) * trend),
+    caps:   Math.round(f * (78 + Math.sin(i * 0.9) * 22 + i * 0.4) * trend),
+  };
+});
+
+// ── Canvas helpers ────────────────────────────────────────────────────────────
+function setupCanvas(id) {
+  const c = document.getElementById(id);
+  if (!c) return null;
+  const rect = c.parentElement.getBoundingClientRect();
+  const W = rect.width || 400;
+  const H = c.offsetHeight || 150;
+  const dpr = window.devicePixelRatio || 1;
+  c.width  = W * dpr;
+  c.height = H * dpr;
+  c.style.width  = W + 'px';
+  c.style.height = H + 'px';
+  const ctx = c.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return { ctx, W, H };
+}
+
+function drawGrid(ctx, W, H, pad) {
+  ctx.strokeStyle = 'rgba(37,56,82,0.6)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([2, 4]);
+  [0.33, 0.66, 1].forEach(f => {
+    const y = pad + (H - pad * 2) * (1 - f);
+    ctx.beginPath();
+    ctx.moveTo(pad, y);
+    ctx.lineTo(W - pad, y);
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+}
+
+function drawBars(ctx, vals, W, H, color, maxV, pad) {
+  const n = vals.length;
+  const aw = W - pad * 2, ah = H - pad * 2;
+  const gap = aw / n;
+  const bw = Math.max(1, gap * 0.62);
+  vals.forEach((v, i) => {
+    const bh = Math.max(0, (v / maxV) * ah);
+    const bx = pad + i * gap + (gap - bw) / 2;
+    const by = pad + ah - bh;
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.82;
+    if (bh > 3) {
+      const r = Math.min(2, bw / 2);
+      ctx.beginPath();
+      ctx.moveTo(bx + r, by);
+      ctx.lineTo(bx + bw - r, by);
+      ctx.arcTo(bx + bw, by, bx + bw, by + r, r);
+      ctx.lineTo(bx + bw, by + bh);
+      ctx.lineTo(bx, by + bh);
+      ctx.lineTo(bx, by + r);
+      ctx.arcTo(bx, by, bx + r, by, r);
+      ctx.closePath();
+      ctx.fill();
+    } else if (bh > 0) {
+      ctx.fillRect(bx, by, bw, bh);
+    }
+    ctx.globalAlpha = 1;
+  });
+}
+
+function drawLine(ctx, vals, W, H, color, maxV, pad, fill) {
+  const n = vals.length;
+  const aw = W - pad * 2, ah = H - pad * 2;
+  const gap = aw / n;
+  const pts = vals.map((v, i) => [pad + i * gap + gap / 2, pad + ah - (v / maxV) * ah]);
+  if (fill) {
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pad + ah);
+    pts.forEach(([x, y]) => ctx.lineTo(x, y));
+    ctx.lineTo(pts[pts.length - 1][0], pad + ah);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, pad, 0, pad + ah);
+    g.addColorStop(0, color + '44');
+    g.addColorStop(1, color + '00');
+    ctx.fillStyle = g;
+    ctx.fill();
+  }
+  ctx.beginPath();
+  pts.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+}
+
+// ── Draw charts ───────────────────────────────────────────────────────────────
+function drawAll() {
+  const pad = 8;
+
+  const meta = setupCanvas('c-meta');
+  if (meta) {
+    drawGrid(meta.ctx, meta.W, meta.H, pad);
+    const ms = D.map(d => d.spend), ml = D.map(d => d.leads);
+    drawBars(meta.ctx, ms, meta.W, meta.H, '#3d84f5', Math.max(...ms) * 1.12, pad);
+    drawLine(meta.ctx, ml, meta.W, meta.H, '#e87220', Math.max(...ml) * 1.12, pad, false);
+  }
+
+  const hot = setupCanvas('c-hot');
+  if (hot) {
+    drawGrid(hot.ctx, hot.W, hot.H, pad);
+    const hs = D.map(d => d.sales);
+    drawBars(hot.ctx, hs, hot.W, hot.H, '#e87220', Math.max(...hs) * 1.15, pad);
+  }
+
+  const ld = setupCanvas('c-leads');
+  if (ld) {
+    drawGrid(ld.ctx, ld.W, ld.H, pad);
+    const lc = D.map(d => d.caps);
+    drawLine(ld.ctx, lc, ld.W, ld.H, '#0899c0', Math.max(...lc) * 1.12, pad, true);
+  }
+}
+
+window.addEventListener('load', () => { requestAnimationFrame(drawAll); });
+window.addEventListener('resize', () => { requestAnimationFrame(drawAll); });
+</script>
+</body>
+</html>

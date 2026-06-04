@@ -1,0 +1,1483 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>Painel IGT — Gestão em 4 Minutos</title>
+<meta name="viewport" content="width=1440" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --color-primary: #3b93c3;
+    --color-primary-dark: #2e7aa8;
+    --color-primary-light: #ebf5fb;
+    --color-accent: #f5a623;
+    --color-bg: #f1f5f9;
+    --color-surface: #ffffff;
+    --color-border: #e2e8f0;
+    --color-border-strong: #cbd5e1;
+    --color-text: #1e293b;
+    --color-text-muted: #64748b;
+    --color-text-faint: #94a3b8;
+    --color-success: #16a34a;
+    --color-success-bg: #ecfdf5;
+    --color-success-border: #a7f3d0;
+    --color-danger: #dc2626;
+    --color-danger-bg: #fef2f2;
+    --color-danger-border: #fecaca;
+    --color-warning: #f5a623;
+    --color-warning-bg: #fffbeb;
+    --color-warning-border: #fde68a;
+    --radius-sm: 8px;
+    --radius-card: 12px;
+    --radius-lg: 16px;
+    --shadow-card: 0 1px 3px rgba(15, 23, 42, .07), 0 1px 2px rgba(15, 23, 42, .04);
+    --shadow-md: 0 4px 14px rgba(15, 23, 42, .08), 0 2px 4px rgba(15, 23, 42, .04);
+    --shadow-pop: 0 12px 32px rgba(15, 23, 42, .12);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-feature-settings: 'cv11','ss01','ss03';
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+    font-size: 14px;
+  }
+  .num { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; font-feature-settings: 'tnum','ss01'; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* ---------- SHELL ---------- */
+  .app { display: flex; min-height: 100vh; }
+  .sidebar {
+    width: 220px; flex-shrink: 0;
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-border);
+    display: flex; flex-direction: column;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .sidebar-brand {
+    height: 56px; background: var(--color-primary);
+    display: flex; align-items: center; gap: 12px; padding: 0 16px;
+  }
+  .sidebar-brand img { width: 28px; height: 28px; }
+  .sidebar-brand span { color: white; font-weight: 600; font-size: 13px; letter-spacing: .08em; }
+  .sidebar-nav { flex: 1; overflow-y: auto; padding: 16px 0; display: flex; flex-direction: column; gap: 2px; }
+  .nav-link {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 16px 9px 13px; margin-right: 0;
+    color: var(--color-text-muted); font-size: 14px; font-weight: 500;
+    text-decoration: none; cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: background-color 120ms, color 120ms;
+  }
+  .nav-link:hover { background: #f8fafc; color: var(--color-text); }
+  .nav-link.active {
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    border-left-color: var(--color-primary);
+  }
+  .nav-link svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .sidebar-footer {
+    border-top: 1px solid var(--color-border);
+    padding: 14px 16px; display: flex; align-items: center; gap: 8px;
+    color: var(--color-text-muted); font-size: 13px;
+  }
+  .sidebar-footer .who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .icon-btn {
+    width: 32px; height: 32px; border-radius: 999px; border: 0; background: transparent;
+    color: var(--color-text-muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  }
+  .icon-btn:hover { background: #f1f5f9; color: var(--color-text); }
+
+  .main { flex: 1; min-width: 0; }
+
+  /* ---------- PAGE HEADER ---------- */
+  .page-header {
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    padding: 18px 28px;
+    display: flex; align-items: center; gap: 18px;
+  }
+  .page-title-block { flex: 1; min-width: 0; }
+  .page-eyebrow {
+    font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--color-text-faint); margin: 0 0 2px;
+  }
+  .page-title { font-size: 22px; font-weight: 600; color: var(--color-text); margin: 0; letter-spacing: -0.015em; }
+  .page-sub { margin: 4px 0 0; font-size: 13px; color: var(--color-text-muted); }
+
+  .date-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .quick-pill {
+    border: 1px solid var(--color-border); background: var(--color-surface);
+    color: var(--color-text-muted);
+    border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 500; cursor: pointer;
+  }
+  .quick-pill.active { background: var(--color-primary); color: white; border-color: var(--color-primary); }
+  .date-input {
+    border: 1px solid var(--color-border); background: var(--color-surface);
+    border-radius: 8px; padding: 6px 10px; font-size: 13px; color: var(--color-text);
+    font-family: inherit;
+  }
+
+  /* ---------- PULSE BANNER (per-tab status header) ---------- */
+  .pulse-banner {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    padding: 18px 22px;
+    display: flex; align-items: center; gap: 18px;
+    box-shadow: var(--shadow-card);
+    position: relative; overflow: hidden;
+  }
+  .pulse-banner::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+    background: var(--pulse-color, var(--color-success));
+  }
+  .pulse-icon {
+    width: 52px; height: 52px; flex-shrink: 0;
+    border-radius: 14px; display: grid; place-items: center;
+    background: var(--pulse-bg, var(--color-success-bg));
+    color: var(--pulse-color, var(--color-success));
+  }
+  .pulse-text { flex: 1; min-width: 0; }
+  .pulse-h {
+    font-size: 16px; font-weight: 600; color: var(--color-text); margin: 0 0 2px;
+    letter-spacing: -0.01em;
+  }
+  .pulse-sub { font-size: 13px; color: var(--color-text-muted); margin: 0; }
+  .pulse-summary { display: flex; gap: 10px; flex-shrink: 0; }
+  .pulse-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 999px;
+    font-size: 12px; font-weight: 600; color: var(--color-text);
+    background: var(--color-bg); border: 1px solid var(--color-border);
+  }
+  .pulse-chip .dot { width: 8px; height: 8px; border-radius: 999px; }
+  .pulse-chip.green .dot { background: var(--color-success); }
+  .pulse-chip.amber .dot { background: var(--color-warning); }
+  .pulse-chip.red   .dot { background: var(--color-danger); }
+  .pulse-chip.muted { color: var(--color-text-muted); }
+
+  /* ---------- COMMON CARDS ---------- */
+  .section { padding: 24px 28px 32px; display: flex; flex-direction: column; gap: 20px; }
+  .section-title {
+    display: flex; align-items: center; gap: 10px; margin: 4px 0 0;
+  }
+  .section-title h2 { font-size: 12px; font-weight: 600; color: var(--color-text-muted); margin: 0; letter-spacing: .06em; text-transform: uppercase; }
+  .section-title .bar { width: 3px; height: 16px; background: var(--color-primary); border-radius: 2px; }
+  .section-title .count {
+    font-size: 12px; font-weight: 600; color: var(--color-text-muted);
+    background: var(--color-bg); border: 1px solid var(--color-border);
+    border-radius: 999px; padding: 2px 10px;
+  }
+  .section-title .helper { color: var(--color-text-muted); font-size: 12px; font-weight: 500; }
+
+  .grid { display: grid; gap: 16px; }
+  .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+  /* Status card — the workhorse component */
+  .stat-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    padding: 16px 18px;
+    box-shadow: var(--shadow-card);
+    display: flex; flex-direction: column; gap: 10px;
+    position: relative;
+    transition: box-shadow 150ms, transform 150ms;
+    cursor: pointer;
+  }
+  .stat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  .stat-card.green { border-left: 2px solid var(--color-success); }
+  .stat-card.amber { border-left: 2px solid var(--color-warning); }
+  .stat-card.red   { border-left: 2px solid var(--color-danger); }
+  .stat-card .corner-status {
+    position: absolute; top: 14px; right: 14px;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 9px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; line-height: 1;
+  }
+  .corner-status.green { color: #15803d; background: #f0fdf4; border: 1px solid #bbf7d0; }
+  .corner-status.amber { color: #92400e; background: #fffbeb; border: 1px solid #fde68a; }
+  .corner-status.red   { color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; }
+  .corner-status .dot { width: 6px; height: 6px; border-radius: 999px; }
+  .corner-status.green .dot { background: var(--color-success); }
+  .corner-status.amber .dot { background: var(--color-warning); }
+  .corner-status.red .dot   { background: var(--color-danger); animation: pulseDot 1.6s ease-in-out infinite; }
+  @keyframes pulseDot {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,.45); }
+    50% { box-shadow: 0 0 0 5px rgba(220,38,38,0); }
+  }
+
+  .stat-head { display: flex; align-items: center; gap: 10px; padding-right: 72px; }
+  .stat-iconbox {
+    width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
+    display: grid; place-items: center;
+    background: var(--color-primary-light); color: var(--color-primary);
+  }
+  .stat-iconbox.yt { background: #fef2f2; color: #dc2626; }
+  .stat-iconbox.ig { background: #fdf2f8; color: #be185d; }
+  .stat-title { font-size: 12px; font-weight: 600; color: var(--color-text-muted); margin: 0; }
+  .stat-help  { font-size: 11px; color: var(--color-text-faint); margin: 1px 0 0; }
+
+  .stat-value { font-size: 28px; font-weight: 600; color: var(--color-text); line-height: 1; letter-spacing: -0.025em; }
+  .stat-value .unit { font-size: 14px; font-weight: 500; color: var(--color-text-muted); margin-left: 3px; letter-spacing: 0; }
+
+  .stat-meta {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding-top: 10px; border-top: 1px dashed var(--color-border);
+  }
+  .delta {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 12px; font-weight: 600;
+    padding: 3px 8px; border-radius: 6px;
+  }
+  .delta.up   { color: #15803d; background: #dcfce7; }
+  .delta.down { color: #991b1b; background: #fee2e2; }
+  .delta.flat { color: var(--color-text-muted); background: var(--color-bg); }
+  .delta svg { width: 11px; height: 11px; }
+
+  .stat-foot { font-size: 11px; color: var(--color-text-muted); }
+  .stat-foot strong { color: var(--color-text); font-weight: 600; }
+
+  /* sparkline holder */
+  .spark { width: 100%; height: 36px; }
+
+  /* ---------- TIPS / EXPLAINERS ---------- */
+  .tip {
+    display: flex; align-items: flex-start; gap: 10px;
+    background: #fafbfc; border: 1px dashed var(--color-border);
+    border-radius: 10px; padding: 10px 12px;
+    font-size: 12px; color: var(--color-text-muted); line-height: 1.5;
+  }
+  .tip svg { width: 14px; height: 14px; flex-shrink: 0; margin-top: 2px; color: var(--color-primary); }
+  .tip b { color: var(--color-text); font-weight: 600; }
+
+  /* ---------- BIG COMPARISON CARD (atual vs anterior) ---------- */
+  .compare-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+  }
+  .compare-card.green { border-left: 2px solid var(--color-success); }
+  .compare-card.amber { border-left: 2px solid var(--color-warning); }
+  .compare-card.red   { border-left: 2px solid var(--color-danger); }
+  .compare-head {
+    display: flex; align-items: center; gap: 12px; padding: 16px 20px;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .compare-head .platform {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: grid; place-items: center; flex-shrink: 0;
+  }
+  .compare-head .platform.yt { background: #fee2e2; color: #dc2626; }
+  .compare-head .platform.ig { background: linear-gradient(135deg, #fdf2f8, #f3e8ff); color: #be185d; }
+  .compare-head h3 { font-size: 15px; font-weight: 700; margin: 0; color: var(--color-text); }
+  .compare-head .metric-label { margin-left: auto; font-size: 12px; color: var(--color-text-muted); font-weight: 500; }
+
+  .compare-body { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  .compare-side { padding: 18px 20px; border-right: 1px dashed var(--color-border); }
+  .compare-side:last-child { border-right: 0; }
+  .compare-side.current { background: var(--color-surface); }
+  .compare-tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 4px;
+  }
+  .compare-tag.previous { background: var(--color-bg); color: var(--color-text-muted); }
+  .compare-tag.current  { background: rgba(59,147,195,.12); color: var(--color-primary); }
+  .compare-tag.current.green { background: rgba(22,163,74,.12); color: var(--color-success); }
+  .compare-tag.current.red   { background: rgba(220,38,38,.12); color: var(--color-danger); }
+
+  .compare-period { font-size: 11px; color: var(--color-text-muted); margin-top: 6px; }
+  .compare-num {
+    font-size: 30px; font-weight: 700; letter-spacing: -0.025em;
+    color: var(--color-text); margin: 8px 0 10px; line-height: 1;
+  }
+  .compare-spark { height: 44px; width: 100%; }
+
+  .compare-footer {
+    border-top: 1px solid var(--color-border);
+    padding: 12px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px;
+    background: #fbfdff;
+  }
+  .compare-footer .verdict { display: flex; align-items: center; gap: 8px; }
+  .compare-footer .verdict svg { width: 16px; height: 16px; }
+  .compare-footer .verdict.green { color: var(--color-success); }
+  .compare-footer .verdict.amber { color: #b45309; }
+  .compare-footer .verdict.red { color: var(--color-danger); }
+  .compare-footer .verdict b { color: var(--color-text); font-weight: 600; }
+  .compare-footer .explore {
+    color: var(--color-primary); font-weight: 600; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+
+  /* ---------- LIST CARDS / FUNNELS ---------- */
+  .list-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    padding: 18px;
+    box-shadow: var(--shadow-card);
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .list-card .lc-head { display: flex; align-items: center; gap: 10px; }
+  .list-card .lc-name { font-size: 14px; font-weight: 700; color: var(--color-text); margin: 0; flex: 1; }
+  .list-card .lc-period { font-size: 11px; color: var(--color-text-muted); }
+
+  .funnel { display: flex; flex-direction: column; gap: 4px; }
+  .funnel-step {
+    display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px;
+    font-size: 12px;
+  }
+  .funnel-bar-wrap { position: relative; height: 22px; background: var(--color-bg); border-radius: 6px; overflow: hidden; }
+  .funnel-bar {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    background: linear-gradient(90deg, var(--color-primary), #4ea4d3);
+    border-radius: 6px;
+    display: flex; align-items: center; padding-left: 10px;
+    color: white; font-weight: 600; font-size: 11px;
+  }
+  .funnel-bar.muted { background: linear-gradient(90deg, #94a3b8, #cbd5e1); }
+  .funnel-step .label { color: var(--color-text); font-weight: 500; }
+  .funnel-step .value { color: var(--color-text); font-weight: 700; min-width: 56px; text-align: right; }
+  .funnel-step .conv { color: var(--color-text-muted); min-width: 56px; text-align: right; font-weight: 500; }
+
+  /* horizontal score bar */
+  .scorebar {
+    height: 8px; border-radius: 999px; background: var(--color-bg); overflow: hidden;
+    position: relative;
+  }
+  .scorebar > span {
+    position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px;
+    background: var(--score-color, var(--color-primary));
+  }
+
+  /* ---------- HEALTH METER (attention page) ---------- */
+  .health-row {
+    display: grid; grid-template-columns: 32px 1fr auto auto; gap: 12px; align-items: center;
+    padding: 10px 0; border-bottom: 1px dashed var(--color-border);
+  }
+  .health-row:last-child { border-bottom: 0; }
+  .health-icon { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; }
+  .health-icon.yt { background: #fee2e2; color: #dc2626; }
+  .health-icon.ig { background: #fce7f3; color: #be185d; }
+  .health-label { font-size: 13px; font-weight: 500; color: var(--color-text); }
+  .health-label small { display: block; font-size: 11px; color: var(--color-text-muted); font-weight: 400; margin-top: 1px; }
+  .health-num { font-size: 14px; font-weight: 700; color: var(--color-text); }
+
+  /* ---------- COCKPIT BAND (attention page) ---------- */
+  .cockpit-band {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .cockpit-tile {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    padding: 16px 18px;
+    display: flex; flex-direction: column; gap: 10px;
+    box-shadow: var(--shadow-card);
+  }
+  .cockpit-tile.green { border-left: 2px solid var(--color-success); }
+  .cockpit-tile.amber { border-left: 2px solid var(--color-warning); }
+  .cockpit-tile.red   { border-left: 2px solid var(--color-danger); }
+  .cockpit-tile h4 { font-size: 11px; font-weight: 600; color: var(--color-text-muted); margin: 0; text-transform: uppercase; letter-spacing: .08em; }
+  .cockpit-tile .big { font-size: 24px; font-weight: 600; color: var(--color-text); letter-spacing: -0.02em; line-height: 1; }
+  .cockpit-tile .row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--color-text-muted); }
+  .cockpit-tile .row b { color: var(--color-text); font-weight: 600; }
+
+  /* ---------- TAB ROUTER ---------- */
+  .tab { display: none; }
+  .tab.active { display: block; }
+
+  /* utilities */
+  .row { display: flex; align-items: center; gap: 12px; }
+  .gap-8 { gap: 8px; }
+  .gap-16 { gap: 16px; }
+  .col { display: flex; flex-direction: column; }
+  .muted { color: var(--color-text-muted); }
+  .small { font-size: 12px; }
+  .xsmall { font-size: 11px; }
+
+  /* progress ring SVG container */
+  .ring { position: relative; width: 96px; height: 96px; flex-shrink: 0; }
+  .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring .ring-text {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font-size: 18px; font-weight: 700; color: var(--color-text);
+  }
+
+  /* clickable card hover */
+  .clickable { cursor: pointer; }
+  .clickable:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+
+  /* tabs underline (sub-section selector) */
+  .subnav { display: flex; gap: 4px; padding: 0 28px; border-bottom: 1px solid var(--color-border); background: var(--color-surface); }
+  .subnav button {
+    background: transparent; border: 0; padding: 12px 16px;
+    font-size: 13px; font-weight: 500; color: var(--color-text-muted);
+    cursor: pointer; border-bottom: 2px solid transparent;
+  }
+  .subnav button.active { color: var(--color-primary); border-bottom-color: var(--color-primary); font-weight: 600; }
+
+</style>
+</head>
+<body>
+  <div class="app">
+    <!-- SIDEBAR -->
+    <aside class="sidebar" data-screen-label="00 Sidebar">
+      <div class="sidebar-brand">
+        <img src="assets/igt-logo.png" alt="IGT" />
+        <span>IGT</span>
+      </div>
+      <nav class="sidebar-nav" id="nav"></nav>
+      <div class="sidebar-footer">
+        <span class="who">leandro@igtbox.com.br</span>
+        <button class="icon-btn" title="Sair">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main" id="main"></main>
+  </div>
+
+<script>
+/* =======================================================================
+   NAV CONFIG
+======================================================================= */
+const NAV = [
+  { id: 'posicionamento',   label: 'Posicionamento',   icon: 'pin' },
+  { id: 'relacionamento',   label: 'Relacionamento',   icon: 'people' },
+  { id: 'prestar-atencao',  label: 'Prestar Atenção',  icon: 'eye' },
+  { id: 'eqa',              label: 'EQA',              icon: 'rows' },
+  { id: 'convite',          label: 'Convite',          icon: 'spark' },
+  { id: 'entrega',          label: 'Entrega Nível A',  icon: 'box' },
+  { id: 'ltv',              label: 'LTV',              icon: 'bars' },
+];
+
+const ICONS = {
+  pin:   '<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/>',
+  people:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  eye:   '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+  rows:  '<path d="M3 3h18v4H3z"/><path d="M3 9h12v4H3z"/><path d="M3 15h7v4H3z"/>',
+  spark: '<path d="M22 12h-4l-3 8-6-16-3 8H2"/>',
+  box:   '<path d="M12 2L2 7l10 5 10-5-10-5z"/><polyline points="2 12 12 17 22 12"/><polyline points="2 17 12 22 22 17"/>',
+  bars:  '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+};
+
+function svg(name) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
+}
+
+/* =======================================================================
+   STATE
+======================================================================= */
+let activeTab = 'posicionamento';
+
+/* =======================================================================
+   RENDER NAV
+======================================================================= */
+function renderNav() {
+  const nav = document.getElementById('nav');
+  nav.innerHTML = NAV.map(n => `
+    <a class="nav-link ${n.id === activeTab ? 'active' : ''}" data-tab="${n.id}">
+      ${svg(n.icon)}
+      <span>${n.label}</span>
+    </a>
+  `).join('');
+  nav.querySelectorAll('.nav-link').forEach(a => {
+    a.addEventListener('click', () => {
+      activeTab = a.dataset.tab;
+      renderNav();
+      renderMain();
+      window.scrollTo(0, 0);
+    });
+  });
+}
+
+/* =======================================================================
+   PAGES — each returns HTML
+======================================================================= */
+function pageHeader({ eyebrow, title, sub, actions }) {
+  return `
+    <div class="page-header">
+      <div class="page-title-block">
+        ${eyebrow ? `<p class="page-eyebrow">${eyebrow}</p>` : ''}
+        <h1 class="page-title">${title}</h1>
+        ${sub ? `<p class="page-sub">${sub}</p>` : ''}
+      </div>
+      ${actions ? `<div class="date-controls">${actions}</div>` : ''}
+    </div>
+  `;
+}
+
+function dateControls({ active = '30' } = {}) {
+  const opts = ['7', '15', '30'];
+  return `
+    ${opts.map(o => `<button class="quick-pill ${o === active ? 'active' : ''}">${o} dias</button>`).join('')}
+    <input class="date-input" type="text" value="09/03/2026" readonly />
+    <span class="muted small">→</span>
+    <input class="date-input" type="text" value="07/05/2026" readonly />
+    <button class="quick-pill" style="background:var(--color-primary);color:white;border-color:var(--color-primary);">Aplicar</button>
+  `;
+}
+
+/* sparkline path generator — input array of numbers, returns <svg> */
+function sparkline(values, color, opts = {}) {
+  if (!values || values.length < 2) return '';
+  const w = opts.w || 200, h = opts.h || 44, pad = 2;
+  const min = Math.min(...values), max = Math.max(...values);
+  const range = max - min || 1;
+  const step = (w - pad * 2) / (values.length - 1);
+  const pts = values.map((v, i) => [pad + i * step, h - pad - ((v - min) / range) * (h - pad * 2)]);
+  const d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  const area = `M${pts[0][0]},${h} ${pts.map(p => 'L' + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ')} L${pts[pts.length-1][0]},${h} Z`;
+  const lastPt = pts[pts.length-1];
+  return `
+    <svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="g-${opts.id || Math.random().toString(36).slice(2,6)}" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="${color}" stop-opacity=".22"/>
+          <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <path d="${area}" fill="url(#g-${opts.id || ''})"/>
+      <path d="${d}" stroke="${color}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${lastPt[0].toFixed(1)}" cy="${lastPt[1].toFixed(1)}" r="3" fill="${color}" stroke="white" stroke-width="1.5"/>
+    </svg>
+  `;
+}
+
+/* delta pill */
+function delta(pct, opts = {}) {
+  const isUp = pct > 0;
+  const isDown = pct < 0;
+  const cls = pct === 0 ? 'flat' : (isUp ? (opts.invert ? 'down' : 'up') : (opts.invert ? 'up' : 'down'));
+  const arrow = pct === 0
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+    : (isUp
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 14 12 8 18 14"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 10 12 16 18 10"/></svg>');
+  const sign = pct > 0 ? '+' : '';
+  return `<span class="delta ${cls}">${arrow}${sign}${pct.toFixed(1)}%</span>`;
+}
+
+/* status: 'green' | 'amber' | 'red' */
+function statusChip(status, label) {
+  const map = { green: 'No verde', amber: 'Atenção', red: 'Crítico' };
+  return `<span class="corner-status ${status}"><span class="dot"></span>${label || map[status]}</span>`;
+}
+
+/* compute status from a target % */
+function statusFor(currentPct) {
+  if (currentPct >= 0) return 'green';
+  if (currentPct >= -10) return 'amber';
+  return 'red';
+}
+
+</script>
+
+<script>
+/* =======================================================================
+   PAGE: POSICIONAMENTO
+   Métrica: total de inscritos / seguidores (fim do período)
+======================================================================= */
+function renderPosicionamento() {
+  // mock data
+  const yt = {
+    prev: 184220, curr: 187930,
+    sparkPrev: [184220,184310,184380,184450,184520,184610,184680,184700,184780,184820,184910,184990,185070,185160,185220,185310,185390,185460,185520,185600,185680,185750,185820,185900,185970,186050,186120,186200,186260,186310],
+    sparkCurr: [186310,186390,186470,186560,186640,186720,186810,186890,186970,187050,187130,187210,187290,187370,187440,187520,187600,187680,187760,187810,187860,187890,187900,187910,187915,187920,187925,187928,187929,187930],
+  };
+  const ig = {
+    prev: 92410, curr: 91120,
+    sparkPrev: [92410,92450,92500,92560,92620,92680,92710,92740,92760,92780,92790,92800,92790,92770,92740,92700,92660,92620,92590,92550,92510,92480,92460,92440,92430,92420,92410,92410,92410,92410],
+    sparkCurr: [92410,92350,92290,92230,92180,92110,92050,91980,91900,91820,91760,91700,91640,91580,91520,91470,91420,91380,91340,91300,91270,91240,91210,91190,91170,91150,91140,91130,91120,91120],
+  };
+  const ytPct = ((yt.curr - yt.prev) / yt.prev) * 100;
+  const igPct = ((ig.curr - ig.prev) / ig.prev) * 100;
+  const ytStatus = ytPct >= 0.5 ? 'green' : (ytPct >= -1 ? 'amber' : 'red');
+  const igStatus = igPct >= 0.5 ? 'green' : (igPct >= -1 ? 'amber' : 'red');
+
+  const okCount = [ytStatus, igStatus].filter(s => s === 'green').length;
+  const warnCount = [ytStatus, igStatus].filter(s => s === 'amber').length;
+  const critCount = [ytStatus, igStatus].filter(s => s === 'red').length;
+
+  // overall pulse
+  let pulse;
+  if (critCount > 0) pulse = { color: 'var(--color-danger)', bg: 'var(--color-danger-bg)', icon: 'alert', h: 'Posicionamento perdendo audiência', sub: 'O Instagram encolheu no período. Vale entender o motivo antes da próxima campanha.' };
+  else if (warnCount > 0) pulse = { color: 'var(--color-warning)', bg: 'var(--color-warning-bg)', icon: 'attn', h: 'Crescimento mais devagar do que o normal', sub: 'A base está estável, mas sem o ritmo de crescimento esperado.' };
+  else pulse = { color: 'var(--color-success)', bg: 'var(--color-success-bg)', icon: 'ok', h: 'Audiência crescendo nas duas redes', sub: 'YouTube e Instagram somam novos seguidores no período. Mantenha o ritmo.' };
+
+  return `
+    ${pageHeader({
+      eyebrow: 'Gestão à Vista · Gestão em 4 Minutos',
+      title: 'Posicionamento',
+      sub: 'O quanto a marca está sendo encontrada nas redes sociais',
+      actions: dateControls({ active: '30' })
+    })}
+
+    <div class="section">
+
+      <!-- PULSE -->
+      <div class="pulse-banner" style="--pulse-color:${pulse.color};--pulse-bg:${pulse.bg};">
+        <div class="pulse-icon">${pulseIcon(pulse.icon)}</div>
+        <div class="pulse-text">
+          <p class="pulse-h">${pulse.h}</p>
+          <p class="pulse-sub">${pulse.sub}</p>
+        </div>
+        <div class="pulse-summary">
+          ${okCount   ? `<span class="pulse-chip green"><span class="dot"></span>${okCount} no verde</span>` : ''}
+          ${warnCount ? `<span class="pulse-chip amber"><span class="dot"></span>${warnCount} atenção</span>` : ''}
+          ${critCount ? `<span class="pulse-chip red"><span class="dot"></span>${critCount} crítico</span>` : ''}
+          <span class="pulse-chip muted"><span class="dot" style="background:var(--color-text-faint)"></span>vs. 30 dias anteriores</span>
+        </div>
+      </div>
+
+      <!-- KEY COMPARISON CARDS -->
+      <div class="grid grid-2">
+        ${compareCard({
+          platform: 'yt',
+          name: 'YouTube',
+          metric: 'Inscritos no canal',
+          prevLabel: '07/02 – 08/03',
+          currLabel: '09/03 – 07/05',
+          prevValue: yt.prev,
+          currValue: yt.curr,
+          prevSpark: yt.sparkPrev,
+          currSpark: yt.sparkCurr,
+          status: ytStatus,
+          verdict: ytStatus === 'green'
+            ? `<b>+${(yt.curr - yt.prev).toLocaleString('pt-BR')} novos inscritos</b> no período (+${ytPct.toFixed(2)}%). O canal segue ganhando audiência.`
+            : ytStatus === 'amber'
+            ? `<b>Crescimento abaixo do esperado.</b> Bem perto da estabilidade, vale empurrar conteúdo.`
+            : `<b>Perdeu inscritos no período.</b> Hora de revisar o quê foi publicado.`
+        })}
+
+        ${compareCard({
+          platform: 'ig',
+          name: 'Instagram',
+          metric: 'Seguidores do perfil',
+          prevLabel: '07/02 – 08/03',
+          currLabel: '09/03 – 07/05',
+          prevValue: ig.prev,
+          currValue: ig.curr,
+          prevSpark: ig.sparkPrev,
+          currSpark: ig.sparkCurr,
+          status: igStatus,
+          verdict: igStatus === 'green'
+            ? `<b>+${(ig.curr - ig.prev).toLocaleString('pt-BR')} novos seguidores</b> no período. Engajamento ajudando o orgânico.`
+            : igStatus === 'amber'
+            ? `<b>Estabilidade preocupante.</b> A base parou de crescer nas últimas semanas.`
+            : `<b>${(ig.prev - ig.curr).toLocaleString('pt-BR')} pessoas saíram</b> da base no período (${igPct.toFixed(2)}%). Vale investigar conteúdo recente e qualidade do tráfego.`
+        })}
+      </div>
+
+      <!-- FOOTER TIP -->
+      <div class="tip">
+        ${svg('eye').replace('<svg', '<svg width="14" height="14"')}
+        <div>
+          <b>Como ler esta tela em 30 segundos:</b> a barra colorida no topo de cada cartão diz o status. Verde = audiência crescendo, âmbar = estável, vermelho = encolhendo. As mini-curvas mostram o movimento dia a dia dentro de cada período.
+        </div>
+      </div>
+
+    </div>
+  `;
+}
+
+/* The big "current vs previous" card */
+function compareCard({ platform, name, metric, prevLabel, currLabel, prevValue, currValue, prevSpark, currSpark, status, verdict }) {
+  const pct = ((currValue - prevValue) / prevValue) * 100;
+  const isUp = pct >= 0;
+  const platformIcon = platform === 'yt'
+    ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/></svg>'
+    : '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>';
+
+  const currColor = status === 'green' ? '#22c55e' : status === 'amber' ? '#f59e0b' : '#ef4444';
+  const currBg    = status === 'green' ? '#f0fdf4' : status === 'amber' ? '#fffbeb' : '#fef2f2';
+  const currTagCls = status === 'green' ? 'green' : (status === 'red' ? 'red' : '');
+
+  const verdictIcon = status === 'green'
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+    : status === 'amber'
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+
+  return `
+    <div class="compare-card">
+      <div class="compare-head">
+        <div class="platform ${platform}">${platformIcon}</div>
+        <h3>${name}</h3>
+        <span class="metric-label">${metric}</span>
+        ${statusChip(status)}
+      </div>
+
+      <div class="compare-body">
+        <div class="compare-side">
+          <span class="compare-tag previous">Anterior</span>
+          <div class="compare-period">${prevLabel}</div>
+          <div class="compare-num num">${prevValue.toLocaleString('pt-BR')}</div>
+          ${sparkline(prevSpark, '#94a3b8', { id: platform + 'p', h: 44 })}
+        </div>
+        <div class="compare-side current" style="--current-bg:${currBg};">
+          <span class="compare-tag current ${currTagCls}">Atual</span>
+          <div class="compare-period">${currLabel}</div>
+          <div class="compare-num num">${currValue.toLocaleString('pt-BR')}</div>
+          ${sparkline(currSpark, currColor, { id: platform + 'c', h: 44 })}
+        </div>
+      </div>
+
+      <div class="compare-footer">
+        <div class="verdict ${status}">
+          ${verdictIcon}
+          <div>${verdict}</div>
+        </div>
+        <div class="row gap-8">
+          ${delta(pct)}
+          <a class="explore" href="#">Explorar →</a>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function pulseIcon(kind) {
+  if (kind === 'ok') return '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+  if (kind === 'attn') return '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+  if (kind === 'alert') return '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+  return '';
+}
+</script>
+
+<script>
+/* =======================================================================
+   PAGE: RELACIONAMENTO
+   Métrica: views YouTube + alcance Instagram (soma do período)
+======================================================================= */
+function renderRelacionamento() {
+  const yt = { prev: 412380, curr: 487120,
+    sparkPrev: gen(30, 12000, 18000, 0.6),
+    sparkCurr: gen(30, 14000, 21000, 0.7) };
+  const ig = { prev: 318900, curr: 264720,
+    sparkPrev: gen(30, 9000, 13000, 0.5),
+    sparkCurr: gen(30, 7000, 11000, 0.4) };
+
+  const ytPct = ((yt.curr - yt.prev) / yt.prev) * 100;
+  const igPct = ((ig.curr - ig.prev) / ig.prev) * 100;
+  const ytStatus = ytPct >= 5 ? 'green' : (ytPct >= -5 ? 'amber' : 'red');
+  const igStatus = igPct >= 5 ? 'green' : (igPct >= -5 ? 'amber' : 'red');
+
+  return `
+    ${pageHeader({
+      eyebrow: 'Gestão à Vista · Gestão em 4 Minutos',
+      title: 'Relacionamento',
+      sub: 'Quanto a audiência está consumindo nosso conteúdo',
+      actions: dateControls({ active: '30' })
+    })}
+
+    <div class="section">
+
+      <div class="pulse-banner" style="--pulse-color:var(--color-warning);--pulse-bg:var(--color-warning-bg);">
+        <div class="pulse-icon">${pulseIcon('attn')}</div>
+        <div class="pulse-text">
+          <p class="pulse-h">YouTube acelerando, Instagram esfriando</p>
+          <p class="pulse-sub">A audiência está consumindo mais vídeo longo e menos conteúdo curto. Vale rever a frequência de Reels.</p>
+        </div>
+        <div class="pulse-summary">
+          <span class="pulse-chip green"><span class="dot"></span>1 acelerando</span>
+          <span class="pulse-chip red"><span class="dot"></span>1 esfriando</span>
+          <span class="pulse-chip muted"><span class="dot" style="background:var(--color-text-faint)"></span>vs. 30 dias anteriores</span>
+        </div>
+      </div>
+
+      <div class="grid grid-2">
+        ${compareCard({
+          platform: 'yt', name: 'YouTube', metric: 'Views no período',
+          prevLabel: '07/02 – 08/03', currLabel: '09/03 – 07/05',
+          prevValue: yt.prev, currValue: yt.curr,
+          prevSpark: yt.sparkPrev, currSpark: yt.sparkCurr,
+          status: ytStatus,
+          verdict: `<b>+${(yt.curr - yt.prev).toLocaleString('pt-BR')} views</b> em relação ao período anterior. Conteúdo acelerou.`
+        })}
+        ${compareCard({
+          platform: 'ig', name: 'Instagram', metric: 'Alcance no período',
+          prevLabel: '07/02 – 08/03', currLabel: '09/03 – 07/05',
+          prevValue: ig.prev, currValue: ig.curr,
+          prevSpark: ig.sparkPrev, currSpark: ig.sparkCurr,
+          status: igStatus,
+          verdict: `<b>−${(ig.prev - ig.curr).toLocaleString('pt-BR')} pessoas alcançadas</b> em relação ao período anterior. Distribuição orgânica caiu.`
+        })}
+      </div>
+
+      <!-- Sub-stats: detail of relationship -->
+      <div class="section-title"><span class="bar"></span><h2>Detalhe</h2><span class="helper">como o consumo se distribui no período atual</span></div>
+
+      <div class="grid grid-4">
+        ${statCard({
+          icon: svg('rows'), title: 'Vídeos publicados', value: '12', unit: '',
+          delta: 20, status: 'green',
+          foot: '<strong>2 a mais</strong> que o período anterior'
+        })}
+        ${statCard({
+          icon: svg('eye'), title: 'Tempo médio assistido', value: '7:42', unit: 'min',
+          delta: 8.4, status: 'green',
+          foot: '<strong>+34s</strong> de retenção média'
+        })}
+        ${statCard({
+          icon: svg('spark'), title: 'Engajamento Reels', value: '4.2', unit: '%',
+          delta: -22.0, status: 'red',
+          foot: 'Meta: <strong>≥ 5,5%</strong>'
+        })}
+        ${statCard({
+          icon: svg('people'), title: 'Comentários respondidos', value: '94', unit: '%',
+          delta: 3.0, status: 'green',
+          foot: '<strong>3 dias</strong> sem responder no IG'
+        })}
+      </div>
+
+      <div class="tip">
+        ${svg('eye').replace('<svg', '<svg width="14" height="14"')}
+        <div><b>Atenção rápida:</b> a queda do Instagram é puxada pelos Reels. Os Stories estão estáveis. Vale alinhar com o time de conteúdo se a meta de Reels segue a mesma para o próximo ciclo.</div>
+      </div>
+
+    </div>
+  `;
+}
+
+/* helpers */
+function gen(n, min, max, drift = 0.5) {
+  const out = [];
+  let v = (min + max) / 2;
+  for (let i = 0; i < n; i++) {
+    const r = (Math.random() - 0.5) * (max - min) * 0.15;
+    v = v + r + (drift - 0.5) * (max - min) * 0.02;
+    v = Math.max(min, Math.min(max, v));
+    out.push(Math.round(v));
+  }
+  return out;
+}
+
+function statCard({ icon, title, help, value, unit, delta: d, status, foot, sparkData }) {
+  return `
+    <div class="stat-card ${status || ''}">
+      ${status ? statusChip(status) : ''}
+      <div class="stat-head">
+        <div class="stat-iconbox">${icon}</div>
+        <div>
+          <p class="stat-title">${title}</p>
+          ${help ? `<p class="stat-help">${help}</p>` : ''}
+        </div>
+      </div>
+      <div class="stat-value num">${value}${unit ? `<span class="unit">${unit}</span>` : ''}</div>
+      ${sparkData ? sparkline(sparkData, status === 'red' ? '#ef4444' : status === 'amber' ? '#f59e0b' : '#22c55e', { h: 36 }) : ''}
+      <div class="stat-meta">
+        ${typeof d === 'number' ? delta(d) : '<span class="muted small">—</span>'}
+        <span class="stat-foot">${foot || ''}</span>
+      </div>
+    </div>
+  `;
+}
+</script>
+
+<script>
+/* =======================================================================
+   PAGE: PRESTAR ATENÇÃO — health summary of Yt + Ig
+======================================================================= */
+function renderPrestarAtencao() {
+  return `
+    ${pageHeader({
+      eyebrow: 'Gestão à Vista · Gestão em 4 Minutos',
+      title: 'Prestar Atenção',
+      sub: 'Os sinais que estão fora do esperado e merecem o seu olhar agora',
+      actions: dateControls({ active: '30' })
+    })}
+
+    <div class="section">
+      <div class="pulse-banner" style="--pulse-color:var(--color-danger);--pulse-bg:var(--color-danger-bg);">
+        <div class="pulse-icon">${pulseIcon('alert')}</div>
+        <div class="pulse-text">
+          <p class="pulse-h">3 sinais merecem atenção e 1 está crítico</p>
+          <p class="pulse-sub">A maioria das métricas está saudável. Foque primeiro nos itens vermelhos abaixo.</p>
+        </div>
+        <div class="pulse-summary">
+          <span class="pulse-chip green"><span class="dot"></span>6 saudáveis</span>
+          <span class="pulse-chip amber"><span class="dot"></span>3 atenção</span>
+          <span class="pulse-chip red"><span class="dot"></span>1 crítico</span>
+        </div>
+      </div>
+
+      <!-- TWO-CARD HEALTH SUMMARY -->
+      <div class="grid grid-2">
+        ${healthCard({
+          platform: 'yt', name: 'YouTube', score: 84, status: 'green',
+          headline: 'Canal com sinal forte',
+          rows: [
+            { label: 'Inscritos', help: 'tendência diária', value: '+218', status: 'green' },
+            { label: 'Views totais', help: 'no período', value: '487,1k', status: 'green' },
+            { label: 'CTR dos thumbnails', help: 'meta: 8%', value: '6,4%', status: 'amber' },
+            { label: 'Retenção média', help: 'meta: 45%', value: '52%', status: 'green' },
+            { label: 'Comentários sem resposta', help: 'há mais de 48h', value: '4', status: 'green' },
+          ]
+        })}
+        ${healthCard({
+          platform: 'ig', name: 'Instagram', score: 47, status: 'red',
+          headline: 'Perfil pedindo socorro',
+          rows: [
+            { label: 'Seguidores', help: 'tendência diária', value: '−43', status: 'red' },
+            { label: 'Alcance', help: 'no período', value: '264,7k', status: 'red' },
+            { label: 'Engajamento Reels', help: 'meta: 5,5%', value: '4,2%', status: 'red' },
+            { label: 'Frequência de posts', help: 'meta: 5/sem', value: '3/sem', status: 'amber' },
+            { label: 'Stories DMs', help: 'em aberto', value: '12', status: 'amber' },
+          ]
+        })}
+      </div>
+
+      <!-- COCKPIT BAND -->
+      <div class="section-title"><span class="bar"></span><h2>O que olhar primeiro</h2><span class="helper">3 movimentos sugeridos para os próximos dias</span></div>
+
+      <div class="cockpit-band">
+        <div class="cockpit-tile red">
+          <h4>Crítico</h4>
+          <div class="big">Reels ↓ 22%</div>
+          <p class="small muted" style="margin:0;">O engajamento dos Reels caiu para 4,2% — abaixo da meta de 5,5%. Os últimos 4 reels não passaram de 1,8k visualizações.</p>
+          <div class="row" style="justify-content:space-between;">
+            <span class="xsmall muted">Resp.: time de conteúdo</span>
+            <a href="#" class="xsmall" style="color:var(--color-primary);font-weight:600;text-decoration:none;">Investigar →</a>
+          </div>
+        </div>
+        <div class="cockpit-tile amber">
+          <h4>Atenção</h4>
+          <div class="big">CTR 6,4%</div>
+          <p class="small muted" style="margin:0;">CTR dos thumbnails do YouTube ainda abaixo da meta de 8%. Pode ser um lote de capas com baixo contraste.</p>
+          <div class="row" style="justify-content:space-between;">
+            <span class="xsmall muted">Resp.: editor</span>
+            <a href="#" class="xsmall" style="color:var(--color-primary);font-weight:600;text-decoration:none;">Ver capas →</a>
+          </div>
+        </div>
+        <div class="cockpit-tile green">
+          <h4>Em ordem</h4>
+          <div class="big">Retenção 52%</div>
+          <p class="small muted" style="margin:0;">A retenção média subiu 6 pontos. Conteúdo está prendendo a atenção da audiência por mais tempo.</p>
+          <div class="row" style="justify-content:space-between;">
+            <span class="xsmall muted">Resp.: roteiro</span>
+            <a href="#" class="xsmall" style="color:var(--color-primary);font-weight:600;text-decoration:none;">Manter →</a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  `;
+}
+
+function healthCard({ platform, name, score, status, headline, rows }) {
+  const ringColor = status === 'green' ? '#22c55e' : status === 'amber' ? '#f59e0b' : '#ef4444';
+  const C = 2 * Math.PI * 40;
+  const off = C - (score / 100) * C;
+  return `
+    <div class="list-card" style="border-color:${status === 'green' ? 'var(--color-success-border)' : status === 'amber' ? 'var(--color-warning-border)' : 'var(--color-danger-border)'};">
+      <div class="lc-head">
+        <div class="stat-iconbox ${platform}" style="width:36px;height:36px;border-radius:10px;">
+          ${platform === 'yt'
+            ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/></svg>'
+            : '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>'}
+        </div>
+        <p class="lc-name">${name}</p>
+        ${statusChip(status)}
+      </div>
+      <div class="row" style="gap:18px;align-items:center;">
+        <div class="ring">
+          <svg viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="40" stroke="#eef2f6" stroke-width="9" fill="none"/>
+            <circle cx="50" cy="50" r="40" stroke="${ringColor}" stroke-width="9" fill="none"
+              stroke-dasharray="${C}" stroke-dashoffset="${off}" stroke-linecap="round"/>
+          </svg>
+          <div class="ring-text num">${score}<span style="font-size:11px;color:var(--color-text-muted);font-weight:500;">/100</span></div>
+        </div>
+        <div style="flex:1;">
+          <p style="margin:0 0 4px;font-size:14px;font-weight:600;color:var(--color-text);">${headline}</p>
+          <p class="muted small" style="margin:0;">Pontuação composta de inscritos/seguidores, alcance, engajamento e frequência. Recalculada diariamente.</p>
+        </div>
+      </div>
+      <div>
+        ${rows.map(r => `
+          <div class="health-row">
+            <span class="dot" style="width:8px;height:8px;border-radius:999px;background:${r.status === 'green' ? 'var(--color-success)' : r.status === 'amber' ? 'var(--color-warning)' : 'var(--color-danger)'};display:inline-block;"></span>
+            <div class="health-label">${r.label}<small>${r.help}</small></div>
+            <span class="health-num">${r.value}</span>
+            ${statusChip(r.status, r.status === 'green' ? 'ok' : r.status === 'amber' ? 'atenção' : 'alerta')}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+</script>
+
+<script>
+/* =======================================================================
+   PAGE: EQA — funnels + events + social seller
+======================================================================= */
+function renderEQA() {
+  const funnels = [
+    {
+      name: 'Destrave Mar/26', period: '01/03 – 31/03',
+      steps: [
+        { label: 'Inscrições', value: 18420, conv: 100 },
+        { label: 'Confirmação de e-mail', value: 14820, conv: 80.5 },
+        { label: 'Aulas iniciadas', value: 9870, conv: 53.6 },
+        { label: 'Concluintes', value: 4310, conv: 23.4 },
+        { label: 'Convertidos', value: 612, conv: 3.32 },
+      ],
+      status: 'green', verdict: '<b>3,32% de conversão final</b> — meta de 3% batida. Funil saudável.'
+    },
+    {
+      name: 'Destrave Fev/26', period: '01/02 – 28/02',
+      steps: [
+        { label: 'Inscrições', value: 15200, conv: 100 },
+        { label: 'Confirmação de e-mail', value: 11800, conv: 77.6 },
+        { label: 'Aulas iniciadas', value: 7430, conv: 48.9 },
+        { label: 'Concluintes', value: 2810, conv: 18.5 },
+        { label: 'Convertidos', value: 312, conv: 2.05 },
+      ],
+      status: 'amber', verdict: '<b>2,05% de conversão final</b> — abaixo da meta. Queda forte na etapa de "aulas iniciadas".'
+    },
+    {
+      name: 'Destrave Jan/26', period: '15/01 – 14/02',
+      steps: [
+        { label: 'Inscrições', value: 22100, conv: 100 },
+        { label: 'Confirmação de e-mail', value: 18950, conv: 85.7 },
+        { label: 'Aulas iniciadas', value: 13620, conv: 61.6 },
+        { label: 'Concluintes', value: 6210, conv: 28.1 },
+        { label: 'Convertidos', value: 1080, conv: 4.89 },
+      ],
+      status: 'green', verdict: 'Melhor funil dos últimos 90 dias. Vale revisitar criativos e copy.'
+    },
+  ];
+
+  return `
+    ${pageHeader({
+      eyebrow: 'Gestão à Vista · Gestão em 4 Minutos',
+      title: 'EQA — Eventos de Qualificação',
+      sub: 'Como cada funil está convertendo do topo até a venda',
+      actions: ''
+    })}
+
+    <div class="section">
+      <div class="pulse-banner" style="--pulse-color:var(--color-success);--pulse-bg:var(--color-success-bg);">
+        <div class="pulse-icon">${pulseIcon('ok')}</div>
+        <div class="pulse-text">
+          <p class="pulse-h">2 funis no verde, 1 com atenção</p>
+          <p class="pulse-sub">O Destrave de março bateu a meta. Fevereiro caiu na etapa "aulas iniciadas" e merece um pós-mortem.</p>
+        </div>
+        <div class="pulse-summary">
+          <span class="pulse-chip green"><span class="dot"></span>2 batendo meta</span>
+          <span class="pulse-chip amber"><span class="dot"></span>1 abaixo</span>
+          <span class="pulse-chip muted"><span class="dot" style="background:var(--color-text-faint)"></span>3 funis ativos</span>
+        </div>
+      </div>
+
+      <div class="section-title"><span class="bar"></span><h2>Funis Ativos</h2><span class="count">3</span></div>
+
+      <div class="grid grid-3">
+        ${funnels.map((f, i) => funnelCard(f, i)).join('')}
+      </div>
+
+      <div class="section-title"><span class="bar"></span><h2>EQA Eventos Comercial</h2><span class="count">2</span></div>
+
+      <div class="grid grid-3">
+        ${eventCard({ name: 'Live de Lançamento Abr/26', date: '12/04/2026', presence: 87, conv: 12.4, target: 10, status: 'green' })}
+        ${eventCard({ name: 'Webinar Estratégia Mar/26', date: '24/03/2026', presence: 64, conv: 6.8, target: 10, status: 'amber' })}
+        ${emptyEventCard()}
+      </div>
+
+      <div class="section-title"><span class="bar"></span><h2>Social Seller</h2><span class="helper">semana 18 — atualização semanal</span></div>
+
+      <div class="grid grid-4">
+        ${statCard({ icon: svg('people'), title: 'Vendedores ativos', value: '14', delta: 7.7, status: 'green', foot: '<strong>1 a mais</strong> que a semana passada' })}
+        ${statCard({ icon: svg('spark'), title: 'Conversas iniciadas', value: '2.483', delta: 12.0, status: 'green', foot: '<strong>177/dia</strong> em média' })}
+        ${statCard({ icon: svg('bars'), title: 'Vendas fechadas', value: '186', delta: 4.5, status: 'green', foot: 'Meta: <strong>180</strong>' })}
+        ${statCard({ icon: svg('eye'), title: 'Tempo médio de resposta', value: '12', unit: 'min', delta: -28.0, status: 'green', foot: 'Meta: <strong>≤ 30 min</strong>' })}
+      </div>
+
+    </div>
+  `;
+}
+
+function funnelCard(f, i) {
+  const max = f.steps[0].value;
+  return `
+    <div class="list-card ${f.status === 'green' ? '' : f.status === 'amber' ? '' : ''}" style="border-color:${f.status === 'green' ? 'var(--color-success-border)' : 'var(--color-warning-border)'};">
+      <div class="lc-head">
+        <div class="stat-iconbox" style="background:var(--color-primary-light);color:var(--color-primary);">${svg('rows')}</div>
+        <div style="flex:1;min-width:0;">
+          <p class="lc-name">${f.name}</p>
+          <p class="lc-period">${f.period}</p>
+        </div>
+        ${statusChip(f.status)}
+      </div>
+      <div class="funnel">
+        ${f.steps.map(s => `
+          <div class="funnel-step">
+            <div class="funnel-bar-wrap">
+              <div class="funnel-bar ${s.conv < 30 ? 'muted' : ''}" style="width:${s.conv}%;">
+                <span style="opacity:${s.conv > 18 ? 1 : 0};">${s.label}</span>
+              </div>
+            </div>
+            <span class="value num">${s.value.toLocaleString('pt-BR')}</span>
+            <span class="conv num">${s.conv.toFixed(1)}%</span>
+          </div>
+        `).join('')}
+      </div>
+      <div class="tip" style="margin-top:0;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:${f.status === 'green' ? 'var(--color-success)' : 'var(--color-warning)'};"><polyline points="20 6 9 17 4 12"/></svg>
+        <div>${f.verdict}</div>
+      </div>
+    </div>
+  `;
+}
+
+function eventCard({ name, date, presence, conv, target, status }) {
+  return `
+    <div class="list-card" style="border-color:${status === 'green' ? 'var(--color-success-border)' : 'var(--color-warning-border)'};">
+      <div class="lc-head">
+        <div class="stat-iconbox" style="background:#fef3c7;color:#b45309;">${svg('spark')}</div>
+        <div style="flex:1;min-width:0;">
+          <p class="lc-name">${name}</p>
+          <p class="lc-period">${date}</p>
+        </div>
+        ${statusChip(status)}
+      </div>
+      <div class="row" style="gap:24px;">
+        <div style="flex:1;">
+          <p class="muted xsmall" style="margin:0 0 6px;">Presença</p>
+          <p class="num" style="font-size:24px;font-weight:800;margin:0;line-height:1;">${presence}<span style="font-size:13px;color:var(--color-text-muted);font-weight:600;">%</span></p>
+          <div class="scorebar" style="margin-top:8px;--score-color:${status === 'green' ? 'var(--color-success)' : 'var(--color-warning)'};"><span style="width:${presence}%"></span></div>
+        </div>
+        <div style="flex:1;">
+          <p class="muted xsmall" style="margin:0 0 6px;">Conversão · meta ${target}%</p>
+          <p class="num" style="font-size:24px;font-weight:800;margin:0;line-height:1;color:${conv >= target ? 'var(--color-success)' : 'var(--color-danger)'};">${conv.toFixed(1)}<span style="font-size:13px;color:var(--color-text-muted);font-weight:600;">%</span></p>
+          <div class="scorebar" style="margin-top:8px;--score-color:${conv >= target ? 'var(--color-success)' : 'var(--color-warning)'};"><span style="width:${Math.min(100, (conv/target)*100)}%"></span></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function emptyEventCard() {
+  return `
+    <div class="list-card" style="border-style:dashed;align-items:center;justify-content:center;text-align:center;">
+      <p class="muted small" style="margin:0;">Nenhum evento futuro programado</p>
+      <button class="quick-pill" style="background:var(--color-primary-light);color:var(--color-primary);border-color:transparent;font-weight:600;">+ Novo evento</button>
+    </div>
+  `;
+}
+</script>
+
+<script>
+/* =======================================================================
+   PAGE: CONVITE
+======================================================================= */
+function renderConvite() {
+  const groups = [
+    { key: 'destrave', label: 'Funil Destrave', count: 3, projects: [
+      { name: 'Destrave Mar/26', start: '01/03', end: '31/03', mainMetric: 'Convidados', value: '18.420', subMetric: 'Conversão', sub: '3,32%', status: 'green', spark: gen(30, 100, 800, 0.65) },
+      { name: 'Destrave Fev/26', start: '01/02', end: '28/02', mainMetric: 'Convidados', value: '15.200', subMetric: 'Conversão', sub: '2,05%', status: 'amber', spark: gen(30, 80, 700, 0.45) },
+      { name: 'Destrave Abr/26', start: '01/04', end: '30/04', mainMetric: 'Convidados', value: '21.470', subMetric: 'Conversão', sub: '3,89%', status: 'green', spark: gen(30, 120, 900, 0.7) },
+    ]},
+    { key: 'ads', label: 'Funil Ads Comercial', count: 2, projects: [
+      { name: 'ADS Comercial Q2/26', start: '01/04', end: '30/06', mainMetric: 'Investido', value: 'R$ 142,8k', subMetric: 'CPL', sub: 'R$ 18,40', status: 'green', spark: gen(30, 100, 500) },
+      { name: 'ADS Lançamento Abr', start: '12/04', end: '20/04', mainMetric: 'Investido', value: 'R$ 38,2k', subMetric: 'CPL', sub: 'R$ 24,10', status: 'red', spark: gen(30, 200, 400, 0.3) },
+    ]},
+    { key: 'ultimate', label: 'Ultimate', count: 1, projects: [
+      { name: 'Ultimate 2026', start: '01/01', end: '31/12', mainMetric: 'Membros ativos', value: '847', subMetric: 'Churn', sub: '2,1%', status: 'green', spark: gen(30, 800, 850, 0.55) },
+    ]},
+    { key: 'fcc', label: 'FCC', count: 1, projects: [
+      { name: 'FCC 2026', start: '01/01', end: '31/12', mainMetric: 'Mentorias ativas', value: '34', subMetric: 'NPS', sub: '78', status: 'green', spark: gen(30, 30, 36, 0.5) },
+    ]},
+    { key: 'mcc', label: 'MCC', count: 1, projects: [
+      { name: 'MCC 2026', start: '01/01', end: '31/12', mainMetric: 'Mentorias ativas', value: '12', subMetric: 'NPS', sub: '64', status: 'amber', spark: gen(30, 10, 14, 0.45) },
+    ]},
+  ];
+
+  return `
+    ${pageHeader({
+      eyebrow: 'Gestão à Vista · Gestão em 4 Minutos',
+      title: 'Convite',
+      sub: 'Cada projeto, em uma frase: convidamos quantos, e quantos toparam',
+      actions: ''
+    })}
+
+    <div class="section">
+      <div class="pulse-banner" style="--pulse-color:var(--color-success);--pulse-bg:var(--color-success-bg);">
+        <div class="pulse-icon">${pulseIcon('ok')}</div>
+        <div class="pulse-text">
+          <p class="pulse-h">Convite na média histórica</p>
+          <p class="pulse-sub">8 projetos no total — 6 saudáveis, 1 em atenção, 1 crítico (ADS Lançamento Abr com CPL acima do teto).</p>
+        </div>
+        <div class="pulse-summary">
+          <span class="pulse-chip green"><span class="dot"></span>6 saudáveis</span>
+          <span class="pulse-chip amber"><span class="dot"></span>1 atenção</span>
+          <span class="pulse-chip red"><span class="dot"></span>1 crítico</span>
+        </div>
+      </div>
+
+      ${groups.map(g => `
+        <div>
+          <div class="section-title"><span class="bar"></span><h2>${g.label}</h2><span class="count">${g.count}</span></div>
+          <div class="grid grid-3" style="margin-top:14px;">
+            ${g.projects.map(p => projectCard(p)).join('')}
+          </div>
+        </div>
+      `).join('')}
+
+    </div>
+  `;
+}
+
+function projectCard(p) {
+  const color = p.status === 'green' ? '#22c55e' : p.status === 'amber' ? '#f59e0b' : '#ef4444';
+  return `
+    <div class="list-card clickable" style="border-color:${p.status === 'green' ? 'var(--color-success-border)' : p.status === 'amber' ? 'var(--color-warning-border)' : 'var(--color-danger-border)'};">
+      <div class="lc-head">
+        <div class="stat-iconbox" style="background:var(--color-primary-light);color:var(--color-primary);">${svg('spark')}</div>
+        <div style="flex:1;min-width:0;">
+          <p class="lc-name">${p.name}</p>
+          <p class="lc-period">${p.start} – ${p.end}</p>
+        </div>
+        ${statusChip(p.status)}
+      </div>
+      <div class="row" style="gap:18px;">
+        <div style="flex:1;">
+          <p class="muted xsmall" style="margin:0 0 4px;">${p.mainMetric}</p>
+          <p class="num" style="font-size:22px;font-weight:800;margin:0;line-height:1;">${p.value}</p>
+        </div>
+        <div style="flex:1;">
+          <p class="muted xsmall" style="margin:0 0 4px;">${p.subMetric}</p>
+          <p class="num" style="font-size:22px;font-weight:800;margin:0;line-height:1;color:${color};">${p.sub}</p>
+        </div>
+      </div>
+      ${sparkline(p.spark, color, { h: 36 })}
+    </div>
+  `;
+}
+</script>
+
+<script>
+/* =======================================================================
+   PAGE: ENTREGA NÍVEL A
+======================================================================= */
+function renderEntrega() {
+  return `
+    ${pageHeader({
+      eyebrow: 'Gestão à Vista · Gestão em 4 Minutos',
+      title: 'Entrega Nível A',
+      sub: 'O quanto cada projeto está cumprindo o que prometeu entregar',
+      actions: ''
+    })}
+
+    <div class="section">
+      <div class="pulse-banner" style="--pulse-color:var(--color-success);--pulse-bg:var(--color-success-bg);">
+        <div class="pulse-icon">${pulseIcon('ok')}</div>
+        <div class="pulse-text">
+          <p class="pulse-h">Entrega no ritmo, sem vermelhos</p>
+          <p class="pulse-sub">Todos os projetos estão dentro da SLA acordada. 2 com leve atraso, mas ainda recuperáveis.</p>
+        </div>
+        <div class="pulse-summary">
+          <span class="pulse-chip green"><span class="dot"></span>5 em dia</span>
+          <span class="pulse-chip amber"><span class="dot"></span>2 atenção</span>
+        </div>
+      </div>
+
+      <div class="section-title"><span class="bar"></span><h2>MCC + FCC · por projeto</h2><span class="count">5</span></div>
+      <div class="grid grid-2">
+        ${deliveryCard({ name: 'FCC 2026 — Turma Março', period: '01/03 — 31/05', expected: 12, delivered: 10, score: 92, status: 'green' })}
+        ${deliveryCard({ name: 'MCC 2026 — Turma Abril', period: '01/04 — 30/06', expected: 8, delivered: 5, score: 76, status: 'amber' })}
+      </div>
+
+      <div class="section-title"><span class="bar"></span><h2>FCC + MCC · mensal</h2><span class="helper">consolidado abr/26</span></div>
+      <div class="grid grid-4">
+        ${statCard({ icon: svg('box'), title: 'Mentorias entregues', value: '46', delta: 12.0, status: 'green', foot: 'Meta mensal: <strong>40</strong>' })}
+        ${statCard({ icon: svg('eye'), title: 'Presença média', value: '87', unit: '%', delta: 3.4, status: 'green', foot: 'Meta: <strong>≥ 80%</strong>' })}
+        ${statCard({ icon: svg('spark'), title: 'NPS médio', value: '74', delta: -2.8, status: 'amber', foot: 'Meta: <strong>≥ 70</strong>' })}
+        ${statCard({ icon: svg('bars'), title: 'Casos sucesso', value: '12', delta: 50.0, status: 'green', foot: '<strong>4 a mais</strong> que mês anterior' })}
+      </div>
+
+      <div class="section-title"><span class="bar"></span><h2>Ultimate · por projeto</h2><span class="count">3</span></div>
+      <div class="grid grid-3">
+        ${deliveryCard({ name: 'Ultimate Q1/26', period: '01/01 — 31/03', expected: 24, delivered: 24, score: 96, status: 'green' })}
+        ${deliveryCard({ name: 'Ultimate Q2/26', period: '01/04 — 30/06', expected: 24, delivered: 14, score: 82, status: 'green' })}
+        ${deliveryCard({ name: 'Ultimate Edge Cases', period: '01/02 — 30/04', expected: 6, delivered: 4, score: 71, status: 'amber' })}
+      </div>
+
+      <div class="section-title"><span class="bar"></span><h2>Destrave · por projeto</h2><span class="count">3</span></div>
+      <div class="grid grid-3">
+        ${deliveryCard({ name: 'Destrave Mar/26', period: '01/03 — 31/03', expected: 5, delivered: 5, score: 94, status: 'green' })}
+        ${deliveryCard({ name: 'Destrave Fev/26', period: '01/02 — 28/02', expected: 5, delivered: 5, score: 88, status: 'green' })}
+        ${deliveryCard({ name: 'Destrave Jan/26', period: '15/01 — 14/02', expected: 5, delivered: 5, score: 91, status: 'green' })}
+      </div>
+    </div>
+  `;
+}
+
+function deliveryCard({ name, period, expected, delivered, score, status }) {
+  const pct = (delivered / expected) * 100;
+  const color = status === 'green' ? '#22c55e' : status === 'amber' ? '#f59e0b' : '#ef4444';
+  return `
+    <div class="list-card" style="border-color:${status === 'green' ? 'var(--color-success-border)' : 'var(--color-warning-border)'};">
+      <div class="lc-head">
+        <div class="stat-iconbox" style="background:var(--color-primary-light);color:var(--color-primary);">${svg('box')}</div>
+        <div style="flex:1;min-width:0;">
+          <p class="lc-name">${name}</p>
+          <p class="lc-period">${period}</p>
+        </div>
+        ${statusChip(status)}
+      </div>
+      <div class="row" style="gap:24px;align-items:flex-end;">
+        <div style="flex:1;">
+          <p class="muted xsmall" style="margin:0 0 4px;">Entregas</p>
+          <p class="num" style="font-size:26px;font-weight:800;margin:0;line-height:1;">${delivered}<span style="font-size:14px;color:var(--color-text-muted);font-weight:600;"> / ${expected}</span></p>
+          <div class="scorebar" style="margin-top:8px;--score-color:${color};"><span style="width:${pct}%"></span></div>
+          <p class="xsmall muted" style="margin-top:6px;">${pct.toFixed(0)}% concluído</p>
+        </div>
+        <div style="text-align:center;">
+          <p class="muted xsmall" style="margin:0;">Qualidade</p>
+          <p class="num" style="font-size:30px;font-weight:800;margin:2px 0 0;color:${color};line-height:1;">${score}</p>
+          <p class="xsmall muted" style="margin:2px 0 0;">de 100</p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+</script>
+
+<script>
+/* =======================================================================
+   PAGE: LTV
+======================================================================= */
+function renderLTV() {
+  const matriz = { active: 1284, mrr: 184320, ltv: 4720, churn: 1.8, status: 'green', spark: gen(30, 1180, 1290, 0.65) };
+  const solides = { active: 412, mrr: 87410, ltv: 3210, churn: 3.2, status: 'amber', spark: gen(30, 400, 420, 0.5) };
+
+  return `
+    ${pageHeader({
+      eyebrow: 'Gestão à Vista · Gestão em 4 Minutos',
+      title: 'LTV',
+      sub: 'Quanto cada cliente vale ao longo do tempo, por fonte',
+      actions: dateControls({ active: '30' })
+    })}
+
+    <div class="section">
+      <div class="pulse-banner" style="--pulse-color:var(--color-success);--pulse-bg:var(--color-success-bg);">
+        <div class="pulse-icon">${pulseIcon('ok')}</div>
+        <div class="pulse-text">
+          <p class="pulse-h">Receita recorrente em alta</p>
+          <p class="pulse-sub">Matriz Humana segue como motor. Solides com churn um pouco acima da meta — vale entender o motivo.</p>
+        </div>
+        <div class="pulse-summary">
+          <span class="pulse-chip green"><span class="dot"></span>1 forte</span>
+          <span class="pulse-chip amber"><span class="dot"></span>1 atenção</span>
+        </div>
+      </div>
+
+      <div class="section-title"><span class="bar"></span><h2>Por fonte</h2><span class="helper">comparativo entre as duas bases</span></div>
+
+      <div class="grid grid-2">
+        ${ltvCard({ name: 'Matriz Humana', subtitle: 'Base própria — assinaturas IGT', data: matriz })}
+        ${ltvCard({ name: 'Solides', subtitle: 'Base parceira — co-marketing', data: solides })}
+      </div>
+
+      <div class="section-title"><span class="bar"></span><h2>Movimento do mês</h2></div>
+      <div class="grid grid-4">
+        ${statCard({ icon: svg('people'), title: 'Novos clientes', value: '+184', delta: 14.0, status: 'green', foot: '<strong>54</strong> via Solides' })}
+        ${statCard({ icon: svg('bars'), title: 'Receita recorrente', value: 'R$ 271,7k', delta: 8.2, status: 'green', foot: '<strong>+R$ 20,4k</strong> vs. mês passado' })}
+        ${statCard({ icon: svg('eye'), title: 'Churn médio', value: '2,4', unit: '%', delta: 0.6, status: 'amber', foot: 'Meta: <strong>≤ 2%</strong>', sparkData: gen(30, 1.8, 2.6, 0.55) })}
+        ${statCard({ icon: svg('spark'), title: 'LTV / CAC', value: '4,1', unit: 'x', delta: 5.1, status: 'green', foot: 'Meta: <strong>≥ 3x</strong>' })}
+      </div>
+
+    </div>
+  `;
+}
+
+function ltvCard({ name, subtitle, data }) {
+  const color = data.status === 'green' ? '#22c55e' : data.status === 'amber' ? '#f59e0b' : '#ef4444';
+  return `
+    <div class="list-card" style="border-color:${data.status === 'green' ? 'var(--color-success-border)' : 'var(--color-warning-border)'};padding:22px;gap:18px;">
+      <div class="lc-head">
+        <div class="stat-iconbox" style="background:var(--color-primary-light);color:var(--color-primary);width:36px;height:36px;border-radius:10px;">${svg('bars')}</div>
+        <div style="flex:1;min-width:0;">
+          <p class="lc-name" style="font-size:16px;">${name}</p>
+          <p class="lc-period">${subtitle}</p>
+        </div>
+        ${statusChip(data.status)}
+      </div>
+
+      <div class="grid grid-2" style="gap:14px;">
+        <div>
+          <p class="muted xsmall" style="margin:0 0 4px;">Clientes ativos</p>
+          <p class="num" style="font-size:30px;font-weight:800;margin:0;line-height:1;">${data.active.toLocaleString('pt-BR')}</p>
+        </div>
+        <div>
+          <p class="muted xsmall" style="margin:0 0 4px;">MRR</p>
+          <p class="num" style="font-size:30px;font-weight:800;margin:0;line-height:1;">R$ ${(data.mrr/1000).toFixed(1)}k</p>
+        </div>
+        <div>
+          <p class="muted xsmall" style="margin:0 0 4px;">LTV médio</p>
+          <p class="num" style="font-size:24px;font-weight:800;margin:0;line-height:1;">R$ ${data.ltv.toLocaleString('pt-BR')}</p>
+        </div>
+        <div>
+          <p class="muted xsmall" style="margin:0 0 4px;">Churn mensal</p>
+          <p class="num" style="font-size:24px;font-weight:800;margin:0;line-height:1;color:${color};">${data.churn.toFixed(1)}<span style="font-size:14px;color:var(--color-text-muted);font-weight:600;">%</span></p>
+        </div>
+      </div>
+
+      <div>
+        <p class="muted xsmall" style="margin:0 0 4px;">Evolução de clientes ativos · 30 dias</p>
+        ${sparkline(data.spark, color, { h: 50 })}
+      </div>
+    </div>
+  `;
+}
+</script>
+
+<script>
+/* =======================================================================
+   ROUTER
+======================================================================= */
+function renderMain() {
+  const main = document.getElementById('main');
+  const map = {
+    'posicionamento':  renderPosicionamento,
+    'relacionamento':  renderRelacionamento,
+    'prestar-atencao': renderPrestarAtencao,
+    'eqa':             renderEQA,
+    'convite':         renderConvite,
+    'entrega':         renderEntrega,
+    'ltv':             renderLTV,
+  };
+  const fn = map[activeTab] || renderPosicionamento;
+  main.innerHTML = `<div class="tab active" data-screen-label="${getLabel(activeTab)}">${fn()}</div>`;
+}
+
+function getLabel(id) {
+  const idx = NAV.findIndex(n => n.id === id);
+  return `${String(idx + 1).padStart(2, '0')} ${NAV[idx].label}`;
+}
+
+renderNav();
+renderMain();
+</script>
+</body>
+</html>

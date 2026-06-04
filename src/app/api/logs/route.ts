@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
     .limit(100);
 
   if (dbError) {
-    return NextResponse.json({ error: dbError.message }, { status: 500 });
+    console.error("[api/logs] dbError:", JSON.stringify({ message: dbError.message, code: dbError.code, details: dbError.details, hint: dbError.hint }));
+    return NextResponse.json({ error: dbError.message, code: dbError.code, details: dbError.details }, { status: 500 });
   }
 
   const logs = (data ?? []).map((row) => {

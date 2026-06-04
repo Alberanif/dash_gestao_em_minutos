@@ -3,6 +3,11 @@
 # Git worktrees
 .worktrees/
 
+# AI tool artifacts
+.claude/
+.firecrawl/
+.superpowers/
+
 # dependencies
 /node_modules
 /.pnp

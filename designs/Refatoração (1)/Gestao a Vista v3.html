@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Gestão à Vista — IGT</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#07101f;--sf:#0d1829;--s2:#121e32;--br:#1c2b40;--bv:#253852;
+  --tx:#ddeaf6;--t2:#7b9ab6;--t3:#3c566f;--t4:#253648;
+  --vi:#9070e8;--em:#0daa7c;--or:#e87220;--bl:#3d84f5;
+  --gn:#1ab96c;--cy:#0899c0;--am:#d99512;--rd:#e04242;
+}
+html,body{height:100%;}
+body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--tx);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+
+/* ── APP SHELL ── */
+.app{display:flex;min-height:100vh;}
+
+/* ── SIDEBAR ── */
+.sidebar{width:208px;flex-shrink:0;background:var(--sf);border-right:1px solid var(--bv);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:hidden;}
+.sb-brand{height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;background:var(--s2);border-bottom:1px solid var(--bv);position:relative;}
+.sb-brand::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:1px;background:linear-gradient(90deg,var(--bl) 0%,transparent 60%);}
+.sb-logo{width:26px;height:26px;background:var(--bl);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:#fff;flex-shrink:0;letter-spacing:.02em;}
+.sb-brand > span{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t2);}
+.sb-nav{flex:1;overflow-y:auto;padding:10px 0;display:flex;flex-direction:column;gap:1px;}
+.nav-link{display:flex;align-items:center;gap:9px;padding:8px 14px;color:var(--t3);font-size:12px;font-weight:500;text-decoration:none;cursor:pointer;border-left:2px solid transparent;transition:background 120ms,color 120ms;}
+.nav-link:hover{background:rgba(255,255,255,.03);color:var(--t2);}
+.nav-link.active{background:rgba(61,132,245,.09);color:var(--bl);border-left-color:var(--bl);font-weight:600;}
+.nav-link svg{width:14px;height:14px;flex-shrink:0;opacity:.6;}
+.nav-link.active svg{opacity:1;}
+.sb-footer{border-top:1px solid var(--bv);padding:11px 14px;display:flex;align-items:center;gap:8px;color:var(--t3);font-size:11px;}
+.sb-footer .who{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.icon-btn{width:26px;height:26px;border-radius:5px;border:0;background:transparent;color:var(--t3);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:background 120ms,color 120ms;}
+.icon-btn:hover{background:var(--br);color:var(--t2);}
+
+/* ── MAIN ── */
+.main{flex:1;min-width:0;}
+
+/* ── PAGE HEADER ── */
+.page-header{background:var(--sf);border-bottom:1px solid var(--bv);padding:16px 28px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+.ph-block{flex:1;min-width:0;}
+.ph-eyebrow{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);margin:0 0 3px;}
+.ph-title{font-size:18px;font-weight:600;color:var(--tx);margin:0;letter-spacing:-.02em;}
+.ph-sub{margin:3px 0 0;font-size:12px;color:var(--t3);}
+
+/* ── PERIOD CONTROLS (Indicadores style) ── */
+.per{display:flex;align-items:center;flex-wrap:wrap;gap:8px;}
+.pset{display:flex;gap:2px;background:var(--bg);border:1px solid var(--bv);border-radius:8px;padding:3px;}
+.pb{padding:4px 10px;font-size:11px;font-weight:600;border-radius:6px;border:none;cursor:pointer;background:transparent;color:var(--t3);font-family:inherit;transition:background 150ms,color 150ms;}
+.pb:hover{color:var(--t2);}
+.pb.on{background:var(--bl);color:#fff;}
+.dp{display:flex;align-items:center;gap:6px;}
+.di{font-size:12px;padding:4px 8px;width:112px;background:var(--bg);border:1px solid var(--bv);border-radius:6px;color:var(--tx);outline:none;font-family:inherit;}
+.di:focus{border-color:var(--bl);}
+.ds{font-size:12px;color:var(--t3);}
+
+/* ── SECTION ── */
+.section{padding:22px 28px 36px;display:flex;flex-direction:column;gap:18px;}
+
+/* ── NARR (numbered section label — Indicadores style) ── */
+.narr{display:flex;align-items:center;gap:9px;margin-bottom:10px;}
+.ns{font-family:'DM Mono',monospace;font-size:10px;color:var(--t4);letter-spacing:.05em;}
+.nl{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;}
+.nd{width:3px;height:3px;border-radius:50%;background:var(--t4);flex-shrink:0;}
+.ndesc{font-size:12px;color:var(--t3);}
+
+/* section sub-title */
+.stitle{display:flex;align-items:center;gap:8px;margin:6px 0 2px;}
+.stitle h2{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:var(--t3);margin:0;letter-spacing:.1em;text-transform:uppercase;}
+.stitle .stbar{width:1px;height:12px;background:var(--bv);}
+.stitle .stcount{font-family:'DM Mono',monospace;font-size:10px;color:var(--t4);background:var(--s2);border:1px solid var(--br);border-radius:4px;padding:1px 7px;}
+.stitle .sthelper{color:var(--t3);font-size:11px;}
+
+/* ── PULSE BANNER ── */
+.pulse{background:var(--sf);border:1px solid var(--bv);border-radius:10px;padding:15px 18px;display:flex;align-items:center;gap:14px;position:relative;overflow:hidden;}
+.pulse::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--pc,var(--gn));}
+.pulse-icon{width:42px;height:42px;flex-shrink:0;border-radius:9px;display:grid;place-items:center;background:var(--pb,rgba(26,185,108,.1));color:var(--pc,var(--gn));}
+.pulse-txt{flex:1;min-width:0;}
+.pulse-h{font-size:13px;font-weight:600;color:var(--tx);margin:0 0 2px;letter-spacing:-.01em;}
+.pulse-s{font-size:12px;color:var(--t2);margin:0;}
+.pulse-sum{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;}
+.pchip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:600;color:var(--t2);background:var(--s2);border:1px solid var(--br);}
+.pchip .dot{width:6px;height:6px;border-radius:50%;}
+.pchip.green .dot{background:var(--gn);}
+.pchip.amber .dot{background:var(--am);}
+.pchip.red   .dot{background:var(--rd);}
+.pchip.muted .dot{background:var(--t3);}
+
+/* ── STATUS CHIP ── */
+.chip{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-family:'DM Mono',monospace;font-size:9px;font-weight:500;letter-spacing:.04em;flex-shrink:0;}
+.chip.green{color:var(--gn);background:rgba(26,185,108,.1);border:1px solid rgba(26,185,108,.22);}
+.chip.amber{color:var(--am);background:rgba(217,149,18,.1);border:1px solid rgba(217,149,18,.22);}
+.chip.red  {color:var(--rd);background:rgba(224,66,66,.1);border:1px solid rgba(224,66,66,.22);}
+.chip .dot{width:5px;height:5px;border-radius:50%;}
+.chip.green .dot{background:var(--gn);}
+.chip.amber .dot{background:var(--am);}
+.chip.red   .dot{background:var(--rd);animation:pDot 1.8s ease-in-out infinite;}
+@keyframes pDot{0%,100%{box-shadow:0 0 0 0 rgba(224,66,66,.5);}50%{box-shadow:0 0 0 4px rgba(224,66,66,0);}}
+
+/* ── DELTA BADGE ── */
+.dbadge{display:inline-flex;align-items:center;gap:3px;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;border-radius:4px;padding:2px 7px;}
+.dbadge.up  {color:var(--gn);background:rgba(26,185,108,.1);border:1px solid rgba(26,185,108,.2);}
+.dbadge.down{color:var(--rd);background:rgba(224,66,66,.1);border:1px solid rgba(224,66,66,.2);}
+.dbadge.flat{color:var(--t2);background:var(--s2);border:1px solid var(--br);}
+.dbadge svg{width:10px;height:10px;}
+
+/* ── GRIDS ── */
+.grid{display:grid;gap:14px;}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr));}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr));}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr));}
+@media(max-width:1100px){.g4{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:840px){.g3{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:640px){.g2,.g3{grid-template-columns:1fr;}}
+
+/* ── STAT CARD (KPI cell) ── */
+.kc{background:var(--s2);border:1px solid var(--br);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden;}
+.kc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--ka,var(--bl));}
+.kc.green{--ka:var(--gn);}
+.kc.amber{--ka:var(--am);}
+.kc.red  {--ka:var(--rd);}
+.kc-chip{position:absolute;top:12px;right:12px;}
+.kc-head{display:flex;align-items:center;gap:9px;padding-right:72px;}
+.kc-icon{width:28px;height:28px;border-radius:7px;flex-shrink:0;display:grid;place-items:center;background:rgba(61,132,245,.1);color:var(--bl);}
+.kc-icon.yt{background:rgba(224,66,66,.1);color:var(--rd);}
+.kc-icon.ig{background:rgba(144,112,232,.1);color:var(--vi);}
+.kc-lbl{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;}
+.kc-sub{font-size:10px;color:var(--t3);margin-top:1px;}
+.kc-val{font-family:'DM Mono',monospace;font-size:26px;font-weight:500;color:var(--tx);line-height:1;letter-spacing:-.02em;}
+.kc-val .unit{font-size:13px;font-weight:400;color:var(--t2);margin-left:2px;letter-spacing:0;}
+.kc-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:8px;border-top:1px solid var(--br);}
+.kc-foot{font-size:11px;color:var(--t3);}
+.kc-foot strong{color:var(--t2);font-weight:600;}
+.spark{width:100%;height:34px;}
+
+/* ── COMPARE CARD ── */
+.cc{background:var(--sf);border:1px solid var(--bv);border-radius:10px;overflow:hidden;position:relative;}
+.cc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--ca,var(--bv));}
+.cc.green{--ca:var(--gn);}
+.cc.amber{--ca:var(--am);}
+.cc.red  {--ca:var(--rd);}
+.cc-head{display:flex;align-items:center;gap:11px;padding:14px 17px;border-bottom:1px solid var(--bv);}
+.cc-plat{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;flex-shrink:0;}
+.cc-plat.yt{background:rgba(224,66,66,.12);color:var(--rd);}
+.cc-plat.ig{background:rgba(144,112,232,.12);color:var(--vi);}
+.cc-head h3{font-size:14px;font-weight:600;margin:0;color:var(--tx);}
+.cc-head .cc-metric{margin-left:auto;font-size:11px;color:var(--t3);}
+.cc-body{display:grid;grid-template-columns:1fr 1fr;}
+.cc-side{padding:14px 17px;border-right:1px solid var(--bv);}
+.cc-side:last-child{border-right:0;background:var(--s2);}
+.cc-tag{display:inline-flex;align-items:center;font-family:'DM Mono',monospace;font-size:9px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:3px;}
+.cc-tag.prev{background:var(--br);color:var(--t3);}
+.cc-tag.curr{background:rgba(61,132,245,.1);color:var(--bl);border:1px solid rgba(61,132,245,.2);}
+.cc-tag.curr.green{background:rgba(26,185,108,.1);color:var(--gn);border-color:rgba(26,185,108,.2);}
+.cc-tag.curr.red  {background:rgba(224,66,66,.1);color:var(--rd);border-color:rgba(224,66,66,.2);}
+.cc-tag.curr.amber{background:rgba(217,149,18,.1);color:var(--am);border-color:rgba(217,149,18,.2);}
+.cc-period{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);margin-top:5px;}
+.cc-num{font-family:'DM Mono',monospace;font-size:26px;font-weight:500;letter-spacing:-.02em;color:var(--tx);margin:7px 0;line-height:1;}
+.cc-footer{border-top:1px solid var(--bv);padding:11px 17px;display:flex;align-items:center;justify-content:space-between;background:var(--s2);gap:10px;}
+.cc-verdict{display:flex;align-items:flex-start;gap:6px;font-size:12px;color:var(--t2);flex:1;min-width:0;}
+.cc-verdict svg{width:12px;height:12px;flex-shrink:0;margin-top:2px;}
+.cc-verdict.green{color:var(--gn);}
+.cc-verdict.amber{color:var(--am);}
+.cc-verdict.red  {color:var(--rd);}
+.cc-verdict b{color:var(--tx);font-weight:600;}
+.cc-ft-r{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.expl{color:var(--bl);font-size:11px;font-weight:600;text-decoration:none;white-space:nowrap;}
+
+/* ── LIST CARD ── */
+.lc{background:var(--sf);border:1px solid var(--bv);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;}
+.lc-head{display:flex;align-items:center;gap:10px;}
+.lc-name{font-size:13px;font-weight:600;color:var(--tx);margin:0;flex:1;min-width:0;}
+.lc-per{font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);margin:1px 0 0;}
+
+/* ── ICON BOX ── */
+.ibox{width:28px;height:28px;border-radius:7px;flex-shrink:0;display:grid;place-items:center;background:rgba(61,132,245,.1);color:var(--bl);}
+.ibox.yt{background:rgba(224,66,66,.1);color:var(--rd);}
+.ibox.ig{background:rgba(144,112,232,.1);color:var(--vi);}
+.ibox.am{background:rgba(217,149,18,.1);color:var(--am);}
+.ibox.gn{background:rgba(26,185,108,.1);color:var(--gn);}
+
+/* ── FUNNEL ── */
+.funnel{display:flex;flex-direction:column;gap:4px;}
+.fstep{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:8px;}
+.fbar-wrap{position:relative;height:20px;background:var(--s2);border:1px solid var(--br);border-radius:5px;overflow:hidden;}
+.fbar{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--bl),rgba(61,132,245,.5));border-radius:5px;display:flex;align-items:center;padding-left:8px;color:#fff;font-weight:600;font-size:10px;}
+.fbar.muted{background:linear-gradient(90deg,var(--bv),var(--br));}
+.fval{font-family:'DM Mono',monospace;color:var(--t2);font-weight:500;min-width:52px;text-align:right;font-size:11px;}
+.fconv{font-family:'DM Mono',monospace;color:var(--t3);min-width:44px;text-align:right;font-size:10px;}
+
+/* ── HEALTH CARD ── */
+.h-row{display:grid;grid-template-columns:8px 1fr auto auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--br);}
+.h-row:last-child{border-bottom:0;}
+.h-lbl{font-size:12px;font-weight:500;color:var(--tx);}
+.h-lbl small{display:block;font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);font-weight:400;margin-top:1px;}
+.h-num{font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:var(--tx);}
+.ring{position:relative;width:84px;height:84px;flex-shrink:0;}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg);}
+.ring-txt{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:15px;font-weight:500;color:var(--tx);text-align:center;line-height:1.1;white-space:nowrap;}
+
+/* ── COCKPIT ── */
+.cockpit{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;}
+.ctile{background:var(--sf);border:1px solid var(--bv);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden;}
+.ctile::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--ta,var(--bv));}
+.ctile.green{--ta:var(--gn);}
+.ctile.amber{--ta:var(--am);}
+.ctile.red  {--ta:var(--rd);}
+.ctile h4{font-family:'DM Mono',monospace;font-size:9px;font-weight:500;color:var(--t3);margin:0;text-transform:uppercase;letter-spacing:.1em;}
+.ctile .big{font-size:20px;font-weight:600;color:var(--tx);letter-spacing:-.02em;line-height:1;}
+.ctile .crow{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--t3);}
+.ctile .crow b{color:var(--t2);font-weight:600;}
+
+/* ── SCOREBAR ── */
+.sbar{height:4px;border-radius:999px;background:var(--br);overflow:hidden;position:relative;}
+.sbar > span{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:var(--sc,var(--bl));}
+
+/* ── TIP ── */
+.tip{display:flex;align-items:flex-start;gap:9px;background:var(--s2);border:1px dashed var(--br);border-radius:8px;padding:9px 11px;font-size:12px;color:var(--t2);line-height:1.55;}
+.tip svg{width:12px;height:12px;flex-shrink:0;margin-top:2px;color:var(--bl);}
+.tip b{color:var(--tx);font-weight:600;}
+
+/* ── UTILITY ── */
+.row{display:flex;align-items:center;gap:10px;}
+.col{display:flex;flex-direction:column;}
+.muted{color:var(--t2);}
+.xmuted{color:var(--t3);}
+.small{font-size:12px;}
+.xsmall{font-size:11px;}
+.mono{font-family:'DM Mono',monospace;}
+.clickable{cursor:pointer;}
+.clickable:hover{border-color:rgba(61,132,245,.5) !important;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar" data-screen-label="00 Sidebar">
+    <div class="sb-brand">
+      <div class="sb-logo">IGT</div>
+      <span>Gestão à Vista</span>
+    </div>
+    <nav class="sb-nav" id="nav"></nav>
+    <div class="sb-footer">
+      <span class="who">leandro@igtbox.com.br</span>
+      <button class="icon-btn" title="Sair">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main" id="main"></main>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<script>
+/* NAV CONFIG */
+const NAV = [
+  { id: 'posicionamento',  label: 'Posicionamento',  icon: 'pin'    },
+  { id: 'relacionamento',  label: 'Relacionamento',  icon: 'people' },
+  { id: 'prestar-atencao', label: 'Prestar Atenção', icon: 'eye'    },
+  { id: 'eqa',             label: 'EQA',             icon: 'rows'   },
+  { id: 'convite',         label: 'Convite',         icon: 'spark'  },
+  { id: 'entrega',         label: 'Entrega Nível A', icon: 'box'    },
+  { id: 'ltv',             label: 'LTV',             icon: 'bars'   },
+];
+const ICONS = {
+  pin:   '<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/>',
+  people:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  eye:   '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+  rows:  '<path d="M3 3h18v4H3z"/><path d="M3 9h12v4H3z"/><path d="M3 15h7v4H3z"/>',
+  spark: '<path d="M22 12h-4l-3 8-6-16-3 8H2"/>',
+  box:   '<path d="M12 2L2 7l10 5 10-5-10-5z"/><polyline points="2 12 12 17 22 12"/><polyline points="2 17 12 22 22 17"/>',
+  bars:  '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+};
+function ico(name, sz = 14) {
+  return `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ''}</svg>`;
+}
+
+let activeTab = localStorage.getItem('gv3-tab') || 'posicionamento';
+
+function renderNav() {
+  const nav = document.getElementById('nav');
+  nav.innerHTML = NAV.map(n => `
+    <a class="nav-link ${n.id === activeTab ? 'active' : ''}" data-tab="${n.id}">
+      ${ico(n.icon)}<span>${n.label}</span>
+    </a>
+  `).join('');
+  nav.querySelectorAll('.nav-link').forEach(a => {
+    a.addEventListener('click', () => {
+      activeTab = a.dataset.tab;
+      localStorage.setItem('gv3-tab', activeTab);
+      renderNav(); renderMain();
+      window.scrollTo(0, 0);
+    });
+  });
+}
+</script>
+
+<!-- ═══════════════════════════════ SHARED HELPERS ══════════════════════════ -->
+<script>
+function pageHeader({ eyebrow, title, sub, actions }) {
+  return `
+    <div class="page-header">
+      <div class="ph-block">
+        ${eyebrow ? `<p class="ph-eyebrow">${eyebrow}</p>` : ''}
+        <h1 class="ph-title">${title}</h1>
+        ${sub ? `<p class="ph-sub">${sub}</p>` : ''}
+      </div>
+      ${actions !== undefined ? `<div class="per">${actions}</div>` : ''}
+    </div>`;
+}
+
+function dateCtrl({ active = '30' } = {}) {
+  const opts = [['7','7d'],['15','15d'],['30','30d']];
+  return `
+    <div class="pset">${opts.map(([v,l]) => `<button class="pb ${v === active ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="dp">
+      <input class="di" type="date" value="2026-03-09">
+      <span class="ds">até</span>
+      <input class="di" type="date" value="2026-05-07">
+    </div>`;
+}
+
+/* sparkline SVG — same logic, dark-theme fill */
+function spark(values, color, opts = {}) {
+  if (!values || values.length < 2) return '';
+  const w = opts.w || 200, h = opts.h || 40, pad = 2;
+  const min = Math.min(...values), max = Math.max(...values);
+  const range = max - min || 1;
+  const step = (w - pad * 2) / (values.length - 1);
+  const pts = values.map((v, i) => [pad + i * step, h - pad - ((v - min) / range) * (h - pad * 2)]);
+  const d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  const area = `M${pts[0][0]},${h} ${pts.map(p => 'L'+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')} L${pts[pts.length-1][0]},${h} Z`;
+  const last = pts[pts.length-1];
+  const uid = opts.id || Math.random().toString(36).slice(2,6);
+  return `
+    <svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+      <defs><linearGradient id="sg-${uid}" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0%" stop-color="${color}" stop-opacity=".22"/>
+        <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+      </linearGradient></defs>
+      <path d="${area}" fill="url(#sg-${uid})"/>
+      <path d="${d}" stroke="${color}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2.5" fill="${color}"/>
+    </svg>`;
+}
+
+function dbadge(pct, opts = {}) {
+  const up = pct > 0, dn = pct < 0;
+  const cls = pct === 0 ? 'flat' : (up ? (opts.invert ? 'down' : 'up') : (opts.invert ? 'up' : 'down'));
+  const arrow = pct === 0
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="5" y1="12" x2="19" y2="12"/></svg>`
+    : (up ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 14 12 8 18 14"/></svg>`
+           : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 10 12 16 18 10"/></svg>`);
+  return `<span class="dbadge ${cls}">${arrow}${pct > 0 ? '+' : ''}${pct.toFixed(1)}%</span>`;
+}
+
+function chip(status, label) {
+  const map = { green: 'Verde', amber: 'Atenção', red: 'Crítico' };
+  return `<span class="chip ${status}"><span class="dot"></span>${label || map[status]}</span>`;
+}
+
+function pulseIco(kind) {
+  if (kind === 'ok')    return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
+  if (kind === 'attn')  return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+  if (kind === 'alert') return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+  return '';
+}
+
+function gen(n, min, max, drift = 0.5) {
+  const out = []; let v = (min + max) / 2;
+  for (let i = 0; i < n; i++) {
+    const r = (Math.random() - 0.5) * (max - min) * 0.15;
+    v = v + r + (drift - 0.5) * (max - min) * 0.02;
+    v = Math.max(min, Math.min(max, v));
+    out.push(Math.round(v));
+  }
+  return out;
+}
+
+/* ── COMPARE CARD ── */
+function compareCard({ platform, name, metric, prevLabel, currLabel, prevValue, currValue, prevSpark, currSpark, status, verdict }) {
+  const pct = ((currValue - prevValue) / prevValue) * 100;
+  const col  = { green: 'var(--gn)', amber: 'var(--am)', red: 'var(--rd)' }[status];
+  const scol = { green: '#1ab96c',   amber: '#d99512',   red: '#e04242'   }[status];
+  const platIco = platform === 'yt'
+    ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/></svg>`
+    : `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>`;
+  const vIcon = status === 'green'
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
+    : status === 'amber'
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+  const currTag = { green: 'Crescendo', amber: 'Estável', red: 'Caindo' }[status];
+  return `
+    <div class="cc ${status}">
+      <div class="cc-head">
+        <div class="cc-plat ${platform}">${platIco}</div>
+        <h3>${name}</h3>
+        <span class="cc-metric">${metric}</span>
+        ${chip(status)}
+      </div>
+      <div class="cc-body">
+        <div class="cc-side">
+          <span class="cc-tag prev">Anterior</span>
+          <div class="cc-period">${prevLabel}</div>
+          <div class="cc-num">${prevValue.toLocaleString('pt-BR')}</div>
+          ${spark(prevSpark, '#3c566f', { id: platform+'p', h: 38 })}
+        </div>
+        <div class="cc-side">
+          <span class="cc-tag curr ${status}">${currTag}</span>
+          <div class="cc-period">${currLabel}</div>
+          <div class="cc-num" style="color:${col};">${currValue.toLocaleString('pt-BR')}</div>
+          ${spark(currSpark, scol, { id: platform+'c', h: 38 })}
+        </div>
+      </div>
+      <div class="cc-footer">
+        <div class="cc-verdict ${status}">${vIcon}<div>${verdict}</div></div>
+        <div class="cc-ft-r">${dbadge(pct)}<a class="expl" href="#">Ver →</a></div>
+      </div>
+    </div>`;
+}
+
+/* ── STAT CARD (KPI Cell) ── */
+function statCard({ icon, title, help, value, unit, delta: d, status, foot, sparkData }) {
+  const scol = { red: '#e04242', amber: '#d99512', green: '#1ab96c' };
+  return `
+    <div class="kc ${status || ''}">
+      ${status ? `<div class="kc-chip">${chip(status)}</div>` : ''}
+      <div class="kc-head">
+        <div class="kc-icon">${icon}</div>
+        <div>
+          <p class="kc-lbl">${title}</p>
+          ${help ? `<p class="kc-sub">${help}</p>` : ''}
+        </div>
+      </div>
+      <div class="kc-val">${value}${unit ? `<span class="unit">${unit}</span>` : ''}</div>
+      ${sparkData ? spark(sparkData, scol[status] || '#3d84f5', { h: 34 }) : ''}
+      <div class="kc-meta">
+        ${typeof d === 'number' ? dbadge(d) : '<span class="xmuted small">—</span>'}
+        <span class="kc-foot">${foot || ''}</span>
+      </div>
+    </div>`;
+}
+</script>
+
+<!-- ═══════════════════════════ PAGE: POSICIONAMENTO ════════════════════════ -->
+<script>
+function renderPosicionamento() {
+  const yt = {
+    prev: 184220, curr: 187930,
+    sparkPrev: [184220,184310,184380,184450,184520,184610,184680,184700,184780,184820,184910,184990,185070,185160,185220,185310,185390,185460,185520,185600,185680,185750,185820,185900,185970,186050,186120,186200,186260,186310],
+    sparkCurr: [186310,186390,186470,186560,186640,186720,186810,186890,186970,187050,187130,187210,187290,187370,187440,187520,187600,187680,187760,187810,187860,187890,187900,187910,187915,187920,187925,187928,187929,187930],
+  };
+  const ig = {
+    prev: 92410, curr: 91120,
+    sparkPrev: [92410,92450,92500,92560,92620,92680,92710,92740,92760,92780,92790,92800,92790,92770,92740,92700,92660,92620,92590,92550,92510,92480,92460,92440,92430,92420,92410,92410,92410,92410],
+    sparkCurr: [92410,92350,92290,92230,92180,92110,92050,91980,91900,91820,91760,91700,91640,91580,91520,91470,91420,91380,91340,91300,91270,91240,91210,91190,91170,91150,91140,91130,91120,91120],
+  };
+  const ytPct = ((yt.curr - yt.prev) / yt.prev) * 100;
+  const igPct = ((ig.curr - ig.prev) / ig.prev) * 100;
+  const ytSt  = ytPct >= 0.5 ? 'green' : (ytPct >= -1 ? 'amber' : 'red');
+  const igSt  = igPct >= 0.5 ? 'green' : (igPct >= -1 ? 'amber' : 'red');
+  const ok = [ytSt,igSt].filter(s=>s==='green').length;
+  const wn = [ytSt,igSt].filter(s=>s==='amber').length;
+  const cr = [ytSt,igSt].filter(s=>s==='red').length;
+  let pulse;
+  if (cr > 0)      pulse = { pc:'var(--rd)', pb:'rgba(224,66,66,.1)', ik:'alert', h:'Posicionamento perdendo audiência', s:'O Instagram encolheu no período. Vale entender o motivo antes da próxima campanha.' };
+  else if (wn > 0) pulse = { pc:'var(--am)', pb:'rgba(217,149,18,.1)', ik:'attn',  h:'Crescimento mais devagar do que o normal', s:'A base está estável, mas sem o ritmo de crescimento esperado.' };
+  else             pulse = { pc:'var(--gn)', pb:'rgba(26,185,108,.1)', ik:'ok',    h:'Audiência crescendo nas duas redes', s:'YouTube e Instagram somam novos seguidores no período. Mantenha o ritmo.' };
+
+  return `
+    ${pageHeader({ eyebrow:'Gestão à Vista · Gestão em 4 Minutos', title:'Posicionamento', sub:'O quanto a marca está sendo encontrada nas redes sociais', actions: dateCtrl({active:'30'}) })}
+    <div class="section">
+      <div class="narr"><span class="ns">01</span><span class="nl">Status do Período</span><span class="nd"></span><span class="ndesc">Audiência acumulada vs. período anterior</span></div>
+      <div class="pulse" style="--pc:${pulse.pc};--pb:${pulse.pb};">
+        <div class="pulse-icon">${pulseIco(pulse.ik)}</div>
+        <div class="pulse-txt">
+          <p class="pulse-h">${pulse.h}</p>
+          <p class="pulse-s">${pulse.s}</p>
+        </div>
+        <div class="pulse-sum">
+          ${ok   ? `<span class="pchip green"><span class="dot"></span>${ok} no verde</span>` : ''}
+          ${wn   ? `<span class="pchip amber"><span class="dot"></span>${wn} atenção</span>` : ''}
+          ${cr   ? `<span class="pchip red"><span class="dot"></span>${cr} crítico</span>` : ''}
+          <span class="pchip muted"><span class="dot"></span>vs. 30d anteriores</span>
+        </div>
+      </div>
+
+      <div class="narr" style="margin-top:4px;"><span class="ns">02</span><span class="nl">Comparativo por Canal</span><span class="nd"></span><span class="ndesc">Período atual vs. período anterior</span></div>
+      <div class="grid g2">
+        ${compareCard({ platform:'yt', name:'YouTube', metric:'Inscritos no canal', prevLabel:'07/02 – 08/03', currLabel:'09/03 – 07/05', prevValue:yt.prev, currValue:yt.curr, prevSpark:yt.sparkPrev, currSpark:yt.sparkCurr, status:ytSt,
+          verdict: ytSt==='green' ? `<b>+${(yt.curr-yt.prev).toLocaleString('pt-BR')} novos inscritos</b> (+${ytPct.toFixed(2)}%). Canal crescendo.`
+                 : ytSt==='amber' ? `<b>Crescimento abaixo do esperado.</b> Perto da estabilidade.`
+                 : `<b>Perdeu inscritos no período.</b> Revisar o quê foi publicado.` })}
+        ${compareCard({ platform:'ig', name:'Instagram', metric:'Seguidores do perfil', prevLabel:'07/02 – 08/03', currLabel:'09/03 – 07/05', prevValue:ig.prev, currValue:ig.curr, prevSpark:ig.sparkPrev, currSpark:ig.sparkCurr, status:igSt,
+          verdict: igSt==='green' ? `<b>+${(ig.curr-ig.prev).toLocaleString('pt-BR')} novos seguidores</b>. Orgânico ajudando.`
+                 : igSt==='amber' ? `<b>Estabilidade preocupante.</b> Base parou de crescer.`
+                 : `<b>${(ig.prev-ig.curr).toLocaleString('pt-BR')} pessoas saíram</b> da base (${igPct.toFixed(2)}%). Investigar conteúdo e tráfego.` })}
+      </div>
+      <div class="tip">${ico('eye')}<div><b>Como ler em 30 s:</b> a linha colorida no topo do cartão indica o status. Verde = crescendo, âmbar = estável, vermelho = encolhendo. As mini-curvas mostram o movimento dia a dia.</div></div>
+    </div>`;
+}
+</script>
+
+<!-- ═══════════════════════════ PAGE: RELACIONAMENTO ════════════════════════ -->
+<script>
+function renderRelacionamento() {
+  const yt = { prev:412380, curr:487120, sparkPrev:gen(30,12000,18000,0.6), sparkCurr:gen(30,14000,21000,0.7) };
+  const ig = { prev:318900, curr:264720, sparkPrev:gen(30,9000,13000,0.5),  sparkCurr:gen(30,7000,11000,0.4) };
+  const ytPct = ((yt.curr-yt.prev)/yt.prev)*100;
+  const igPct = ((ig.curr-ig.prev)/ig.prev)*100;
+  const ytSt  = ytPct>=5 ? 'green' : (ytPct>=-5 ? 'amber' : 'red');
+  const igSt  = igPct>=5 ? 'green' : (igPct>=-5 ? 'amber' : 'red');
+
+  return `
+    ${pageHeader({ eyebrow:'Gestão à Vista · Gestão em 4 Minutos', title:'Relacionamento', sub:'Quanto a audiência está consumindo nosso conteúdo', actions: dateCtrl({active:'30'}) })}
+    <div class="section">
+      <div class="narr"><span class="ns">01</span><span class="nl">Pulso do Período</span><span class="nd"></span><span class="ndesc">Consumo vs. período anterior</span></div>
+      <div class="pulse" style="--pc:var(--am);--pb:rgba(217,149,18,.1);">
+        <div class="pulse-icon">${pulseIco('attn')}</div>
+        <div class="pulse-txt">
+          <p class="pulse-h">YouTube acelerando, Instagram esfriando</p>
+          <p class="pulse-s">A audiência está consumindo mais vídeo longo e menos conteúdo curto. Vale rever a frequência de Reels.</p>
+        </div>
+        <div class="pulse-sum">
+          <span class="pchip green"><span class="dot"></span>1 acelerando</span>
+          <span class="pchip red"><span class="dot"></span>1 esfriando</span>
+          <span class="pchip muted"><span class="dot"></span>vs. 30d anteriores</span>
+        </div>
+      </div>
+
+      <div class="narr" style="margin-top:4px;"><span class="ns">02</span><span class="nl">Alcance por Plataforma</span></div>
+      <div class="grid g2">
+        ${compareCard({ platform:'yt', name:'YouTube', metric:'Views no período', prevLabel:'07/02 – 08/03', currLabel:'09/03 – 07/05', prevValue:yt.prev, currValue:yt.curr, prevSpark:yt.sparkPrev, currSpark:yt.sparkCurr, status:ytSt, verdict:`<b>+${(yt.curr-yt.prev).toLocaleString('pt-BR')} views</b> vs. período anterior. Conteúdo acelerou.` })}
+        ${compareCard({ platform:'ig', name:'Instagram', metric:'Alcance no período', prevLabel:'07/02 – 08/03', currLabel:'09/03 – 07/05', prevValue:ig.prev, currValue:ig.curr, prevSpark:ig.sparkPrev, currSpark:ig.sparkCurr, status:igSt, verdict:`<b>−${(ig.prev-ig.curr).toLocaleString('pt-BR')} pessoas alcançadas</b> vs. período anterior. Distribuição orgânica caiu.` })}
+      </div>
+
+      <div class="narr" style="margin-top:4px;"><span class="ns">03</span><span class="nl">Detalhe do Período</span><span class="nd"></span><span class="ndesc">Como o consumo se distribui</span></div>
+      <div class="grid g4">
+        ${statCard({ icon:ico('rows'), title:'Vídeos publicados',       value:'12',  delta:20,    status:'green', foot:'<strong>2 a mais</strong> que o período anterior' })}
+        ${statCard({ icon:ico('eye'),  title:'Tempo médio assistido',   value:'7:42',unit:'min',  delta:8.4,   status:'green', foot:'<strong>+34s</strong> de retenção média' })}
+        ${statCard({ icon:ico('spark'),title:'Engajamento Reels',       value:'4.2', unit:'%',   delta:-22.0, status:'red',   foot:'Meta: <strong>≥ 5,5%</strong>' })}
+        ${statCard({ icon:ico('people'),title:'Comentários respondidos',value:'94',  unit:'%',   delta:3.0,   status:'green', foot:'<strong>3 dias</strong> sem responder no IG' })}
+      </div>
+      <div class="tip">${ico('eye')}<div><b>Atenção rápida:</b> a queda do Instagram é puxada pelos Reels. Os Stories estão estáveis. Vale alinhar com o time de conteúdo se a meta de Reels segue a mesma para o próximo ciclo.</div></div>
+    </div>`;
+}
+</script>
+
+<!-- ══════════════════════════ PAGE: PRESTAR ATENÇÃO ════════════════════════ -->
+<script>
+function renderPrestarAtencao() {
+  return `
+    ${pageHeader({ eyebrow:'Gestão à Vista · Gestão em 4 Minutos', title:'Prestar Atenção', sub:'Sinais fora do esperado que merecem o seu olhar agora', actions: dateCtrl({active:'30'}) })}
+    <div class="section">
+      <div class="narr"><span class="ns">01</span><span class="nl">Visão Geral</span><span class="nd"></span><span class="ndesc">Saúde consolidada das plataformas</span></div>
+      <div class="pulse" style="--pc:var(--rd);--pb:rgba(224,66,66,.1);">
+        <div class="pulse-icon">${pulseIco('alert')}</div>
+        <div class="pulse-txt">
+          <p class="pulse-h">3 sinais merecem atenção e 1 está crítico</p>
+          <p class="pulse-s">A maioria das métricas está saudável. Foque primeiro nos itens vermelhos abaixo.</p>
+        </div>
+        <div class="pulse-sum">
+          <span class="pchip green"><span class="dot"></span>6 saudáveis</span>
+          <span class="pchip amber"><span class="dot"></span>3 atenção</span>
+          <span class="pchip red"><span class="dot"></span>1 crítico</span>
+        </div>
+      </div>
+
+      <div class="narr" style="margin-top:4px;"><span class="ns">02</span><span class="nl">Score por Plataforma</span></div>
+      <div class="grid g2">
+        ${healthCard({ platform:'yt', name:'YouTube', score:84, status:'green', headline:'Canal com sinal forte',
+          rows:[ {label:'Inscritos',help:'tendência diária',value:'+218',status:'green'}, {label:'Views totais',help:'no período',value:'487,1k',status:'green'}, {label:'CTR dos thumbnails',help:'meta: 8%',value:'6,4%',status:'amber'}, {label:'Retenção média',help:'meta: 45%',value:'52%',status:'green'}, {label:'Comentários sem resposta',help:'há mais de 48h',value:'4',status:'green'} ] })}
+        ${healthCard({ platform:'ig', name:'Instagram', score:47, status:'red', headline:'Perfil pedindo socorro',
+          rows:[ {label:'Seguidores',help:'tendência diária',value:'−43',status:'red'}, {label:'Alcance',help:'no período',value:'264,7k',status:'red'}, {label:'Engajamento Reels',help:'meta: 5,5%',value:'4,2%',status:'red'}, {label:'Frequência de posts',help:'meta: 5/sem',value:'3/sem',status:'amber'}, {label:'Stories DMs',help:'em aberto',value:'12',status:'amber'} ] })}
+      </div>
+
+      <div class="narr" style="margin-top:4px;"><span class="ns">03</span><span class="nl">O Que Olhar Primeiro</span><span class="nd"></span><span class="ndesc">3 movimentos sugeridos para os próximos dias</span></div>
+      <div class="cockpit">
+        <div class="ctile red">
+          <h4>Crítico</h4>
+          <div class="big">Reels ↓ 22%</div>
+          <p class="small xmuted" style="margin:0;">Engajamento caiu para 4,2% — abaixo da meta de 5,5%. Os últimos 4 reels não passaram de 1,8k views.</p>
+          <div class="crow"><span class="xsmall xmuted">Resp.: time de conteúdo</span><a href="#" style="font-size:11px;color:var(--bl);font-weight:600;text-decoration:none;">Investigar →</a></div>
+        </div>
+        <div class="ctile amber">
+          <h4>Atenção</h4>
+          <div class="big">CTR 6,4%</div>
+          <p class="small xmuted" style="margin:0;">CTR dos thumbnails do YouTube abaixo da meta de 8%. Pode ser um lote de capas com baixo contraste.</p>
+          <div class="crow"><span class="xsmall xmuted">Resp.: editor</span><a href="#" style="font-size:11px;color:var(--bl);font-weight:600;text-decoration:none;">Ver capas →</a></div>
+        </div>
+        <div class="ctile green">
+          <h4>Em ordem</h4>
+          <div class="big">Retenção 52%</div>
+          <p class="small xmuted" style="margin:0;">Retenção média subiu 6 pontos. Conteúdo está prendendo a atenção da audiência por mais tempo.</p>
+          <div class="crow"><span class="xsmall xmuted">Resp.: roteiro</span><a href="#" style="font-size:11px;color:var(--bl);font-weight:600;text-decoration:none;">Manter →</a></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function healthCard({ platform, name, score, status, headline, rows }) {
+  const rc = { green:'#1ab96c', amber:'#d99512', red:'#e04242' }[status];
+  const C = 2 * Math.PI * 38;
+  const off = C - (score / 100) * C;
+  return `
+    <div class="lc">
+      <div class="lc-head">
+        <div class="ibox ${platform}">${platform==='yt'
+          ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/></svg>`
+          : `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>`}
+        </div>
+        <p class="lc-name">${name}</p>
+        ${chip(status)}
+      </div>
+      <div class="row" style="gap:16px;align-items:center;">
+        <div class="ring">
+          <svg viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="38" stroke="var(--br)" stroke-width="8" fill="none"/>
+            <circle cx="50" cy="50" r="38" stroke="${rc}" stroke-width="8" fill="none" stroke-dasharray="${C.toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}" stroke-linecap="round"/>
+          </svg>
+          <div class="ring-txt">${score}<span style="font-size:10px;color:var(--t3);font-weight:400;">/100</span></div>
+        </div>
+        <div style="flex:1;">
+          <p style="margin:0 0 3px;font-size:13px;font-weight:600;color:var(--tx);">${headline}</p>
+          <p class="xsmall xmuted" style="margin:0;">Pontuação composta de inscritos, alcance, engajamento e frequência. Recalculada diariamente.</p>
+        </div>
+      </div>
+      <div>${rows.map(r => `
+        <div class="h-row">
+          <span style="width:6px;height:6px;border-radius:50%;background:${r.status==='green'?'var(--gn)':r.status==='amber'?'var(--am)':'var(--rd)'};display:inline-block;flex-shrink:0;"></span>
+          <div class="h-lbl">${r.label}<small>${r.help}</small></div>
+          <span class="h-num">${r.value}</span>
+          ${chip(r.status, r.status==='green'?'ok':r.status==='amber'?'atenção':'alerta')}
+        </div>`).join('')}
+      </div>
+    </div>`;
+}
+</script>
+
+<!-- ═══════════════════════════════ PAGE: EQA ═══════════════════════════════ -->
+<script>
+function renderEQA() {
+  const funnels = [
+    { name:'Destrave Mar/26', period:'01/03 – 31/03', steps:[{label:'Inscrições',value:18420,conv:100},{label:'Confirmação e-mail',value:14820,conv:80.5},{label:'Aulas iniciadas',value:9870,conv:53.6},{label:'Concluintes',value:4310,conv:23.4},{label:'Convertidos',value:612,conv:3.32}], status:'green', verdict:'<b>3,32% de conversão final</b> — meta de 3% batida. Funil saudável.' },
+    { name:'Destrave Fev/26', period:'01/02 – 28/02', steps:[{label:'Inscrições',value:15200,conv:100},{label:'Confirmação e-mail',value:11800,conv:77.6},{label:'Aulas iniciadas',value:7430,conv:48.9},{label:'Concluintes',value:2810,conv:18.5},{label:'Convertidos',value:312,conv:2.05}], status:'amber', verdict:'<b>2,05% de conversão</b> — abaixo da meta. Queda em "aulas iniciadas".' },
+    { name:'Destrave Jan/26', period:'15/01 – 14/02', steps:[{label:'Inscrições',value:22100,conv:100},{label:'Confirmação e-mail',value:18950,conv:85.7},{label:'Aulas iniciadas',value:13620,conv:61.6},{label:'Concluintes',value:6210,conv:28.1},{label:'Convertidos',value:1080,conv:4.89}], status:'green', verdict:'Melhor funil dos últimos 90 dias. Vale revisitar criativos e copy.' },
+  ];
+  return `
+    ${pageHeader({ eyebrow:'Gestão à Vista · Gestão em 4 Minutos', title:'EQA — Eventos de Qualificação', sub:'Como cada funil está convertendo do topo até a venda', actions:'' })}
+    <div class="section">
+      <div class="narr"><span class="ns">01</span><span class="nl">Status Geral</span></div>
+      <div class="pulse" style="--pc:var(--gn);--pb:rgba(26,185,108,.1);">
+        <div class="pulse-icon">${pulseIco('ok')}</div>
+        <div class="pulse-txt">
+          <p class="pulse-h">2 funis no verde, 1 com atenção</p>
+          <p class="pulse-s">Destrave de março bateu a meta. Fevereiro caiu na etapa "aulas iniciadas" e merece um pós-mortem.</p>
+        </div>
+        <div class="pulse-sum">
+          <span class="pchip green"><span class="dot"></span>2 batendo meta</span>
+          <span class="pchip amber"><span class="dot"></span>1 abaixo</span>
+          <span class="pchip muted"><span class="dot"></span>3 funis ativos</span>
+        </div>
+      </div>
+
+      <div class="narr" style="margin-top:4px;"><span class="ns">02</span><span class="nl">Funis Ativos</span><span class="nd"></span><span class="ndesc">3 funis</span></div>
+      <div class="grid g3">${funnels.map(f => funnelCard(f)).join('')}</div>
+
+      <div class="narr" style="margin-top:4px;"><span class="ns">03</span><span class="nl">EQA Eventos Comercial</span></div>
+      <div class="grid g3">
+        ${eventCard({ name:'Live de Lançamento Abr/26', date:'12/04/2026', presence:87, conv:12.4, target:10, status:'green' })}
+        ${eventCard({ name:'Webinar Estratégia Mar/26', date:'24/03/2026', presence:64, conv:6.8,  target:10, status:'amber' })}
+        <div class="lc" style="border-style:dashed;align-items:center;justify-content:center;text-align:center;min-height:120px;">
+          <p class="small xmuted" style="margin:0;">Nenhum evento futuro programado</p>
+          <button style="margin-top:8px;padding:5px 12px;font-size:11px;font-weight:600;color:var(--bl);background:rgba(61,132,245,.1);border:1px solid rgba(61,132,245,.2);border-radius:6px;cursor:pointer;font-family:inherit;">+ Novo evento</button>
+        </div>
+      </div>
+
+      <div class="narr" style="margin-top:4px;"><span class="ns">04</span><span class="nl">Social Seller</span><span class="nd"></span><span class="ndesc">Semana 18 — atualização semanal</span></div>
+      <div class="grid g4">
+        ${statCard({ icon:ico('people'), title:'Vendedores ativos',     value:'14',    delta:7.7,  status:'green', foot:'<strong>1 a mais</strong> que a semana passada' })}
+        ${statCard({ icon:ico('spark'),  title:'Conversas iniciadas',   value:'2.483', delta:12.0, status:'green', foot:'<strong>177/dia</strong> em média' })}
+        ${statCard({ icon:ico('bars'),   title:'Vendas fechadas',       value:'186',   delta:4.5,  status:'green', foot:'Meta: <strong>180</strong>' })}
+        ${statCard({ icon:ico('eye'),    title:'Tempo médio resposta',  value:'12', unit:'min', delta:-28.0, status:'green', foot:'Meta: <strong>≤ 30 min</strong>' })}
+      </div>
+    </div>`;
+}
+
+function funnelCard(f) {
+  const bc = { green:'rgba(26,185,108,.25)', amber:'rgba(217,149,18,.25)' }[f.status] || 'var(--bv)';
+  return `
+    <div class="lc" style="border-color:${bc};">
+      <div class="lc-head">
+        <div class="ibox">${ico('rows')}</div>
+        <div style="flex:1;min-width:0;"><p class="lc-name">${f.name}</p><p class="lc-per">${f.period}</p></div>
+        ${chip(f.status)}
+      </div>
+      <div class="funnel">
+        ${f.steps.map(s => `
+          <div class="fstep">
+            <div class="fbar-wrap">
+              <div class="fbar ${s.conv < 30 ? 'muted' : ''}" style="width:${s.conv}%;">
+                <span style="opacity:${s.conv>18?1:0};">${s.label}</span>
+              </div>
+            </div>
+            <span class="fval">${s.value.toLocaleString('pt-BR')}</span>
+            <span class="fconv">${s.conv.toFixed(1)}%</span>
+          </div>`).join('')}
+      </div>
+      <div class="tip" style="margin-top:0;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;color:${f.status==='green'?'var(--gn)':'var(--am)'}"><polyline points="20 6 9 17 4 12"/></svg>
+        <div>${f.verdict}</div>
+      </div>
+    </div>`;
+}
+
+function eventCard({ name, date, presence, conv, target, status }) {
+  const col = { green:'var(--gn)', amber:'var(--am)' }[status];
+  const sc  = { green:'#1ab96c',   amber:'#d99512'   }[status];
+  const bc  = { green:'rgba(26,185,108,.25)', amber:'rgba(217,149,18,.25)' }[status];
+  return `
+    <div class="lc" style="border-color:${bc};">
+      <div class="lc-head">
+        <div class="ibox am">${ico('spark')}</div>
+        <div style="flex:1;min-width:0;"><p class="lc-name">${name}</p><p class="lc-per">${date}</p></div>
+        ${chip(status)}
+      </div>
+      <div class="row" style="gap:20px;">
+        <div style="flex:1;">
+          <p class="xsmall xmuted" style="margin:0 0 5px;">Presença</p>
+          <p class="mono" style="font-size:22px;font-weight:500;margin:0;line-height:1;color:var(--tx);">${presence}<span style="font-size:12px;color:var(--t2);">%</span></p>
+          <div class="sbar" style="margin-top:7px;--sc:${col};"><span style="width:${presence}%"></span></div>
+        </div>
+        <div style="flex:1;">
+          <p class="xsmall xmuted" style="margin:0 0 5px;">Conversão · meta ${target}%</p>
+          <p class="mono" style="font-size:22px;font-weight:500;margin:0;line-height:1;color:${conv>=target?'var(--gn)':'var(--rd)'};">${conv.toFixed(1)}<span style="font-size:12px;color:var(--t2);">%</span></p>
+          <div class="sbar" style="margin-top:7px;--sc:${col};"><span style="width:${Math.min(100,(conv/target)*100)}%"></span></div>
+        </div>
+      </div>
+    </div>`;
+}
+</script>
+
+<!-- ═══════════════════════════════ PAGE: CONVITE ═══════════════════════════ -->
+<script>
+function renderConvite() {
+  const groups = [
+    { key:'destrave', label:'Funil Destrave', count:3, projects:[
+      { name:'Destrave Mar/26', start:'01/03', end:'31/03', mainMetric:'Convidados', value:'18.420', subMetric:'Conversão', sub:'3,32%', status:'green', spark:gen(30,100,800,0.65) },
+      { name:'Destrave Fev/26', start:'01/02', end:'28/02', mainMetric:'Convidados', value:'15.200', subMetric:'Conversão', sub:'2,05%', status:'amber', spark:gen(30,80,700,0.45) },
+      { name:'Destrave Abr/26', start:'01/04', end:'30/04', mainMetric:'Convidados', value:'21.470', subMetric:'Conversão', sub:'3,89%', status:'green', spark:gen(30,120,900,0.7) },
+    ]},
+    { key:'ads', label:'Funil Ads Comercial', count:2, projects:[
+      { name:'ADS Comercial Q2/26', start:'01/04', end:'30/06', mainMetric:'Investido', value:'R$ 142,8k', subMetric:'CPL', sub:'R$ 18,40', status:'green', spark:gen(30,100,500) },
+      { name:'ADS Lançamento Abr',  start:'12/04', end:'20/04', mainMetric:'Investido', value:'R$ 38,2k',  subMetric:'CPL', sub:'R$ 24,10', status:'red',   spark:gen(30,200,400,0.3) },
+    ]},
+    { key:'ultimate', label:'Ultimate', count:1, projects:[
+      { name:'Ultimate 2026', start:'01/01', end:'31/12', mainMetric:'Membros ativos', value:'847', subMetric:'Churn', sub:'2,1%', status:'green', spark:gen(30,800,850,0.55) },
+    ]},
+    { key:'fcc', label:'FCC', count:1, projects:[
+      { name:'FCC 2026', start:'01/01', end:'31/12', mainMetric:'Mentorias ativas', value:'34', subMetric:'NPS', sub:'78', status:'green', spark:gen(30,30,36,0.5) },
+    ]},
+    { key:'mcc', label:'MCC', count:1, projects:[
+      { name:'MCC 2026', start:'01/01', end:'31/12', mainMetric:'Mentorias ativas', value:'12', subMetric:'NPS', sub:'64', status:'amber', spark:gen(30,10,14,0.45) },
+    ]},
+  ];
+  return `
+    ${pageHeader({ eyebrow:'Gestão à Vista · Gestão em 4 Minutos', title:'Convite', sub:'Cada projeto em uma frase: convidamos quantos, e quantos toparam', actions:'' })}
+    <div class="section">
+      <div class="pulse" style="--pc:var(--gn);--pb:rgba(26,185,108,.1);">
+        <div class="pulse-icon">${pulseIco('ok')}</div>
+        <div class="pulse-txt">
+          <p class="pulse-h">Convite na média histórica</p>
+          <p class="pulse-s">8 projetos no total — 6 saudáveis, 1 em atenção, 1 crítico (ADS Lançamento Abr com CPL acima do teto).</p>
+        </div>
+        <div class="pulse-sum">
+          <span class="pchip green"><span class="dot"></span>6 saudáveis</span>
+          <span class="pchip amber"><span class="dot"></span>1 atenção</span>
+          <span class="pchip red"><span class="dot"></span>1 crítico</span>
+        </div>
+      </div>
+      ${groups.map((g, gi) => `
+        <div>
+          <div class="narr"><span class="ns">0${gi+1}</span><span class="nl">${g.label}</span><span class="nd"></span><span class="ndesc">${g.count} projeto${g.count>1?'s':''}</span></div>
+          <div class="grid g3">${g.projects.map(p => projectCard(p)).join('')}</div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function projectCard(p) {
+  const col = { green:'var(--gn)', amber:'var(--am)', red:'var(--rd)' }[p.status];
+  const sc  = { green:'#1ab96c',   amber:'#d99512',   red:'#e04242'  }[p.status];
+  const bc  = { green:'rgba(26,185,108,.22)', amber:'rgba(217,149,18,.22)', red:'rgba(224,66,66,.22)' }[p.status];
+  return `
+    <div class="lc clickable" style="border-color:${bc};">
+      <div class="lc-head">
+        <div class="ibox">${ico('spark')}</div>
+        <div style="flex:1;min-width:0;"><p class="lc-name">${p.name}</p><p class="lc-per">${p.start} – ${p.end}</p></div>
+        ${chip(p.status)}
+      </div>
+      <div class="row" style="gap:16px;">
+        <div style="flex:1;">
+          <p class="xsmall xmuted" style="margin:0 0 3px;">${p.mainMetric}</p>
+          <p class="mono" style="font-size:20px;font-weight:500;margin:0;line-height:1;color:var(--tx);">${p.value}</p>
+        </div>
+        <div style="flex:1;">
+          <p class="xsmall xmuted" style="margin:0 0 3px;">${p.subMetric}</p>
+          <p class="mono" style="font-size:20px;font-weight:500;margin:0;line-height:1;color:${col};">${p.sub}</p>
+        </div>
+      </div>
+      ${spark(p.spark, sc, { h: 34 })}
+    </div>`;
+}
+</script>
+
+<!-- ════════════════════════════ PAGE: ENTREGA NÍVEL A ══════════════════════ -->
+<script>
+function renderEntrega() {
+  return `
+    ${pageHeader({ eyebrow:'Gestão à Vista · Gestão em 4 Minutos', title:'Entrega Nível A', sub:'O quanto cada projeto está cumprindo o que prometeu entregar', actions:'' })}
+    <div class="section">
+      <div class="pulse" style="--pc:var(--gn);--pb:rgba(26,185,108,.1);">
+        <div class="pulse-icon">${pulseIco('ok')}</div>
+        <div class="pulse-txt">
+          <p class="pulse-h">Entrega no ritmo, sem vermelhos</p>
+          <p class="pulse-s">Todos os projetos estão dentro da SLA acordada. 2 com leve atraso, mas ainda recuperáveis.</p>
+        </div>
+        <div class="pulse-sum">
+          <span class="pchip green"><span class="dot"></span>5 em dia</span>
+          <span class="pchip amber"><span class="dot"></span>2 atenção</span>
+        </div>
+      </div>
+
+      <div class="narr"><span class="ns">01</span><span class="nl">MCC + FCC · por projeto</span><span class="nd"></span><span class="ndesc">2 projetos</span></div>
+      <div class="grid g2">
+        ${deliveryCard({ name:'FCC 2026 — Turma Março', period:'01/03 — 31/05', expected:12, delivered:10, score:92, status:'green' })}
+        ${deliveryCard({ name:'MCC 2026 — Turma Abril', period:'01/04 — 30/06', expected:8,  delivered:5,  score:76, status:'amber' })}
+      </div>
+
+      <div class="narr"><span class="ns">02</span><span class="nl">FCC + MCC · Mensal</span><span class="nd"></span><span class="ndesc">Consolidado abr/26</span></div>
+      <div class="grid g4">
+        ${statCard({ icon:ico('box'),    title:'Mentorias entregues', value:'46',   delta:12.0,  status:'green', foot:'Meta mensal: <strong>40</strong>' })}
+        ${statCard({ icon:ico('eye'),    title:'Presença média',      value:'87',   unit:'%',    delta:3.4,   status:'green', foot:'Meta: <strong>≥ 80%</strong>' })}
+        ${statCard({ icon:ico('spark'),  title:'NPS médio',           value:'74',                delta:-2.8,  status:'amber', foot:'Meta: <strong>≥ 70</strong>' })}
+        ${statCard({ icon:ico('bars'),   title:'Casos de sucesso',    value:'12',   delta:50.0,  status:'green', foot:'<strong>4 a mais</strong> que mês anterior' })}
+      </div>
+
+      <div class="narr"><span class="ns">03</span><span class="nl">Ultimate · por projeto</span><span class="nd"></span><span class="ndesc">3 projetos</span></div>
+      <div class="grid g3">
+        ${deliveryCard({ name:'Ultimate Q1/26',      period:'01/01 — 31/03', expected:24, delivered:24, score:96, status:'green' })}
+        ${deliveryCard({ name:'Ultimate Q2/26',      period:'01/04 — 30/06', expected:24, delivered:14, score:82, status:'green' })}
+        ${deliveryCard({ name:'Ultimate Edge Cases', period:'01/02 — 30/04', expected:6,  delivered:4,  score:71, status:'amber' })}
+      </div>
+
+      <div class="narr"><span class="ns">04</span><span class="nl">Destrave · por projeto</span><span class="nd"></span><span class="ndesc">3 projetos</span></div>
+      <div class="grid g3">
+        ${deliveryCard({ name:'Destrave Mar/26', period:'01/03 — 31/03', expected:5, delivered:5, score:94, status:'green' })}
+        ${deliveryCard({ name:'Destrave Fev/26', period:'01/02 — 28/02', expected:5, delivered:5, score:88, status:'green' })}
+        ${deliveryCard({ name:'Destrave Jan/26', period:'15/01 — 14/02', expected:5, delivered:5, score:91, status:'green' })}
+      </div>
+    </div>`;
+}
+
+function deliveryCard({ name, period, expected, delivered, score, status }) {
+  const pct = (delivered / expected) * 100;
+  const col = { green:'var(--gn)', amber:'var(--am)', red:'var(--rd)' }[status];
+  const sc  = { green:'#1ab96c',   amber:'#d99512',   red:'#e04242'  }[status];
+  const bc  = { green:'rgba(26,185,108,.22)', amber:'rgba(217,149,18,.22)' }[status] || 'var(--bv)';
+  return `
+    <div class="lc" style="border-color:${bc};">
+      <div class="lc-head">
+        <div class="ibox">${ico('box')}</div>
+        <div style="flex:1;min-width:0;"><p class="lc-name">${name}</p><p class="lc-per">${period}</p></div>
+        ${chip(status)}
+      </div>
+      <div class="row" style="gap:20px;align-items:flex-end;">
+        <div style="flex:1;">
+          <p class="xsmall xmuted" style="margin:0 0 3px;">Entregas</p>
+          <p class="mono" style="font-size:24px;font-weight:500;margin:0;line-height:1;color:var(--tx);">${delivered}<span style="font-size:13px;color:var(--t3);font-weight:400;"> / ${expected}</span></p>
+          <div class="sbar" style="margin-top:8px;--sc:${col};"><span style="width:${pct}%"></span></div>
+          <p class="xsmall xmuted" style="margin-top:5px;">${pct.toFixed(0)}% concluído</p>
+        </div>
+        <div style="text-align:right;">
+          <p class="xsmall xmuted" style="margin:0 0 2px;">Qualidade</p>
+          <p class="mono" style="font-size:28px;font-weight:500;margin:0;line-height:1;color:${col};">${score}</p>
+          <p class="xsmall xmuted" style="margin:2px 0 0;">/ 100</p>
+        </div>
+      </div>
+    </div>`;
+}
+</script>
+
+<!-- ═══════════════════════════════ PAGE: LTV ═══════════════════════════════ -->
+<script>
+function renderLTV() {
+  const matriz  = { active:1284, mrr:184320, ltv:4720, churn:1.8, status:'green', sparkData:gen(30,1180,1290,0.65) };
+  const solides = { active:412,  mrr:87410,  ltv:3210, churn:3.2, status:'amber', sparkData:gen(30,400,420,0.5) };
+
+  return `
+    ${pageHeader({ eyebrow:'Gestão à Vista · Gestão em 4 Minutos', title:'LTV', sub:'Quanto cada cliente vale ao longo do tempo, por fonte', actions: dateCtrl({active:'30'}) })}
+    <div class="section">
+      <div class="pulse" style="--pc:var(--gn);--pb:rgba(26,185,108,.1);">
+        <div class="pulse-icon">${pulseIco('ok')}</div>
+        <div class="pulse-txt">
+          <p class="pulse-h">Receita recorrente em alta</p>
+          <p class="pulse-s">Matriz Humana segue como motor. Solides com churn um pouco acima da meta — vale entender o motivo.</p>
+        </div>
+        <div class="pulse-sum">
+          <span class="pchip green"><span class="dot"></span>1 forte</span>
+          <span class="pchip amber"><span class="dot"></span>1 atenção</span>
+        </div>
+      </div>
+
+      <div class="narr"><span class="ns">01</span><span class="nl">Por Fonte</span><span class="nd"></span><span class="ndesc">Comparativo entre as duas bases</span></div>
+      <div class="grid g2">
+        ${ltvCard({ name:'Matriz Humana', subtitle:'Base própria — assinaturas IGT', data:matriz })}
+        ${ltvCard({ name:'Solides',       subtitle:'Base parceira — co-marketing',    data:solides })}
+      </div>
+
+      <div class="narr"><span class="ns">02</span><span class="nl">Movimento do Mês</span></div>
+      <div class="grid g4">
+        ${statCard({ icon:ico('people'), title:'Novos clientes',    value:'+184',      delta:14.0, status:'green', foot:'<strong>54</strong> via Solides' })}
+        ${statCard({ icon:ico('bars'),   title:'Receita recorrente',value:'R$ 271,7k', delta:8.2,  status:'green', foot:'<strong>+R$ 20,4k</strong> vs. mês passado' })}
+        ${statCard({ icon:ico('eye'),    title:'Churn médio',       value:'2,4', unit:'%',    delta:0.6,  status:'amber', foot:'Meta: <strong>≤ 2%</strong>', sparkData:gen(30,1.8,2.6,0.55) })}
+        ${statCard({ icon:ico('spark'),  title:'LTV / CAC',         value:'4,1', unit:'×',    delta:5.1,  status:'green', foot:'Meta: <strong>≥ 3×</strong>' })}
+      </div>
+    </div>`;
+}
+
+function ltvCard({ name, subtitle, data }) {
+  const col = { green:'var(--gn)', amber:'var(--am)' }[data.status];
+  const sc  = { green:'#1ab96c',   amber:'#d99512'   }[data.status];
+  const bc  = { green:'rgba(26,185,108,.22)', amber:'rgba(217,149,18,.22)' }[data.status] || 'var(--bv)';
+  return `
+    <div class="lc" style="border-color:${bc};gap:16px;padding:18px;">
+      <div class="lc-head">
+        <div class="ibox" style="width:32px;height:32px;border-radius:8px;">${ico('bars',16)}</div>
+        <div style="flex:1;min-width:0;">
+          <p class="lc-name" style="font-size:14px;">${name}</p>
+          <p class="lc-per">${subtitle}</p>
+        </div>
+        ${chip(data.status)}
+      </div>
+      <div class="grid g2" style="gap:12px;">
+        <div>
+          <p class="xsmall xmuted" style="margin:0 0 3px;">Clientes ativos</p>
+          <p class="mono" style="font-size:26px;font-weight:500;margin:0;line-height:1;color:var(--tx);">${data.active.toLocaleString('pt-BR')}</p>
+        </div>
+        <div>
+          <p class="xsmall xmuted" style="margin:0 0 3px;">MRR</p>
+          <p class="mono" style="font-size:26px;font-weight:500;margin:0;line-height:1;color:var(--tx);">R$&thinsp;${(data.mrr/1000).toFixed(1)}k</p>
+        </div>
+        <div>
+          <p class="xsmall xmuted" style="margin:0 0 3px;">LTV médio</p>
+          <p class="mono" style="font-size:20px;font-weight:500;margin:0;line-height:1;color:var(--tx);">R$&thinsp;${data.ltv.toLocaleString('pt-BR')}</p>
+        </div>
+        <div>
+          <p class="xsmall xmuted" style="margin:0 0 3px;">Churn mensal</p>
+          <p class="mono" style="font-size:20px;font-weight:500;margin:0;line-height:1;color:${col};">${data.churn.toFixed(1)}<span style="font-size:12px;color:var(--t3);">%</span></p>
+        </div>
+      </div>
+      <div>
+        <p class="xsmall xmuted" style="margin:0 0 4px;">Evolução de clientes ativos · 30 dias</p>
+        ${spark(data.sparkData, sc, { h: 48 })}
+      </div>
+    </div>`;
+}
+</script>
+
+<!-- ═══════════════════════════════ ROUTER ═══════════════════════════════ -->
+<script>
+function renderMain() {
+  const main = document.getElementById('main');
+  const map = {
+    'posicionamento':  renderPosicionamento,
+    'relacionamento':  renderRelacionamento,
+    'prestar-atencao': renderPrestarAtencao,
+    'eqa':             renderEQA,
+    'convite':         renderConvite,
+    'entrega':         renderEntrega,
+    'ltv':             renderLTV,
+  };
+  const idx = NAV.findIndex(n => n.id === activeTab);
+  const label = idx >= 0 ? `${String(idx+1).padStart(2,'0')} ${NAV[idx].label}` : activeTab;
+  const fn = map[activeTab] || renderPosicionamento;
+  main.innerHTML = `<div data-screen-label="${label}">${fn()}</div>`;
+}
+
+renderNav();
+renderMain();
+</script>
+</body>
+</html>

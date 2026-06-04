@@ -11,26 +11,16 @@ interface AccountTabsProps {
 export function AccountTabs({ accounts, selectedId, onSelect }: AccountTabsProps) {
   if (accounts.length === 0) return null;
 
+  const single = accounts.length === 1;
+
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="pset">
       {accounts.map((account) => (
         <button
           key={account.id}
-          onClick={() => onSelect(account.id)}
-          className="rounded-[var(--radius-sm)] px-3.5 py-1.5 text-[13px] font-medium transition-colors hover:bg-[var(--color-primary-light)]"
-          style={
-            account.id === selectedId
-              ? {
-                  background: "var(--color-primary)",
-                  border: "1px solid var(--color-primary)",
-                  color: "white",
-                }
-              : {
-                  background: "transparent",
-                  border: "1px solid var(--color-border)",
-                  color: "var(--color-text-muted)",
-                }
-          }
+          onClick={single ? undefined : () => onSelect(account.id)}
+          title={single ? "Única conta cadastrada" : undefined}
+          className={`pb${account.id === selectedId ? " on" : ""}${single ? " cursor-default opacity-60" : ""}`}
         >
           {account.name}
         </button>

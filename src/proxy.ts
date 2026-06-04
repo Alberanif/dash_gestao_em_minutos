@@ -3,14 +3,11 @@ import { updateSession } from "@/lib/supabase/middleware";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-
-  // Redirect legacy /auth/login path (old bookmarks, Supabase email templates)
   if (pathname.startsWith("/auth/login")) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
-
   return await updateSession(request);
 }
 

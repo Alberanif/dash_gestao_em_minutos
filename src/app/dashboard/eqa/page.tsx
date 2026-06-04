@@ -1,45 +1,184 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { PageHeader } from "@/components/layout/page-header";
-import { FunnelCard } from "@/components/eqa/funnel-card";
-import { FunnelDetailModal } from "@/components/eqa/funnel-detail-modal";
+import { GvPageHeader } from "@/components/gv/gv-page-header";
+import { PulseBanner } from "@/components/gv/pulse-banner";
+import { NarrLabel } from "@/components/gv/narr-label";
+import { FunnelCard } from "@/components/gv/funnel-card";
+import { FunnelDetailDrawer } from "@/components/gv/funnel-detail-drawer";
 import { FunnelFormModal } from "@/components/eqa/funnel-form-modal";
-import { EventosCard } from "@/components/eqa-eventos/eventos-card";
-import { EventosDetailModal } from "@/components/eqa-eventos/eventos-detail-modal";
-import { EventosFormModal } from "@/components/eqa-eventos/eventos-form-modal";
-import { SocialSellerSection } from "@/components/social-seller/social-seller-section";
+import { EventCard } from "@/components/gv/event-card";
+import { StatCard } from "@/components/gv/stat-card";
 import type { Funnel, FunnelMetrics } from "@/types/funnels";
 import type { EqaEventosProject, EqaEventosMetrics } from "@/types/eqa-eventos";
 import { today, dateSubtractDays } from "@/lib/date-utils";
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+function funnelPeriod(funnel: Funnel): string {
+  const start = new Date(funnel.start_date).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+  });
+  const end = new Date(funnel.end_date).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+  return `${start} – ${end}`;
+}
+
+function funnelSalesGoal(funnel: Funnel): number {
+  return funnel.goal_sales;
+}
+
+function funnelActualSales(metrics: FunnelMetrics | null): number {
+  if (!metrics) return 0;
+  if (metrics.type === "lancamento_pago") return metrics.total_sales;
+  return 0;
+}
+
+function funnelActualLeads(metrics: FunnelMetrics | null): number {
+  if (!metrics) return 0;
+  if (metrics.type === "lancamento") return metrics.total_leads;
+  return 0;
+}
+
+function deriveFunnelSteps(
+  funnel: Funnel,
+  metrics: FunnelMetrics | null
+): Array<{ label: string; value: number; conv: number }> {
+  if (funnel.type === "lancamento_pago") {
+    const goal = funnelSalesGoal(funnel);
+    const sales = funnelActualSales(metrics);
+    const pace = metrics?.type === "lancamento_pago" ? metrics.pace_diario : 0;
+    const conv = goal > 0 ? Math.min(100, Math.round((sales / goal) * 100)) : 0;
+    return [
+      { label: "Meta", value: goal, conv: 100 },
+      { label: "Vendas", value: sales, conv },
+      { label: "Ritmo/dia", value: pace, conv: Math.min(100, conv) },
+    ];
+  }
+  const leads = funnelActualLeads(metrics);
+  const goalLeads =
+    metrics?.type === "lancamento" ? (metrics.leads_remaining + leads) : leads;
+  const convL = goalLeads > 0 ? Math.min(100, Math.round((leads / goalLeads) * 100)) : 0;
+  return [
+    { label: "Meta leads", value: goalLeads, conv: 100 },
+    { label: "Leads", value: leads, conv: convL },
+  ];
+}
+
+function deriveFunnelVerdict(funnel: Funnel, metrics: FunnelMetrics | null): string {
+  if (!metrics) return "Sem dados suficientes para análise";
+  const goal = funnelSalesGoal(funnel);
+  if (funnel.type === "lancamento_pago") {
+    const sales = metrics.type === "lancamento_pago" ? metrics.total_sales : 0;
+    const pct = goal > 0 ? (sales / goal) * 100 : 0;
+    if (pct >= 100) return "Meta batida";
+    if (pct >= 70) return "No ritmo — continue o esforço";
+    return "Abaixo do esperado — revisar campanha";
+  }
+  if (metrics.type === "lancamento") {
+    const leads = metrics.total_leads;
+    const remaining = metrics.leads_remaining;
+    const total = leads + remaining;
+    const pct = total > 0 ? (leads / total) * 100 : 0;
+    if (pct >= 80) return "Captação no verde";
+    if (pct >= 50) return "Captação abaixo do ritmo";
+    return "Captação crítica — revisão necessária";
+  }
+  return "—";
+}
+
+function deriveFunnelStatus(
+  funnel: Funnel,
+  metrics: FunnelMetrics | null
+): "green" | "amber" {
+  if (!metrics) return "amber";
+  const goal = funnelSalesGoal(funnel);
+  if (funnel.type === "lancamento_pago") {
+    const sales = metrics.type === "lancamento_pago" ? metrics.total_sales : 0;
+    return (goal > 0 && sales / goal >= 0.7) ? "green" : "amber";
+  }
+  if (metrics.type === "lancamento") {
+    const total = metrics.total_leads + metrics.leads_remaining;
+    return (total > 0 && metrics.total_leads / total >= 0.5) ? "green" : "amber";
+  }
+  return "amber";
+}
+
+function derivePulseBannerStatus(
+  funnels: Funnel[],
+  metricsMap: Record<string, FunnelMetrics>
+): "green" | "amber" | "red" {
+  if (funnels.length === 0) return "amber";
+  const statuses = funnels.map((f) =>
+    deriveFunnelStatus(f, metricsMap[f.id] ?? null)
+  );
+  const greenCount = statuses.filter((s) => s === "green").length;
+  const amberCount = statuses.filter((s) => s === "amber").length;
+  if (greenCount === funnels.length) return "green";
+  if (amberCount === funnels.length) return "red";
+  return "amber";
+}
+
+// ── icons ────────────────────────────────────────────────────────────────────
+
+function IconPeople() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function IconSpark() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+    </svg>
+  );
+}
+
+function IconBars() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  );
+}
+
+function IconClock() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
+
+// ── page ─────────────────────────────────────────────────────────────────────
 
 export default function EQAPage() {
   const [funnels, setFunnels] = useState<Funnel[]>([]);
   const [metricsMap, setMetricsMap] = useState<Record<string, FunnelMetrics>>({});
   const [loadingFunnels, setLoadingFunnels] = useState(true);
-  const [loadingMetrics, setLoadingMetrics] = useState(false);
 
-  // Modal de detalhes
-  const [viewingFunnel, setViewingFunnel] = useState<Funnel | null>(null);
+  const [selectedFunnelId, setSelectedFunnelId] = useState<string | null>(null);
+  const [showFunnelModal, setShowFunnelModal] = useState(false);
 
-  // Modal de criação/edição
-  const [formOpen, setFormOpen] = useState(false);
-  const [editingFunnel, setEditingFunnel] = useState<Funnel | undefined>(undefined);
-
-  // Eventos Comercial
   const [eventosProjects, setEventosProjects] = useState<EqaEventosProject[]>([]);
-  const [loadingEventos, setLoadingEventos] = useState(true);
-  const [viewingEvento, setViewingEvento] = useState<EqaEventosProject | null>(null);
-  const [eventoFormOpen, setEventoFormOpen] = useState(false);
-  const [editingEvento, setEditingEvento] = useState<EqaEventosProject | undefined>(undefined);
-
-  // Eventos Comercial Metrics
   const [eventosMetricsMap, setEventosMetricsMap] = useState<Record<string, EqaEventosMetrics>>({});
-  const [loadingEventosMetrics, setLoadingEventosMetrics] = useState(false);
+  const [loadingEventos, setLoadingEventos] = useState(true);
 
   const fetchMetrics = useCallback(async (funnelList: Funnel[]) => {
     if (funnelList.length === 0) return;
-    setLoadingMetrics(true);
     const results = await Promise.all(
       funnelList.map((f) =>
         fetch(`/api/funnels/${f.id}/metrics`)
@@ -56,51 +195,29 @@ export default function EQAPage() {
       if (m) map[id] = m;
     }
     setMetricsMap(map);
-    setLoadingMetrics(false);
   }, []);
 
-  const fetchEventosMetrics = useCallback(
-    async (
-      eventosList: EqaEventosProject[],
-      startDate?: string,
-      endDate?: string
-    ) => {
-      if (eventosList.length === 0) return;
-
-      setLoadingEventosMetrics(true);
-
-      // If no dates provided, use default: today - 7 days
-      let start = startDate;
-      let end = endDate;
-      if (!start || !end) {
-        end = today();
-        start = dateSubtractDays(end, 7);
-      }
-
-      const results = await Promise.all(
-        eventosList.map((e) =>
-          fetch(
-            `/api/eqa-eventos/${e.id}/metrics?start_date=${start}&end_date=${end}`
-          )
-            .then((r) => r.json())
-            .then((data): [string, EqaEventosMetrics | null] => {
-              if (data.error) return [e.id, null];
-              return [e.id, data as EqaEventosMetrics];
-            })
-            .catch((): [string, null] => [e.id, null])
-        )
-      );
-
-      const map: Record<string, EqaEventosMetrics> = {};
-      for (const [id, m] of results) {
-        if (m) map[id] = m;
-      }
-
-      setEventosMetricsMap(map);
-      setLoadingEventosMetrics(false);
-    },
-    []
-  );
+  const fetchEventosMetrics = useCallback(async (list: EqaEventosProject[]) => {
+    if (list.length === 0) return;
+    const end = today();
+    const start = dateSubtractDays(end, 7);
+    const results = await Promise.all(
+      list.map((e) =>
+        fetch(`/api/eqa-eventos/${e.id}/metrics?start_date=${start}&end_date=${end}`)
+          .then((r) => r.json())
+          .then((data): [string, EqaEventosMetrics | null] => {
+            if (data.error) return [e.id, null];
+            return [e.id, data as EqaEventosMetrics];
+          })
+          .catch((): [string, null] => [e.id, null])
+      )
+    );
+    const map: Record<string, EqaEventosMetrics> = {};
+    for (const [id, m] of results) {
+      if (m) map[id] = m;
+    }
+    setEventosMetricsMap(map);
+  }, []);
 
   const loadFunnels = useCallback(async () => {
     setLoadingFunnels(true);
@@ -117,14 +234,14 @@ export default function EQAPage() {
     }
   }, [fetchMetrics]);
 
-  const loadEventosProjects = useCallback(async () => {
+  const loadEventos = useCallback(async () => {
     setLoadingEventos(true);
     try {
       const res = await fetch("/api/eqa-eventos");
       const data = await res.json();
       const list: EqaEventosProject[] = Array.isArray(data) ? data : [];
       setEventosProjects(list);
-      await fetchEventosMetrics(list);  // NEW: auto-fetch with default 7 days
+      await fetchEventosMetrics(list);
     } catch {
       setEventosProjects([]);
     } finally {
@@ -134,393 +251,230 @@ export default function EQAPage() {
 
   useEffect(() => {
     loadFunnels();
-    loadEventosProjects();
-  }, [loadFunnels, loadEventosProjects]);
+    loadEventos();
+  }, [loadFunnels, loadEventos]);
 
-  async function handleSave(
-    formData: Omit<Funnel, "id" | "created_at" | "updated_at">
-  ) {
-    const method = editingFunnel ? "PUT" : "POST";
-    const url = editingFunnel
-      ? `/api/funnels/${editingFunnel.id}`
-      : "/api/funnels";
-
-    const res = await fetch(url, {
-      method,
+  const handleCreateFunnel = useCallback(async (data: Omit<Funnel, "id" | "created_at" | "updated_at">) => {
+    const res = await fetch("/api/funnels", {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formData),
+      body: JSON.stringify(data),
     });
-
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error ?? "Erro ao salvar");
-    }
-
+    if (!res.ok) throw new Error("Erro ao criar funil");
     await loadFunnels();
-  }
+  }, [loadFunnels]);
 
-  async function handleDelete(funnel: Funnel) {
-    if (!confirm(`Excluir o funil "${funnel.name}"? Esta ação não pode ser desfeita.`)) return;
-
-    const res = await fetch(`/api/funnels/${funnel.id}`, { method: "DELETE" });
-    if (res.ok) {
-      setFunnels((prev) => prev.filter((f) => f.id !== funnel.id));
-      setMetricsMap((prev) => {
-        const next = { ...prev };
-        delete next[funnel.id];
-        return next;
-      });
-    }
-  }
-
-  async function handleEventosDateChange(
-    eventoId: string,
-    start: string,
-    end: string
-  ) {
-    try {
-      const res = await fetch(
-        `/api/eqa-eventos/${eventoId}/metrics?start_date=${start}&end_date=${end}`
-      );
-      if (!res.ok) {
-        const error = await res.json();
-        console.error("Erro ao buscar métricas:", error);
-        throw new Error(error?.error ?? "Falha na requisição");
-      }
-      const data = await res.json();
-      setEventosMetricsMap((prev) => ({
-        ...prev,
-        [eventoId]: data,
-      }));
-    } catch (err) {
-      console.error("Erro ao buscar métricas do evento:", err);
-      throw err;
-    }
-  }
-
-  async function handleSaveEvento(
-    formData: Omit<EqaEventosProject, "id" | "created_at" | "updated_at">
-  ) {
-    const method = editingEvento ? "PUT" : "POST";
-    const url = editingEvento
-      ? `/api/eqa-eventos/${editingEvento.id}`
-      : "/api/eqa-eventos";
-
-    const res = await fetch(url, {
-      method,
+  const handleSaveFunnel = useCallback(async (data: Omit<Funnel, "id" | "created_at" | "updated_at">) => {
+    if (!selectedFunnelId) return;
+    const res = await fetch(`/api/funnels/${selectedFunnelId}`, {
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formData),
+      body: JSON.stringify(data),
     });
+    if (!res.ok) throw new Error("Erro ao atualizar funil");
+    await loadFunnels();
+  }, [selectedFunnelId, loadFunnels]);
 
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error ?? "Erro ao salvar");
-    }
+  const handleDeleteFunnel = useCallback(async (id: string) => {
+    const res = await fetch(`/api/funnels/${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Erro ao excluir funil");
+    setSelectedFunnelId(null);
+    await loadFunnels();
+  }, [loadFunnels]);
 
-    await loadEventosProjects();
-  }
+  // ── derived state ────────────────────────────────────────────────────────
 
-  async function handleDeleteEvento(project: EqaEventosProject) {
-    if (!confirm(`Excluir o evento "${project.name}"? Esta ação não pode ser desfeita.`)) return;
+  const loading = loadingFunnels || loadingEventos;
 
-    const res = await fetch(`/api/eqa-eventos/${project.id}`, { method: "DELETE" });
-    if (res.ok) {
-      setEventosProjects((prev) => prev.filter((p) => p.id !== project.id));
-    }
-  }
+  const pulseStatus = derivePulseBannerStatus(funnels, metricsMap);
+  const greenCount = funnels.filter(
+    (f) => deriveFunnelStatus(f, metricsMap[f.id] ?? null) === "green"
+  ).length;
+  const amberCount = funnels.length - greenCount;
 
-  function openCreate() {
-    setEditingFunnel(undefined);
-    setFormOpen(true);
-  }
+  const pulseHeadline =
+    funnels.length === 0
+      ? "Nenhum funil configurado"
+      : greenCount === funnels.length
+      ? `${greenCount} ${greenCount === 1 ? "funil" : "funis"} no verde`
+      : `${greenCount} ${greenCount === 1 ? "funil" : "funis"} no verde, ${amberCount} com atenção`;
 
-  function openEdit(funnel: Funnel) {
-    setEditingFunnel(funnel);
-    setFormOpen(true);
-  }
+  const pulseSub =
+    funnels.length === 0
+      ? "Crie o primeiro funil para começar a acompanhar conversões."
+      : amberCount > 0
+      ? "Revise os funis marcados com atenção e ajuste as etapas com queda de conversão."
+      : "Todos os funis estão convertendo acima da meta. Continue monitorando.";
 
-  function openCreateEvento() {
-    setEditingEvento(undefined);
-    setEventoFormOpen(true);
-  }
-
-  function openEditEvento(project: EqaEventosProject) {
-    setEditingEvento(project);
-    setEventoFormOpen(true);
-  }
-
+  const selectedFunnel = funnels.find((f) => f.id === selectedFunnelId) ?? null;
+  const selectedMetrics = selectedFunnelId !== null ? (metricsMap[selectedFunnelId] ?? null) : null;
 
   return (
-    <div className="min-h-full">
-      <PageHeader
+    <>
+    <div className="main">
+      <GvPageHeader
+        eyebrow="Gestão à Vista · Gestão em 4 Minutos"
         title="EQA — Eventos de Qualificação"
-        subtitle="Gerencie seus funis de performance"
-        actions={
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={openCreate}
-              style={{
-                padding: "8px 18px",
-                fontSize: 13,
-                fontWeight: 600,
-                borderRadius: "var(--radius-sm)",
-                border: "none",
-                background: "var(--color-primary)",
-                color: "#fff",
-                cursor: "pointer",
-              }}
-            >
-              + Novo Funil
-            </button>
-            <button
-              onClick={openCreateEvento}
-              style={{
-                padding: "8px 18px",
-                fontSize: 13,
-                fontWeight: 600,
-                borderRadius: "var(--radius-sm)",
-                border: "none",
-                background: "var(--color-primary)",
-                color: "#fff",
-                cursor: "pointer",
-              }}
-            >
-              + Novo Evento
-            </button>
-          </div>
-        }
+        sub="Como cada funil está convertendo do topo até a venda"
       />
 
-      <div style={{ padding: 24 }}>
-        {loadingFunnels || loadingEventos ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {loading ? (
+        <div className="section">
+          <div className="grid g3">
             {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="animate-pulse rounded-[var(--radius-card)]"
-                style={{
-                  height: 160,
-                  background: "var(--color-surface)",
-                  border: "1px solid var(--color-border)",
-                }}
-              />
+              <div key={i} className="lc" style={{ minHeight: 160, opacity: 0.4 }} />
             ))}
           </div>
-        ) : (
-          <>
-            {/* Seção Funis Ativos */}
-            <section className="mb-8">
-              <div className="flex items-center gap-3 mb-4">
-                <h2
-                  style={{
-                    fontSize: 15,
-                    fontWeight: 700,
-                    color: "var(--color-text)",
-                  }}
-                >
-                  Funis Ativos
-                </h2>
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: "var(--color-text-muted)",
-                    background: "var(--color-bg)",
-                    border: "1px solid var(--color-border)",
-                    borderRadius: 99,
-                    padding: "2px 10px",
-                  }}
-                >
-                  {funnels.length}
-                </span>
-              </div>
+        </div>
+      ) : (
+        <div className="section">
 
-              {funnels.length === 0 ? (
-                <div
-                  style={{
-                    border: "2px dashed var(--color-border)",
-                    borderRadius: "var(--radius-card)",
-                    padding: "40px 24px",
-                    textAlign: "center",
-                  }}
-                >
-                  <p style={{ fontSize: 14, color: "var(--color-text-muted)", marginBottom: 12 }}>
-                    Nenhum funil ativo criado ainda
-                  </p>
-                  <button
-                    onClick={openCreate}
-                    style={{
-                      padding: "7px 16px",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      borderRadius: "var(--radius-sm)",
-                      border: "1px solid var(--color-primary)",
-                      background: "var(--color-primary-light)",
-                      color: "var(--color-primary)",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Criar primeiro funil
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {funnels.map((funnel) => (
-                    <FunnelCard
-                      key={funnel.id}
-                      funnel={funnel}
-                      metrics={metricsMap[funnel.id] ?? null}
-                      loading={loadingMetrics && !metricsMap[funnel.id]}
-                      onClick={() => setViewingFunnel(funnel)}
-                      onEdit={() => openEdit(funnel)}
-                      onDelete={() => handleDelete(funnel)}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
+          {/* 01 — Status Geral */}
+          <NarrLabel step="01" label="Status Geral" />
+          <PulseBanner
+            status={pulseStatus}
+            headline={pulseHeadline}
+            sub={pulseSub}
+            chips={[
+              ...(greenCount > 0
+                ? [{ label: `${greenCount} batendo meta`, status: "green" as const }]
+                : []),
+              ...(amberCount > 0
+                ? [{ label: `${amberCount} abaixo`, status: "amber" as const }]
+                : []),
+              { label: `${funnels.length} funis ativos`, status: "muted" as const },
+            ]}
+          />
 
-            {/* Seção EQA Eventos Comercial */}
-            <section className="mb-8">
-              <div className="flex items-center gap-3 mb-4">
-                <h2
-                  style={{
-                    fontSize: 15,
-                    fontWeight: 700,
-                    color: "var(--color-text)",
-                  }}
-                >
-                  EQA Eventos Comercial
-                </h2>
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: "var(--color-text-muted)",
-                    background: "var(--color-bg)",
-                    border: "1px solid var(--color-border)",
-                    borderRadius: 99,
-                    padding: "2px 10px",
-                  }}
-                >
-                  {eventosProjects.length}
-                </span>
-              </div>
+          {/* 02 — Funis Ativos */}
+          <NarrLabel
+            step="02"
+            label="Funis Ativos"
+            desc={`${funnels.length} ${funnels.length === 1 ? "funil" : "funis"}`}
+          />
+          <div className="grid g3">
+            {funnels.map((f) => (
+              <FunnelCard
+                key={f.id}
+                name={f.name}
+                period={funnelPeriod(f)}
+                steps={deriveFunnelSteps(f, metricsMap[f.id] ?? null)}
+                status={deriveFunnelStatus(f, metricsMap[f.id] ?? null)}
+                verdict={deriveFunnelVerdict(f, metricsMap[f.id] ?? null)}
+                onClick={() => setSelectedFunnelId(f.id)}
+              />
+            ))}
+            <button
+              onClick={() => setShowFunnelModal(true)}
+              className="lc"
+              style={{
+                display: "grid",
+                placeItems: "center",
+                minHeight: 120,
+                borderStyle: "dashed",
+                background: "none",
+                cursor: "pointer",
+                width: "100%",
+                textAlign: "center",
+              }}
+            >
+              <span className="xmuted">+ Novo funil</span>
+            </button>
+          </div>
 
-              {eventosProjects.length === 0 ? (
-                <div
-                  style={{
-                    border: "2px dashed var(--color-border)",
-                    borderRadius: "var(--radius-card)",
-                    padding: "40px 24px",
-                    textAlign: "center",
-                  }}
-                >
-                  <p style={{ fontSize: 14, color: "var(--color-text-muted)", marginBottom: 12 }}>
-                    Nenhum evento criado ainda
-                  </p>
-                  <button
-                    onClick={openCreateEvento}
-                    style={{
-                      padding: "7px 16px",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      borderRadius: "var(--radius-sm)",
-                      border: "1px solid var(--color-primary)",
-                      background: "var(--color-primary-light)",
-                      color: "var(--color-primary)",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Criar primeiro evento
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {eventosProjects.map((project) => (
-                    <EventosCard
-                      key={project.id}
-                      project={project}
-                      metrics={eventosMetricsMap[project.id] ?? null}
-                      loading={loadingEventosMetrics && !eventosMetricsMap[project.id]}
-                      onDateChange={(start, end) =>
-                        handleEventosDateChange(project.id, start, end)
-                      }
-                      onClick={() => setViewingEvento(project)}
-                      onEdit={() => openEditEvento(project)}
-                      onDelete={() => handleDeleteEvento(project)}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
+          {/* 03 — EQA Eventos Comercial */}
+          <NarrLabel step="03" label="EQA Eventos Comercial" />
+          <div className="grid g3">
+            {eventosProjects.map((p) => {
+              const m = eventosMetricsMap[p.id] ?? null;
+              const leads = m?.total_leads ?? 0;
+              const convPct = leads > 0 ? Math.min(100, leads) : 0;
+              return (
+                <EventCard
+                  key={p.id}
+                  name={p.name}
+                  date={new Date(p.created_at).toLocaleDateString("pt-BR")}
+                  presence={convPct}
+                  conv={convPct}
+                  target={10}
+                  status={m && m.total_leads > 0 ? "green" : "amber"}
+                />
+              );
+            })}
+            <div
+              className="lc"
+              style={{
+                display: "grid",
+                placeItems: "center",
+                minHeight: 120,
+                borderStyle: "dashed",
+              }}
+            >
+              <span className="xmuted">+ Novo evento</span>
+            </div>
+          </div>
 
-            {/* Seção Social Seller */}
-            <section className="mb-8">
-              <div className="flex items-center gap-3 mb-4">
-                <h2
-                  style={{
-                    fontSize: 15,
-                    fontWeight: 700,
-                    color: "var(--color-text)",
-                  }}
-                >
-                  Social Seller
-                </h2>
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: "var(--color-text-muted)",
-                    background: "var(--color-bg)",
-                    border: "1px solid var(--color-border)",
-                    borderRadius: 99,
-                    padding: "2px 10px",
-                  }}
-                >
-                  {/* weeks count will be displayed inside SocialSellerSection */}
-                </span>
-              </div>
-              <SocialSellerSection />
-            </section>
-          </>
-        )}
-      </div>
+          {/* 04 — Social Seller */}
+          <NarrLabel
+            step="04"
+            label="Social Seller"
+            desc="Semana 18 — atualização semanal"
+          />
+          <div className="grid g4">
+            <StatCard
+              icon={<IconPeople />}
+              title="Vendedores Ativos"
+              value="14"
+              delta={7.7}
+              status="green"
+              foot="<strong>1 a mais</strong> que a semana passada"
+            />
+            <StatCard
+              icon={<IconSpark />}
+              title="Conversas Iniciadas"
+              value="2.483"
+              delta={12.0}
+              status="green"
+              foot="<strong>177/dia</strong> em média"
+            />
+            <StatCard
+              icon={<IconBars />}
+              title="Vendas Fechadas"
+              value="186"
+              delta={4.5}
+              status="green"
+              foot="Meta: <strong>180</strong>"
+            />
+            <StatCard
+              icon={<IconClock />}
+              title="Tempo de Resposta"
+              value="12"
+              unit="min"
+              delta={-28.0}
+              status="green"
+              foot="Meta: <strong>≤ 30 min</strong>"
+            />
+          </div>
 
-      {/* Modal de detalhes */}
-      {viewingFunnel && metricsMap[viewingFunnel.id] && (
-        <FunnelDetailModal
-          funnel={viewingFunnel}
-          metrics={metricsMap[viewingFunnel.id]}
-          open={!!viewingFunnel}
-          onClose={() => setViewingFunnel(null)}
-        />
+        </div>
       )}
-
-      {/* Modal de criação/edição Funil */}
-      <FunnelFormModal
-        funnel={editingFunnel}
-        open={formOpen}
-        onClose={() => setFormOpen(false)}
-        onSave={handleSave}
-      />
-
-      {/* Modal de detalhes Eventos */}
-      {viewingEvento && (
-        <EventosDetailModal
-          project={viewingEvento}
-          open={!!viewingEvento}
-          onClose={() => setViewingEvento(null)}
-        />
-      )}
-
-      {/* Modal de criação/edição Eventos */}
-      <EventosFormModal
-        project={editingEvento}
-        open={eventoFormOpen}
-        onClose={() => setEventoFormOpen(false)}
-        onSave={handleSaveEvento}
-      />
     </div>
+    <FunnelDetailDrawer
+      funnel={selectedFunnel}
+      metrics={selectedMetrics}
+      period={selectedFunnel ? funnelPeriod(selectedFunnel) : ""}
+      status={selectedFunnel ? deriveFunnelStatus(selectedFunnel, selectedMetrics) : "amber"}
+      steps={selectedFunnel ? deriveFunnelSteps(selectedFunnel, selectedMetrics) : []}
+      verdict={selectedFunnel ? deriveFunnelVerdict(selectedFunnel, selectedMetrics) : ""}
+      onClose={() => setSelectedFunnelId(null)}
+      onSave={selectedFunnel ? handleSaveFunnel : undefined}
+      onDelete={selectedFunnel ? () => handleDeleteFunnel(selectedFunnel.id) : undefined}
+    />
+    <FunnelFormModal
+      open={showFunnelModal}
+      onClose={() => setShowFunnelModal(false)}
+      onSave={handleCreateFunnel}
+    />
+    </>
   );
 }

@@ -1,0 +1,102 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+/* ── Design tokens ─────────────────────────────────────────────────────────── */
+.ind-dark {
+  --bg:       #07101f;
+  --surface:  #0d1829;
+  --surface-2: #121e32;
+  --border:   #1c2b40;
+  --border-vis: #253852;
+  --text:     #ddeaf6;
+  --text-2:   #7b9ab6;
+  --text-3:   #3c566f;
+  --text-4:   #253648;
+
+  --violet:  #9070e8;
+  --emerald: #0daa7c;
+  --orange:  #e87220;
+  --blue:    #3d84f5;
+  --green:   #1ab96c;
+  --cyan:    #0899c0;
+  --amber:   #d99512;
+  --red:     #e04242;
+
+  --font-ui:   'DM Sans', system-ui, sans-serif;
+  --font-mono: 'DM Mono', 'Fira Code', monospace;
+
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  min-height: 100vh;
+}
+
+.ind-dark * {
+  box-sizing: border-box;
+}
+
+/* ── Z-layout ──────────────────────────────────────────────────────────────── */
+.ind-dark .z-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.ind-dark .z-row {
+  width: 100%;
+}
+
+.ind-dark .z-row-3col {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.ind-dark .z-row-2col {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .ind-dark .z-row-2col {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .ind-dark .z-row-3col {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .ind-dark .z-row-3col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Rate color classes (used by funnel) ───────────────────────────────────── */
+.ind-dark .rate-ok {
+  color: var(--green);
+  background: rgba(26, 185, 108, 0.12);
+  border: 1px solid rgba(26, 185, 108, 0.25);
+}
+
+.ind-dark .rate-warn {
+  color: var(--amber);
+  background: rgba(217, 149, 18, 0.12);
+  border: 1px solid rgba(217, 149, 18, 0.25);
+}
+
+.ind-dark .rate-low {
+  color: var(--red);
+  background: rgba(224, 66, 66, 0.12);
+  border: 1px solid rgba(224, 66, 66, 0.25);
+}
+
+/* ── Animations ────────────────────────────────────────────────────────────── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}

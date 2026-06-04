@@ -51,6 +51,7 @@ describe("PUT /api/indicadores/filters/[id]", () => {
       name: "Updated",
       hotmart_products: [],
       meta_ads_terms: ["campanha"],
+      captacao_leads_eventos: [],
       created_at: "2025-01-01T00:00:00Z",
       updated_at: "2025-01-02T00:00:00Z",
     };
@@ -61,12 +62,33 @@ describe("PUT /api/indicadores/filters/[id]", () => {
       name: "Updated",
       hotmart_products: [],
       meta_ads_terms: ["campanha"],
+      captacao_leads_eventos: [],
     });
     const res = await PUT(req, { params: Promise.resolve(params) });
     const body = await res.json();
 
     expect(res.status).toBe(200);
     expect(body).toEqual(updated);
+  });
+
+  it("persists captacao_leads_eventos in the update call", async () => {
+    const mockUpdate = jest.fn();
+    mockFrom.mockReturnValue({ update: mockUpdate });
+    const mockEq = jest.fn().mockReturnValue({ select: jest.fn().mockReturnValue({ single: jest.fn().mockResolvedValue({ data: { id: "filter-uuid" }, error: null }) }) });
+    mockUpdate.mockReturnValue({ eq: mockEq });
+
+    const { PUT } = await import("../route");
+    const req = makeRequest("PUT", "http://localhost/api/indicadores/filters/filter-uuid", {
+      name: "Leads Only",
+      hotmart_products: [],
+      meta_ads_terms: [],
+      captacao_leads_eventos: ["Evento A", "Evento B"],
+    });
+    await PUT(req, { params: Promise.resolve(params) });
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ captacao_leads_eventos: ["Evento A", "Evento B"] })
+    );
   });
 
   it("returns 404 when filter not found", async () => {
