@@ -1,4 +1,4 @@
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup, renderToString } from "react-dom/server";
 import { HeroKpiCard } from "@/components/indicadores/hero-kpi-card";
 import { KpiCell } from "@/components/indicadores/kpi-cell";
 import { HorizontalFunnelFlow } from "@/components/indicadores/horizontal-funnel-flow";
@@ -11,10 +11,12 @@ import { NotConfiguredBadge } from "@/components/indicadores/not-configured-badg
 import type { FunnelStage, ConversionRate } from "@/lib/utils/funnel-metrics";
 import type { FilterRecord } from "@/types/indicadores";
 
+import React from "react";
+
 jest.mock("@/components/indicadores/trend-charts", () => ({
-  LeadsCaptacoesChart: () => null,
-  MetaAdsInvestimentoLeadsChart: () => null,
-  HotmartVendasChart: () => null,
+  LeadsCaptacoesChart: () => React.createElement("span", { "data-chart": "leads" }, null),
+  MetaAdsInvestimentoLeadsChart: () => React.createElement("span", { "data-chart": "meta" }, null),
+  HotmartVendasChart: () => React.createElement("span", { "data-chart": "hotmart" }, null),
 }));
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -487,5 +489,55 @@ describe("NotConfiguredBadge", () => {
   it("uses var(--text-3) color", () => {
     const html = render(NotConfiguredBadge({ text: "Test badge" }));
     expect(html).toContain("var(--text-3)");
+  });
+});
+
+// ── MetaAdsCard — chart visibility (#46) ─────────────────────────────────────
+
+import { HotmartCard } from "@/components/indicadores/hotmart-card";
+
+describe("MetaAdsCard — chart visibility", () => {
+  it("does NOT render MetaAdsInvestimentoLeadsChart when hasMetaFilter is false", () => {
+    const html = render(
+      MetaAdsCard({ metaState: zeroedMeta, dailyState: emptyDaily, hasMetaFilter: false })
+    );
+    expect(html).not.toContain('data-chart="meta"');
+  });
+
+  it("DOES render MetaAdsInvestimentoLeadsChart when hasMetaFilter is true", () => {
+    const html = render(
+      MetaAdsCard({ metaState: zeroedMeta, dailyState: emptyDaily, hasMetaFilter: true })
+    );
+    expect(html).toContain('data-chart="meta"');
+  });
+});
+
+// ── HotmartCard — chart visibility (#46) ─────────────────────────────────────
+
+const zeroedHotmart: { data: import("@/types/indicadores").GlobalHotmartMetrics; loading: boolean; error: boolean } = {
+  data: {
+    total_revenue: 0,
+    total_sales: 0,
+    total_sales_brl: 0,
+    total_sales_foreign: 0,
+    products: [],
+  },
+  loading: false,
+  error: false,
+};
+
+describe("HotmartCard — chart visibility", () => {
+  it("does NOT render HotmartVendasChart when hasHotmartFilter is false", () => {
+    const html = renderToString(
+      React.createElement(HotmartCard, { hotmartState: zeroedHotmart, dailyState: emptyDaily, hasHotmartFilter: false })
+    );
+    expect(html).not.toContain('data-chart="hotmart"');
+  });
+
+  it("DOES render HotmartVendasChart when hasHotmartFilter is true", () => {
+    const html = renderToString(
+      React.createElement(HotmartCard, { hotmartState: zeroedHotmart, dailyState: emptyDaily, hasHotmartFilter: true })
+    );
+    expect(html).toContain('data-chart="hotmart"');
   });
 });

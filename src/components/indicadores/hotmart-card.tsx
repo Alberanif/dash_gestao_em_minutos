@@ -340,7 +340,9 @@ export function HotmartCard({
           </div>
         )}
 
-        <HotmartVendasChart data={dailyState.data ?? []} loading={dailyState.loading} />
+        {hasHotmartFilter && (
+          <HotmartVendasChart data={dailyState.data ?? []} loading={dailyState.loading} />
+        )}
       </div>
     </div>
   );

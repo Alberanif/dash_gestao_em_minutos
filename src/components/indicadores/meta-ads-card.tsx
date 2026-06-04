@@ -154,10 +154,12 @@ export function MetaAdsCard({ metaState, dailyState, hasMetaFilter = true }: Met
               </>
             );
           })()}
-          <MetaAdsInvestimentoLeadsChart
-            data={dailyState.data ?? []}
-            loading={dailyState.loading}
-          />
+          {hasMetaFilter && (
+            <MetaAdsInvestimentoLeadsChart
+              data={dailyState.data ?? []}
+              loading={dailyState.loading}
+            />
+          )}
         </div>
       )}
     </div>
