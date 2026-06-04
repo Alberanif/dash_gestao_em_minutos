@@ -261,13 +261,17 @@ export default function IndicadoresPage() {
       params += `&offer_code=${encodeURIComponent(offerCode)}`;
     }
 
-    // Always fetch leads and daily; conditionally fetch meta and hotmart
-    const alwaysFetches = [
+    // Fetch all four sources in parallel; skip meta/hotmart with Promise.resolve(null) when unconfigured
+    const [leadsRes, dailyRes, metaRes, hotmartRes] = await Promise.allSettled([
       fetch(`/api/indicadores/leads?start_date=${start}&end_date=${end}`).then((r) => r.json()),
       fetch(`/api/indicadores/daily${params}`).then((r) => r.json()),
-    ] as const;
-
-    const [leadsRes, dailyRes] = await Promise.allSettled(alwaysFetches);
+      hasMetaFilter
+        ? fetch(`/api/indicadores/metrics${params}`).then((r) => r.json())
+        : Promise.resolve(null),
+      hasHotmartFilter
+        ? fetch(`/api/indicadores/hotmart${params}`).then((r) => r.json())
+        : Promise.resolve(null),
+    ]);
 
     setLeadsState({
       data: leadsRes.status === "fulfilled" ? leadsRes.value : null,
@@ -279,28 +283,16 @@ export default function IndicadoresPage() {
       loading: false,
       error: dailyRes.status === "rejected",
     });
-
-    if (hasMetaFilter) {
-      const [metaRes] = await Promise.allSettled([
-        fetch(`/api/indicadores/metrics${params}`).then((r) => r.json()),
-      ]);
-      setMetaState({
-        data: metaRes.status === "fulfilled" ? metaRes.value : null,
-        loading: false,
-        error: metaRes.status === "rejected",
-      });
-    }
-
-    if (hasHotmartFilter) {
-      const [hotmartRes] = await Promise.allSettled([
-        fetch(`/api/indicadores/hotmart${params}`).then((r) => r.json()),
-      ]);
-      setHotmartState({
-        data: hotmartRes.status === "fulfilled" ? hotmartRes.value : null,
-        loading: false,
-        error: hotmartRes.status === "rejected",
-      });
-    }
+    setMetaState({
+      data: metaRes.status === "fulfilled" && metaRes.value !== null ? metaRes.value : ZEROED_META,
+      loading: false,
+      error: metaRes.status === "rejected",
+    });
+    setHotmartState({
+      data: hotmartRes.status === "fulfilled" && hotmartRes.value !== null ? hotmartRes.value : ZEROED_HOTMART,
+      loading: false,
+      error: hotmartRes.status === "rejected",
+    });
   }, []);
 
   useEffect(() => {
@@ -351,12 +343,6 @@ export default function IndicadoresPage() {
     setEndDate(v);
     setActivePreset(getActivePreset(startDate, v, today));
   }
-
-  // ── Source flags (available for prop-drilling to child components) ──────────
-
-  const { hasMetaFilter, hasHotmartFilter } = activeFilter
-    ? deriveSourceFlags(activeFilter)
-    : { hasMetaFilter: false, hasHotmartFilter: false };
 
   // ── Derived data for Z-1 and Z-2 ──────────────────────────────────────────
 
