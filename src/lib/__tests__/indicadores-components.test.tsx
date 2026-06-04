@@ -7,7 +7,7 @@ import { FilterDropdownList } from "@/components/indicadores/filter-dropdown";
 import { IndicadoresEmptyState } from "@/components/indicadores/indicadores-empty-state";
 import { getPartialFilterWarning } from "@/components/indicadores/filter-modal";
 import { MetaAdsCard } from "@/components/indicadores/meta-ads-card";
-import { NotConfiguredBadge } from "@/components/indicadores/hotmart-card";
+import { NotConfiguredBadge } from "@/components/indicadores/not-configured-badge";
 import type { FunnelStage, ConversionRate } from "@/lib/utils/funnel-metrics";
 import type { FilterRecord } from "@/types/indicadores";
 

@@ -3,6 +3,7 @@
 import { KpiCell } from "./kpi-cell";
 import { MetaAdsInvestimentoLeadsChart } from "./trend-charts";
 import type { GlobalMetrics, DailyPoint } from "@/types/indicadores";
+import { NotConfiguredBadge } from "./not-configured-badge";
 
 interface SectionState<T> {
   data: T | null;
@@ -91,15 +92,7 @@ export function MetaAdsCard({ metaState, dailyState, hasMetaFilter = true }: Met
     >
       <CardHeader />
       {!hasMetaFilter && (
-        <div style={{
-          padding: "6px 20px",
-          fontSize: 11,
-          color: "var(--text-3)",
-          background: "var(--surface-2)",
-          borderBottom: "1px solid var(--border-vis)",
-        }}>
-          Meta Ads não configurado neste filtro — dados zerados
-        </div>
+        <NotConfiguredBadge text="Meta Ads não configurado neste filtro — dados zerados" />
       )}
 
       {metaState.loading && (

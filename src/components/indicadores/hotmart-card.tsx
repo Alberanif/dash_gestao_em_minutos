@@ -6,6 +6,9 @@ import { KpiCell } from "./kpi-cell";
 import type { GlobalHotmartMetrics, DailyPoint } from "@/types/indicadores";
 import { sortOffers } from "@/lib/utils/hotmart-offers";
 import type { HotmartOffer } from "@/lib/utils/hotmart-offers";
+import { NotConfiguredBadge } from "./not-configured-badge";
+
+export { NotConfiguredBadge } from "./not-configured-badge";
 
 const PAGE_SIZE = 5;
 
@@ -22,20 +25,6 @@ interface HotmartCardProps {
   selectedProductId?: string | null;
   onOfferCodeChange?: (offerCode: string | null, productId: string | null) => void;
   hasHotmartFilter?: boolean;
-}
-
-export function NotConfiguredBadge({ text }: { text: string }) {
-  return (
-    <div style={{
-      padding: "6px 20px",
-      fontSize: 11,
-      color: "var(--text-3)",
-      background: "var(--surface-2)",
-      borderBottom: "1px solid var(--border-vis)",
-    }}>
-      {text}
-    </div>
-  );
 }
 
 function fmtBRL(n: number): string {
