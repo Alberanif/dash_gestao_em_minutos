@@ -7,6 +7,7 @@ import { calcPresetDates, getActivePreset, type PresetKey } from "@/lib/utils/pe
 import { calcROAS, calcCPA, calcConversionRate } from "@/lib/utils/cross-metrics";
 import { calcFunnelStages, calcConversionRates } from "@/lib/utils/funnel-metrics";
 import type { GlobalMetrics, GlobalHotmartMetrics, GlobalLeadsMetrics, DailyPoint, FilterRecord } from "@/types/indicadores";
+import { deriveSourceFlags } from "./source-flags";
 import { HeroKpiCard } from "@/components/indicadores/hero-kpi-card";
 import { HorizontalFunnelFlow } from "@/components/indicadores/horizontal-funnel-flow";
 import { MetaAdsCard } from "@/components/indicadores/meta-ads-card";
@@ -60,6 +61,30 @@ interface SectionState<T> {
 function initialSection<T>(): SectionState<T> {
   return { data: null, loading: true, error: false };
 }
+
+// ── Zeroed states for unconfigured sources ────────────────────────────────────
+
+const ZEROED_META: GlobalMetrics = {
+  meta_spend: 0,
+  meta_cpm: 0,
+  meta_ctr: 0,
+  meta_leads: 0,
+  meta_checkout: 0,
+  meta_impressions: 0,
+  meta_link_clicks: 0,
+  meta_page_views: 0,
+  meta_connect_rate: null,
+  meta_lp_conversion: null,
+  meta_cpl_traffic: null,
+};
+
+const ZEROED_HOTMART: GlobalHotmartMetrics = {
+  products: [],
+  total_sales: 0,
+  total_sales_brl: 0,
+  total_sales_foreign: 0,
+  total_revenue: 0,
+};
 
 // ── Period controls ───────────────────────────────────────────────────────────
 
@@ -216,8 +241,14 @@ export default function IndicadoresPage() {
     filter: FilterRecord | null,
     offerCode: string | null = null,
   ) => {
-    setMetaState(initialSection());
-    setHotmartState(initialSection());
+    // Derive which sources are actually configured in this filter
+    const { hasMetaFilter, hasHotmartFilter } = filter
+      ? deriveSourceFlags(filter)
+      : { hasMetaFilter: false, hasHotmartFilter: false };
+
+    // Immediately zero out states for unconfigured sources (no loading spinner)
+    setMetaState(hasMetaFilter ? initialSection() : { data: ZEROED_META, loading: false, error: false });
+    setHotmartState(hasHotmartFilter ? initialSection() : { data: ZEROED_HOTMART, loading: false, error: false });
     setLeadsState(initialSection());
     setDailyState(initialSection());
 
@@ -230,23 +261,14 @@ export default function IndicadoresPage() {
       params += `&offer_code=${encodeURIComponent(offerCode)}`;
     }
 
-    const [metaRes, hotmartRes, leadsRes, dailyRes] = await Promise.allSettled([
-      fetch(`/api/indicadores/metrics${params}`).then((r) => r.json()),
-      fetch(`/api/indicadores/hotmart${params}`).then((r) => r.json()),
+    // Always fetch leads and daily; conditionally fetch meta and hotmart
+    const alwaysFetches = [
       fetch(`/api/indicadores/leads?start_date=${start}&end_date=${end}`).then((r) => r.json()),
       fetch(`/api/indicadores/daily${params}`).then((r) => r.json()),
-    ]);
+    ] as const;
 
-    setMetaState({
-      data: metaRes.status === "fulfilled" ? metaRes.value : null,
-      loading: false,
-      error: metaRes.status === "rejected",
-    });
-    setHotmartState({
-      data: hotmartRes.status === "fulfilled" ? hotmartRes.value : null,
-      loading: false,
-      error: hotmartRes.status === "rejected",
-    });
+    const [leadsRes, dailyRes] = await Promise.allSettled(alwaysFetches);
+
     setLeadsState({
       data: leadsRes.status === "fulfilled" ? leadsRes.value : null,
       loading: false,
@@ -257,6 +279,28 @@ export default function IndicadoresPage() {
       loading: false,
       error: dailyRes.status === "rejected",
     });
+
+    if (hasMetaFilter) {
+      const [metaRes] = await Promise.allSettled([
+        fetch(`/api/indicadores/metrics${params}`).then((r) => r.json()),
+      ]);
+      setMetaState({
+        data: metaRes.status === "fulfilled" ? metaRes.value : null,
+        loading: false,
+        error: metaRes.status === "rejected",
+      });
+    }
+
+    if (hasHotmartFilter) {
+      const [hotmartRes] = await Promise.allSettled([
+        fetch(`/api/indicadores/hotmart${params}`).then((r) => r.json()),
+      ]);
+      setHotmartState({
+        data: hotmartRes.status === "fulfilled" ? hotmartRes.value : null,
+        loading: false,
+        error: hotmartRes.status === "rejected",
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -307,6 +351,12 @@ export default function IndicadoresPage() {
     setEndDate(v);
     setActivePreset(getActivePreset(startDate, v, today));
   }
+
+  // ── Source flags (available for prop-drilling to child components) ──────────
+
+  const { hasMetaFilter, hasHotmartFilter } = activeFilter
+    ? deriveSourceFlags(activeFilter)
+    : { hasMetaFilter: false, hasHotmartFilter: false };
 
   // ── Derived data for Z-1 and Z-2 ──────────────────────────────────────────
 

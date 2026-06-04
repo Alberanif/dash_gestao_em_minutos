@@ -322,6 +322,56 @@ describe("IndicadoresEmptyState", () => {
   });
 });
 
+// ── deriveSourceFlags ─────────────────────────────────────────────────────────
+
+import { deriveSourceFlags } from "@/app/indicadores/source-flags";
+
+describe("deriveSourceFlags", () => {
+  it("only meta terms → hasMetaFilter true, hasHotmartFilter false", () => {
+    const filter: FilterRecord = {
+      id: "f1", account_id: "acc1", name: "Meta only",
+      meta_ads_terms: ["lançamento"],
+      hotmart_products: [],
+      created_at: "2024-01-01T00:00:00Z",
+      updated_at: "2024-01-01T00:00:00Z",
+    };
+    expect(deriveSourceFlags(filter)).toEqual({ hasMetaFilter: true, hasHotmartFilter: false });
+  });
+
+  it("only hotmart products → hasMetaFilter false, hasHotmartFilter true", () => {
+    const filter: FilterRecord = {
+      id: "f2", account_id: "acc1", name: "Hotmart only",
+      meta_ads_terms: [],
+      hotmart_products: [{ product_id: "p1", product_name: "Curso" }],
+      created_at: "2024-01-01T00:00:00Z",
+      updated_at: "2024-01-01T00:00:00Z",
+    };
+    expect(deriveSourceFlags(filter)).toEqual({ hasMetaFilter: false, hasHotmartFilter: true });
+  });
+
+  it("both configured → hasMetaFilter true, hasHotmartFilter true", () => {
+    const filter: FilterRecord = {
+      id: "f3", account_id: "acc1", name: "Both",
+      meta_ads_terms: ["lançamento"],
+      hotmart_products: [{ product_id: "p1", product_name: "Curso" }],
+      created_at: "2024-01-01T00:00:00Z",
+      updated_at: "2024-01-01T00:00:00Z",
+    };
+    expect(deriveSourceFlags(filter)).toEqual({ hasMetaFilter: true, hasHotmartFilter: true });
+  });
+
+  it("neither configured → hasMetaFilter false, hasHotmartFilter false", () => {
+    const filter: FilterRecord = {
+      id: "f4", account_id: "acc1", name: "Neither",
+      meta_ads_terms: [],
+      hotmart_products: [],
+      created_at: "2024-01-01T00:00:00Z",
+      updated_at: "2024-01-01T00:00:00Z",
+    };
+    expect(deriveSourceFlags(filter)).toEqual({ hasMetaFilter: false, hasHotmartFilter: false });
+  });
+});
+
 // ── FilterDropdownList ────────────────────────────────────────────────────────
 
 const sampleFilters: FilterRecord[] = [
