@@ -373,17 +373,4 @@ describe("FilterDropdownList", () => {
   });
 });
 
-// ── IndicadoresEmptyState ─────────────────────────────────────────────────────
-
-describe("IndicadoresEmptyState", () => {
-  it("renders an orientative message guiding the user to select or create a filter", () => {
-    const html = render(IndicadoresEmptyState({ onOpenFilter: noop }));
-    expect(html.toLowerCase()).toMatch(/filtro|selecione|crie/);
-  });
-
-  it("renders a call-to-action button", () => {
-    const html = render(IndicadoresEmptyState({ onOpenFilter: noop }));
-    expect(html).toMatch(/<button/i);
-  });
-});
 

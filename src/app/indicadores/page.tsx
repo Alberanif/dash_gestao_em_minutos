@@ -14,6 +14,7 @@ import { HotmartCard } from "@/components/indicadores/hotmart-card";
 import { LeadsSection } from "@/components/indicadores/leads-section";
 import { FilterDropdown } from "@/components/indicadores/filter-dropdown";
 import { FilterModal } from "@/components/indicadores/filter-modal";
+import { IndicadoresEmptyState } from "@/components/indicadores/indicadores-empty-state";
 
 const LS_FILTER_ID = "indicadores_active_filter_id";
 
@@ -398,87 +399,89 @@ export default function IndicadoresPage() {
         />
       )}
 
-      {/* Z-layout */}
-      <div className="z-layout">
+      {/* Dashboard content or empty state */}
+      {activeFilter === null ? (
+        <IndicadoresEmptyState
+          onOpenFilter={() => { setFilterEditTarget(null); setFilterModalOpen(true); }}
+        />
+      ) : (
+        <div className="z-layout">
 
-        {/* Z-1: Hero KPIs — 3 columns */}
-        <div>
-          <SectionNarrative step="01" label="Resultado" desc="Desempenho consolidado do período selecionado" />
-          <div className="z-row-3col">
-            <HeroKpiCard
-              label="ROAS"
-              value={roas !== null ? `${fmtDecimal(roas, 2)}×` : "—"}
-              subtitle="Receita ÷ Investimento"
-              accent="var(--violet)"
-              loading={heroLoading}
-            />
-            <HeroKpiCard
-              label="Receita BRL"
-              value={hotmartData ? fmtBRL(hotmartData.total_revenue) : "—"}
-              subtitle="via Hotmart"
-              accent="var(--emerald)"
-              loading={heroLoading}
-            />
-            <HeroKpiCard
-              label="Total de Vendas"
-              value={hotmartData ? fmtNum(hotmartData.total_sales) : "—"}
-              subtitle="total de conversões"
-              accent="var(--orange)"
-              loading={heroLoading}
-            />
-          </div>
-        </div>
-
-        {/* Z-2: Horizontal funnel — full width */}
-        {funnelStages && funnelRates && (
+          {/* Z-1: Hero KPIs — 3 columns */}
           <div>
-            <SectionNarrative step="02" label="Jornada de Conversão" desc="Do investimento até a venda" />
-            <div className="z-row">
-              <HorizontalFunnelFlow
-                stages={funnelStages}
-                rates={funnelRates}
-                metaSpend={metaData?.meta_spend ?? null}
-                metaCpl={metaData?.meta_cpl_traffic ?? null}
-                metaCpm={metaData?.meta_cpm ?? null}
-                metaConvRate={convRate}
-                cpa={cpa}
+            <SectionNarrative step="01" label="Resultado" desc="Desempenho consolidado do período selecionado" />
+            <div className="z-row-3col">
+              <HeroKpiCard
+                label="ROAS"
+                value={roas !== null ? `${fmtDecimal(roas, 2)}×` : "—"}
+                subtitle="Receita ÷ Investimento"
+                accent="var(--violet)"
+                loading={heroLoading}
+              />
+              <HeroKpiCard
+                label="Receita BRL"
+                value={hotmartData ? fmtBRL(hotmartData.total_revenue) : "—"}
+                subtitle="via Hotmart"
+                accent="var(--emerald)"
+                loading={heroLoading}
+              />
+              <HeroKpiCard
+                label="Total de Vendas"
+                value={hotmartData ? fmtNum(hotmartData.total_sales) : "—"}
+                subtitle="total de conversões"
+                accent="var(--orange)"
+                loading={heroLoading}
               />
             </div>
           </div>
-        )}
 
-        {/* Z-3: Meta Ads + Hotmart — 2 columns */}
-        <div>
-          <SectionNarrative step="03" label="Plataformas" desc="Detalhe por fonte de dados" />
-          <div className="z-row-2col">
-            <MetaAdsCard metaState={metaState} dailyState={dailyState} />
-            <HotmartCard
-              hotmartState={hotmartState}
-              dailyState={dailyState}
-              accountId={accountId}
-              selectedProductId={activeProductForOffer}
-              onOfferCodeChange={handleOfferCodeChange}
+          {/* Z-2: Horizontal funnel — full width */}
+          {funnelStages && funnelRates && (
+            <div>
+              <SectionNarrative step="02" label="Jornada de Conversão" desc="Do investimento até a venda" />
+              <div className="z-row">
+                <HorizontalFunnelFlow
+                  stages={funnelStages}
+                  rates={funnelRates}
+                  metaSpend={metaData?.meta_spend ?? null}
+                  metaCpl={metaData?.meta_cpl_traffic ?? null}
+                  metaCpm={metaData?.meta_cpm ?? null}
+                  metaConvRate={convRate}
+                  cpa={cpa}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Z-3: Meta Ads + Hotmart — 2 columns */}
+          <div>
+            <SectionNarrative step="03" label="Plataformas" desc="Detalhe por fonte de dados" />
+            <div className="z-row-2col">
+              <MetaAdsCard metaState={metaState} dailyState={dailyState} />
+              <HotmartCard
+                hotmartState={hotmartState}
+                dailyState={dailyState}
+                accountId={accountId}
+                selectedProductId={activeProductForOffer}
+                onOfferCodeChange={handleOfferCodeChange}
+              />
+            </div>
+          </div>
+
+          {/* Z-4: Captação de Leads — full width */}
+          <div>
+            <SectionNarrative
+              step="04"
+              label="Captação de Leads"
+              desc="Novos leads que entraram no funil · Dados não filtrados"
             />
+            <div className="z-row">
+              <LeadsSection leadsState={leadsState} dailyState={dailyState} />
+            </div>
           </div>
-        </div>
 
-        {/* Z-4: Captação de Leads — full width */}
-        <div>
-          <SectionNarrative
-            step="04"
-            label="Captação de Leads"
-            desc={
-              activeFilter
-                ? "Novos leads que entraram no funil · Dados não filtrados"
-                : "Novos leads que entraram no funil"
-            }
-          />
-          <div className="z-row">
-            <LeadsSection leadsState={leadsState} dailyState={dailyState} />
-          </div>
         </div>
-
-      </div>
+      )}
     </div>
   );
 }
