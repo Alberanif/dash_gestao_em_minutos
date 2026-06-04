@@ -500,13 +500,14 @@ export default function IndicadoresPage() {
           <div>
             <SectionNarrative step="03" label="Plataformas" desc="Detalhe por fonte de dados" />
             <div className="z-row-2col">
-              <MetaAdsCard metaState={metaState} dailyState={dailyState} />
+              <MetaAdsCard metaState={metaState} dailyState={dailyState} hasMetaFilter={hasMetaFilter} />
               <HotmartCard
                 hotmartState={hotmartState}
                 dailyState={dailyState}
                 accountId={accountId}
                 selectedProductId={activeProductForOffer}
                 onOfferCodeChange={handleOfferCodeChange}
+                hasHotmartFilter={hasHotmartFilter}
               />
             </div>
           </div>

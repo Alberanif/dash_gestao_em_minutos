@@ -21,6 +21,21 @@ interface HotmartCardProps {
   accountId?: string;
   selectedProductId?: string | null;
   onOfferCodeChange?: (offerCode: string | null, productId: string | null) => void;
+  hasHotmartFilter?: boolean;
+}
+
+export function NotConfiguredBadge({ text }: { text: string }) {
+  return (
+    <div style={{
+      padding: "6px 20px",
+      fontSize: 11,
+      color: "var(--text-3)",
+      background: "var(--surface-2)",
+      borderBottom: "1px solid var(--border-vis)",
+    }}>
+      {text}
+    </div>
+  );
 }
 
 function fmtBRL(n: number): string {
@@ -56,6 +71,7 @@ export function HotmartCard({
   accountId,
   selectedProductId,
   onOfferCodeChange,
+  hasHotmartFilter = true,
 }: HotmartCardProps) {
   const [page, setPage] = useState(0);
 
@@ -123,6 +139,7 @@ export function HotmartCard({
     return (
       <div style={cardStyle}>
         <CardHeader />
+        {!hasHotmartFilter && <NotConfiguredBadge text="Hotmart não configurado neste filtro — dados zerados" />}
         <div style={{ padding: 20, display: "flex", flexDirection: "column" as const, gap: 12 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <SkeletonBox height={72} />
@@ -138,6 +155,7 @@ export function HotmartCard({
     return (
       <div style={cardStyle}>
         <CardHeader />
+        {!hasHotmartFilter && <NotConfiguredBadge text="Hotmart não configurado neste filtro — dados zerados" />}
         <div style={{ padding: 20 }}>
           <p style={{ fontSize: 13, color: "var(--red)" }}>Erro ao carregar dados do Hotmart.</p>
         </div>
@@ -207,6 +225,7 @@ export function HotmartCard({
   return (
     <div style={cardStyle}>
       <CardHeader />
+      {!hasHotmartFilter && <NotConfiguredBadge text="Hotmart não configurado neste filtro — dados zerados" />}
       <div style={{ padding: 20 }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
           <KpiCell label="Receita BRL" value={fmtBRL(d.total_revenue)} accent="var(--emerald)" large />

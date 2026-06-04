@@ -13,6 +13,7 @@ interface SectionState<T> {
 interface MetaAdsCardProps {
   metaState: SectionState<GlobalMetrics>;
   dailyState: SectionState<DailyPoint[]>;
+  hasMetaFilter?: boolean;
 }
 
 function fmtBRL(n: number | null | undefined): string {
@@ -78,7 +79,7 @@ function CardHeader() {
   );
 }
 
-export function MetaAdsCard({ metaState, dailyState }: MetaAdsCardProps) {
+export function MetaAdsCard({ metaState, dailyState, hasMetaFilter = true }: MetaAdsCardProps) {
   return (
     <div
       style={{
@@ -89,6 +90,17 @@ export function MetaAdsCard({ metaState, dailyState }: MetaAdsCardProps) {
       }}
     >
       <CardHeader />
+      {!hasMetaFilter && (
+        <div style={{
+          padding: "6px 20px",
+          fontSize: 11,
+          color: "var(--text-3)",
+          background: "var(--surface-2)",
+          borderBottom: "1px solid var(--border-vis)",
+        }}>
+          Meta Ads não configurado neste filtro — dados zerados
+        </div>
+      )}
 
       {metaState.loading && (
         <div style={{ padding: 20 }}>

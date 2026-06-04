@@ -6,6 +6,8 @@ import { LeadsSection } from "@/components/indicadores/leads-section";
 import { FilterDropdownList } from "@/components/indicadores/filter-dropdown";
 import { IndicadoresEmptyState } from "@/components/indicadores/indicadores-empty-state";
 import { getPartialFilterWarning } from "@/components/indicadores/filter-modal";
+import { MetaAdsCard } from "@/components/indicadores/meta-ads-card";
+import { NotConfiguredBadge } from "@/components/indicadores/hotmart-card";
 import type { FunnelStage, ConversionRate } from "@/lib/utils/funnel-metrics";
 import type { FilterRecord } from "@/types/indicadores";
 
@@ -444,4 +446,46 @@ describe("FilterDropdownList", () => {
   });
 });
 
+// ── MetaAdsCard badge ─────────────────────────────────────────────────────────
 
+const zeroedMeta = {
+  data: {
+    meta_spend: 0, meta_cpm: 0, meta_ctr: 0, meta_leads: 0,
+    meta_checkout: 0, meta_impressions: 0, meta_link_clicks: 0,
+    meta_page_views: 0, meta_connect_rate: null, meta_lp_conversion: null,
+    meta_cpl_traffic: null,
+  },
+  loading: false,
+  error: false,
+};
+const emptyDaily = { data: [], loading: false, error: false };
+
+describe("MetaAdsCard — not-configured badge", () => {
+  it("shows 'Meta Ads não configurado' when hasMetaFilter is false", () => {
+    const html = render(
+      MetaAdsCard({ metaState: zeroedMeta, dailyState: emptyDaily, hasMetaFilter: false })
+    );
+    expect(html).toContain("Meta Ads não configurado");
+  });
+
+  it("does NOT show 'não configurado' when hasMetaFilter is true", () => {
+    const html = render(
+      MetaAdsCard({ metaState: zeroedMeta, dailyState: emptyDaily, hasMetaFilter: true })
+    );
+    expect(html).not.toContain("não configurado");
+  });
+});
+
+// ── NotConfiguredBadge (pure component from hotmart-card) ─────────────────────
+
+describe("NotConfiguredBadge", () => {
+  it("renders the provided text", () => {
+    const html = render(NotConfiguredBadge({ text: "Hotmart não configurado neste filtro — dados zerados" }));
+    expect(html).toContain("Hotmart não configurado");
+  });
+
+  it("uses var(--text-3) color", () => {
+    const html = render(NotConfiguredBadge({ text: "Test badge" }));
+    expect(html).toContain("var(--text-3)");
+  });
+});
