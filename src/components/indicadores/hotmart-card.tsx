@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { HotmartVendasChart } from "./trend-charts";
 import { KpiCell } from "./kpi-cell";
 import type { GlobalHotmartMetrics, DailyPoint } from "@/types/indicadores";
+import { sortOffers } from "@/lib/utils/hotmart-offers";
+import type { HotmartOffer } from "@/lib/utils/hotmart-offers";
 
 const PAGE_SIZE = 5;
 
@@ -16,6 +18,9 @@ interface SectionState<T> {
 interface HotmartCardProps {
   hotmartState: SectionState<GlobalHotmartMetrics>;
   dailyState: SectionState<DailyPoint[]>;
+  accountId?: string;
+  selectedProductId?: string | null;
+  onOfferCodeChange?: (offerCode: string | null, productId: string | null) => void;
 }
 
 function fmtBRL(n: number): string {
@@ -45,8 +50,67 @@ function SkeletonBox({ height, width = "100%" }: { height: number; width?: strin
   );
 }
 
-export function HotmartCard({ hotmartState, dailyState }: HotmartCardProps) {
+export function HotmartCard({
+  hotmartState,
+  dailyState,
+  accountId,
+  selectedProductId,
+  onOfferCodeChange,
+}: HotmartCardProps) {
   const [page, setPage] = useState(0);
+
+  // Offer filter state
+  const [offerProductId, setOfferProductId] = useState<string | null>(null);
+  const [offerCode, setOfferCode] = useState<string | null>(null);
+  const [offers, setOffers] = useState<HotmartOffer[]>([]);
+  const [offersLoading, setOffersLoading] = useState(false);
+
+  // When selectedProductId changes externally, sync internal state
+  useEffect(() => {
+    if (selectedProductId !== undefined && selectedProductId !== offerProductId) {
+      setOfferProductId(selectedProductId ?? null);
+      setOfferCode(null);
+      setOffers([]);
+    }
+  }, [selectedProductId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch offers whenever offerProductId changes
+  useEffect(() => {
+    if (!offerProductId || !accountId) {
+      setOffers([]);
+      setOfferCode(null);
+      return;
+    }
+    setOffersLoading(true);
+    fetch(`/api/hotmart/offers?account_id=${encodeURIComponent(accountId)}&product_id=${encodeURIComponent(offerProductId)}`)
+      .then((r) => r.json())
+      .then((data: HotmartOffer[]) => {
+        if (Array.isArray(data)) setOffers(sortOffers(data));
+        else setOffers([]);
+      })
+      .catch(() => setOffers([]))
+      .finally(() => setOffersLoading(false));
+  }, [offerProductId, accountId]);
+
+  function handleProductSelect(productId: string) {
+    const newProductId = productId || null;
+    setOfferProductId(newProductId);
+    setOfferCode(null);
+    onOfferCodeChange?.(null, newProductId);
+  }
+
+  function handleOfferSelect(code: string) {
+    const newCode = code || null;
+    setOfferCode(newCode);
+    onOfferCodeChange?.(newCode, offerProductId);
+  }
+
+  function handleClearOfferFilter() {
+    setOfferProductId(null);
+    setOfferCode(null);
+    setOffers([]);
+    onOfferCodeChange?.(null, null);
+  }
 
   const cardStyle = {
     background: "var(--surface)",
@@ -115,6 +179,31 @@ export function HotmartCard({ hotmartState, dailyState }: HotmartCardProps) {
     padding: 0,
   });
 
+  // Products available for the offer filter (from hotmart data)
+  const availableProducts = d.products;
+
+  const selectStyle: React.CSSProperties = {
+    fontSize: 12,
+    padding: "5px 8px",
+    background: "var(--surface)",
+    border: "1px solid var(--border-vis)",
+    borderRadius: 6,
+    color: "var(--text)",
+    outline: "none",
+    cursor: "pointer",
+    flex: 1,
+  };
+
+  const clearBtnStyle: React.CSSProperties = {
+    fontSize: 11,
+    padding: "5px 8px",
+    background: "transparent",
+    border: "1px solid var(--border-vis)",
+    borderRadius: 6,
+    color: "var(--text-3)",
+    cursor: "pointer",
+  };
+
   return (
     <div style={cardStyle}>
       <CardHeader />
@@ -124,6 +213,54 @@ export function HotmartCard({ hotmartState, dailyState }: HotmartCardProps) {
           <KpiCell label="Vendas BRL" value={fmtNum(d.total_sales_brl)} accent="var(--orange)" large />
           <KpiCell label="Vendas Ext." value={fmtNum(d.total_sales_foreign)} accent="var(--text-2)" />
         </div>
+
+        {/* Offer filter — only shown when there are products */}
+        {availableProducts.length > 0 && (
+          <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-3)" }}>
+                Filtrar por oferta
+              </span>
+              {offerProductId && (
+                <button onClick={handleClearOfferFilter} style={clearBtnStyle}>
+                  Limpar
+                </button>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <select
+                value={offerProductId ?? ""}
+                onChange={(e) => handleProductSelect(e.target.value)}
+                style={selectStyle}
+              >
+                <option value="">Todos os produtos</option>
+                {availableProducts.map((p) => (
+                  <option key={p.product_id} value={p.product_id}>
+                    {p.product_name}
+                  </option>
+                ))}
+              </select>
+
+              {offerProductId && (
+                <select
+                  value={offerCode ?? ""}
+                  onChange={(e) => handleOfferSelect(e.target.value)}
+                  style={{ ...selectStyle, opacity: offersLoading ? 0.6 : 1 }}
+                  disabled={offersLoading || offers.length === 0}
+                >
+                  <option value="">
+                    {offersLoading ? "Carregando..." : offers.length === 0 ? "Sem ofertas" : "Todas as ofertas"}
+                  </option>
+                  {offers.map((o) => (
+                    <option key={o.offer_code} value={o.offer_code}>
+                      {o.offer_name}{o.is_main_offer ? " (principal)" : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          </div>
+        )}
 
         {d.products.length > 0 && (
           <div style={{ marginTop: 20, overflowX: "auto" }}>

@@ -181,6 +181,10 @@ export default function IndicadoresPage() {
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [filterEditTarget, setFilterEditTarget] = useState<FilterRecord | null>(null);
 
+  // Offer filter — live, not persisted
+  const [activeOfferCode, setActiveOfferCode] = useState<string | null>(null);
+  const [activeProductForOffer, setActiveProductForOffer] = useState<string | null>(null);
+
   // Bootstrap: fetch account_id + filters, restore active filter from localStorage
   useEffect(() => {
     fetch("/api/accounts")
@@ -205,7 +209,12 @@ export default function IndicadoresPage() {
       .catch(() => {});
   }, []);
 
-  const fetchAll = useCallback(async (start: string, end: string, filter: FilterRecord | null) => {
+  const fetchAll = useCallback(async (
+    start: string,
+    end: string,
+    filter: FilterRecord | null,
+    offerCode: string | null = null,
+  ) => {
     setMetaState(initialSection());
     setHotmartState(initialSection());
     setLeadsState(initialSection());
@@ -215,6 +224,9 @@ export default function IndicadoresPage() {
     if (filter) {
       filter.meta_ads_terms.forEach((t) => { params += `&meta_terms[]=${encodeURIComponent(t)}`; });
       filter.hotmart_products.forEach((p) => { params += `&product_ids[]=${encodeURIComponent(p.product_id)}`; });
+    }
+    if (offerCode) {
+      params += `&offer_code=${encodeURIComponent(offerCode)}`;
     }
 
     const [metaRes, hotmartRes, leadsRes, dailyRes] = await Promise.allSettled([
@@ -247,8 +259,8 @@ export default function IndicadoresPage() {
   }, []);
 
   useEffect(() => {
-    fetchAll(startDate, endDate, activeFilter);
-  }, [startDate, endDate, activeFilter, fetchAll]);
+    fetchAll(startDate, endDate, activeFilter, activeOfferCode);
+  }, [startDate, endDate, activeFilter, activeOfferCode, fetchAll]);
 
   function handleSelectFilter(filter: FilterRecord | null) {
     setActiveFilter(filter);
@@ -270,6 +282,11 @@ export default function IndicadoresPage() {
     await fetch(`/api/indicadores/filters/${filter.id}`, { method: "DELETE" });
     setFilters((prev) => prev.filter((f) => f.id !== filter.id));
     if (activeFilter?.id === filter.id) handleSelectFilter(null);
+  }
+
+  function handleOfferCodeChange(offerCode: string | null, productId: string | null) {
+    setActiveOfferCode(offerCode);
+    setActiveProductForOffer(productId);
   }
 
   function handlePreset(key: PresetKey) {
@@ -435,7 +452,13 @@ export default function IndicadoresPage() {
           <SectionNarrative step="03" label="Plataformas" desc="Detalhe por fonte de dados" />
           <div className="z-row-2col">
             <MetaAdsCard metaState={metaState} dailyState={dailyState} />
-            <HotmartCard hotmartState={hotmartState} dailyState={dailyState} />
+            <HotmartCard
+              hotmartState={hotmartState}
+              dailyState={dailyState}
+              accountId={accountId}
+              selectedProductId={activeProductForOffer}
+              onOfferCodeChange={handleOfferCodeChange}
+            />
           </div>
         </div>
 

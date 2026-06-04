@@ -1,29 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiAuth } from "@/lib/utils/api-auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { sortProductsByName } from "@/lib/utils/hotmart-products";
 
 export async function GET(request: NextRequest) {
   const { error } = await validateApiAuth();
   if (error) return error;
 
   const accountId = request.nextUrl.searchParams.get("account_id");
-  if (!accountId) {
-    return NextResponse.json({ error: "account_id é obrigatório" }, { status: 400 });
+  const productId = request.nextUrl.searchParams.get("product_id");
+
+  if (!accountId || !productId) {
+    return NextResponse.json(
+      { error: "account_id e product_id são obrigatórios" },
+      { status: 400 }
+    );
   }
 
   const supabase = await createSupabaseServerClient();
 
   const { data, error: dbError } = await supabase
-    .from("dash_gestao_hotmart_products")
-    .select("product_id, product_name")
+    .from("dash_gestao_hotmart_offers")
+    .select("offer_code, offer_name, price, currency, is_main_offer")
     .eq("account_id", accountId)
+    .eq("product_id", productId)
     .eq("is_active", true)
-    .order("product_name", { ascending: true });
+    .order("is_main_offer", { ascending: false });
 
   if (dbError) {
     return NextResponse.json({ error: dbError.message }, { status: 500 });
   }
 
-  return NextResponse.json(sortProductsByName(data ?? []));
+  return NextResponse.json(data ?? []);
 }

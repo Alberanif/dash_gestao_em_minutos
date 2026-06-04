@@ -90,6 +90,12 @@ export default function DadosPage() {
   const [batchResult, setBatchResult] = useState<{ salesRecords: number } | null>(null);
   const [batchError, setBatchError] = useState<string | null>(null);
 
+  // Hotmart sync products state
+  const [syncProductsAccountId, setSyncProductsAccountId] = useState("");
+  const [syncProductsStatus, setSyncProductsStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [syncProductsResult, setSyncProductsResult] = useState<{ productsRecords: number; offersRecords: number } | null>(null);
+  const [syncProductsError, setSyncProductsError] = useState<string | null>(null);
+
   // Meta Ads batch collect state
   const [metaAccounts, setMetaAccounts] = useState<HotmartAccount[]>([]);
   const [metaBatchAccountId, setMetaBatchAccountId] = useState("");
@@ -154,9 +160,10 @@ export default function DadosPage() {
       .then((accs: HotmartAccount[]) => {
         setHotmartAccounts(Array.isArray(accs) ? accs : []);
         if (accs.length > 0 && !batchAccountId) setBatchAccountId(accs[0].id);
+        if (accs.length > 0 && !syncProductsAccountId) setSyncProductsAccountId(accs[0].id);
       })
       .catch(() => setHotmartAccounts([]));
-  }, [activeTab, batchAccountId]);
+  }, [activeTab, batchAccountId, syncProductsAccountId]);
 
   useEffect(() => {
     if (activeTab !== "meta-ads") return;
@@ -327,6 +334,31 @@ export default function DadosPage() {
     } catch {
       setIgBatchStatus("error");
       setIgBatchError("Falha na comunicação com o servidor");
+    }
+  }
+
+  async function handleSyncProducts() {
+    setSyncProductsStatus("loading");
+    setSyncProductsResult(null);
+    setSyncProductsError(null);
+    try {
+      const res = await fetch("/api/hotmart/sync-products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ account_id: syncProductsAccountId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setSyncProductsStatus("error");
+        setSyncProductsError(json.error ?? "Erro desconhecido");
+      } else {
+        setSyncProductsStatus("success");
+        setSyncProductsResult({ productsRecords: json.productsRecords, offersRecords: json.offersRecords });
+        await fetchLogs(activeTab);
+      }
+    } catch {
+      setSyncProductsStatus("error");
+      setSyncProductsError("Falha na comunicação com o servidor");
     }
   }
 
@@ -544,6 +576,45 @@ export default function DadosPage() {
               ) : null}
               {batchStatus === "error" && batchError ? (
                 <div className="mt-4"><StatusBadge tone="error" label={batchError} /></div>
+              ) : null}
+            </section>
+          ) : null}
+
+          {activeTab === "hotmart" ? (
+            <section className="surface-card p-5">
+              <div className="mb-4">
+                <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text)" }}>Sincronizar Produtos e Ofertas</h2>
+                <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+                  Atualiza o catálogo de produtos e ofertas direto da API Hotmart, incluindo produtos sem vendas.
+                </p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-[13px] font-medium" style={{ color: "var(--color-text-muted)" }}>Conta</label>
+                  <select value={syncProductsAccountId} onChange={(e) => setSyncProductsAccountId(e.target.value)} className="field-control">
+                    {hotmartAccounts.map((account) => (
+                      <option key={account.id} value={account.id}>{account.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={handleSyncProducts}
+                    disabled={!syncProductsAccountId || syncProductsStatus === "loading"}
+                    className="btn-primary w-full"
+                  >
+                    {syncProductsStatus === "loading" ? "Sincronizando..." : "Sincronizar Produtos"}
+                  </button>
+                </div>
+              </div>
+              {syncProductsStatus === "success" && syncProductsResult ? (
+                <div className="mt-4">
+                  <StatusBadge tone="success" label={`${syncProductsResult.productsRecords} produtos e ${syncProductsResult.offersRecords} ofertas sincronizados`} />
+                </div>
+              ) : null}
+              {syncProductsStatus === "error" && syncProductsError ? (
+                <div className="mt-4"><StatusBadge tone="error" label={syncProductsError} /></div>
               ) : null}
             </section>
           ) : null}

@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
   const endUtc = brtToUtc(end_date, true);
 
   const productIds = searchParams.getAll("product_ids[]").filter(Boolean);
+  const offerCode = searchParams.get("offer_code");
 
   const supabase = createSupabaseServiceClient();
 
@@ -54,6 +55,7 @@ export async function GET(request: NextRequest) {
     const { data: rpcData, error: rpcError } = await supabase.rpc("get_hotmart_metrics", {
       p_start_date: startUtc,
       p_end_date: endUtc,
+      ...(offerCode ? { p_offer_code: offerCode } : {}),
     });
 
     if (!rpcError && rpcData) {
@@ -73,6 +75,9 @@ export async function GET(request: NextRequest) {
       .lte("purchase_date", endUtc);
     if (productIds.length > 0) {
       query = query.in("product_id", productIds);
+    }
+    if (offerCode) {
+      query = query.eq("offer_code", offerCode);
     }
     return query;
   };
