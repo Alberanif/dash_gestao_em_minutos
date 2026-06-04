@@ -86,6 +86,13 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
     return () => document.removeEventListener("keydown", handleKey);
   }, [onCancel]);
 
+  // Reset the "already warned" flag whenever the user edits either source,
+  // so the two-step save protection fires correctly after subsequent changes.
+  useEffect(() => {
+    setPartialWarning("");
+    setPartialWarningShown(false);
+  }, [hotmartProducts, metaTerms]);
+
   const selectedIds = new Set(hotmartProducts.map((p) => p.product_id));
   const filteredOptions = productOptions.filter((p) => !selectedIds.has(p.product_id));
 
