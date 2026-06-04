@@ -1,4 +1,4 @@
-import { renderToStaticMarkup, renderToString } from "react-dom/server";
+import { renderToStaticMarkup } from "react-dom/server";
 import { HeroKpiCard } from "@/components/indicadores/hero-kpi-card";
 import { KpiCell } from "@/components/indicadores/kpi-cell";
 import { HorizontalFunnelFlow } from "@/components/indicadores/horizontal-funnel-flow";
@@ -7,6 +7,7 @@ import { FilterDropdownList } from "@/components/indicadores/filter-dropdown";
 import { IndicadoresEmptyState } from "@/components/indicadores/indicadores-empty-state";
 import { getPartialFilterWarning } from "@/components/indicadores/filter-modal";
 import { MetaAdsCard } from "@/components/indicadores/meta-ads-card";
+import { HotmartCard } from "@/components/indicadores/hotmart-card";
 import { NotConfiguredBadge } from "@/components/indicadores/not-configured-badge";
 import type { FunnelStage, ConversionRate } from "@/lib/utils/funnel-metrics";
 import type { FilterRecord } from "@/types/indicadores";
@@ -494,8 +495,6 @@ describe("NotConfiguredBadge", () => {
 
 // ── MetaAdsCard — chart visibility (#46) ─────────────────────────────────────
 
-import { HotmartCard } from "@/components/indicadores/hotmart-card";
-
 describe("MetaAdsCard — chart visibility", () => {
   it("does NOT render MetaAdsInvestimentoLeadsChart when hasMetaFilter is false", () => {
     const html = render(
@@ -528,15 +527,15 @@ const zeroedHotmart: { data: import("@/types/indicadores").GlobalHotmartMetrics;
 
 describe("HotmartCard — chart visibility", () => {
   it("does NOT render HotmartVendasChart when hasHotmartFilter is false", () => {
-    const html = renderToString(
-      React.createElement(HotmartCard, { hotmartState: zeroedHotmart, dailyState: emptyDaily, hasHotmartFilter: false })
+    const html = render(
+      <HotmartCard hotmartState={zeroedHotmart} dailyState={emptyDaily} hasHotmartFilter={false} />
     );
     expect(html).not.toContain('data-chart="hotmart"');
   });
 
   it("DOES render HotmartVendasChart when hasHotmartFilter is true", () => {
-    const html = renderToString(
-      React.createElement(HotmartCard, { hotmartState: zeroedHotmart, dailyState: emptyDaily, hasHotmartFilter: true })
+    const html = render(
+      <HotmartCard hotmartState={zeroedHotmart} dailyState={emptyDaily} hasHotmartFilter={true} />
     );
     expect(html).toContain('data-chart="hotmart"');
   });
