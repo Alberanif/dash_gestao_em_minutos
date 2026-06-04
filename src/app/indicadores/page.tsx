@@ -344,6 +344,12 @@ export default function IndicadoresPage() {
     setActivePreset(getActivePreset(startDate, v, today));
   }
 
+  // ── Derived source flags ──────────────────────────────────────────────────
+
+  const { hasMetaFilter, hasHotmartFilter } = activeFilter
+    ? deriveSourceFlags(activeFilter)
+    : { hasMetaFilter: false, hasHotmartFilter: false };
+
   // ── Derived data for Z-1 and Z-2 ──────────────────────────────────────────
 
   const metaData = metaState.data;
