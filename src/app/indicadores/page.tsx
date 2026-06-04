@@ -495,7 +495,7 @@ export default function IndicadoresPage() {
                   metaSpend={hasMetaFilter ? (metaData?.meta_spend ?? null) : null}
                   metaCpl={hasMetaFilter ? (metaData?.meta_cpl_traffic ?? null) : null}
                   metaCpm={hasMetaFilter ? (metaData?.meta_cpm ?? null) : null}
-                  metaConvRate={hasMetaFilter ? convRate : null}
+                  metaConvRate={convRate}
                   cpa={cpa}
                 />
               </div>

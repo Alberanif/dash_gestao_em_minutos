@@ -1,4 +1,6 @@
 import { calcROAS, calcCPA, calcConversionRate } from "../utils/cross-metrics";
+import { calcFunnelStages } from "../utils/funnel-metrics";
+import type { GlobalMetrics, GlobalHotmartMetrics } from "@/types/indicadores";
 
 // ── Guard-layer helpers (mirrors the inline guard logic used in page.tsx) ────
 // These helpers simulate the source-flag guard:
@@ -165,5 +167,46 @@ describe("ConversionRate with source-flag guard", () => {
 
   it("returns calculated value when both sources are configured", () => {
     expect(guardedConvRate(true, true, 50, 10)).toBeCloseTo(20, 5);
+  });
+});
+
+// ── calcFunnelStages — source guard ─────────────────────────────────────────
+// Verifies that the funnel section is suppressed when either source is absent.
+
+const metaData: GlobalMetrics = {
+  meta_spend: 1000,
+  meta_cpm: 10,
+  meta_ctr: 2,
+  meta_leads: 50,
+  meta_checkout: 5,
+  meta_impressions: 100000,
+  meta_link_clicks: 2000,
+  meta_page_views: 1500,
+  meta_connect_rate: null,
+  meta_lp_conversion: null,
+  meta_cpl_traffic: null,
+};
+
+const hotmartData: GlobalHotmartMetrics = {
+  products: [],
+  total_sales: 10,
+  total_sales_brl: 10,
+  total_sales_foreign: 0,
+  total_revenue: 5000,
+};
+
+describe("calcFunnelStages — source guard", () => {
+  it("returns null when hasMetaFilter=false (Meta not configured)", () => {
+    // Guard: Meta not configured → pass null instead of stale/zeroed metaData
+    expect(calcFunnelStages(null, hotmartData)).toBeNull();
+  });
+
+  it("returns null when hasHotmartFilter=false (Hotmart not configured)", () => {
+    // Guard: Hotmart not configured → pass null instead of stale/zeroed hotmartData
+    expect(calcFunnelStages(metaData, null)).toBeNull();
+  });
+
+  it("returns non-null when both sources are configured", () => {
+    expect(calcFunnelStages(metaData, hotmartData)).not.toBeNull();
   });
 });
