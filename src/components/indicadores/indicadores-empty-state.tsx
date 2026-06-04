@@ -1,3 +1,5 @@
+"use client";
+
 interface IndicadoresEmptyStateProps {
   onOpenFilter: () => void;
 }

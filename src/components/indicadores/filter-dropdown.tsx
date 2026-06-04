@@ -3,6 +3,15 @@
 import { useState, useRef, useEffect } from "react";
 import type { FilterRecord } from "@/types/indicadores";
 
+interface FilterDropdownListProps {
+  filters: FilterRecord[];
+  activeFilter: FilterRecord | null;
+  onSelect: (filter: FilterRecord) => void;
+  onNew: () => void;
+  onEdit: (filter: FilterRecord) => void;
+  onDelete: (filter: FilterRecord) => void;
+}
+
 interface FilterDropdownProps {
   filters: FilterRecord[];
   activeFilter: FilterRecord | null;
@@ -20,7 +29,7 @@ export function FilterDropdownList({
   onNew,
   onEdit,
   onDelete,
-}: FilterDropdownProps) {
+}: FilterDropdownListProps) {
   return (
     <div
       style={{
