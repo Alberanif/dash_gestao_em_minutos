@@ -355,20 +355,26 @@ export default function IndicadoresPage() {
   const metaData = metaState.data;
   const hotmartData = hotmartState.data;
 
+  // Guard metric inputs by source flags: when a source is not configured, pass
+  // null instead of the zeroed placeholder so cross-source metrics display '--'
+  // rather than 0, Infinity, or any other misleading value.
   const roas = calcROAS({
-    metaSpend: metaData?.meta_spend ?? null,
-    hotmartTotalRevenue: hotmartData?.total_revenue ?? null,
+    metaSpend: hasMetaFilter ? (metaData?.meta_spend ?? null) : null,
+    hotmartTotalRevenue: hasHotmartFilter ? (hotmartData?.total_revenue ?? null) : null,
   });
   const cpa = calcCPA({
-    metaSpend: metaData?.meta_spend ?? null,
-    hotmartTotalSales: hotmartData?.total_sales ?? null,
+    metaSpend: hasMetaFilter ? (metaData?.meta_spend ?? null) : null,
+    hotmartTotalSales: hasHotmartFilter ? (hotmartData?.total_sales ?? null) : null,
   });
   const convRate = calcConversionRate({
-    metaLeads: metaData?.meta_leads ?? null,
-    hotmartTotalSales: hotmartData?.total_sales ?? null,
+    metaLeads: hasMetaFilter ? (metaData?.meta_leads ?? null) : null,
+    hotmartTotalSales: hasHotmartFilter ? (hotmartData?.total_sales ?? null) : null,
   });
 
-  const funnelStages = calcFunnelStages(metaData, hotmartData);
+  const funnelStages = calcFunnelStages(
+    hasMetaFilter ? metaData : null,
+    hasHotmartFilter ? hotmartData : null,
+  );
   const funnelRates = funnelStages ? calcConversionRates(funnelStages) : null;
 
   const heroLoading = metaState.loading || hotmartState.loading;
@@ -486,10 +492,10 @@ export default function IndicadoresPage() {
                 <HorizontalFunnelFlow
                   stages={funnelStages}
                   rates={funnelRates}
-                  metaSpend={metaData?.meta_spend ?? null}
-                  metaCpl={metaData?.meta_cpl_traffic ?? null}
-                  metaCpm={metaData?.meta_cpm ?? null}
-                  metaConvRate={convRate}
+                  metaSpend={hasMetaFilter ? (metaData?.meta_spend ?? null) : null}
+                  metaCpl={hasMetaFilter ? (metaData?.meta_cpl_traffic ?? null) : null}
+                  metaCpm={hasMetaFilter ? (metaData?.meta_cpm ?? null) : null}
+                  metaConvRate={hasMetaFilter ? convRate : null}
                   cpa={cpa}
                 />
               </div>

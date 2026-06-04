@@ -1,5 +1,46 @@
 import { calcROAS, calcCPA, calcConversionRate } from "../utils/cross-metrics";
 
+// ── Guard-layer helpers (mirrors the inline guard logic used in page.tsx) ────
+// These helpers simulate the source-flag guard:
+//   hasMetaFilter ? (value ?? null) : null
+// They verify the expected contract before the guard is applied in page.tsx.
+
+function guardedROAS(
+  hasMetaFilter: boolean,
+  hasHotmartFilter: boolean,
+  metaSpend: number | null,
+  hotmartRevenue: number | null,
+): ReturnType<typeof calcROAS> {
+  return calcROAS({
+    metaSpend: hasMetaFilter ? metaSpend : null,
+    hotmartTotalRevenue: hasHotmartFilter ? hotmartRevenue : null,
+  });
+}
+
+function guardedCPA(
+  hasMetaFilter: boolean,
+  hasHotmartFilter: boolean,
+  metaSpend: number | null,
+  hotmartSales: number | null,
+): ReturnType<typeof calcCPA> {
+  return calcCPA({
+    metaSpend: hasMetaFilter ? metaSpend : null,
+    hotmartTotalSales: hasHotmartFilter ? hotmartSales : null,
+  });
+}
+
+function guardedConvRate(
+  hasMetaFilter: boolean,
+  hasHotmartFilter: boolean,
+  metaLeads: number | null,
+  hotmartSales: number | null,
+): ReturnType<typeof calcConversionRate> {
+  return calcConversionRate({
+    metaLeads: hasMetaFilter ? metaLeads : null,
+    hotmartTotalSales: hasHotmartFilter ? hotmartSales : null,
+  });
+}
+
 describe("calcROAS()", () => {
   it("returns null when metaSpend is 0", () => {
     expect(calcROAS({ metaSpend: 0, hotmartTotalRevenue: 5000 })).toBeNull();
@@ -68,5 +109,61 @@ describe("calcConversionRate()", () => {
   it("calculates conversion rate as (sales / leads) × 100", () => {
     // 10 sales from 50 leads = 20%
     expect(calcConversionRate({ metaLeads: 50, hotmartTotalSales: 10 })).toBeCloseTo(20, 5);
+  });
+});
+
+// ── Source-flag guards (page.tsx contract) ───────────────────────────────────
+// These tests verify that when a source flag is false, the guarded wrappers
+// return null regardless of the data values. This is the contract that the
+// guard logic in page.tsx must satisfy.
+
+describe("ROAS with source-flag guard", () => {
+  it("returns null when hasMetaFilter is false (only Hotmart configured)", () => {
+    // Meta not configured → meta_spend comes in as 0 (ZEROED_META)
+    // The guard must pass null instead of 0 to avoid Infinity or wrong results
+    expect(guardedROAS(false, true, 0, 5000)).toBeNull();
+  });
+
+  it("returns null when hasHotmartFilter is false (only Meta configured)", () => {
+    // Hotmart not configured → total_revenue comes in as 0 (ZEROED_HOTMART)
+    expect(guardedROAS(true, false, 1000, 0)).toBeNull();
+  });
+
+  it("returns calculated value when both sources are configured", () => {
+    expect(guardedROAS(true, true, 1000, 5000)).toBeCloseTo(5, 5);
+  });
+
+  it("returns null when both sources are unconfigured", () => {
+    expect(guardedROAS(false, false, 0, 0)).toBeNull();
+  });
+});
+
+describe("CPA with source-flag guard", () => {
+  it("returns null when hasMetaFilter is false", () => {
+    expect(guardedCPA(false, true, 0, 10)).toBeNull();
+  });
+
+  it("returns null when hasHotmartFilter is false", () => {
+    expect(guardedCPA(true, false, 1000, 0)).toBeNull();
+  });
+
+  it("returns calculated value when both sources are configured", () => {
+    expect(guardedCPA(true, true, 1000, 10)).toBeCloseTo(100, 5);
+  });
+});
+
+describe("ConversionRate with source-flag guard", () => {
+  it("returns null when hasMetaFilter is false", () => {
+    expect(guardedConvRate(false, true, 0, 10)).toBeNull();
+  });
+
+  it("returns null when hasHotmartFilter is false and hotmart sales > 0 would otherwise produce a result", () => {
+    // Without the guard: calcConversionRate({ metaLeads: 50, hotmartTotalSales: 0 }) = 0
+    // With guard, hotmart not configured → hotmartSales becomes null → returns null
+    expect(guardedConvRate(true, false, 50, 0)).toBeNull();
+  });
+
+  it("returns calculated value when both sources are configured", () => {
+    expect(guardedConvRate(true, true, 50, 10)).toBeCloseTo(20, 5);
   });
 });
