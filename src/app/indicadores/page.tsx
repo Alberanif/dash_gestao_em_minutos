@@ -260,6 +260,7 @@ export default function IndicadoresPage() {
   }, []);
 
   useEffect(() => {
+    if (!activeFilter) return;
     fetchAll(startDate, endDate, activeFilter, activeOfferCode);
   }, [startDate, endDate, activeFilter, activeOfferCode, fetchAll]);
 

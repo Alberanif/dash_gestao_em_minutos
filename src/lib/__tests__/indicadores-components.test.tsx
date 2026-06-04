@@ -299,6 +299,29 @@ describe("LeadsSection", () => {
   });
 });
 
+const noop = () => {};
+
+// ── IndicadoresEmptyState ─────────────────────────────────────────────────────
+
+describe("IndicadoresEmptyState", () => {
+  it("renders orientative message guiding user to select a filter", () => {
+    const html = render(IndicadoresEmptyState({ onOpenFilter: noop }));
+    expect(html).toContain("Nenhum filtro selecionado");
+    expect(html).toContain("Selecione ou crie um filtro");
+  });
+
+  it("renders a call-to-action button with actionable text", () => {
+    const html = render(IndicadoresEmptyState({ onOpenFilter: noop }));
+    expect(html).toContain("Criar ou selecionar filtro");
+  });
+
+  it("renders the filter icon SVG inside the button area", () => {
+    const html = render(IndicadoresEmptyState({ onOpenFilter: noop }));
+    // The component renders a plus-sign SVG inside the button
+    expect(html).toContain("svg");
+  });
+});
+
 // ── FilterDropdownList ────────────────────────────────────────────────────────
 
 const sampleFilters: FilterRecord[] = [
@@ -312,8 +335,6 @@ const sampleFilters: FilterRecord[] = [
     updated_at: "2024-01-01T00:00:00Z",
   },
 ];
-
-const noop = () => {};
 
 describe("FilterDropdownList", () => {
   it("does not render 'Sem filtro' option", () => {
