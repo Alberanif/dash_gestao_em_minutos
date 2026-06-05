@@ -63,18 +63,14 @@ async function metaGetAllPages<T>(
   accessToken: string
 ): Promise<T[]> {
   const all: T[] = [];
-  let nextUrl: string | null = null;
 
-  const first = await metaGet(endpoint, params, accessToken);
+  const first = await metaGet(endpoint, { ...params, limit: META_API_PAGE_LIMIT }, accessToken);
   all.push(...(first.data ?? []));
-  nextUrl = first.paging?.next ?? null;
+  let nextUrl: string | null = first.paging?.next ?? null;
 
   while (nextUrl) {
-    const res = await fetch(nextUrl);
-    if (!res.ok) {
-      throw new Error(`Meta Ads API error (pagination): ${res.status} ${await res.text()}`);
-    }
-    const page = await res.json();
+    await sleep(PAGE_DELAY_MS);
+    const page = await fetchWithRetry(nextUrl, "Meta Ads API error (pagination)");
     all.push(...(page.data ?? []));
     nextUrl = page.paging?.next ?? null;
   }
