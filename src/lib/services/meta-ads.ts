@@ -148,7 +148,7 @@ export async function collectMetaAds(
       .limit(1)
       .single();
 
-    since = lastDailyRow?.date ? subtractDays(lastDailyRow.date, 3) : subtractDays(todayStr, 30);
+    since = lastDailyRow?.date ? subtractDays(lastDailyRow.date, 3) : subtractDays(todayStr, INITIAL_FETCH_DAYS);
     until = todayStr;
 
     // Campaign daily: ceiling at D-1 — today's data is partial and unreliable
@@ -162,7 +162,7 @@ export async function collectMetaAds(
 
     campaignSince = lastCampaignRow?.date
       ? subtractDays(lastCampaignRow.date, 3)
-      : subtractDays(yesterdayStr, 30);
+      : subtractDays(yesterdayStr, INITIAL_FETCH_DAYS);
     campaignUntil = yesterdayStr;
   }
 
