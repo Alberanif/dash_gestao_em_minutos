@@ -54,11 +54,7 @@ async function metaGet(endpoint: string, params: Record<string, string>, accessT
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value);
   }
-  const res = await fetch(url.toString());
-  if (!res.ok) {
-    throw new Error(`Meta Ads API error: ${res.status} ${await res.text()}`);
-  }
-  return res.json();
+  return fetchWithRetry(url.toString(), "Meta Ads API error");
 }
 
 async function metaGetAllPages<T>(
