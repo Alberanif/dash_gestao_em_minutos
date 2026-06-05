@@ -4,6 +4,42 @@ import { extractPurchases, extractCheckout } from "@/lib/utils/meta-ads-events";
 
 const META_API_BASE = "https://graph.facebook.com/v21.0";
 const META_API_CAMPAIGNS_LIMIT = "100";
+const META_API_PAGE_LIMIT = "500"; // Max rows/page permitido pela Insights API
+const INITIAL_FETCH_DAYS = 14; // Janela inicial conservadora (era 30)
+const PAGE_DELAY_MS = 500; // Delay entre requests paginados
+const RETRY_DELAYS_MS = [30_000, 60_000, 120_000]; // Backoff: 30s, 60s, 120s
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isTransientMetaError(status: number, body: string): boolean {
+  if (status !== 403 && status !== 429) return false;
+  try {
+    return JSON.parse(body)?.error?.is_transient === true;
+  } catch {
+    return false;
+  }
+}
+
+async function fetchWithRetry(url: string, label: string): Promise<any> { // eslint-disable-line @typescript-eslint/no-explicit-any
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    const res = await fetch(url);
+    if (res.ok) return res.json();
+
+    const text = await res.text();
+    const isLast = attempt >= RETRY_DELAYS_MS.length;
+
+    if (!isLast && isTransientMetaError(res.status, text)) {
+      await sleep(RETRY_DELAYS_MS[attempt]);
+      continue;
+    }
+
+    throw new Error(`${label}: ${res.status} ${text}`);
+  }
+  // Unreachable mas necessário para o compilador TS
+  throw new Error(`${label}: max retries exceeded`);
+}
 
 const CONVERSION_ACTION_TYPES = new Set([
   "purchase",
