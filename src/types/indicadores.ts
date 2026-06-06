@@ -31,6 +31,7 @@ export interface GlobalHotmartMetrics {
 export interface GlobalLeadsMetrics {
   total: number;
   by_event: Array<{ evento: string; count: number }>;
+  by_source: Array<{ source: string; count: number }>;
 }
 
 export interface FilterRecord {

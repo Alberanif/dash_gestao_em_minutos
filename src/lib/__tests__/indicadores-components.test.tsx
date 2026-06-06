@@ -287,6 +287,7 @@ describe("LeadsSection", () => {
   const leadsData = {
     total: 100,
     by_event: [{ evento: "evento-xyz", count: 50 }],
+    by_source: [{ source: "organic_IG_Bio", count: 80 }],
   };
   const loaded = { data: leadsData, loading: false, error: false };
   const loadedDaily = { data: [], loading: false, error: false };

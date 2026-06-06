@@ -246,7 +246,7 @@ export default function IndicadoresPage() {
       ? deriveSourceFlags(filter)
       : { hasMetaFilter: false, hasHotmartFilter: false, hasLeadsFilter: false };
 
-    const ZEROED_LEADS: GlobalLeadsMetrics = { total: 0, by_event: [] };
+    const ZEROED_LEADS: GlobalLeadsMetrics = { total: 0, by_event: [], by_source: [] };
 
     // Immediately zero out states for unconfigured sources (no loading spinner)
     setMetaState(hasMetaFilter ? initialSection() : { data: ZEROED_META, loading: false, error: false });

@@ -172,10 +172,12 @@ export function LeadsSection({ leadsState, dailyState }: LeadsSectionProps) {
           </span>
         </div>
 
-        <LeadsCaptacoesChart
-          data={dailyState.data ?? []}
-          loading={dailyState.loading}
-        />
+        <div>
+          <LeadsCaptacoesChart
+            data={dailyState.data ?? []}
+            loading={dailyState.loading}
+          />
+        </div>
 
         {d.by_event.length > 0 && (
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -243,6 +245,91 @@ export function LeadsSection({ leadsState, dailyState }: LeadsSectionProps) {
             </tbody>
           </table>
         )}
+      </div>
+
+      {d.by_source.length > 0 && (
+        <SourcesChart sources={d.by_source} />
+      )}
+    </div>
+  );
+}
+
+function SourcesChart({ sources }: { sources: Array<{ source: string; count: number }> }) {
+  const max = sources[0]?.count ?? 1;
+
+  return (
+    <div
+      style={{
+        borderTop: "1px solid var(--border-vis)",
+        padding: "16px 20px 20px",
+      }}
+    >
+      <span
+        style={{
+          fontSize: 9,
+          fontWeight: 600,
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+          color: "var(--text-3)",
+          display: "block",
+          marginBottom: 14,
+        }}
+      >
+        Fontes (utm_source)
+      </span>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {sources.map((row) => (
+          <div key={row.source} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: 11,
+                color: "var(--text-2)",
+                width: 200,
+                flexShrink: 0,
+                textAlign: "right",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {row.source}
+            </span>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+              <div
+                style={{
+                  flex: 1,
+                  height: 20,
+                  background: "var(--surface-2)",
+                  borderRadius: 3,
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    width: `${(row.count / max) * 100}%`,
+                    height: "100%",
+                    background: "var(--cyan)",
+                    borderRadius: 3,
+                  }}
+                />
+              </div>
+              <span
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "var(--text)",
+                  width: 48,
+                  flexShrink: 0,
+                  textAlign: "right",
+                }}
+              >
+                {fmtNum(row.count)}
+              </span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
