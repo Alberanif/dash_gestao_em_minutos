@@ -16,6 +16,12 @@ import { LeadsSection } from "@/components/indicadores/leads-section";
 import { FilterDropdown } from "@/components/indicadores/filter-dropdown";
 import { FilterModal } from "@/components/indicadores/filter-modal";
 import { IndicadoresEmptyState } from "@/components/indicadores/indicadores-empty-state";
+import { useAgentChat } from "@/hooks/use-agent-chat";
+import type { DashboardContext } from "@/hooks/use-agent-chat";
+import { AgentFAB } from "@/components/agent/AgentFAB";
+import { AgentDrawer } from "@/components/agent/AgentDrawer";
+import { ChatMessageList } from "@/components/agent/ChatMessageList";
+import { ChatInput } from "@/components/agent/ChatInput";
 
 const LS_FILTER_ID = "indicadores_active_filter_id";
 
@@ -196,6 +202,9 @@ export default function IndicadoresPage() {
   const [endDate, setEndDate] = useState(defaultDates.endDate);
   const [activePreset, setActivePreset] = useState<PresetKey | null>("28d");
 
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const { messages, isStreaming, sendMessage, clearHistory } = useAgentChat();
+
   const [metaState, setMetaState] = useState<SectionState<GlobalMetrics>>(initialSection());
   const [hotmartState, setHotmartState] = useState<SectionState<GlobalHotmartMetrics>>(initialSection());
   const [leadsState, setLeadsState] = useState<SectionState<GlobalLeadsMetrics>>(initialSection());
@@ -357,6 +366,24 @@ export default function IndicadoresPage() {
   function handleEndDate(v: string) {
     setEndDate(v);
     setActivePreset(getActivePreset(startDate, v, today));
+  }
+
+  function handleCloseDrawer() {
+    setDrawerOpen(false);
+    clearHistory();
+  }
+
+  function handleSend(text: string) {
+    const ctx: DashboardContext = {
+      activeFilter,
+      startDate,
+      endDate,
+      activePreset,
+      metaData: metaState.data,
+      hotmartData: hotmartState.data,
+      leadsData: leadsState.data,
+    };
+    sendMessage(text, ctx);
   }
 
   // ── Derived source flags ──────────────────────────────────────────────────
@@ -547,6 +574,13 @@ export default function IndicadoresPage() {
 
         </div>
       )}
+
+      {/* Agent FAB + Drawer — position: fixed, fora do fluxo do layout */}
+      <AgentFAB onClick={() => setDrawerOpen(true)} />
+      <AgentDrawer isOpen={drawerOpen} onClose={handleCloseDrawer}>
+        <ChatMessageList messages={messages} />
+        <ChatInput onSend={handleSend} isStreaming={isStreaming} />
+      </AgentDrawer>
     </div>
   );
 }
