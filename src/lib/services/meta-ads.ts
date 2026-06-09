@@ -13,10 +13,20 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Subcodes que o Meta às vezes marca is_transient=false mas que são sabidamente temporários
+const KNOWN_TRANSIENT_SUBCODES = new Set([1504044]);
+
 function isTransientMetaError(status: number, body: string): boolean {
-  if (status !== 403 && status !== 429) return false;
+  if (status !== 400 && status !== 403 && status !== 429 && status !== 500) return false;
   try {
-    return JSON.parse(body)?.error?.is_transient === true;
+    const err = JSON.parse(body)?.error;
+    if (status === 500) {
+      // Meta code 1 = generic server error; subcode 99 = "temporary downtime, retry"
+      return err?.code === 1;
+    }
+    if (err?.is_transient === true) return true;
+    // Subcodes conhecidos como transientes apesar do flag is_transient=false
+    return KNOWN_TRANSIENT_SUBCODES.has(err?.error_subcode);
   } catch {
     return false;
   }
@@ -167,19 +177,7 @@ export async function collectMetaAds(
   }
 
   // 1. Métricas diárias a nível de conta
-  const insightsResponse = await metaGet(
-    `${ad_account_id}/insights`,
-    {
-      fields: "spend,impressions,reach,clicks,ctr,cpc,cpm,actions,action_values",
-      level: "account",
-      time_increment: "1",
-      since,
-      until,
-    },
-    access_token
-  );
-
-  const dailyRows = (insightsResponse.data || []).map((row: {
+  const accountRows = await metaGetAllPages<{
     date_start: string;
     spend?: string;
     impressions?: string;
@@ -190,7 +188,18 @@ export async function collectMetaAds(
     cpm?: string;
     actions?: Array<{ action_type: string; value: string }>;
     action_values?: Array<{ action_type: string; value: string }>;
-  }) => {
+  }>(
+    `${ad_account_id}/insights`,
+    {
+      fields: "spend,impressions,reach,clicks,ctr,cpc,cpm,actions,action_values",
+      level: "account",
+      time_increment: "1",
+      time_range: JSON.stringify({ since, until }),
+    },
+    access_token
+  );
+
+  const dailyRows = accountRows.map((row) => {
     const { conversions, conversion_value } = extractConversions(row.actions, row.action_values);
     return {
       account_id: account.id,
@@ -240,8 +249,7 @@ export async function collectMetaAds(
       fields: "campaign_id,campaign_name,spend,impressions,reach,clicks,ctr,cpm,inline_link_clicks,inline_link_click_ctr,outbound_clicks,outbound_clicks_ctr,actions,action_values",
       level: "campaign",
       time_increment: "1",
-      since: campaignSince,
-      until: campaignUntil,
+      time_range: JSON.stringify({ since: campaignSince, until: campaignUntil }),
     },
     access_token
   );

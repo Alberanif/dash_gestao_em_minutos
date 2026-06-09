@@ -47,6 +47,32 @@ function make403Response(isTransient: boolean): Response {
   } as unknown as Response;
 }
 
+function make500Response(code: number): Response {
+  const body = JSON.stringify({ error: { code, message: "An unknown error occurred", error_subcode: 99 } });
+  return {
+    ok: false,
+    status: 500,
+    text: () => Promise.resolve(body),
+  } as unknown as Response;
+}
+
+function make400SubcodeResponse(error_subcode: number, is_transient = false): Response {
+  const body = JSON.stringify({
+    error: {
+      message: "Service temporarily unavailable",
+      type: "OAuthException",
+      is_transient,
+      code: 2,
+      error_subcode,
+    },
+  });
+  return {
+    ok: false,
+    status: 400,
+    text: () => Promise.resolve(body),
+  } as unknown as Response;
+}
+
 describe("collectMetaAdsCampaignsList", () => {
   let mockFetch: jest.Mock;
 
@@ -113,6 +139,64 @@ describe("collectMetaAdsCampaignsList", () => {
     const p = collectMetaAdsCampaignsList(testAccount);
     const settled = p.catch((e: Error) => e);
     // Advance page-delay timer so the pagination fetch can happen
+    await jest.runAllTimersAsync();
+    const err = await settled;
+
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toContain("Meta Ads API error (pagination)");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("Test 5a: retry on 400 subcode=1504044 (is_transient=false mas sabidamente temporário) succeeds", async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeFetchResponse([], "https://graph.facebook.com/page2"))
+      .mockResolvedValueOnce(make400SubcodeResponse(1504044, false))
+      .mockResolvedValueOnce(makeFetchResponse([campaignData]));
+
+    const p = collectMetaAdsCampaignsList(testAccount);
+    await jest.runAllTimersAsync();
+    const result = await p;
+
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(result.campaignsCollected).toBe(1);
+  });
+
+  it("Test 5b: 400 com subcode desconhecido não é retried", async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeFetchResponse([], "https://graph.facebook.com/page2"))
+      .mockResolvedValueOnce(make400SubcodeResponse(9999999, false));
+
+    const p = collectMetaAdsCampaignsList(testAccount);
+    const settled = p.catch((e: Error) => e);
+    await jest.runAllTimersAsync();
+    const err = await settled;
+
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toContain("Meta Ads API error (pagination)");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("Test 5c: retry on 500 code=1 (Meta unknown error) succeeds", async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeFetchResponse([], "https://graph.facebook.com/page2"))
+      .mockResolvedValueOnce(make500Response(1))
+      .mockResolvedValueOnce(makeFetchResponse([campaignData]));
+
+    const p = collectMetaAdsCampaignsList(testAccount);
+    await jest.runAllTimersAsync();
+    const result = await p;
+
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(result.campaignsCollected).toBe(1);
+  });
+
+  it("Test 5b: 500 with non-transient code throws immediately", async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeFetchResponse([], "https://graph.facebook.com/page2"))
+      .mockResolvedValueOnce(make500Response(2)); // code 2 = not retried
+
+    const p = collectMetaAdsCampaignsList(testAccount);
+    const settled = p.catch((e: Error) => e);
     await jest.runAllTimersAsync();
     const err = await settled;
 
