@@ -81,24 +81,13 @@ async function getOrganicLeadsCount(
   dataInicio: string,
   dataFim: string
 ) {
-  const baseQuery = (utmContent: string) =>
-    supabase
-      .from("dash_gestao_captacao_leads")
-      .select("*", { count: "exact", head: true })
-      .gte("data_cadastro", dataInicio)
-      .lte("data_cadastro", `${dataFim}T23:59:59`)
-      .eq("utm_content", utmContent)
-      .in("evento", events);
-
-  const [orgResult, unknownResult] = await Promise.all([
-    baseQuery("ORG"),
-    baseQuery(""),
-  ]);
-
-  if (orgResult.error) throw new Error(orgResult.error.message);
-  if (unknownResult.error) throw new Error(unknownResult.error.message);
-
-  return (orgResult.count ?? 0) + (unknownResult.count ?? 0);
+  const { data, error } = await supabase.rpc("dash_gestao_organic_leads_unique_count", {
+    p_start_date: `${dataInicio}T00:00:00`,
+    p_end_date: `${dataFim}T23:59:59`,
+    p_eventos: events,
+  });
+  if (error) throw new Error(error.message);
+  return Number(data ?? 0);
 }
 
 export async function calculateAdsComercialMetrics(
