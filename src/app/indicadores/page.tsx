@@ -6,13 +6,14 @@ import Link from "next/link";
 import { calcPresetDates, getActivePreset, type PresetKey } from "@/lib/utils/period-presets";
 import { calcROAS, calcCPA, calcConversionRate } from "@/lib/utils/cross-metrics";
 import { calcFunnelStages, calcConversionRates } from "@/lib/utils/funnel-metrics";
-import type { GlobalMetrics, GlobalHotmartMetrics, GlobalLeadsMetrics, DailyPoint, FilterRecord } from "@/types/indicadores";
+import type { GlobalMetrics, GlobalHotmartMetrics, GlobalLeadsMetrics, DailyPoint, FilterRecord, ConversionSourceRow } from "@/types/indicadores";
 import { deriveSourceFlags } from "./source-flags";
 import { HeroKpiCard } from "@/components/indicadores/hero-kpi-card";
 import { HorizontalFunnelFlow } from "@/components/indicadores/horizontal-funnel-flow";
 import { MetaAdsCard } from "@/components/indicadores/meta-ads-card";
 import { HotmartCard } from "@/components/indicadores/hotmart-card";
 import { LeadsSection } from "@/components/indicadores/leads-section";
+import { ConversionSourcesCard } from "@/components/indicadores/conversion-sources-card";
 import { FilterDropdown } from "@/components/indicadores/filter-dropdown";
 import { FilterModal } from "@/components/indicadores/filter-modal";
 import { IndicadoresEmptyState } from "@/components/indicadores/indicadores-empty-state";
@@ -209,6 +210,7 @@ export default function IndicadoresPage() {
   const [hotmartState, setHotmartState] = useState<SectionState<GlobalHotmartMetrics>>(initialSection());
   const [leadsState, setLeadsState] = useState<SectionState<GlobalLeadsMetrics>>(initialSection());
   const [dailyState, setDailyState] = useState<SectionState<DailyPoint[]>>(initialSection());
+  const [conversionSourcesState, setConversionSourcesState] = useState<SectionState<ConversionSourceRow[]>>(initialSection());
 
   const [accountId, setAccountId] = useState<string>("");
   const [filters, setFilters] = useState<FilterRecord[]>([]);
@@ -257,10 +259,13 @@ export default function IndicadoresPage() {
 
     const ZEROED_LEADS: GlobalLeadsMetrics = { total: 0, by_event: [], by_source: [] };
 
+    const ZEROED_SOURCES: ConversionSourceRow[] = [];
+
     // Immediately zero out states for unconfigured sources (no loading spinner)
     setMetaState(hasMetaFilter ? initialSection() : { data: ZEROED_META, loading: false, error: false });
     setHotmartState(hasHotmartFilter ? initialSection() : { data: ZEROED_HOTMART, loading: false, error: false });
     setLeadsState(hasLeadsFilter ? initialSection() : { data: ZEROED_LEADS, loading: false, error: false });
+    setConversionSourcesState(hasHotmartFilter ? initialSection() : { data: ZEROED_SOURCES, loading: false, error: false });
     setDailyState(initialSection());
 
     let params = `?start_date=${start}&end_date=${end}`;
@@ -284,7 +289,7 @@ export default function IndicadoresPage() {
       return r.json();
     };
 
-    const [leadsRes, dailyRes, metaRes, hotmartRes] = await Promise.allSettled([
+    const [leadsRes, dailyRes, metaRes, hotmartRes, sourcesRes] = await Promise.allSettled([
       hasLeadsFilter
         ? fetch(`/api/indicadores/leads${leadsParams}`).then(jsonOrThrow)
         : Promise.resolve(null),
@@ -294,6 +299,9 @@ export default function IndicadoresPage() {
         : Promise.resolve(null),
       hasHotmartFilter
         ? fetch(`/api/indicadores/hotmart${params}`).then(jsonOrThrow)
+        : Promise.resolve(null),
+      hasHotmartFilter
+        ? fetch(`/api/indicadores/conversion-sources${params}`).then(jsonOrThrow)
         : Promise.resolve(null),
     ]);
 
@@ -316,6 +324,11 @@ export default function IndicadoresPage() {
       data: hotmartRes.status === "fulfilled" && hotmartRes.value !== null ? hotmartRes.value : ZEROED_HOTMART,
       loading: false,
       error: hotmartRes.status === "rejected",
+    });
+    setConversionSourcesState({
+      data: sourcesRes.status === "fulfilled" && sourcesRes.value !== null ? sourcesRes.value : ZEROED_SOURCES,
+      loading: false,
+      error: sourcesRes.status === "rejected",
     });
   }, []);
 
@@ -559,6 +572,13 @@ export default function IndicadoresPage() {
               />
             </div>
           </div>
+
+          {/* Origens de Conversão — full width, abaixo de Plataformas */}
+          {hasHotmartFilter && (
+            <div className="z-row">
+              <ConversionSourcesCard state={conversionSourcesState} />
+            </div>
+          )}
 
           {/* Z-4: Captação de Leads — full width */}
           <div>

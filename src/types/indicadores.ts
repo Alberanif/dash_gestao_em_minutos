@@ -45,6 +45,11 @@ export interface FilterRecord {
   updated_at: string;
 }
 
+export interface ConversionSourceRow {
+  source: string;
+  count: number;
+}
+
 export interface DailyPoint {
   date: string;
   meta_spend: number;
