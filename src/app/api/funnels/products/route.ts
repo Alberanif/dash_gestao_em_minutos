@@ -10,8 +10,9 @@ export async function GET(request: NextRequest) {
   const supabase = createSupabaseServiceClient();
 
   let query = supabase
-    .from("dash_gestao_hotmart_sales")
+    .from("dash_gestao_hotmart_products")
     .select("product_id, product_name")
+    .eq("is_active", true)
     .order("product_name", { ascending: true })
     .limit(100);
 
@@ -27,13 +28,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: dbError.message }, { status: 500 });
   }
 
-  // Deduplicar por product_id
-  const seen = new Set<string>();
-  const unique = (data ?? []).filter((row) => {
-    if (seen.has(row.product_id)) return false;
-    seen.add(row.product_id);
-    return true;
-  });
-
-  return NextResponse.json(unique);
+  return NextResponse.json(data ?? []);
 }
