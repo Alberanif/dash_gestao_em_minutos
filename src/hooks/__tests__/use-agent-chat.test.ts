@@ -13,8 +13,10 @@ import { TextDecoder as NodeTextDecoder, TextEncoder as NodeTextEncoder } from '
 import { renderHook, act } from '@testing-library/react';
 import { useAgentChat } from '../use-agent-chat';
 import type { AgentScopeInput } from '../use-agent-chat';
+import { encodeFrame, type AgentFrame } from '@/lib/agent/sse';
 
-function makeStream(chunks: string[]): ReadableStream {
+/** Bytes crus na rede — o corte entre chunks não respeita fronteira de frame. */
+function makeRawStream(chunks: string[]): ReadableStream {
   return new ReadableStream({
     async start(controller) {
       for (const chunk of chunks) {
@@ -23,6 +25,16 @@ function makeStream(chunks: string[]): ReadableStream {
       controller.close();
     },
   });
+}
+
+/** O que o servidor de verdade manda: frames SSE, um por chunk, e o `done`. */
+function makeStream(tokens: string[], extra: AgentFrame[] = []): ReadableStream {
+  const frames: AgentFrame[] = [
+    ...tokens.map((content): AgentFrame => ({ type: 'token', content })),
+    ...extra,
+    { type: 'done' },
+  ];
+  return makeRawStream(frames.map(encodeFrame));
 }
 
 const baseScope: AgentScopeInput = {
@@ -192,7 +204,64 @@ test('o body envia filterId e período, e nenhum objeto de filtro nem snapshot d
   expect(body).not.toHaveProperty('filter');
 });
 
-// Behavior 7: network error → friendly error message + isStreaming false
+// Behavior 7: o frame de erro vira mensagem legível — nunca resposta em branco
+test('frame de erro vira mensagem legível no chat', async () => {
+  const notice = '⚠️ Não consegui consultar os dados: relation não existe. Tente novamente em instantes.';
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    body: makeStream([], [{ type: 'error', message: notice }]),
+  } as unknown as Response);
+
+  const { result } = renderHook(() => useAgentChat());
+
+  await act(async () => {
+    await result.current.sendMessage('qual a receita?', baseScope);
+  });
+
+  expect(result.current.messages[1]).toEqual({ role: 'assistant', content: notice });
+});
+
+// Behavior 8: falha no meio da resposta não apaga o que já tinha sido dito
+test('erro depois de tokens preserva a resposta parcial e anexa o aviso', async () => {
+  const notice = '⚠️ A consulta demorou mais de 60 segundos e foi interrompida.';
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    body: makeStream(['Em junho ', 'a receita '], [{ type: 'error', message: notice }]),
+  } as unknown as Response);
+
+  const { result } = renderHook(() => useAgentChat());
+
+  await act(async () => {
+    await result.current.sendMessage('qual a receita?', baseScope);
+  });
+
+  expect(result.current.messages[1].content).toBe(`Em junho a receita \n\n${notice}`);
+});
+
+// Behavior 9: a rede corta onde quer — um frame partido entre dois chunks não some
+test('frame cortado entre dois chunks é remontado pelo cliente', async () => {
+  const wire = [
+    encodeFrame({ type: 'token', content: 'Ola' }),
+    encodeFrame({ type: 'token', content: ' mundo' }),
+    encodeFrame({ type: 'done' }),
+  ].join('');
+  const cut = wire.indexOf('mundo'); // corta no meio do segundo frame
+
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    body: makeRawStream([wire.slice(0, cut), wire.slice(cut)]),
+  } as unknown as Response);
+
+  const { result } = renderHook(() => useAgentChat());
+
+  await act(async () => {
+    await result.current.sendMessage('ola', baseScope);
+  });
+
+  expect(result.current.messages[1]).toEqual({ role: 'assistant', content: 'Ola mundo' });
+});
+
+// Behavior 10: network error → friendly error message + isStreaming false
 test('erro de rede → mensagem de erro amigável e isStreaming false', async () => {
   global.fetch = jest.fn().mockRejectedValue(new Error('network error'));
 
