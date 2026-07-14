@@ -3,45 +3,35 @@
 interface KpiCellProps {
   label: string;
   value: string;
-  accent?: string;
   large?: boolean;
+  muted?: boolean;
 }
 
-export function KpiCell({ label, value, accent, large }: KpiCellProps) {
+export function KpiCell({ label, value, large, muted }: KpiCellProps) {
   return (
-    <div
-      style={{
-        background: "var(--surface-2)",
-        border: "1px solid var(--border)",
-        borderRadius: 8,
-        padding: "12px 14px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 5,
-        minWidth: 0,
-      }}
-    >
-      <span
+    <div style={{ minWidth: 0 }}>
+      <div
         style={{
           fontSize: 9,
           fontWeight: 600,
+          letterSpacing: "0.07em",
           textTransform: "uppercase",
-          letterSpacing: "0.08em",
           color: "var(--text-3)",
+          marginBottom: large ? 8 : 6,
         }}
       >
         {label}
-      </span>
-      <span
+      </div>
+      <div
         style={{
-          fontFamily: "'DM Mono', monospace",
-          fontSize: large ? 22 : 14,
-          fontWeight: 500,
-          color: accent ?? "var(--text)",
+          fontSize: large ? 24 : 15,
+          fontWeight: large ? 600 : 500,
+          color: muted || !large ? "var(--text-2)" : "var(--text-strong)",
+          lineHeight: 1,
         }}
       >
         {value}
-      </span>
+      </div>
     </div>
   );
 }

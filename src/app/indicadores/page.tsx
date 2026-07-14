@@ -10,8 +10,7 @@ import type { GlobalMetrics, GlobalHotmartMetrics, GlobalLeadsMetrics, DailyPoin
 import { deriveSourceFlags } from "./source-flags";
 import { HeroKpiCard } from "@/components/indicadores/hero-kpi-card";
 import { HorizontalFunnelFlow } from "@/components/indicadores/horizontal-funnel-flow";
-import { MetaAdsCard } from "@/components/indicadores/meta-ads-card";
-import { HotmartCard } from "@/components/indicadores/hotmart-card";
+import { PlatformsCard } from "@/components/indicadores/platforms-card";
 import { LeadsSection } from "@/components/indicadores/leads-section";
 import { ConversionSourcesCard } from "@/components/indicadores/conversion-sources-card";
 import { FilterDropdown } from "@/components/indicadores/filter-dropdown";
@@ -105,15 +104,26 @@ interface PeriodControlsProps {
 }
 
 function PeriodControls({ startDate, endDate, activePreset, onPreset, onStartDate, onEndDate }: PeriodControlsProps) {
+  const dateInputStyle: React.CSSProperties = {
+    fontFamily: "inherit",
+    fontSize: 12,
+    padding: "6px 9px",
+    background: "var(--surface)",
+    border: "1px solid var(--border-vis)",
+    borderRadius: 7,
+    color: "var(--text)",
+    outline: "none",
+  };
+
   return (
-    <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+    <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
       <div
         style={{
           display: "flex",
           gap: 2,
           background: "var(--surface)",
           border: "1px solid var(--border-vis)",
-          borderRadius: 8,
+          borderRadius: 9,
           padding: 3,
         }}
       >
@@ -122,15 +132,15 @@ function PeriodControls({ startDate, endDate, activePreset, onPreset, onStartDat
             key={key}
             onClick={() => onPreset(key)}
             style={{
-              padding: "4px 11px",
-              fontSize: 11,
+              padding: "6px 12px",
+              fontSize: 12,
               fontWeight: 600,
               fontFamily: "inherit",
-              borderRadius: 6,
               border: "none",
+              borderRadius: 6,
               cursor: "pointer",
-              background: activePreset === key ? "var(--blue)" : "transparent",
-              color: activePreset === key ? "#fff" : "var(--text-3)",
+              background: activePreset === key ? "#2a2f38" : "transparent",
+              color: activePreset === key ? "var(--text-strong)" : "var(--text-muted)",
               transition: "background 150ms ease, color 150ms ease",
             }}
           >
@@ -138,57 +148,35 @@ function PeriodControls({ startDate, endDate, activePreset, onPreset, onStartDat
           </button>
         ))}
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
         <input
           type="date"
           value={startDate}
           onChange={(e) => onStartDate(e.target.value)}
-          style={{
-            fontSize: 12,
-            padding: "5px 8px",
-            width: 130,
-            background: "var(--surface)",
-            border: "1px solid var(--border-vis)",
-            borderRadius: 6,
-            color: "var(--text)",
-            outline: "none",
-          }}
+          style={dateInputStyle}
         />
         <span style={{ fontSize: 12, color: "var(--text-3)" }}>até</span>
         <input
           type="date"
           value={endDate}
           onChange={(e) => onEndDate(e.target.value)}
-          style={{
-            fontSize: 12,
-            padding: "5px 8px",
-            width: 130,
-            background: "var(--surface)",
-            border: "1px solid var(--border-vis)",
-            borderRadius: 6,
-            color: "var(--text)",
-            outline: "none",
-          }}
+          style={dateInputStyle}
         />
       </div>
     </div>
   );
 }
 
-// ── Section narrative ─────────────────────────────────────────────────────────
+// ── Section header ────────────────────────────────────────────────────────────
 
-function SectionNarrative({ step, label, desc }: { step: string; label: string; desc: string | React.ReactNode }) {
+function SectionHeader({ index, title, desc }: { index: string; title: string; desc: string }) {
   return (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 2 }}>
-        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "var(--text-3)", letterSpacing: "0.05em" }}>
-          {step}
-        </span>
-        <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-2)" }}>
-          {label}
-        </span>
-      </div>
-      <span style={{ fontSize: 11, color: "var(--text-3)" }}>{desc}</span>
+    <div style={{ display: "flex", alignItems: "baseline", gap: 11, marginBottom: 15 }}>
+      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-4)" }}>{index}</span>
+      <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-strong)", margin: 0, letterSpacing: "-0.01em" }}>
+        {title}
+      </h2>
+      <span style={{ fontSize: 12, color: "var(--text-3)" }}>{desc}</span>
     </div>
   );
 }
@@ -435,44 +423,44 @@ export default function IndicadoresPage() {
   const heroLoading = metaState.loading || hotmartState.loading;
 
   return (
-    <div className="ind-dark" style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px 48px" }}>
-      {/* Dark header */}
+    <div className="ind-dark" style={{ maxWidth: 1220, margin: "0 auto", padding: "0 28px 64px" }}>
+      {/* Header / control bar */}
       <header
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           flexWrap: "wrap",
-          gap: 12,
-          padding: "20px 0",
-          borderBottom: "1px solid var(--border-vis)",
+          gap: 16,
+          padding: "22px 0 18px",
+          borderBottom: "1px solid var(--border)",
           marginBottom: 32,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <Link
             href="/"
             style={{
-              fontSize: 13,
-              color: "var(--text-3)",
-              textDecoration: "none",
               display: "flex",
               alignItems: "center",
-              gap: 4,
+              gap: 6,
+              fontSize: 13,
+              color: "var(--text-muted)",
+              textDecoration: "none",
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M19 12H5M12 5l-7 7 7 7" />
             </svg>
             Módulos
           </Link>
-          <div style={{ width: 1, height: 16, background: "var(--border-vis)" }} />
-          <h1 style={{ fontSize: 17, fontWeight: 600, letterSpacing: "-0.015em", color: "var(--text)", margin: 0 }}>
+          <div style={{ width: 1, height: 18, background: "#262b33" }} />
+          <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-strong)", margin: 0 }}>
             Indicadores
           </h1>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <PeriodControls
             startDate={startDate}
             endDate={endDate}
@@ -511,38 +499,38 @@ export default function IndicadoresPage() {
       ) : (
         <div className="z-layout">
 
-          {/* Z-1: Hero KPIs — 3 columns */}
-          <div>
-            <SectionNarrative step="01" label="Resultado" desc="Desempenho consolidado do período selecionado" />
+          {/* 01 · Resultado — 3 hero KPIs */}
+          <section>
+            <SectionHeader index="01" title="Resultado" desc="Desempenho consolidado do período" />
             <div className="z-row-3col">
               <HeroKpiCard
                 label="ROAS"
                 value={roas !== null ? `${fmtDecimal(roas, 2)}×` : "—"}
                 subtitle="Receita ÷ Investimento"
-                accent="var(--violet)"
+                dotColor="var(--violet)"
                 loading={heroLoading}
               />
               <HeroKpiCard
                 label="Receita BRL"
                 value={hotmartData ? fmtBRL(hotmartData.total_revenue) : "—"}
                 subtitle="via Hotmart"
-                accent="var(--emerald)"
+                dotColor="var(--orange)"
                 loading={heroLoading}
               />
               <HeroKpiCard
                 label="Total de Vendas"
                 value={hotmartData ? fmtNum(hotmartData.total_sales) : "—"}
                 subtitle="total de conversões"
-                accent="var(--orange)"
+                dotColor="var(--orange)"
                 loading={heroLoading}
               />
             </div>
-          </div>
+          </section>
 
-          {/* Z-2: Horizontal funnel — full width */}
+          {/* 02 · Jornada de Conversão — full width */}
           {funnelStages && funnelRates && (
-            <div>
-              <SectionNarrative step="02" label="Jornada de Conversão" desc="Do investimento até a venda" />
+            <section>
+              <SectionHeader index="02" title="Jornada de Conversão" desc="Do investimento até a venda" />
               <div className="z-row">
                 <HorizontalFunnelFlow
                   stages={funnelStages}
@@ -554,43 +542,42 @@ export default function IndicadoresPage() {
                   cpa={cpa}
                 />
               </div>
-            </div>
+            </section>
           )}
 
-          {/* Z-3: Meta Ads + Hotmart — 2 columns */}
-          <div>
-            <SectionNarrative step="03" label="Plataformas" desc="Detalhe por fonte de dados" />
-            <div className="z-row-2col">
-              <MetaAdsCard metaState={metaState} dailyState={dailyState} hasMetaFilter={hasMetaFilter} />
-              <HotmartCard
+          {/* 03 · Plataformas — card com abas + origens de conversão */}
+          <section>
+            <SectionHeader index="03" title="Plataformas" desc="Detalhe por fonte de dados" />
+            <div className="z-row">
+              <PlatformsCard
+                metaState={metaState}
                 hotmartState={hotmartState}
                 dailyState={dailyState}
                 accountId={accountId}
                 selectedProductId={activeProductForOffer}
                 onOfferCodeChange={handleOfferCodeChange}
+                hasMetaFilter={hasMetaFilter}
                 hasHotmartFilter={hasHotmartFilter}
               />
             </div>
-          </div>
+            {hasHotmartFilter && (
+              <div className="z-row" style={{ marginTop: 14 }}>
+                <ConversionSourcesCard state={conversionSourcesState} />
+              </div>
+            )}
+          </section>
 
-          {/* Origens de Conversão — full width, abaixo de Plataformas */}
-          {hasHotmartFilter && (
-            <div className="z-row">
-              <ConversionSourcesCard state={conversionSourcesState} />
-            </div>
-          )}
-
-          {/* Z-4: Captação de Leads — full width */}
-          <div>
-            <SectionNarrative
-              step="04"
-              label="Captação de Leads"
-              desc="Novos leads que entraram no funil · Dados não filtrados"
+          {/* 04 · Captação de Leads — full width */}
+          <section>
+            <SectionHeader
+              index="04"
+              title="Captação de Leads"
+              desc="Novos leads que entraram no funil · dados não filtrados"
             />
             <div className="z-row">
               <LeadsSection leadsState={leadsState} dailyState={dailyState} />
             </div>
-          </div>
+          </section>
 
         </div>
       )}

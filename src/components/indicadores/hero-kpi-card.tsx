@@ -1,52 +1,21 @@
 "use client";
 
-interface BadgeProp {
-  text: string;
-  variant: "positive" | "neutral" | "negative";
-}
-
 interface HeroKpiCardProps {
   label: string;
   value: string;
   subtitle: string;
-  accent: string;
-  badge?: BadgeProp;
+  dotColor: string;
   loading?: boolean;
 }
 
-const badgeStyles: Record<BadgeProp["variant"], React.CSSProperties> = {
-  positive: {
-    color: "var(--green)",
-    background: "rgba(34,197,94,0.1)",
-    border: "1px solid rgba(34,197,94,0.2)",
-  },
-  neutral: {
-    color: "var(--amber)",
-    background: "rgba(245,158,11,0.1)",
-    border: "1px solid rgba(245,158,11,0.2)",
-  },
-  negative: {
-    color: "var(--red)",
-    background: "rgba(239,68,68,0.1)",
-    border: "1px solid rgba(239,68,68,0.2)",
-  },
-};
-
-export function HeroKpiCard({
-  label,
-  value,
-  subtitle,
-  accent,
-  badge,
-  loading,
-}: HeroKpiCardProps) {
+export function HeroKpiCard({ label, value, subtitle, dotColor, loading }: HeroKpiCardProps) {
   if (loading) {
     return (
       <div
         style={{
-          height: "96px",
+          height: 118,
           background: "var(--surface-2)",
-          borderRadius: "10px",
+          borderRadius: 11,
           animation: "pulse 1.5s ease-in-out infinite",
         }}
       />
@@ -58,64 +27,40 @@ export function HeroKpiCard({
       style={{
         background: "var(--surface)",
         border: "1px solid var(--border-vis)",
-        borderRadius: "10px",
-        padding: "20px 20px 16px",
-        position: "relative",
-        overflow: "hidden",
+        borderRadius: 11,
+        padding: "18px 20px",
       }}
     >
       <div
         style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: "2px",
-          background: accent,
-        }}
-      />
-
-      <span
-        style={{
-          fontSize: "10px",
-          fontWeight: 700,
+          display: "flex",
+          alignItems: "center",
+          gap: 7,
+          fontSize: 11,
+          fontWeight: 600,
+          letterSpacing: "0.07em",
           textTransform: "uppercase",
-          letterSpacing: "0.1em",
-          color: "var(--text-3)",
+          color: "var(--text-label)",
+          marginBottom: 12,
         }}
       >
+        <span style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
         {label}
-      </span>
+      </div>
 
       <div
         style={{
-          fontFamily: "'DM Mono', monospace",
-          fontSize: "40px",
-          fontWeight: 500,
-          color: accent,
+          fontSize: 36,
+          fontWeight: 600,
           lineHeight: 1,
-          margin: "8px 0 4px",
+          letterSpacing: "-0.02em",
+          color: "var(--text-strong)",
         }}
       >
         {value}
       </div>
 
-      <div style={{ fontSize: "12px", color: "var(--text-3)" }}>{subtitle}</div>
-
-      {badge && (
-        <div
-          style={{
-            display: "inline-block",
-            marginTop: "6px",
-            fontSize: "10px",
-            borderRadius: "4px",
-            padding: "2px 6px",
-            ...badgeStyles[badge.variant],
-          }}
-        >
-          {badge.text}
-        </div>
-      )}
+      <div style={{ fontSize: 12, color: "var(--text-3)", marginTop: 9 }}>{subtitle}</div>
     </div>
   );
 }

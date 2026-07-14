@@ -1,26 +1,46 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
 
 .ind-dark {
-  --bg: #07101f;
-  --surface: #0d1829;
-  --surface-2: #121e32;
-  --border: #1c2b40;
-  --border-vis: #253852;
-  --text: #ddeaf6;
-  --text-2: #7b9ab6;
-  --text-3: #3c566f;
-  --text-4: #253648;
-  --violet: #9070e8;
-  --emerald: #0daa7c;
-  --orange: #e87220;
-  --blue: #3d84f5;
-  --green: #1ab96c;
-  --cyan: #0899c0;
-  --amber: #d99512;
-  --red: #e04242;
+  /* Superfícies */
+  --bg: #0d0f12;
+  --surface: #15181d;
+  --surface-2: #1a1e24;
+
+  /* Bordas */
+  --border: #1e2229;
+  --border-vis: #23272f;
+  --border-strong: #2c313b;
+
+  /* Texto */
+  --text: #e8eaed;
+  --text-strong: #f2f4f7;
+  --text-2: #c2c8d0;
+  --text-label: #7c8492;
+  --text-muted: #8891a0;
+  --text-3: #6c7480;
+  --text-4: #4a515c;
+  --arrow: #3f4650;
+
+  /* Acentos */
+  --violet: #7c6ff0;
+  --orange: #e8853f;
+  --green: #4fae82;
+  --emerald: #4fae82;
+  --blue: #4c8dff;
+  --link: #5b93ff;
+  --amber: #cf9b45;
+  --red: #d76767;
+  --cyan: #7fb9d6;
+
+  /* Tipografia */
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
 
   background: var(--bg);
   color: var(--text);
+  font-family: var(--font-sans);
+  font-feature-settings: 'tnum' 1;
+  -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
 
@@ -28,10 +48,23 @@
   box-sizing: border-box;
 }
 
+.ind-dark a {
+  color: var(--link);
+  text-decoration: none;
+}
+
+.ind-dark a:hover {
+  color: #85b0ff;
+}
+
+.ind-dark input[type='date'] {
+  color-scheme: dark;
+}
+
 .ind-dark .z-layout {
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 34px;
 }
 
 .ind-dark .z-row {
@@ -41,17 +74,31 @@
 .ind-dark .z-row-3col {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  gap: 14px;
 }
 
-.ind-dark .z-row-2col {
+.ind-dark .hotmart-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 26px;
+  align-items: start;
 }
 
-@media (max-width: 1024px) {
-  .ind-dark .z-row-2col {
+@media (max-width: 900px) {
+  .ind-dark .hotmart-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ind-dark .leads-grid {
+  display: grid;
+  grid-template-columns: 210px 1fr 1fr;
+  gap: 22px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .ind-dark .leads-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -68,26 +115,15 @@
   }
 }
 
+/* Taxas do funil — texto colorido por threshold, sem chip */
 .ind-dark .rate-ok {
   color: var(--green);
-  background: rgba(26, 185, 108, 0.12);
-  border: 1px solid rgba(26, 185, 108, 0.25);
-  border-radius: 4px;
-  padding: 2px 5px;
 }
 
 .ind-dark .rate-warn {
   color: var(--amber);
-  background: rgba(217, 149, 18, 0.12);
-  border: 1px solid rgba(217, 149, 18, 0.25);
-  border-radius: 4px;
-  padding: 2px 5px;
 }
 
 .ind-dark .rate-low {
   color: var(--red);
-  background: rgba(224, 66, 66, 0.12);
-  border: 1px solid rgba(224, 66, 66, 0.25);
-  border-radius: 4px;
-  padding: 2px 5px;
 }
