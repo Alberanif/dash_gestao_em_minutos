@@ -7,7 +7,7 @@ import { calcPresetDates, getActivePreset, type PresetKey } from "@/lib/utils/pe
 import { calcROAS, calcCPA, calcConversionRate } from "@/lib/utils/cross-metrics";
 import { calcFunnelStages, calcConversionRates } from "@/lib/utils/funnel-metrics";
 import type { GlobalMetrics, GlobalHotmartMetrics, GlobalLeadsMetrics, DailyPoint, FilterRecord, ConversionSourceRow } from "@/types/indicadores";
-import { deriveSourceFlags } from "./source-flags";
+import { expandFilter, toSearchParams } from "@/lib/indicadores/filter-expansion";
 import { HeroKpiCard } from "@/components/indicadores/hero-kpi-card";
 import { HorizontalFunnelFlow } from "@/components/indicadores/horizontal-funnel-flow";
 import { PlatformsCard } from "@/components/indicadores/platforms-card";
@@ -239,10 +239,10 @@ export default function IndicadoresPage() {
     filter: FilterRecord | null,
     offerCode: string | null = null,
   ) => {
-    // Derive which sources are actually configured in this filter
-    const { hasMetaFilter, hasHotmartFilter, hasLeadsFilter } = filter
-      ? deriveSourceFlags(filter)
-      : { hasMetaFilter: false, hasHotmartFilter: false, hasLeadsFilter: false };
+    // O que este filtro significa — definido em um único lugar, compartilhado
+    // com o agente. Enquanto houver duas cópias dessa lógica, elas divergem.
+    const expanded = expandFilter(filter, offerCode);
+    const { meta: hasMetaFilter, hotmart: hasHotmartFilter, leads: hasLeadsFilter } = expanded.sources;
 
     const ZEROED_LEADS: GlobalLeadsMetrics = { total: 0, by_event: [], by_source: [] };
 
@@ -255,20 +255,15 @@ export default function IndicadoresPage() {
     setConversionSourcesState(hasHotmartFilter ? initialSection() : { data: ZEROED_SOURCES, loading: false, error: false });
     setDailyState(initialSection());
 
-    let params = `?start_date=${start}&end_date=${end}`;
-    if (filter) {
-      filter.meta_ads_terms.forEach((t) => { params += `&meta_terms[]=${encodeURIComponent(t)}`; });
-      filter.hotmart_products.forEach((p) => { params += `&product_ids[]=${encodeURIComponent(p.product_id)}`; });
-      (filter.captacao_leads_eventos ?? []).forEach((e) => { params += `&eventos[]=${encodeURIComponent(e)}`; });
-    }
-    if (offerCode) {
-      params += `&offer_code=${encodeURIComponent(offerCode)}`;
-    }
+    const period = { startDate: start, endDate: end };
+    const params = `?${toSearchParams(expanded, period)}`;
 
-    let leadsParams = `?start_date=${start}&end_date=${end}`;
-    if (filter) {
-      (filter.captacao_leads_eventos ?? []).forEach((e) => { leadsParams += `&eventos[]=${encodeURIComponent(e)}`; });
-    }
+    // O endpoint de leads só filtra por evento: mandar produto, termo de Meta
+    // ou oferta para ele não restringe nada — é escopo, não ruído.
+    const leadsParams = `?${toSearchParams(
+      { ...expanded, metaTerms: [], productIds: [], offerCode: null },
+      period,
+    )}`;
 
     // Fetch all four sources in parallel; skip unconfigured sources with Promise.resolve(null)
     const jsonOrThrow = (r: Response) => {
@@ -385,9 +380,7 @@ export default function IndicadoresPage() {
 
   // ── Derived source flags ──────────────────────────────────────────────────
 
-  const { hasMetaFilter, hasHotmartFilter } = activeFilter
-    ? deriveSourceFlags(activeFilter)
-    : { hasMetaFilter: false, hasHotmartFilter: false };
+  const { meta: hasMetaFilter, hotmart: hasHotmartFilter } = expandFilter(activeFilter).sources;
 
   // ── Derived data for Z-1 and Z-2 ──────────────────────────────────────────
 

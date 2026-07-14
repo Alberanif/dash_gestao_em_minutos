@@ -389,46 +389,9 @@ describe("IndicadoresEmptyState", () => {
   });
 });
 
-// ── deriveSourceFlags ─────────────────────────────────────────────────────────
-
-import { deriveSourceFlags } from "@/app/indicadores/source-flags";
-
-describe("deriveSourceFlags", () => {
-  const base: FilterRecord = {
-    id: "f1", account_id: "acc1", name: "test",
-    meta_ads_terms: [], hotmart_products: [], captacao_leads_eventos: [],
-    created_at: "2024-01-01T00:00:00Z", updated_at: "2024-01-01T00:00:00Z",
-  };
-
-  it("only meta terms → hasMetaFilter true, others false", () => {
-    const filter = { ...base, meta_ads_terms: ["lançamento"] };
-    expect(deriveSourceFlags(filter)).toEqual({ hasMetaFilter: true, hasHotmartFilter: false, hasLeadsFilter: false });
-  });
-
-  it("only hotmart products → hasHotmartFilter true, others false", () => {
-    const filter = { ...base, hotmart_products: [{ product_id: "p1", product_name: "Curso" }] };
-    expect(deriveSourceFlags(filter)).toEqual({ hasMetaFilter: false, hasHotmartFilter: true, hasLeadsFilter: false });
-  });
-
-  it("only leads eventos → hasLeadsFilter true, others false", () => {
-    const filter = { ...base, captacao_leads_eventos: ["Inscricao Webinar"] };
-    expect(deriveSourceFlags(filter)).toEqual({ hasMetaFilter: false, hasHotmartFilter: false, hasLeadsFilter: true });
-  });
-
-  it("all three configured → all flags true", () => {
-    const filter = {
-      ...base,
-      meta_ads_terms: ["lançamento"],
-      hotmart_products: [{ product_id: "p1", product_name: "Curso" }],
-      captacao_leads_eventos: ["Inscricao Webinar"],
-    };
-    expect(deriveSourceFlags(filter)).toEqual({ hasMetaFilter: true, hasHotmartFilter: true, hasLeadsFilter: true });
-  });
-
-  it("neither configured → all flags false", () => {
-    expect(deriveSourceFlags(base)).toEqual({ hasMetaFilter: false, hasHotmartFilter: false, hasLeadsFilter: false });
-  });
-});
+// As flags de fonte configurada agora vivem em expandFilter().sources — única
+// definição de "o que um filtro significa". Cobertura em
+// src/lib/indicadores/__tests__/filter-expansion.test.ts.
 
 // ── FilterDropdownList ────────────────────────────────────────────────────────
 
