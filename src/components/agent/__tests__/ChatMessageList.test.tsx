@@ -64,4 +64,36 @@ describe('ChatMessageList', () => {
     const { container } = render(<ChatMessageList messages={[]} />);
     expect(container).toBeTruthy();
   });
+
+  it('durante uma consulta, mostra o período que está sendo consultado', () => {
+    render(
+      <ChatMessageList
+        messages={[{ role: 'user', content: 'qual a receita de junho?' }]}
+        activeQuery={{
+          tool: 'getPeriodSummary',
+          period: { startDate: '2026-06-01', endDate: '2026-06-30' },
+        }}
+      />,
+    );
+    expect(screen.getByText('Consultando dados de 01/06 a 30/06...')).toBeTruthy();
+  });
+
+  it('sem consulta em andamento, não mostra indicador', () => {
+    render(<ChatMessageList messages={[{ role: 'assistant', content: 'Pronto.' }]} />);
+    expect(screen.queryByTestId('agent-query-indicator')).toBeNull();
+  });
+
+  it('consulta sem período legível avisa mesmo assim — sem "undefined" nem "Invalid Date"', () => {
+    render(
+      <ChatMessageList
+        messages={[]}
+        activeQuery={{ tool: 'getPeriodSummary', period: null }}
+      />,
+    );
+    const indicator = screen.getByTestId('agent-query-indicator');
+    expect(indicator.textContent).toContain('Consultando dados');
+    expect(indicator.textContent).not.toContain('undefined');
+    expect(indicator.textContent).not.toContain('Invalid Date');
+    expect(indicator.textContent).not.toContain('null');
+  });
 });

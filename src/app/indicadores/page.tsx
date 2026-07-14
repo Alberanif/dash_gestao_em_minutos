@@ -191,7 +191,7 @@ export default function IndicadoresPage() {
   const [activePreset, setActivePreset] = useState<PresetKey | null>("28d");
 
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { messages, isStreaming, sendMessage, clearHistory } = useAgentChat();
+  const { messages, isStreaming, activeQuery, sendMessage, clearHistory } = useAgentChat();
 
   const [metaState, setMetaState] = useState<SectionState<GlobalMetrics>>(initialSection());
   const [hotmartState, setHotmartState] = useState<SectionState<GlobalHotmartMetrics>>(initialSection());
@@ -581,7 +581,7 @@ export default function IndicadoresPage() {
         endDate={endDate}
         offerCode={activeOfferCode}
       >
-        <ChatMessageList messages={messages} />
+        <ChatMessageList messages={messages} activeQuery={activeQuery} />
         <ChatInput onSend={handleSend} isStreaming={isStreaming} />
       </AgentDrawer>
     </div>
