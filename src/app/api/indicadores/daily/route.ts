@@ -1,138 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiAuth } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import type { DailyPoint } from "@/types/indicadores";
-
-function brtToUtc(dateStr: string, endOfDay = false): string {
-  const time = endOfDay ? "T23:59:59" : "T00:00:00";
-  return new Date(`${dateStr}${time}-03:00`).toISOString();
-}
+import { expandFromSearchParams } from "@/lib/indicadores/filter-expansion";
+import { fetchDailySeries } from "@/lib/indicadores/service/daily";
 
 export async function GET(request: NextRequest) {
   const { error } = await validateApiAuth();
   if (error) return error;
 
   const { searchParams } = request.nextUrl;
-  const start_date = searchParams.get("start_date");
-  const end_date = searchParams.get("end_date");
+  const startDate = searchParams.get("start_date");
+  const endDate = searchParams.get("end_date");
 
-  if (!start_date || !end_date) {
+  if (!startDate || !endDate) {
     return NextResponse.json({ error: "start_date and end_date are required" }, { status: 400 });
   }
 
-  const startUtc = brtToUtc(start_date, false);
-  const endUtc = brtToUtc(end_date, true);
-
-  const metaTerms = searchParams.getAll("meta_terms[]").filter(Boolean);
-  const productIds = searchParams.getAll("product_ids[]").filter(Boolean);
-  const eventosFilter = searchParams.getAll("eventos[]").filter(Boolean);
-
+  const filter = expandFromSearchParams(searchParams);
   const supabase = createSupabaseServiceClient();
 
-  let metaQuery = supabase
-    .from("dash_gestao_meta_ads_campaigns_daily")
-    .select("date, spend, leads_all, checkout")
-    .gte("date", start_date)
-    .lte("date", end_date);
-
-  if (metaTerms.length > 0) {
-    metaQuery = metaQuery.or(metaTerms.map(t => `campaign_name.ilike.%${t}%`).join(','));
+  try {
+    const series = await fetchDailySeries({ period: { startDate, endDate }, filter }, supabase);
+    return NextResponse.json(series);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Erro ao buscar a série diária";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  let hotmartQuery = supabase
-    .from("dash_gestao_hotmart_sales")
-    .select("purchase_date")
-    .in("status", ["COMPLETE", "APPROVED"])
-    .gte("purchase_date", startUtc)
-    .lte("purchase_date", endUtc);
-
-  if (productIds.length > 0) {
-    hotmartQuery = hotmartQuery.in("product_id", productIds);
-  }
-
-  const [metaResult, hotmartResult, leadsResult] = await Promise.all([
-    metaQuery,
-    hotmartQuery,
-    supabase.rpc("dash_gestao_leads_daily_counts", {
-      p_start_date: start_date,
-      p_end_date: end_date,
-      p_eventos: eventosFilter.length > 0 ? eventosFilter : null,
-    }),
-  ]);
-
-  if (metaResult.error) {
-    return NextResponse.json({ error: metaResult.error.message }, { status: 500 });
-  }
-  if (hotmartResult.error) {
-    return NextResponse.json({ error: hotmartResult.error.message }, { status: 500 });
-  }
-  if (leadsResult.error) {
-    return NextResponse.json({ error: leadsResult.error.message }, { status: 500 });
-  }
-
-  // Aggregate Meta Ads by date
-  const metaByDate = new Map<string, { spend: number; leads: number; checkout: number }>();
-  for (const row of (metaResult.data ?? []) as { date: string; spend: number; leads_all: number; checkout: number }[]) {
-    const d = row.date;
-    const existing = metaByDate.get(d);
-    if (existing) {
-      existing.spend += row.spend ?? 0;
-      existing.leads += row.leads_all ?? 0;
-      existing.checkout += row.checkout ?? 0;
-    } else {
-      metaByDate.set(d, { spend: row.spend ?? 0, leads: row.leads_all ?? 0, checkout: row.checkout ?? 0 });
-    }
-  }
-
-  // Aggregate Hotmart by BRT date (slice purchase_date to date string)
-  const hotmartByDate = new Map<string, number>();
-  for (const row of (hotmartResult.data ?? []) as { purchase_date: string }[]) {
-    // Convert UTC timestamp back to BRT date by subtracting 3h
-    const brtDate = new Date(new Date(row.purchase_date).getTime() - 3 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 10);
-    hotmartByDate.set(brtDate, (hotmartByDate.get(brtDate) ?? 0) + 1);
-  }
-
-  // Leads already aggregated by date in the DB function — no row limit applies
-  const leadsByDate = new Map<string, number>();
-  for (const row of (leadsResult.data ?? []) as { date: string; count: number }[]) {
-    leadsByDate.set(row.date, Number(row.count));
-  }
-
-  // Build complete date range
-  const allDates = new Set<string>([
-    ...metaByDate.keys(),
-    ...hotmartByDate.keys(),
-    ...leadsByDate.keys(),
-  ]);
-
-  // Fill gaps in the date range between start_date and end_date
-  const start = new Date(start_date);
-  const end = new Date(end_date);
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    allDates.add(d.toISOString().slice(0, 10));
-  }
-
-  const points: DailyPoint[] = Array.from(allDates)
-    .sort()
-    .map((date) => {
-      const meta = metaByDate.get(date);
-      const meta_spend = meta?.spend ?? 0;
-      const meta_leads = meta?.leads ?? 0;
-      const meta_checkout = meta?.checkout ?? 0;
-      const meta_cpl_traffic = meta_leads > 0 ? meta_spend / meta_leads : null;
-
-      return {
-        date,
-        meta_spend,
-        meta_leads,
-        meta_cpl_traffic,
-        meta_checkout,
-        hotmart_sales: hotmartByDate.get(date) ?? 0,
-        lead_captacoes: leadsByDate.get(date) ?? 0,
-      };
-    });
-
-  return NextResponse.json(points);
 }
