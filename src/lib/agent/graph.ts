@@ -4,6 +4,7 @@ import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages
 import { resolveAgentModel } from "./model";
 import { buildSystemPrompt, type AgentState } from "./prompt";
 import { buildAgentTools, type AgentScope } from "./tools";
+import { encodeFrame, type AgentFrame, type FramePeriod } from "./sse";
 
 /**
  * Um passo = uma ida ao modelo ou uma execução de tool. Uma pergunta legítima
@@ -74,6 +75,25 @@ function describeFailure(error: unknown, timedOut: boolean): string {
   return `⚠️ Não consegui consultar os dados: ${message}. Tente novamente em instantes.`;
 }
 
+/**
+ * O período que a tool está consultando, tirado do input com que o modelo a
+ * chamou — é o que o chat exibe enquanto espera. O LangGraph às vezes aninha o
+ * input um nível; e o modelo pode chamar a tool com argumento malformado. Nada
+ * disso pode derrubar o stream: sem período legível, o frame vai com `null`.
+ */
+function readPeriod(input: unknown): FramePeriod | null {
+  if (typeof input !== "object" || input === null) return null;
+
+  const candidate = input as { startDate?: unknown; endDate?: unknown; input?: unknown };
+  const { startDate, endDate } = candidate;
+
+  if (typeof startDate === "string" && typeof endDate === "string") {
+    return { startDate, endDate };
+  }
+
+  return candidate.input === undefined ? null : readPeriod(candidate.input);
+}
+
 export async function streamAgentResponse(
   input: StreamAgentInput
 ): Promise<ReadableStream<Uint8Array>> {
@@ -112,24 +132,42 @@ export async function streamAgentResponse(
   return new ReadableStream<Uint8Array>({
     async start(controller) {
       const encoder = new TextEncoder();
-      let emittedAnything = false;
+      const emit = (frame: AgentFrame) =>
+        controller.enqueue(encoder.encode(encodeFrame(frame)));
 
       try {
         for await (const event of eventStream) {
           if (event.event === "on_chat_model_stream") {
             const content = event.data?.chunk?.content;
             if (typeof content === "string" && content.length > 0) {
-              controller.enqueue(encoder.encode(content));
-              emittedAnything = true;
+              emit({ type: "token", content });
             }
+            continue;
+          }
+
+          // Enquanto uma tool roda, o modelo não emite token nenhum. Sem estes
+          // frames o chat fica mudo por segundos e o usuário conclui que travou.
+          if (event.event === "on_tool_start") {
+            emit({
+              type: "tool_start",
+              tool: event.name ?? "",
+              period: readPeriod(event.data?.input),
+            });
+            continue;
+          }
+
+          if (event.event === "on_tool_end") {
+            emit({ type: "tool_end", tool: event.name ?? "" });
           }
         }
       } catch (error) {
         // Sem este catch, uma tool que estoura fecha o stream vazio e o usuário
-        // recebe uma resposta em branco, sem saber que algo falhou.
-        const notice = describeFailure(error, timedOut);
-        controller.enqueue(encoder.encode(emittedAnything ? `\n\n${notice}` : notice));
+        // recebe uma resposta em branco, sem saber que algo falhou. Os tokens já
+        // emitidos continuam valendo: a resposta parcial não se perde — quem
+        // junta o aviso ao texto parcial é o cliente.
+        emit({ type: "error", message: describeFailure(error, timedOut) });
       } finally {
+        emit({ type: "done" });
         clearTimeout(timer);
         controller.close();
       }

@@ -11,6 +11,7 @@ jest.mock("@langchain/langgraph/prebuilt", () => ({
 import { ChatOpenAI } from "@langchain/openai";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { streamAgentResponse, type ChatTurn, type StreamAgentInput } from "../graph";
+import { createFrameParser, type AgentFrame, type TokenFrame } from "../sse";
 import { expandFilter } from "@/lib/indicadores/filter-expansion";
 import { makeFakeSupabase } from "@/lib/indicadores/__tests__/fake-supabase";
 
@@ -22,6 +23,15 @@ function tokenEvents(...tokens: string[]) {
     for (const token of tokens) {
       yield { event: "on_chat_model_stream", data: { chunk: { content: token } } };
     }
+  })();
+}
+
+/** O que o LangGraph emite ao redor de uma consulta: começo, fim, e a resposta. */
+function toolEvents(tool: string, period: { startDate: string; endDate: string }) {
+  return (async function* () {
+    yield { event: "on_tool_start", name: tool, data: { input: period } };
+    yield { event: "on_tool_end", name: tool, data: { output: "{}" } };
+    yield { event: "on_chat_model_stream", data: { chunk: { content: "R$ 250." } } };
   })();
 }
 
@@ -62,16 +72,30 @@ function input(overrides: Partial<StreamAgentInput> = {}): StreamAgentInput {
   };
 }
 
-async function drain(stream: ReadableStream<Uint8Array>): Promise<string> {
+/** O stream agora é SSE: lemos com o mesmo parser que o cliente usa. */
+async function drain(stream: ReadableStream<Uint8Array>): Promise<AgentFrame[]> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
-  let out = "";
+  const parser = createFrameParser();
+  const frames: AgentFrame[] = [];
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
-    out += decoder.decode(value, { stream: true });
+    frames.push(...parser.push(decoder.decode(value, { stream: true })));
   }
-  return out;
+  return frames;
+}
+
+/** O texto que o usuário vê: só os frames de token, concatenados. */
+function textOf(frames: AgentFrame[]): string {
+  return frames
+    .filter((frame): frame is TokenFrame => frame.type === "token")
+    .map((frame) => frame.content)
+    .join("");
+}
+
+function errorOf(frames: AgentFrame[]): string | undefined {
+  return frames.find((frame) => frame.type === "error")?.message;
 }
 
 beforeEach(() => {
@@ -80,12 +104,37 @@ beforeEach(() => {
 });
 
 describe("streamAgentResponse", () => {
-  it("emite os tokens do modelo no stream", async () => {
+  it("emite os tokens do modelo como frames de token", async () => {
     mockStreamEvents.mockReturnValue(tokenEvents("Sua receita ", "foi ", "R$ 250."));
 
-    const stream = await streamAgentResponse(input());
+    const frames = await drain(await streamAgentResponse(input()));
 
-    expect(await drain(stream)).toBe("Sua receita foi R$ 250.");
+    expect(textOf(frames)).toBe("Sua receita foi R$ 250.");
+  });
+
+  it("anuncia a consulta em curso, com o período que está lendo", async () => {
+    // Enquanto a tool roda o modelo não emite token: sem estes frames o chat
+    // fica mudo por segundos e o usuário conclui que travou.
+    mockStreamEvents.mockReturnValue(
+      toolEvents("getPeriodSummary", { startDate: "2026-06-01", endDate: "2026-06-30" })
+    );
+
+    const frames = await drain(await streamAgentResponse(input()));
+
+    expect(frames).toContainEqual({
+      type: "tool_start",
+      tool: "getPeriodSummary",
+      period: { startDate: "2026-06-01", endDate: "2026-06-30" },
+    });
+    expect(frames).toContainEqual({ type: "tool_end", tool: "getPeriodSummary" });
+  });
+
+  it("fecha o stream com um frame done", async () => {
+    mockStreamEvents.mockReturnValue(tokenEvents("pronto"));
+
+    const frames = await drain(await streamAgentResponse(input()));
+
+    expect(frames[frames.length - 1]).toEqual({ type: "done" });
   });
 
   it("usa o modelo configurado em AGENT_MODEL", async () => {
@@ -127,11 +176,18 @@ describe("streamAgentResponse", () => {
       failingEvents(new Error("relation dash_gestao_hotmart_sales does not exist"))
     );
 
-    const stream = await streamAgentResponse(input());
-    const out = await drain(stream);
+    const frames = await drain(await streamAgentResponse(input()));
 
-    expect(out).not.toBe("");
-    expect(out).toContain("Não consegui consultar os dados");
+    expect(errorOf(frames)).toContain("Não consegui consultar os dados");
+  });
+
+  it("uma falha no meio da resposta não apaga o que já tinha sido dito", async () => {
+    mockStreamEvents.mockReturnValue(failingEvents(new Error("timeout na RPC"), "Em junho a receita "));
+
+    const frames = await drain(await streamAgentResponse(input()));
+
+    expect(textOf(frames)).toBe("Em junho a receita ");
+    expect(errorOf(frames)).toContain("Não consegui consultar os dados");
   });
 
   it("roda o grafo com um teto de passos — o laço de tools não corre solto", async () => {
@@ -151,10 +207,10 @@ describe("streamAgentResponse", () => {
     );
     mockStreamEvents.mockReturnValue(failingEvents(recursionError));
 
-    const out = await drain(await streamAgentResponse(input()));
+    const frames = await drain(await streamAgentResponse(input()));
 
-    expect(out).toContain("consultas");
-    expect(out).not.toContain("Recursion limit");
+    expect(errorOf(frames)).toContain("consultas");
+    expect(errorOf(frames)).not.toContain("Recursion limit");
   });
 
   it("uma consulta que passa do timeout é abortada e o usuário é informado", async () => {
@@ -174,12 +230,12 @@ describe("streamAgentResponse", () => {
 
     const drained = drain(await streamAgentResponse(input()));
     await jest.advanceTimersByTimeAsync(60_000);
-    const out = await drained;
+    const frames = await drained;
 
     jest.useRealTimers();
 
-    expect(out).not.toContain("tarde demais");
-    expect(out).toContain("demorou");
+    expect(textOf(frames)).not.toContain("tarde demais");
+    expect(errorOf(frames)).toContain("demorou");
   });
 
   it("trunca o histórico no servidor — a décima pergunta não custa mais que a primeira", async () => {
