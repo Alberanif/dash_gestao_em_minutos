@@ -580,7 +580,14 @@ export default function IndicadoresPage() {
 
       {/* Agent FAB + Drawer — position: fixed, fora do fluxo do layout */}
       <AgentFAB onClick={() => setDrawerOpen(true)} />
-      <AgentDrawer isOpen={drawerOpen} onClose={handleCloseDrawer}>
+      <AgentDrawer
+        isOpen={drawerOpen}
+        onClose={handleCloseDrawer}
+        filterName={activeFilter?.name ?? null}
+        startDate={startDate}
+        endDate={endDate}
+        offerCode={activeOfferCode}
+      >
         <ChatMessageList messages={messages} />
         <ChatInput onSend={handleSend} isStreaming={isStreaming} />
       </AgentDrawer>
