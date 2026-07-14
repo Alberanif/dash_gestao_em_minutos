@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { createFrameParser, type FramePeriod } from '@/lib/agent/sse';
 
 export interface Message {
@@ -32,17 +32,29 @@ export function useAgentChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [activeQuery, setActiveQuery] = useState<ActiveQuery | null>(null);
+  /** O abort da resposta em curso. Vive num ref: trocá-lo não re-renderiza nada. */
+  const abortRef = useRef<AbortController | null>(null);
 
   async function sendMessage(text: string, scope: AgentScopeInput): Promise<void> {
     const userMessage: Message = { role: 'user', content: text };
     setMessages((prev) => [...prev, userMessage]);
     setIsStreaming(true);
 
+    // Cada envio tem o seu controller: o abort de uma resposta anterior não pode
+    // matar a próxima.
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
       const history = messages; // snapshot antes desta mensagem
       const response = await fetch('/api/agent/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // O sinal vai ao fetch, não só ao laço de leitura: abortar o fetch
+        // derruba a conexão, e é a queda dela que faz o servidor cancelar o
+        // trabalho em curso. Parar de ler, sozinho, deixaria o modelo gerando
+        // (e cobrando) do outro lado.
+        signal: controller.signal,
         body: JSON.stringify({
           message: text,
           history,
@@ -103,11 +115,16 @@ export function useAgentChat() {
         }
       }
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: 'Ocorreu um erro ao processar sua mensagem. Tente novamente.' },
-      ]);
+      // Parar de propósito não é falhar. O texto que já chegou fica como está —
+      // limpo, sem aviso nenhum. Só um erro de verdade vira mensagem de erro.
+      if (!controller.signal.aborted) {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: 'Ocorreu um erro ao processar sua mensagem. Tente novamente.' },
+        ]);
+      }
     } finally {
+      if (abortRef.current === controller) abortRef.current = null;
       setIsStreaming(false);
       // Uma consulta que morre no meio (erro, timeout, abort) nunca manda o
       // `tool_end` que a fecharia. Sem isto o indicador fica preso na tela para
@@ -116,9 +133,14 @@ export function useAgentChat() {
     }
   }
 
+  /** Interrompe a resposta em andamento. Sem nada em curso, não faz nada. */
+  function stop() {
+    abortRef.current?.abort();
+  }
+
   function clearHistory() {
     setMessages([]);
   }
 
-  return { messages, isStreaming, activeQuery, sendMessage, clearHistory };
+  return { messages, isStreaming, activeQuery, sendMessage, stop, clearHistory };
 }

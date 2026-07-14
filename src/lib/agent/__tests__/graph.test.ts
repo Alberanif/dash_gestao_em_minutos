@@ -35,6 +35,33 @@ function toolEvents(tool: string, period: { startDate: string; endDate: string }
   })();
 }
 
+/**
+ * Um grafo que gera alguns tokens e depois continua trabalhando indefinidamente —
+ * é o que o modelo faz quando o usuário já percebeu que a resposta está errada.
+ * Só termina se alguém abortar o signal que ele recebeu: é exatamente essa
+ * reação que prova que o trabalho no servidor foi cancelado, e não apenas
+ * ignorado por um cliente que parou de ler.
+ */
+function hangingEvents(...tokensBefore: string[]) {
+  return (_state: unknown, config: { signal: AbortSignal }) =>
+    (async function* () {
+      for (const token of tokensBefore) {
+        yield { event: "on_chat_model_stream", data: { chunk: { content: token } } };
+      }
+
+      await new Promise<never>((_resolve, reject) => {
+        const fail = () =>
+          reject(Object.assign(new Error("Aborted"), { name: "AbortError" }));
+        if (config.signal.aborted) fail();
+        else config.signal.addEventListener("abort", fail);
+      });
+
+      // Só chega aqui se o cancelamento não tiver sido propagado: é o token que
+      // o usuário nunca pode ver, e o trabalho que ele nunca pode pagar.
+      yield { event: "on_chat_model_stream", data: { chunk: { content: "trabalho órfão" } } };
+    })();
+}
+
 /** Tokens do modelo e, no meio do caminho, uma tool que estoura. */
 function failingEvents(error: Error, ...tokensBefore: string[]) {
   return (async function* () {
@@ -236,6 +263,58 @@ describe("streamAgentResponse", () => {
 
     expect(textOf(frames)).not.toContain("tarde demais");
     expect(errorOf(frames)).toContain("demorou");
+  });
+
+  it("quando o cliente desiste, o grafo é abortado — não fica trabalho órfão gerando tokens", async () => {
+    const client = new AbortController();
+    let graphSignal: AbortSignal | undefined;
+
+    mockStreamEvents.mockImplementation((state: unknown, config: { signal: AbortSignal }) => {
+      graphSignal = config.signal;
+      return hangingEvents("Em junho a receita ")(state, config);
+    });
+
+    const drained = drain(await streamAgentResponse(input({ signal: client.signal })));
+    await new Promise((resolve) => setTimeout(resolve, 0)); // o primeiro token sai
+    client.abort();
+    const frames = await drained;
+
+    // O grafo recebe o cancelamento: é ele que corta a chamada ao modelo. Um
+    // cliente que apenas para de ler deixaria o servidor gerando e cobrando.
+    expect(graphSignal?.aborted).toBe(true);
+    expect(textOf(frames)).toBe("Em junho a receita ");
+    expect(textOf(frames)).not.toContain("trabalho órfão");
+  });
+
+  it("parar de propósito não é erro — o chat não recebe aviso de falha, e o stream fecha limpo", async () => {
+    const client = new AbortController();
+    mockStreamEvents.mockImplementation(hangingEvents("Em junho a receita "));
+
+    const drained = drain(await streamAgentResponse(input({ signal: client.signal })));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    client.abort();
+    const frames = await drained;
+
+    expect(errorOf(frames)).toBeUndefined();
+    expect(frames[frames.length - 1]).toEqual({ type: "done" });
+  });
+
+  it("cliente que larga o stream no meio também para o grafo — a desconexão basta", async () => {
+    // Nem todo runtime aborta o signal da request quando a conexão cai; o que
+    // sempre chega é o cancelamento do próprio stream. É o segundo caminho para
+    // o mesmo dever: ninguém lendo, ninguém gerando.
+    let graphSignal: AbortSignal | undefined;
+    mockStreamEvents.mockImplementation((state: unknown, config: { signal: AbortSignal }) => {
+      graphSignal = config.signal;
+      return hangingEvents("Em junho ")(state, config);
+    });
+
+    const stream = await streamAgentResponse(input()); // sem signal de request
+    const reader = stream.getReader();
+    await reader.read(); // o primeiro token chega
+    await reader.cancel(); // e o usuário fecha o drawer / o navegador some
+
+    expect(graphSignal?.aborted).toBe(true);
   });
 
   it("trunca o histórico no servidor — a décima pergunta não custa mais que a primeira", async () => {

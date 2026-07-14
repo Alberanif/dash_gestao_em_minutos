@@ -42,6 +42,10 @@ export async function POST(request: NextRequest) {
   const stream = await streamAgentResponse({
     message,
     history: history ?? [],
+    // Quando o usuário aperta parar, o fetch é abortado e a conexão cai; o
+    // runtime aborta este signal. Repassá-lo ao agente é o que faz o trabalho em
+    // curso ser cancelado, em vez de continuar gerando para ninguém.
+    signal: request.signal,
     scope: { filter, supabase },
     state: {
       today: todayInSaoPaulo(new Date()),

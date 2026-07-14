@@ -35,4 +35,21 @@ describe('ChatInput', () => {
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: true });
     expect(onSend).not.toHaveBeenCalled();
   });
+
+  it('durante o streaming, oferece parar a geração', () => {
+    // Enquanto o agente responde, o único comando útil é interromper: quem já
+    // percebeu que a resposta está errada não tem por que esperar o fim dela.
+    const onStop = jest.fn();
+    render(<ChatInput onSend={() => {}} onStop={onStop} isStreaming={true} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Parar geração' }));
+
+    expect(onStop).toHaveBeenCalled();
+  });
+
+  it('fora do streaming não há o que parar', () => {
+    render(<ChatInput onSend={() => {}} onStop={() => {}} isStreaming={false} />);
+
+    expect(screen.queryByRole('button', { name: 'Parar geração' })).toBeNull();
+  });
 });

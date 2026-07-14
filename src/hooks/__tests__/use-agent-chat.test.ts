@@ -71,6 +71,34 @@ function makeControlledStream(): {
   };
 }
 
+/**
+ * Um servidor que emite alguns tokens e depois fica gerando indefinidamente —
+ * exatamente o caso em que o usuário desiste. Reproduz o que o `fetch` real faz
+ * ao ser abortado: o corpo da resposta é interrompido com um `AbortError`.
+ */
+function makeAbortableStream(tokens: string[], signal: AbortSignal | undefined): ReadableStream {
+  return new ReadableStream({
+    start(controller) {
+      for (const content of tokens) {
+        controller.enqueue(new TextEncoder().encode(encodeFrame({ type: 'token', content })));
+      }
+      // Nunca fecha: o modelo continuaria escrevendo se ninguém o interrompesse.
+      signal?.addEventListener('abort', () => {
+        controller.error(Object.assign(new Error('The user aborted a request.'), { name: 'AbortError' }));
+      });
+    },
+  });
+}
+
+/** Guarda o `signal` que o hook passou ao fetch, e responde com um stream sem fim. */
+function mockNeverEndingFetch(tokens: string[]) {
+  const fetchMock = jest.fn((_url: string, init: RequestInit) =>
+    Promise.resolve({ ok: true, body: makeAbortableStream(tokens, init.signal ?? undefined) } as unknown as Response)
+  );
+  global.fetch = fetchMock as unknown as typeof fetch;
+  return fetchMock;
+}
+
 const baseScope: AgentScopeInput = {
   filterId: 'f-1',
   offerCode: null,
@@ -435,5 +463,65 @@ test('erro de rede → mensagem de erro amigável e isStreaming false', async ()
 
   expect(result.current.messages[1].role).toBe('assistant');
   expect(result.current.messages[1].content).toContain('Ocorreu um erro');
+  expect(result.current.isStreaming).toBe(false);
+});
+
+// Behavior 11: parar de propósito interrompe o texto e preserva o que já chegou
+test('parar interrompe o streaming e mantém no chat o texto que já tinha chegado', async () => {
+  mockNeverEndingFetch(['Em junho ', 'a receita foi ']);
+
+  const { result } = renderHook(() => useAgentChat());
+
+  await act(async () => {
+    result.current.sendMessage('qual a receita?', baseScope);
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  expect(result.current.messages[1].content).toBe('Em junho a receita foi ');
+  expect(result.current.isStreaming).toBe(true);
+
+  await act(async () => {
+    result.current.stop();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  // Parar não é falhar: o texto parcial fica limpo, sem nenhum aviso de erro.
+  expect(result.current.messages).toHaveLength(2);
+  expect(result.current.messages[1]).toEqual({
+    role: 'assistant',
+    content: 'Em junho a receita foi ',
+  });
+  expect(result.current.isStreaming).toBe(false);
+});
+
+// Behavior 12: parar não deixa resíduo — a próxima pergunta funciona normalmente
+test('depois de parar, a mensagem seguinte é enviada e respondida normalmente', async () => {
+  mockNeverEndingFetch(['Em junho ']);
+
+  const { result } = renderHook(() => useAgentChat());
+
+  await act(async () => {
+    result.current.sendMessage('qual a receita?', baseScope);
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  await act(async () => {
+    result.current.stop();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    body: makeStream(['Foram 42 vendas.']),
+  } as unknown as Response);
+
+  await act(async () => {
+    await result.current.sendMessage('e as vendas?', baseScope);
+  });
+
+  // O sinal abortado da resposta anterior não pode contaminar a próxima.
+  const init = (global.fetch as jest.Mock).mock.calls[0][1] as RequestInit;
+  expect(init.signal?.aborted).toBe(false);
+  expect(result.current.messages[3]).toEqual({ role: 'assistant', content: 'Foram 42 vendas.' });
   expect(result.current.isStreaming).toBe(false);
 });

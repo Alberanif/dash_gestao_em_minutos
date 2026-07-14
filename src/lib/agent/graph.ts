@@ -39,6 +39,11 @@ export interface StreamAgentInput {
   history: ChatTurn[];
   scope: AgentScope;
   state: AgentState;
+  /**
+   * O cancelamento vindo do cliente (o signal da request). Abortá-lo encerra o
+   * trabalho em curso — inclusive a chamada ao modelo, que é o que se paga.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -117,23 +122,46 @@ export async function streamAgentResponse(
     new HumanMessage(message),
   ];
 
+  // Um único abort para o grafo, com duas razões possíveis de disparar: o teto de
+  // tempo e a desistência do cliente. As duas encerram o mesmo trabalho — o que
+  // muda é só o que se diz a quem ficou olhando.
   const abort = new AbortController();
   let timedOut = false;
+  let cancelledByClient = false;
+
   const timer = setTimeout(() => {
     timedOut = true;
     abort.abort();
   }, TIMEOUT_MS);
+
+  const cancelWork = () => {
+    cancelledByClient = true;
+    abort.abort();
+  };
+
+  // Sem esta ponte, apertar parar só faz o cliente deixar de ler: o modelo segue
+  // gerando do outro lado, até o fim, e a conta chega igual.
+  const clientSignal = input.signal;
+  if (clientSignal) {
+    if (clientSignal.aborted) cancelWork();
+    else clientSignal.addEventListener("abort", cancelWork, { once: true });
+  }
 
   const eventStream = graph.streamEvents(
     { messages },
     { version: "v2", recursionLimit: STEP_LIMIT, signal: abort.signal }
   );
 
+  /** Ninguém do outro lado: escrever no stream a partir daqui é erro de estado. */
+  let streamGone = false;
+
   return new ReadableStream<Uint8Array>({
     async start(controller) {
       const encoder = new TextEncoder();
-      const emit = (frame: AgentFrame) =>
+      const emit = (frame: AgentFrame) => {
+        if (streamGone) return;
         controller.enqueue(encoder.encode(encodeFrame(frame)));
+      };
 
       try {
         for await (const event of eventStream) {
@@ -161,16 +189,33 @@ export async function streamAgentResponse(
           }
         }
       } catch (error) {
-        // Sem este catch, uma tool que estoura fecha o stream vazio e o usuário
-        // recebe uma resposta em branco, sem saber que algo falhou. Os tokens já
-        // emitidos continuam valendo: a resposta parcial não se perde — quem
-        // junta o aviso ao texto parcial é o cliente.
-        emit({ type: "error", message: describeFailure(error, timedOut) });
+        // Parar de propósito não é falhar. O abort do cliente chega aqui como
+        // exceção do grafo, mas virar "⚠️ ocorreu um erro" seria mentir: o
+        // usuário mandou parar, e o texto parcial é a resposta dele.
+        if (!cancelledByClient) {
+          // Sem este catch, uma tool que estoura fecha o stream vazio e o usuário
+          // recebe uma resposta em branco, sem saber que algo falhou. Os tokens já
+          // emitidos continuam valendo: a resposta parcial não se perde — quem
+          // junta o aviso ao texto parcial é o cliente.
+          emit({ type: "error", message: describeFailure(error, timedOut) });
+        }
       } finally {
         emit({ type: "done" });
         clearTimeout(timer);
-        controller.close();
+        clientSignal?.removeEventListener("abort", cancelWork);
+        if (!streamGone) controller.close();
       }
+    },
+
+    /**
+     * O cliente fechou a conexão sem abortar o signal (o runtime nem sempre
+     * expõe as duas coisas). Cancelar o grafo aqui também é o que garante que
+     * nenhum caminho de desconexão deixe o modelo gerando sozinho.
+     */
+    cancel() {
+      streamGone = true;
+      cancelWork();
+      clearTimeout(timer);
     },
   });
 }
