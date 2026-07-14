@@ -525,3 +525,88 @@ test('depois de parar, a mensagem seguinte é enviada e respondida normalmente',
   expect(result.current.messages[3]).toEqual({ role: 'assistant', content: 'Foram 42 vendas.' });
   expect(result.current.isStreaming).toBe(false);
 });
+
+// A conexão cai no meio da resposta — não é falha do agente (que viria como frame
+// `error`), é a rede sumindo. O balão do assistente já existe na tela nesse ponto.
+test('queda de rede no meio do stream não deixa um balão vazio no chat', async () => {
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    body: new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode(encodeFrame({ type: 'token', content: 'Sua receita foi ' }))
+        );
+        // A queda vem *depois* de o leitor consumir o que já estava na rede —
+        // `error()` síncrono esvaziaria a fila e o token nunca chegaria.
+        setTimeout(() => controller.error(new Error('network error')), 0);
+      },
+    }),
+  } as unknown as Response);
+
+  const { result } = renderHook(() => useAgentChat());
+
+  await act(async () => {
+    await result.current.sendMessage('qual a receita?', baseScope);
+  });
+
+  const doAssistente = result.current.messages.filter((m) => m.role === 'assistant');
+
+  // Um balão, não dois: o aviso entra no que já estava na tela.
+  expect(doAssistente).toHaveLength(1);
+  expect(doAssistente[0].content).toContain('Sua receita foi');
+  expect(doAssistente[0].content).toContain('erro');
+  expect(result.current.messages.some((m) => m.content === '')).toBe(false);
+});
+
+// Sem placeholder na tela (a rede caiu antes de qualquer byte), o aviso precisa
+// virar uma mensagem nova — senão a falha não aparece em lugar nenhum.
+test('falha antes do primeiro byte ainda produz mensagem de erro', async () => {
+  global.fetch = jest.fn().mockRejectedValue(new Error('network error'));
+
+  const { result } = renderHook(() => useAgentChat());
+
+  await act(async () => {
+    await result.current.sendMessage('qual a receita?', baseScope);
+  });
+
+  const doAssistente = result.current.messages.filter((m) => m.role === 'assistant');
+  expect(doAssistente).toHaveLength(1);
+  expect(doAssistente[0].content).toContain('erro');
+});
+
+// Comparar dois períodos numa pergunta só faz o modelo emitir dois tool_calls no
+// mesmo turno, e o LangGraph roda os dois em paralelo. Os frames se intercalam.
+test('com duas consultas em voo, o indicador só apaga quando a última termina', async () => {
+  const wire = makeControlledStream();
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, body: wire.stream } as unknown as Response);
+
+  const { result } = renderHook(() => useAgentChat());
+
+  act(() => {
+    void result.current.sendMessage('compare junho com maio', baseScope);
+  });
+
+  await wire.push({
+    type: 'tool_start',
+    tool: 'getPeriodSummary',
+    period: { startDate: '2026-06-01', endDate: '2026-06-30' },
+  });
+  await wire.push({
+    type: 'tool_start',
+    tool: 'getPeriodSummary',
+    period: { startDate: '2026-05-01', endDate: '2026-05-31' },
+  });
+
+  // A primeira volta; a segunda ainda está no banco.
+  await wire.push({ type: 'tool_end', tool: 'getPeriodSummary' });
+
+  expect(result.current.activeQuery).not.toBeNull();
+
+  // Só agora o agente parou de consultar.
+  await wire.push({ type: 'tool_end', tool: 'getPeriodSummary' });
+
+  expect(result.current.activeQuery).toBeNull();
+
+  await wire.push({ type: 'done' });
+  await wire.close();
+});
