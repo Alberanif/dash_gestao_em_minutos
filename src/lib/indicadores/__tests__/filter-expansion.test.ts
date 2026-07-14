@@ -34,6 +34,33 @@ describe("expandFilter", () => {
     expect(expanded.sources).toEqual({ meta: true, hotmart: true, leads: true });
   });
 
+  it("trata um filtro só-Meta: Hotmart e leads não configurados", () => {
+    const expanded = expandFilter(
+      makeFilter({ hotmart_products: [], captacao_leads_eventos: [] }),
+      null
+    );
+
+    expect(expanded.sources).toEqual({ meta: true, hotmart: false, leads: false });
+  });
+
+  it("trata um filtro só-leads: Meta e Hotmart não configurados", () => {
+    const expanded = expandFilter(
+      makeFilter({ meta_ads_terms: [], hotmart_products: [] }),
+      null
+    );
+
+    expect(expanded.sources).toEqual({ meta: false, hotmart: false, leads: true });
+  });
+
+  it("marca leads como configurado com um ou com vários eventos", () => {
+    expect(
+      expandFilter(makeFilter({ captacao_leads_eventos: ["Inscricao Webinar"] }), null).sources.leads
+    ).toBe(true);
+    expect(
+      expandFilter(makeFilter({ captacao_leads_eventos: ["Evento A", "Evento B"] }), null).sources.leads
+    ).toBe(true);
+  });
+
   it("trata um filtro só-Hotmart: Meta e leads não configurados", () => {
     const expanded = expandFilter(
       makeFilter({ meta_ads_terms: [], captacao_leads_eventos: [] }),

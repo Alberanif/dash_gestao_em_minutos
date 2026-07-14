@@ -8,6 +8,7 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^react-markdown$': '<rootDir>/__mocks__/react-markdown.tsx',
     '^remark-gfm$': '<rootDir>/__mocks__/remark-gfm.ts',
+    '\\.css$': '<rootDir>/__mocks__/style-mock.js',
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
