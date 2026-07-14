@@ -51,11 +51,12 @@ function validBody(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeRequest(body: unknown): NextRequest {
+function makeRequest(body: unknown, signal?: AbortSignal): NextRequest {
   return new NextRequest("http://localhost/api/agent/chat", {
     method: "POST",
     body: JSON.stringify(body),
     headers: { "Content-Type": "application/json" },
+    signal,
   });
 }
 
@@ -164,6 +165,24 @@ describe("POST /api/agent/chat", () => {
 
     expect(res.status).toBe(200);
     expect(await res.text()).toBe(notice);
+  });
+
+  it("entrega ao agente o cancelamento da request — desistir no cliente para o trabalho no servidor", async () => {
+    // Quando o usuário aperta parar, o fetch é abortado e a conexão cai. Se esse
+    // cancelamento não chegar ao agente, o modelo continua gerando — e cobrando —
+    // sem ninguém do outro lado para ler.
+    const client = new AbortController();
+
+    const { POST } = await import("../chat/route");
+    await POST(makeRequest(validBody(), client.signal));
+
+    const { signal } = mockStreamAgentResponse.mock.calls[0][0];
+    expect(signal).toBeDefined();
+    expect(signal?.aborted).toBe(false);
+
+    client.abort();
+
+    expect(signal?.aborted).toBe(true);
   });
 
   it("responde 200 como stream em request válida", async () => {
