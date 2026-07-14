@@ -130,6 +130,50 @@ describe("getPeriodSummary", () => {
     expect(summary.period).toEqual({ startDate: "2026-06-01", endDate: "2026-06-30" });
   });
 
+  it("devolve todas as seções numa call só — o modelo nunca raciocina sobre dado parcial", async () => {
+    supabase.setRows("dash_gestao_meta_ads_campaigns_daily", [
+      { spend: 100, impressions: 1000, link_clicks: 50, leads_all: 20, page_views: 30, checkout: 5 },
+    ]);
+    supabase.setRows("dash_gestao_hotmart_sales", [sale(250)]);
+    supabase.setRpc("dash_gestao_leads_unique_total", 40);
+    supabase.setRpc("dash_gestao_leads_by_event_unique", [{ evento: "evento-a", count: 40 }]);
+    supabase.setRpc("dash_gestao_leads_by_source", [{ source: "instagram", count: 40 }]);
+    supabase.setRpc("get_conversion_sources", [{ source: "instagram", count: 1 }]);
+
+    const summary = JSON.parse(
+      (await toolNamed("getPeriodSummary").invoke({
+        startDate: "2026-06-01",
+        endDate: "2026-06-30",
+      })) as string
+    );
+
+    expect(summary.meta.meta_spend).toBe(100);
+    expect(summary.hotmart.total_revenue).toBe(250);
+    expect(summary.hotmart.products).toHaveLength(1);
+    expect(summary.leads.total).toBe(40);
+    expect(summary.leads.by_event).toEqual([{ evento: "evento-a", count: 40 }]);
+    expect(summary.leads.by_source).toEqual([{ source: "instagram", count: 40 }]);
+    expect(summary.conversionSources).toEqual([{ source: "instagram", count: 1 }]);
+    // 250 / 100
+    expect(summary.derived.roas).toBeCloseTo(2.5);
+  });
+
+  it("entrega ROAS indisponível como null no JSON — o modelo não pode ler Infinity nem zero", async () => {
+    supabase.setRows("dash_gestao_meta_ads_campaigns_daily", [
+      { spend: 0, impressions: 0, link_clicks: 0, leads_all: 0, page_views: 0, checkout: 0 },
+    ]);
+    supabase.setRows("dash_gestao_hotmart_sales", [sale(250)]);
+
+    const summary = JSON.parse(
+      (await toolNamed("getPeriodSummary").invoke({
+        startDate: "2026-06-01",
+        endDate: "2026-06-30",
+      })) as string
+    );
+
+    expect(summary.derived).toEqual({ roas: null, cpa: null, conversionRate: null });
+  });
+
   it("propaga a falha da consulta em vez de devolver zero", async () => {
     supabase.setError("dash_gestao_hotmart_sales", "timeout no banco");
 
