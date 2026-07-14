@@ -1,42 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiAuth } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import type { ConversionSourceRow } from "@/types/indicadores";
-
-function brtToUtc(dateStr: string, endOfDay = false): string {
-  const time = endOfDay ? "T23:59:59" : "T00:00:00";
-  return new Date(`${dateStr}${time}-03:00`).toISOString();
-}
+import { expandFromSearchParams } from "@/lib/indicadores/filter-expansion";
+import {
+  fetchConversionSources,
+  fetchConversionSourcesUnscoped,
+} from "@/lib/indicadores/service/conversion-sources";
 
 export async function GET(request: NextRequest) {
   const { error } = await validateApiAuth();
   if (error) return error;
 
   const { searchParams } = request.nextUrl;
-  const start_date = searchParams.get("start_date");
-  const end_date = searchParams.get("end_date");
+  const startDate = searchParams.get("start_date");
+  const endDate = searchParams.get("end_date");
 
-  if (!start_date || !end_date) {
+  if (!startDate || !endDate) {
     return NextResponse.json({ error: "start_date and end_date are required" }, { status: 400 });
   }
 
-  const startUtc = brtToUtc(start_date, false);
-  const endUtc = brtToUtc(end_date, true);
-  const productIds = searchParams.getAll("product_ids[]").filter(Boolean);
-  const eventos = searchParams.getAll("eventos[]").filter(Boolean);
-
+  const filter = expandFromSearchParams(searchParams);
   const supabase = createSupabaseServiceClient();
+  const query = { period: { startDate, endDate }, filter };
 
-  const { data, error: rpcError } = await supabase.rpc("get_conversion_sources", {
-    p_start_date: startUtc,
-    p_end_date: endUtc,
-    ...(productIds.length > 0 ? { p_product_ids: productIds } : {}),
-    ...(eventos.length > 0 ? { p_eventos: eventos } : {}),
-  });
-
-  if (rpcError) {
-    return NextResponse.json({ error: rpcError.message }, { status: 500 });
+  try {
+    const sources = filter.sources.hotmart
+      ? await fetchConversionSources(query, supabase)
+      : await fetchConversionSourcesUnscoped(query, supabase);
+    return NextResponse.json(sources);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Erro ao buscar origens de conversão";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  return NextResponse.json(data as ConversionSourceRow[]);
 }
