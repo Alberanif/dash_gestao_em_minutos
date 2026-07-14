@@ -1,9 +1,19 @@
 import { useState } from 'react';
-import { createFrameParser } from '@/lib/agent/sse';
+import { createFrameParser, type FramePeriod } from '@/lib/agent/sse';
 
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
+}
+
+/**
+ * A consulta que o agente está executando *neste instante* — `null` quando ele
+ * não está consultando nada. É efêmera por natureza: nasce no `tool_start`,
+ * morre no `tool_end`.
+ */
+export interface ActiveQuery {
+  tool: string;
+  period: FramePeriod | null;
 }
 
 /**
@@ -21,6 +31,7 @@ export interface AgentScopeInput {
 export function useAgentChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [activeQuery, setActiveQuery] = useState<ActiveQuery | null>(null);
 
   async function sendMessage(text: string, scope: AgentScopeInput): Promise<void> {
     const userMessage: Message = { role: 'user', content: text };
@@ -75,6 +86,10 @@ export function useAgentChat() {
             if (frame.type === 'token') {
               accumulated += frame.content;
               render(accumulated);
+            } else if (frame.type === 'tool_start') {
+              setActiveQuery({ tool: frame.tool, period: frame.period });
+            } else if (frame.type === 'tool_end') {
+              setActiveQuery(null);
             } else if (frame.type === 'error') {
               // A resposta parcial não se perde: o aviso entra depois dela, não
               // no lugar dela. Sem conteúdo antes, o aviso é a resposta — o que
@@ -94,6 +109,10 @@ export function useAgentChat() {
       ]);
     } finally {
       setIsStreaming(false);
+      // Uma consulta que morre no meio (erro, timeout, abort) nunca manda o
+      // `tool_end` que a fecharia. Sem isto o indicador fica preso na tela para
+      // sempre, anunciando um trabalho que já acabou.
+      setActiveQuery(null);
     }
   }
 
@@ -101,5 +120,5 @@ export function useAgentChat() {
     setMessages([]);
   }
 
-  return { messages, isStreaming, sendMessage, clearHistory };
+  return { messages, isStreaming, activeQuery, sendMessage, clearHistory };
 }

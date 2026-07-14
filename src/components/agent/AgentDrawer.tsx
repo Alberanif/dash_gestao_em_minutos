@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatDayMonth } from '@/lib/agent/format-period';
 
 interface AgentDrawerProps {
   isOpen: boolean;
@@ -12,20 +13,6 @@ interface AgentDrawerProps {
   /** Código da oferta ativa; `null`/ausente quando nenhuma está selecionada. */
   offerCode?: string | null;
   children: React.ReactNode;
-}
-
-/**
- * Formata `YYYY-MM-DD` como `DD/MM`.
- *
- * Deliberadamente sem `new Date`: `new Date("2026-06-01")` é lido como UTC e,
- * em BRT (UTC-3), volta 31/05. A string já é a data que o usuário escolheu na
- * tela — basta reordenar os campos.
- */
-function formatDayMonth(isoDate: string): string | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
-  if (!match) return null;
-  const [, , month, day] = match;
-  return `${day}/${month}`;
 }
 
 function formatPeriod(startDate?: string | null, endDate?: string | null): string | null {
