@@ -148,6 +148,24 @@ describe("POST /api/agent/chat", () => {
     expect(arg.state.offerCode).toBe("OFERTA-X");
   });
 
+  it("entrega o erro do agente no corpo da resposta — o cliente nunca recebe stream vazio", async () => {
+    const notice = "⚠️ Não consegui consultar os dados: conexão recusada. Tente novamente em instantes.";
+    mockStreamAgentResponse.mockResolvedValue(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(notice));
+          controller.close();
+        },
+      })
+    );
+
+    const { POST } = await import("../chat/route");
+    const res = await POST(makeRequest(validBody()));
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe(notice);
+  });
+
   it("responde 200 como stream em request válida", async () => {
     const { POST } = await import("../chat/route");
     const res = await POST(makeRequest(validBody()));
