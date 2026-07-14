@@ -138,3 +138,65 @@ describe("getPeriodSummary", () => {
     ).rejects.toThrow("timeout no banco");
   });
 });
+
+describe("getDailySeries", () => {
+  it("aplica o filtro fechado por closure na série, no período que o modelo pediu", async () => {
+    supabase.setRows("dash_gestao_hotmart_sales", [sale(250)]);
+
+    const raw = await toolNamed("getDailySeries").invoke({
+      startDate: "2026-06-14",
+      endDate: "2026-06-16",
+    });
+    const { series } = JSON.parse(raw as string);
+
+    expect(series.map((p: { date: string; hotmart_sales: number }) => p.hotmart_sales)).toEqual([
+      0, 1, 0,
+    ]);
+
+    const query = supabase.queriesFor("dash_gestao_hotmart_sales")[0];
+    expect(query.in).toContainEqual(["product_id", ["111"]]);
+    expect(supabase.rpcCalls("dash_gestao_leads_daily_counts")[0].args.p_eventos).toEqual([
+      "evento-a",
+    ]);
+  });
+
+  it("ignora qualquer parâmetro de escopo que o modelo tente injetar", async () => {
+    await toolNamed("getDailySeries").invoke({
+      startDate: "2026-06-01",
+      endDate: "2026-06-02",
+      product_ids: ["999"],
+      filterId: "outro-filtro",
+    } as never);
+
+    const query = supabase.queriesFor("dash_gestao_hotmart_sales")[0];
+    expect(query.in).toContainEqual(["product_id", ["111"]]);
+    expect(query.in).not.toContainEqual(["product_id", ["999"]]);
+  });
+
+  it("informa o período consultado, para o modelo citar as datas certas da virada", async () => {
+    const payload = JSON.parse(
+      (await toolNamed("getDailySeries").invoke({
+        startDate: "2026-06-01",
+        endDate: "2026-06-02",
+      })) as string
+    );
+
+    expect(payload.period).toEqual({ startDate: "2026-06-01", endDate: "2026-06-02" });
+    expect(payload.sources).toEqual({ meta: true, hotmart: true, leads: true });
+  });
+
+  it("diz ao modelo quando usá-la e que o filtro já vai aplicado", () => {
+    const description = toolNamed("getDailySeries").description.toLowerCase();
+
+    expect(description).toContain("tendência");
+    expect(description).toContain("filtro ativo já é aplicado");
+  });
+
+  it("propaga a falha da consulta em vez de devolver série zerada", async () => {
+    supabase.setError("dash_gestao_hotmart_sales", "timeout no banco");
+
+    await expect(
+      toolNamed("getDailySeries").invoke({ startDate: "2026-06-01", endDate: "2026-06-02" })
+    ).rejects.toThrow("timeout no banco");
+  });
+});
