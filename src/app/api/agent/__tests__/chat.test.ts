@@ -1,14 +1,25 @@
-import { NextRequest } from "next/server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-// Mock validateApiAuth
 jest.mock("@/lib/utils/api-auth", () => ({
   validateApiAuth: jest.fn(),
 }));
 
-// Mock streamAgentResponse
 jest.mock("@/lib/agent/graph", () => ({
   streamAgentResponse: jest.fn(),
+}));
+
+const mockFilterLookup = jest.fn();
+
+jest.mock("@/lib/supabase/server", () => ({
+  createSupabaseServiceClient: jest.fn(() => ({
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: mockFilterLookup,
+        }),
+      }),
+    }),
+  })),
 }));
 
 import { validateApiAuth } from "@/lib/utils/api-auth";
@@ -17,22 +28,40 @@ import { streamAgentResponse } from "@/lib/agent/graph";
 const mockValidateApiAuth = validateApiAuth as jest.MockedFunction<typeof validateApiAuth>;
 const mockStreamAgentResponse = streamAgentResponse as jest.MockedFunction<typeof streamAgentResponse>;
 
-function makeRequest(body: unknown, headers: Record<string, string> = {}): NextRequest {
+const FILTER_ROW = {
+  id: "f-1",
+  account_id: "acc-1",
+  name: "Ingresso PC Ao Vivo",
+  hotmart_products: [{ product_id: "111", product_name: "Ingresso" }],
+  meta_ads_terms: ["PC Ao Vivo"],
+  captacao_leads_eventos: ["evento-a"],
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
+};
+
+function validBody(overrides: Record<string, unknown> = {}) {
+  return {
+    message: "Qual foi minha receita?",
+    history: [],
+    filterId: "f-1",
+    offerCode: null,
+    startDate: "2026-06-01",
+    endDate: "2026-06-30",
+    ...overrides,
+  };
+}
+
+function makeRequest(body: unknown): NextRequest {
   return new NextRequest("http://localhost/api/agent/chat", {
     method: "POST",
     body: JSON.stringify(body),
-    headers: {
-      "Content-Type": "application/json",
-      ...headers,
-    },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
-function makeReadableStream(text: string): ReadableStream<Uint8Array> {
-  const encoder = new TextEncoder();
+function emptyStream(): ReadableStream<Uint8Array> {
   return new ReadableStream<Uint8Array>({
     start(controller) {
-      controller.enqueue(encoder.encode(text));
       controller.close();
     },
   });
@@ -40,11 +69,13 @@ function makeReadableStream(text: string): ReadableStream<Uint8Array> {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockValidateApiAuth.mockResolvedValue({ error: null, userId: "user-1", role: "gestor" });
+  mockStreamAgentResponse.mockResolvedValue(emptyStream());
+  mockFilterLookup.mockResolvedValue({ data: FILTER_ROW, error: null });
 });
 
 describe("POST /api/agent/chat", () => {
-  it("retorna 401 quando não há autenticação", async () => {
-    // Arrange
+  it("retorna 401 sem sessão", async () => {
     mockValidateApiAuth.mockResolvedValue({
       error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
       userId: null,
@@ -52,87 +83,76 @@ describe("POST /api/agent/chat", () => {
     });
 
     const { POST } = await import("../chat/route");
-    const req = makeRequest({ message: "Olá" });
-
-    // Act
-    const res = await POST(req);
-
-    // Assert
-    expect(res.status).toBe(401);
+    expect((await POST(makeRequest(validBody()))).status).toBe(401);
   });
 
-  it("retorna 400 quando body não tem message", async () => {
-    // Arrange
-    mockValidateApiAuth.mockResolvedValue({
-      error: null,
-      userId: "user-1",
-      role: "gestor",
-    });
-
+  it("retorna 400 sem message", async () => {
     const { POST } = await import("../chat/route");
-    const req = makeRequest({ history: [], context: null });
+    const res = await POST(makeRequest(validBody({ message: undefined })));
 
-    // Act
-    const res = await POST(req);
-    const body = await res.json();
-
-    // Assert
     expect(res.status).toBe(400);
-    expect(body.error).toBe("message is required");
+    expect((await res.json()).error).toBe("message is required");
   });
 
-  it("retorna 200 com Content-Type text/event-stream em request válida", async () => {
-    // Arrange
-    mockValidateApiAuth.mockResolvedValue({
-      error: null,
-      userId: "user-1",
-      role: "gestor",
-    });
-    mockStreamAgentResponse.mockResolvedValue(makeReadableStream("resposta do agente"));
+  it("retorna 400 sem filterId — o agente não responde fora de um escopo", async () => {
+    const { POST } = await import("../chat/route");
+    const res = await POST(makeRequest(validBody({ filterId: undefined })));
+
+    expect(res.status).toBe(400);
+  });
+
+  it("retorna 400 quando o filterId não existe", async () => {
+    mockFilterLookup.mockResolvedValue({ data: null, error: { code: "PGRST116" } });
 
     const { POST } = await import("../chat/route");
-    const req = makeRequest({
-      message: "Qual é o CPL?",
-      history: [],
-      context: { startDate: "2026-05-01", endDate: "2026-05-31" },
-    });
+    const res = await POST(makeRequest(validBody({ filterId: "inexistente" })));
 
-    // Act
-    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(mockStreamAgentResponse).not.toHaveBeenCalled();
+  });
 
-    // Assert
+  it("carrega o filtro no servidor e passa o escopo expandido ao agente", async () => {
+    const { POST } = await import("../chat/route");
+    await POST(makeRequest(validBody()));
+
+    const arg = mockStreamAgentResponse.mock.calls[0][0];
+    expect(arg.scope.filter.productIds).toEqual(["111"]);
+    expect(arg.scope.filter.metaTerms).toEqual(["PC Ao Vivo"]);
+    expect(arg.state.filterName).toBe("Ingresso PC Ao Vivo");
+    expect(arg.state.period).toEqual({ startDate: "2026-06-01", endDate: "2026-06-30" });
+  });
+
+  it("ignora um objeto de filtro forjado pelo cliente — só o filterId conta", async () => {
+    const { POST } = await import("../chat/route");
+    await POST(
+      makeRequest(
+        validBody({
+          filter: {
+            hotmart_products: [{ product_id: "999", product_name: "Produto de outra pessoa" }],
+          },
+          context: { hotmartData: { total_revenue: 999999 } },
+        })
+      )
+    );
+
+    const arg = mockStreamAgentResponse.mock.calls[0][0];
+    expect(arg.scope.filter.productIds).toEqual(["111"]);
+  });
+
+  it("aplica o offerCode ao escopo", async () => {
+    const { POST } = await import("../chat/route");
+    await POST(makeRequest(validBody({ offerCode: "OFERTA-X" })));
+
+    const arg = mockStreamAgentResponse.mock.calls[0][0];
+    expect(arg.scope.filter.offerCode).toBe("OFERTA-X");
+    expect(arg.state.offerCode).toBe("OFERTA-X");
+  });
+
+  it("responde 200 como stream em request válida", async () => {
+    const { POST } = await import("../chat/route");
+    const res = await POST(makeRequest(validBody()));
+
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("text/event-stream");
-  });
-
-  it("repassa o cookie da request nos authHeaders das tool calls", async () => {
-    // Arrange
-    mockValidateApiAuth.mockResolvedValue({
-      error: null,
-      userId: "user-1",
-      role: "gestor",
-    });
-    mockStreamAgentResponse.mockResolvedValue(makeReadableStream("ok"));
-
-    const { POST } = await import("../chat/route");
-    const cookieValue = "session=abc123; other=xyz";
-    const req = makeRequest(
-      {
-        message: "teste",
-        history: [],
-        context: null,
-      },
-      { cookie: cookieValue }
-    );
-
-    // Act
-    await POST(req);
-
-    // Assert: streamAgentResponse was called with authHeaders containing the cookie
-    expect(mockStreamAgentResponse).toHaveBeenCalledWith(
-      expect.objectContaining({
-        authHeaders: { cookie: cookieValue },
-      })
-    );
   });
 });

@@ -12,7 +12,7 @@ import { TextDecoder as NodeTextDecoder, TextEncoder as NodeTextEncoder } from '
 
 import { renderHook, act } from '@testing-library/react';
 import { useAgentChat } from '../use-agent-chat';
-import type { DashboardContext } from '../use-agent-chat';
+import type { AgentScopeInput } from '../use-agent-chat';
 
 function makeStream(chunks: string[]): ReadableStream {
   return new ReadableStream({
@@ -25,14 +25,11 @@ function makeStream(chunks: string[]): ReadableStream {
   });
 }
 
-const baseCtx: DashboardContext = {
-  activeFilter: null,
+const baseScope: AgentScopeInput = {
+  filterId: 'f-1',
+  offerCode: null,
   startDate: '2026-01-01',
   endDate: '2026-01-31',
-  activePreset: null,
-  metaData: null,
-  hotmartData: null,
-  leadsData: null,
 };
 
 beforeEach(() => {
@@ -46,7 +43,7 @@ test('sendMessage adiciona mensagem do usuário imediatamente', async () => {
   const { result } = renderHook(() => useAgentChat());
 
   act(() => {
-    result.current.sendMessage('ola', baseCtx);
+    result.current.sendMessage('ola', baseScope);
   });
 
   expect(result.current.messages[0]).toEqual({ role: 'user', content: 'ola' });
@@ -64,7 +61,7 @@ test('isStreaming é true durante fetch e false ao terminar', async () => {
 
   // Start sendMessage without awaiting
   act(() => {
-    result.current.sendMessage('ola', baseCtx);
+    result.current.sendMessage('ola', baseScope);
   });
 
   // isStreaming should be true now — fetch hasn't resolved yet
@@ -90,7 +87,7 @@ test('resposta do assistente é acumulada chunk por chunk', async () => {
   const { result } = renderHook(() => useAgentChat());
 
   await act(async () => {
-    await result.current.sendMessage('ola', baseCtx);
+    await result.current.sendMessage('ola', baseScope);
   });
 
   expect(result.current.messages[1]).toEqual({ role: 'assistant', content: 'Ola mundo!' });
@@ -106,7 +103,7 @@ test('clearHistory esvazia messages', async () => {
   const { result } = renderHook(() => useAgentChat());
 
   await act(async () => {
-    await result.current.sendMessage('ola', baseCtx);
+    await result.current.sendMessage('ola', baseScope);
   });
 
   expect(result.current.messages.length).toBeGreaterThan(0);
@@ -129,7 +126,7 @@ test('histórico completo é enviado no body de cada request', async () => {
 
   // first message
   await act(async () => {
-    await result.current.sendMessage('msg1', baseCtx);
+    await result.current.sendMessage('msg1', baseScope);
   });
 
   // reset mock to fresh response
@@ -140,7 +137,7 @@ test('histórico completo é enviado no body de cada request', async () => {
 
   // second message
   await act(async () => {
-    await result.current.sendMessage('msg2', baseCtx);
+    await result.current.sendMessage('msg2', baseScope);
   });
 
   // reset mock again
@@ -151,7 +148,7 @@ test('histórico completo é enviado no body de cada request', async () => {
 
   // third message — history should contain the 4 previous messages
   await act(async () => {
-    await result.current.sendMessage('msg3', baseCtx);
+    await result.current.sendMessage('msg3', baseScope);
   });
 
   const thirdCallBody = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
@@ -163,14 +160,46 @@ test('histórico completo é enviado no body de cada request', async () => {
   expect(thirdCallBody.history[3]).toEqual({ role: 'assistant', content: 'ok2' });
 });
 
-// Behavior 6: network error → friendly error message + isStreaming false
+// Behavior 6: o cliente manda o id do filtro, nunca o conteúdo dele
+test('o body envia filterId e período, e nenhum objeto de filtro nem snapshot de métricas', async () => {
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    body: makeStream(['ok']),
+  } as unknown as Response);
+
+  const { result } = renderHook(() => useAgentChat());
+
+  await act(async () => {
+    await result.current.sendMessage('qual a receita?', {
+      filterId: 'f-1',
+      offerCode: 'OFERTA-X',
+      startDate: '2026-06-01',
+      endDate: '2026-06-30',
+    });
+  });
+
+  const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+
+  expect(body).toEqual({
+    message: 'qual a receita?',
+    history: [],
+    filterId: 'f-1',
+    offerCode: 'OFERTA-X',
+    startDate: '2026-06-01',
+    endDate: '2026-06-30',
+  });
+  expect(body).not.toHaveProperty('context');
+  expect(body).not.toHaveProperty('filter');
+});
+
+// Behavior 7: network error → friendly error message + isStreaming false
 test('erro de rede → mensagem de erro amigável e isStreaming false', async () => {
   global.fetch = jest.fn().mockRejectedValue(new Error('network error'));
 
   const { result } = renderHook(() => useAgentChat());
 
   await act(async () => {
-    await result.current.sendMessage('ola', baseCtx);
+    await result.current.sendMessage('ola', baseScope);
   });
 
   expect(result.current.messages[1].role).toBe('assistant');

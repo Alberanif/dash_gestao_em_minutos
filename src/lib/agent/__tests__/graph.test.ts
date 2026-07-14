@@ -1,182 +1,125 @@
-import type { DashboardContext } from "../types";
-
-// Mock @langchain/openai before importing graph
 jest.mock("@langchain/openai", () => ({
-  ChatOpenAI: jest.fn(),
+  ChatOpenAI: jest.fn().mockImplementation((config) => ({ config })),
 }));
 
-// Mock @langchain/langgraph/prebuilt
+const mockStreamEvents = jest.fn();
+
 jest.mock("@langchain/langgraph/prebuilt", () => ({
-  createReactAgent: jest.fn(),
-}));
-
-// Mock @langchain/core/messages
-jest.mock("@langchain/core/messages", () => ({
-  HumanMessage: jest.fn().mockImplementation((content: string) => ({ _type: "human", content })),
-  AIMessage: jest.fn().mockImplementation((content: string) => ({ _type: "ai", content })),
-  SystemMessage: jest.fn().mockImplementation((content: string) => ({ _type: "system", content })),
-}));
-
-// Mock tools module
-jest.mock("../tools", () => ({
-  getMetaAdsMetrics: jest.fn(),
-  getHotmartMetrics: jest.fn(),
-  getLeadsMetrics: jest.fn(),
-  getDailySeries: jest.fn(),
+  createReactAgent: jest.fn(() => ({ streamEvents: mockStreamEvents })),
 }));
 
 import { ChatOpenAI } from "@langchain/openai";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
-import { streamAgentResponse } from "../graph";
+import { streamAgentResponse, type StreamAgentInput } from "../graph";
+import { expandFilter } from "@/lib/indicadores/filter-expansion";
+import { makeFakeSupabase } from "@/lib/indicadores/__tests__/fake-supabase";
 
-const MockChatOpenAI = ChatOpenAI as jest.MockedClass<typeof ChatOpenAI>;
-const mockCreateReactAgent = createReactAgent as jest.MockedFunction<typeof createReactAgent>;
+const MockChatOpenAI = ChatOpenAI as unknown as jest.Mock;
+const mockCreateReactAgent = createReactAgent as unknown as jest.Mock;
 
-function makeContext(overrides: Partial<DashboardContext> = {}): DashboardContext {
-  return {
-    activeFilter: null,
-    startDate: "2026-05-01",
-    endDate: "2026-05-31",
-    activePreset: "last30days",
-    metaData: null,
-    hotmartData: null,
-    leadsData: null,
-    ...overrides,
-  };
-}
-
-function makeAsyncGenerator<T>(items: T[]): AsyncGenerator<T> {
+function tokenEvents(...tokens: string[]) {
   return (async function* () {
-    for (const item of items) {
-      yield item;
+    for (const token of tokens) {
+      yield { event: "on_chat_model_stream", data: { chunk: { content: token } } };
     }
   })();
 }
 
+function input(overrides: Partial<StreamAgentInput> = {}): StreamAgentInput {
+  const filter = expandFilter({
+    id: "f-1",
+    account_id: "acc-1",
+    name: "Ingresso",
+    hotmart_products: [{ product_id: "111", product_name: "Ingresso" }],
+    meta_ads_terms: [],
+    captacao_leads_eventos: [],
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  });
+
+  return {
+    message: "Qual foi minha receita?",
+    history: [],
+    scope: { filter, supabase: makeFakeSupabase().client },
+    state: {
+      today: "2026-07-14",
+      period: { startDate: "2026-06-01", endDate: "2026-06-30" },
+      filterName: "Ingresso",
+      offerCode: null,
+      sources: filter.sources,
+    },
+    ...overrides,
+  };
+}
+
+async function drain(stream: ReadableStream<Uint8Array>): Promise<string> {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let out = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    out += decoder.decode(value, { stream: true });
+  }
+  return out;
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockStreamEvents.mockReturnValue(tokenEvents());
+});
+
 describe("streamAgentResponse", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+  it("emite os tokens do modelo no stream", async () => {
+    mockStreamEvents.mockReturnValue(tokenEvents("Sua receita ", "foi ", "R$ 250."));
+
+    const stream = await streamAgentResponse(input());
+
+    expect(await drain(stream)).toBe("Sua receita foi R$ 250.");
   });
 
-  it("retorna um ReadableStream", async () => {
-    // Arrange: mock agent with empty stream
-    const mockGraph = {
-      streamEvents: jest.fn().mockReturnValue(makeAsyncGenerator([])),
-    };
-    mockCreateReactAgent.mockReturnValue(mockGraph as unknown as ReturnType<typeof createReactAgent>);
-    MockChatOpenAI.mockImplementation(() => ({}) as unknown as InstanceType<typeof ChatOpenAI>);
+  it("usa o modelo configurado em AGENT_MODEL", async () => {
+    process.env.AGENT_MODEL = "gpt-5";
 
-    // Act
-    const result = await streamAgentResponse({
-      message: "Olá",
-      history: [],
-      context: makeContext(),
-      authHeaders: {},
-    });
+    await streamAgentResponse(input());
 
-    // Assert
-    expect(result).toBeInstanceOf(ReadableStream);
+    expect(MockChatOpenAI).toHaveBeenCalledWith(expect.objectContaining({ model: "gpt-5" }));
+    delete process.env.AGENT_MODEL;
   });
 
-  it("o stream emite texto quando o LLM responde com tokens", async () => {
-    // Arrange: simulate on_chat_model_stream events (ChatOpenAI emits AIMessageChunk with .content)
-    const events = [
-      { event: "on_chat_model_stream", data: { chunk: { content: "Olá, " } } },
-      { event: "on_chat_model_stream", data: { chunk: { content: "como posso ajudar?" } } },
-    ];
-    const mockGraph = {
-      streamEvents: jest.fn().mockReturnValue(makeAsyncGenerator(events)),
-    };
-    mockCreateReactAgent.mockReturnValue(mockGraph as unknown as ReturnType<typeof createReactAgent>);
-    MockChatOpenAI.mockImplementation(() => ({}) as unknown as InstanceType<typeof ChatOpenAI>);
+  it("dá ao modelo apenas tools de escopo fechado — nenhuma aceita filtro", async () => {
+    await streamAgentResponse(input());
 
-    // Act
-    const stream = await streamAgentResponse({
-      message: "Olá",
-      history: [],
-      context: makeContext(),
-      authHeaders: {},
-    });
-
-    // Collect all chunks from the stream
-    const reader = stream.getReader();
-    const decoder = new TextDecoder();
-    let text = "";
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      text += decoder.decode(value);
+    const { tools } = mockCreateReactAgent.mock.calls[0][0];
+    expect(tools.length).toBeGreaterThan(0);
+    for (const tool of tools) {
+      expect(Object.keys(tool.schema.shape).sort()).toEqual(["endDate", "startDate"]);
     }
-
-    // Assert
-    expect(text).toContain("Olá, ");
-    expect(text).toContain("como posso ajudar?");
   });
 
-  it("quando há histórico, as mensagens anteriores são incluídas no grafo", async () => {
-    // Arrange
-    const mockGraph = {
-      streamEvents: jest.fn().mockReturnValue(makeAsyncGenerator([])),
-    };
-    mockCreateReactAgent.mockReturnValue(mockGraph as unknown as ReturnType<typeof createReactAgent>);
-    MockChatOpenAI.mockImplementation(() => ({}) as unknown as InstanceType<typeof ChatOpenAI>);
+  it("manda o histórico da conversa antes da mensagem atual", async () => {
+    await streamAgentResponse(
+      input({
+        history: [
+          { role: "user", content: "e em maio?" },
+          { role: "assistant", content: "Em maio foram R$ 100." },
+        ],
+      })
+    );
 
-    const history = [
-      { role: "user" as const, content: "Qual foi o spend de ontem?" },
-      { role: "assistant" as const, content: "O spend foi R$ 500." },
-    ];
-
-    // Act
-    await streamAgentResponse({
-      message: "E hoje?",
-      history,
-      context: makeContext(),
-      authHeaders: {},
-    });
-
-    // Assert: streamEvents was called with messages containing the history
-    expect(mockGraph.streamEvents).toHaveBeenCalledTimes(1);
-    const callArgs = mockGraph.streamEvents.mock.calls[0][0];
-    const messages: Array<{ _type: string; content: string }> = callArgs.messages;
-
-    // Should include history messages + current message
-    const contents = messages.map((m) => m.content);
-    expect(contents).toContain("Qual foi o spend de ontem?");
-    expect(contents).toContain("O spend foi R$ 500.");
-    expect(contents).toContain("E hoje?");
+    const { messages } = mockStreamEvents.mock.calls[0][0];
+    expect(messages).toHaveLength(4); // system + 2 de histórico + mensagem atual
+    expect(messages[messages.length - 1].content).toBe("Qual foi minha receita?");
   });
 
-  it("eventos que não são on_chat_model_stream são ignorados", async () => {
-    // Arrange: mix of event types
-    const events = [
-      { event: "on_chain_start", data: {} },
-      { event: "on_chat_model_stream", data: { chunk: { content: "token" } } },
-      { event: "on_tool_start", data: {} },
-    ];
-    const mockGraph = {
-      streamEvents: jest.fn().mockReturnValue(makeAsyncGenerator(events)),
-    };
-    mockCreateReactAgent.mockReturnValue(mockGraph as unknown as ReturnType<typeof createReactAgent>);
-    MockChatOpenAI.mockImplementation(() => ({}) as unknown as InstanceType<typeof ChatOpenAI>);
+  it("injeta o system prompt com o estado da tela e nenhum número", async () => {
+    await streamAgentResponse(input());
 
-    // Act
-    const stream = await streamAgentResponse({
-      message: "teste",
-      history: [],
-      context: makeContext(),
-      authHeaders: {},
-    });
+    const { messages } = mockStreamEvents.mock.calls[0][0];
+    const systemPrompt = messages[0].content as string;
 
-    const reader = stream.getReader();
-    const decoder = new TextDecoder();
-    let text = "";
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      text += decoder.decode(value);
-    }
-
-    // Assert: only the llm_stream token was emitted
-    expect(text).toBe("token");
+    expect(systemPrompt).toContain("2026-07-14");
+    expect(systemPrompt).toContain("Ingresso");
+    expect(systemPrompt).not.toContain("total_revenue");
   });
 });

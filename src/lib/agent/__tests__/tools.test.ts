@@ -1,218 +1,140 @@
-import {
-  getMetaAdsMetrics,
-  getHotmartMetrics,
-  getLeadsMetrics,
-  getDailySeries,
-} from "../tools";
-import type { GlobalMetrics, GlobalHotmartMetrics, GlobalLeadsMetrics, DailyPoint } from "@/types/indicadores";
+import { z } from "zod";
+import { buildAgentTools } from "../tools";
+import { expandFilter } from "@/lib/indicadores/filter-expansion";
+import { makeFakeSupabase, type FakeSupabase } from "@/lib/indicadores/__tests__/fake-supabase";
+import type { FilterRecord } from "@/types/indicadores";
 
-const params = { startDate: "2026-05-01", endDate: "2026-05-31", filterId: "filter-abc" };
-const authHeaders = { Authorization: "Bearer token-xyz", "x-account-id": "acc-1" };
+const FILTER: FilterRecord = {
+  id: "f-1",
+  account_id: "acc-1",
+  name: "Ingresso PC Ao Vivo",
+  hotmart_products: [{ product_id: "111", product_name: "Ingresso" }],
+  meta_ads_terms: ["PC Ao Vivo"],
+  captacao_leads_eventos: ["evento-a"],
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
+};
 
-function makeOkResponse(body: unknown): Response {
+function sale(price: number, product_id = "111") {
   return {
-    ok: true,
-    status: 200,
-    json: () => Promise.resolve(body),
-  } as unknown as Response;
+    product_id,
+    product_name: "Ingresso",
+    price,
+    currency: "BRL",
+    status: "APPROVED",
+    purchase_date: "2026-06-15T12:00:00.000Z",
+  };
 }
 
-function makeErrorResponse(status: number): Response {
-  return {
-    ok: false,
-    status,
-    json: () => Promise.resolve({ error: "Not found" }),
-  } as unknown as Response;
+let supabase: FakeSupabase;
+
+function buildTools(filter = expandFilter(FILTER)) {
+  return buildAgentTools({ filter, supabase: supabase.client });
 }
 
-describe("getMetaAdsMetrics", () => {
-  let mockFetch: jest.Mock;
+function schemaKeys(tool: { schema: unknown }): string[] {
+  return Object.keys((tool.schema as z.ZodObject<z.ZodRawShape>).shape ?? {});
+}
 
-  beforeEach(() => {
-    mockFetch = jest.fn();
-    global.fetch = mockFetch;
+function toolNamed(name: string) {
+  const tool = buildTools().find((t) => t.name === name);
+  if (!tool) throw new Error(`tool ${name} não existe`);
+  return tool;
+}
+
+beforeEach(() => {
+  supabase = makeFakeSupabase();
+});
+
+describe("schema exposto ao modelo", () => {
+  it("aceita somente startDate e endDate — o modelo não tem como pedir outro escopo", () => {
+    for (const tool of buildTools()) {
+      const shape = schemaKeys(tool);
+      expect(shape.sort()).toEqual(["endDate", "startDate"]);
+    }
   });
 
-  it("faz fetch para URL correta com params corretos", async () => {
-    mockFetch.mockResolvedValueOnce(makeOkResponse({}));
-    await getMetaAdsMetrics(params, authHeaders);
-
-    const url: string = mockFetch.mock.calls[0][0];
-    expect(url).toContain("/api/indicadores/metrics");
-    expect(url).toContain("start_date=2026-05-01");
-    expect(url).toContain("end_date=2026-05-31");
-    expect(url).toContain("filter_id=filter-abc");
-  });
-
-  it("repassa authHeaders no fetch", async () => {
-    mockFetch.mockResolvedValueOnce(makeOkResponse({}));
-    await getMetaAdsMetrics(params, authHeaders);
-
-    const options = mockFetch.mock.calls[0][1];
-    expect(options.headers).toMatchObject(authHeaders);
-  });
-
-  it("retorna dados parseados do JSON quando status ok", async () => {
-    const mockData: GlobalMetrics = {
-      meta_spend: 999,
-      meta_cpm: 5,
-      meta_ctr: 0.01,
-      meta_leads: 200,
-      meta_checkout: 40,
-      meta_impressions: 50000,
-      meta_link_clicks: 1000,
-      meta_page_views: 900,
-      meta_connect_rate: null,
-      meta_lp_conversion: null,
-      meta_cpl_traffic: 4.99,
-    };
-    mockFetch.mockResolvedValueOnce(makeOkResponse(mockData));
-    const result = await getMetaAdsMetrics(params, authHeaders);
-    expect(result).toEqual(mockData);
-  });
-
-  it("lança Error com mensagem descritiva quando status >= 400", async () => {
-    mockFetch.mockResolvedValueOnce(makeErrorResponse(404));
-    await expect(getMetaAdsMetrics(params, authHeaders)).rejects.toThrow(/meta.?ads/i);
+  it("não expõe filterId, product_ids nem qualquer parâmetro de filtro", () => {
+    for (const tool of buildTools()) {
+      const shape = schemaKeys(tool);
+      expect(shape).not.toContain("filterId");
+      expect(shape).not.toContain("filter_id");
+      expect(shape).not.toContain("productIds");
+    }
   });
 });
 
-describe("getHotmartMetrics", () => {
-  let mockFetch: jest.Mock;
+describe("getPeriodSummary", () => {
+  it("aplica o filtro fechado por closure na consulta, no período que o modelo pediu", async () => {
+    supabase.setRows("dash_gestao_hotmart_sales", [sale(250)]);
 
-  beforeEach(() => {
-    mockFetch = jest.fn();
-    global.fetch = mockFetch;
+    const raw = await toolNamed("getPeriodSummary").invoke({
+      startDate: "2026-06-01",
+      endDate: "2026-06-30",
+    });
+    const summary = JSON.parse(raw as string);
+
+    expect(summary.hotmart.total_revenue).toBe(250);
+    const query = supabase.queriesFor("dash_gestao_hotmart_sales")[0];
+    expect(query.in).toContainEqual(["product_id", ["111"]]);
+    expect(query.gte).toContainEqual(["purchase_date", "2026-06-01T03:00:00.000Z"]);
   });
 
-  it("faz fetch para URL correta com params corretos", async () => {
-    mockFetch.mockResolvedValueOnce(makeOkResponse({}));
-    await getHotmartMetrics(params, authHeaders);
+  it("mantém o filtro em um período diferente do da tela", async () => {
+    supabase.setRows("dash_gestao_hotmart_sales", [sale(80)]);
 
-    const url: string = mockFetch.mock.calls[0][0];
-    expect(url).toContain("/api/indicadores/hotmart");
-    expect(url).toContain("start_date=2026-05-01");
-    expect(url).toContain("end_date=2026-05-31");
-    expect(url).toContain("filter_id=filter-abc");
+    await toolNamed("getPeriodSummary").invoke({
+      startDate: "2026-05-01",
+      endDate: "2026-05-31",
+    });
+
+    const query = supabase.queriesFor("dash_gestao_hotmart_sales")[0];
+    expect(query.in).toContainEqual(["product_id", ["111"]]);
+    expect(query.gte).toContainEqual(["purchase_date", "2026-05-01T03:00:00.000Z"]);
   });
 
-  it("repassa authHeaders no fetch", async () => {
-    mockFetch.mockResolvedValueOnce(makeOkResponse({}));
-    await getHotmartMetrics(params, authHeaders);
+  it("ignora qualquer parâmetro de escopo que o modelo tente injetar", async () => {
+    supabase.setRows("dash_gestao_hotmart_sales", [sale(100)]);
 
-    const options = mockFetch.mock.calls[0][1];
-    expect(options.headers).toMatchObject(authHeaders);
+    await toolNamed("getPeriodSummary").invoke({
+      startDate: "2026-06-01",
+      endDate: "2026-06-30",
+      product_ids: ["999"],
+      filterId: "outro-filtro",
+    } as never);
+
+    const query = supabase.queriesFor("dash_gestao_hotmart_sales")[0];
+    expect(query.in).toContainEqual(["product_id", ["111"]]);
+    expect(query.in).not.toContainEqual(["product_id", ["999"]]);
   });
 
-  it("retorna dados parseados do JSON quando status ok", async () => {
-    const mockData: GlobalHotmartMetrics = {
-      products: [],
-      total_sales: 80,
-      total_sales_brl: 70,
-      total_sales_foreign: 10,
-      total_revenue: 32000,
-    };
-    mockFetch.mockResolvedValueOnce(makeOkResponse(mockData));
-    const result = await getHotmartMetrics(params, authHeaders);
-    expect(result).toEqual(mockData);
+  it("declara quais fontes estão configuradas, para o modelo não confundir ausência com zero", async () => {
+    const semMeta = expandFilter({ ...FILTER, meta_ads_terms: [] });
+    const tool = buildTools(semMeta).find((t) => t.name === "getPeriodSummary")!;
+
+    const summary = JSON.parse(
+      (await tool.invoke({ startDate: "2026-06-01", endDate: "2026-06-30" })) as string
+    );
+
+    expect(summary.sources).toEqual({ meta: false, hotmart: true, leads: true });
   });
 
-  it("lança Error com mensagem descritiva quando status >= 400", async () => {
-    mockFetch.mockResolvedValueOnce(makeErrorResponse(500));
-    await expect(getHotmartMetrics(params, authHeaders)).rejects.toThrow(/hotmart/i);
-  });
-});
+  it("informa o período consultado no retorno, para o modelo citar as datas certas", async () => {
+    const summary = JSON.parse(
+      (await toolNamed("getPeriodSummary").invoke({
+        startDate: "2026-06-01",
+        endDate: "2026-06-30",
+      })) as string
+    );
 
-describe("getLeadsMetrics", () => {
-  let mockFetch: jest.Mock;
-
-  beforeEach(() => {
-    mockFetch = jest.fn();
-    global.fetch = mockFetch;
+    expect(summary.period).toEqual({ startDate: "2026-06-01", endDate: "2026-06-30" });
   });
 
-  it("faz fetch para URL correta com params corretos", async () => {
-    mockFetch.mockResolvedValueOnce(makeOkResponse({}));
-    await getLeadsMetrics(params, authHeaders);
+  it("propaga a falha da consulta em vez de devolver zero", async () => {
+    supabase.setError("dash_gestao_hotmart_sales", "timeout no banco");
 
-    const url: string = mockFetch.mock.calls[0][0];
-    expect(url).toContain("/api/indicadores/leads");
-    expect(url).toContain("start_date=2026-05-01");
-    expect(url).toContain("end_date=2026-05-31");
-    expect(url).toContain("filter_id=filter-abc");
-  });
-
-  it("repassa authHeaders no fetch", async () => {
-    mockFetch.mockResolvedValueOnce(makeOkResponse({}));
-    await getLeadsMetrics(params, authHeaders);
-
-    const options = mockFetch.mock.calls[0][1];
-    expect(options.headers).toMatchObject(authHeaders);
-  });
-
-  it("retorna dados parseados do JSON quando status ok", async () => {
-    const mockData: GlobalLeadsMetrics = {
-      total: 350,
-      by_event: [{ evento: "PageView", count: 100 }],
-      by_source: [{ source: "instagram", count: 200 }],
-    };
-    mockFetch.mockResolvedValueOnce(makeOkResponse(mockData));
-    const result = await getLeadsMetrics(params, authHeaders);
-    expect(result).toEqual(mockData);
-  });
-
-  it("lança Error com mensagem descritiva quando status >= 400", async () => {
-    mockFetch.mockResolvedValueOnce(makeErrorResponse(403));
-    await expect(getLeadsMetrics(params, authHeaders)).rejects.toThrow(/leads/i);
-  });
-});
-
-describe("getDailySeries", () => {
-  let mockFetch: jest.Mock;
-
-  beforeEach(() => {
-    mockFetch = jest.fn();
-    global.fetch = mockFetch;
-  });
-
-  it("faz fetch para URL correta com params corretos", async () => {
-    mockFetch.mockResolvedValueOnce(makeOkResponse([]));
-    await getDailySeries(params, authHeaders);
-
-    const url: string = mockFetch.mock.calls[0][0];
-    expect(url).toContain("/api/indicadores/daily");
-    expect(url).toContain("start_date=2026-05-01");
-    expect(url).toContain("end_date=2026-05-31");
-    expect(url).toContain("filter_id=filter-abc");
-  });
-
-  it("repassa authHeaders no fetch", async () => {
-    mockFetch.mockResolvedValueOnce(makeOkResponse([]));
-    await getDailySeries(params, authHeaders);
-
-    const options = mockFetch.mock.calls[0][1];
-    expect(options.headers).toMatchObject(authHeaders);
-  });
-
-  it("retorna dados parseados do JSON quando status ok", async () => {
-    const mockData: DailyPoint[] = [
-      {
-        date: "2026-05-01",
-        meta_spend: 50,
-        meta_leads: 10,
-        meta_cpl_traffic: 5,
-        meta_checkout: 2,
-        hotmart_sales: 3,
-        lead_captacoes: 8,
-      },
-    ];
-    mockFetch.mockResolvedValueOnce(makeOkResponse(mockData));
-    const result = await getDailySeries(params, authHeaders);
-    expect(result).toEqual(mockData);
-  });
-
-  it("lança Error com mensagem descritiva quando status >= 400", async () => {
-    mockFetch.mockResolvedValueOnce(makeErrorResponse(400));
-    await expect(getDailySeries(params, authHeaders)).rejects.toThrow(/daily|série/i);
+    await expect(
+      toolNamed("getPeriodSummary").invoke({ startDate: "2026-06-01", endDate: "2026-06-30" })
+    ).rejects.toThrow("timeout no banco");
   });
 });

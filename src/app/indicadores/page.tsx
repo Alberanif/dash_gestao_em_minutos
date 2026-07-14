@@ -17,7 +17,6 @@ import { FilterDropdown } from "@/components/indicadores/filter-dropdown";
 import { FilterModal } from "@/components/indicadores/filter-modal";
 import { IndicadoresEmptyState } from "@/components/indicadores/indicadores-empty-state";
 import { useAgentChat } from "@/hooks/use-agent-chat";
-import type { DashboardContext } from "@/hooks/use-agent-chat";
 import { AgentFAB } from "@/components/agent/AgentFAB";
 import { AgentDrawer } from "@/components/agent/AgentDrawer";
 import { ChatMessageList } from "@/components/agent/ChatMessageList";
@@ -375,16 +374,13 @@ export default function IndicadoresPage() {
   }
 
   function handleSend(text: string) {
-    const ctx: DashboardContext = {
-      activeFilter,
+    if (!activeFilter) return;
+    sendMessage(text, {
+      filterId: activeFilter.id,
+      offerCode: activeOfferCode,
       startDate,
       endDate,
-      activePreset,
-      metaData: metaState.data,
-      hotmartData: hotmartState.data,
-      leadsData: leadsState.data,
-    };
-    sendMessage(text, ctx);
+    });
   }
 
   // ── Derived source flags ──────────────────────────────────────────────────

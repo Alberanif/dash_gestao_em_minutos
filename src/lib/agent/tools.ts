@@ -1,55 +1,51 @@
-import type {
-  GlobalMetrics,
-  GlobalHotmartMetrics,
-  GlobalLeadsMetrics,
-  DailyPoint,
-} from "@/types/indicadores";
+import { DynamicStructuredTool } from "@langchain/core/tools";
+import { z } from "zod";
+import type { ExpandedFilter, Period } from "@/lib/indicadores/filter-expansion";
+import type { SupabaseLike } from "@/lib/indicadores/service/types";
+import { fetchHotmartMetrics } from "@/lib/indicadores/service/hotmart";
 
-export type ToolParams = { startDate: string; endDate: string; filterId: string };
-export type AuthHeaders = Record<string, string>;
-
-const BASE_URL = "http://localhost:3000";
-
-function buildUrl(path: string, params: ToolParams): string {
-  return `${BASE_URL}${path}?start_date=${params.startDate}&end_date=${params.endDate}&filter_id=${params.filterId}`;
+/**
+ * O escopo é fechado por closure no servidor, no momento em que as tools são
+ * construídas. O modelo enxerga apenas o intervalo de datas: é *impossível* ele
+ * consultar fora do filtro ativo, mesmo alucinando um parâmetro.
+ */
+export interface AgentScope {
+  filter: ExpandedFilter;
+  supabase: SupabaseLike;
 }
 
-async function fetchTool<T>(url: string, authHeaders: AuthHeaders, errorLabel: string): Promise<T> {
-  const response = await fetch(url, { headers: authHeaders });
-  if (!response.ok) {
-    throw new Error(`Erro ao buscar dados de ${errorLabel}: status ${response.status}`);
-  }
-  return response.json() as Promise<T>;
+const periodSchema = z.object({
+  startDate: z.string().describe("Data inicial no formato YYYY-MM-DD"),
+  endDate: z.string().describe("Data final no formato YYYY-MM-DD"),
+});
+
+export async function buildPeriodSummary(
+  period: Period,
+  scope: AgentScope
+): Promise<Record<string, unknown>> {
+  const hotmart = await fetchHotmartMetrics({ period, filter: scope.filter }, scope.supabase);
+
+  return {
+    period,
+    sources: scope.filter.sources,
+    hotmart,
+  };
 }
 
-export async function getMetaAdsMetrics(
-  params: ToolParams,
-  authHeaders: AuthHeaders
-): Promise<GlobalMetrics> {
-  const url = buildUrl("/api/indicadores/metrics", params);
-  return fetchTool<GlobalMetrics>(url, authHeaders, "Meta Ads");
-}
-
-export async function getHotmartMetrics(
-  params: ToolParams,
-  authHeaders: AuthHeaders
-): Promise<GlobalHotmartMetrics> {
-  const url = buildUrl("/api/indicadores/hotmart", params);
-  return fetchTool<GlobalHotmartMetrics>(url, authHeaders, "Hotmart");
-}
-
-export async function getLeadsMetrics(
-  params: ToolParams,
-  authHeaders: AuthHeaders
-): Promise<GlobalLeadsMetrics> {
-  const url = buildUrl("/api/indicadores/leads", params);
-  return fetchTool<GlobalLeadsMetrics>(url, authHeaders, "Leads");
-}
-
-export async function getDailySeries(
-  params: ToolParams,
-  authHeaders: AuthHeaders
-): Promise<DailyPoint[]> {
-  const url = buildUrl("/api/indicadores/daily", params);
-  return fetchTool<DailyPoint[]>(url, authHeaders, "série diária");
+export function buildAgentTools(scope: AgentScope): DynamicStructuredTool[] {
+  return [
+    new DynamicStructuredTool({
+      name: "getPeriodSummary",
+      description:
+        "Retorna os números do período no escopo do filtro ativo: receita e vendas Hotmart, " +
+        "quebra por produto, e quais fontes de dados estão configuradas. " +
+        "O filtro ativo já é aplicado automaticamente — informe apenas o intervalo de datas. " +
+        "Para comparar dois períodos, chame esta tool duas vezes.",
+      schema: periodSchema,
+      func: async ({ startDate, endDate }) => {
+        const summary = await buildPeriodSummary({ startDate, endDate }, scope);
+        return JSON.stringify(summary);
+      },
+    }),
+  ];
 }
