@@ -34,6 +34,9 @@ export interface GlobalLeadsMetrics {
   by_source: Array<{ source: string; count: number }>;
 }
 
+export const FILTER_STATUSES = ["ativo", "finalizado", "cancelado"] as const;
+export type FilterStatus = (typeof FILTER_STATUSES)[number];
+
 export interface FilterRecord {
   id: string;
   account_id: string;
@@ -41,6 +44,8 @@ export interface FilterRecord {
   hotmart_products: Array<{ product_id: string; product_name: string }>;
   meta_ads_terms: string[];
   captacao_leads_eventos: string[];
+  status: FilterStatus;
+  status_changed_at: string | null;
   created_at: string;
   updated_at: string;
 }

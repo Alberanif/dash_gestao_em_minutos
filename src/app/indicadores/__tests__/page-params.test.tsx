@@ -27,6 +27,8 @@ const FULL_FILTER: FilterRecord = {
   ],
   meta_ads_terms: ["PC Ao Vivo", "Ingresso"],
   captacao_leads_eventos: ["evento-a", "evento-b"],
+  status: "ativo",
+  status_changed_at: null,
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-01T00:00:00Z",
 };

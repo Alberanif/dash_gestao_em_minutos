@@ -17,6 +17,8 @@ function filterWith(products: string[]): FilterRecord {
     hotmart_products: products.map((id) => ({ product_id: id, product_name: `Produto ${id}` })),
     meta_ads_terms: [],
     captacao_leads_eventos: [],
+    status: "ativo",
+    status_changed_at: null,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
   };

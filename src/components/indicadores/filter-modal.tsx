@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import type { FilterRecord } from "@/types/indicadores";
+import type { FilterRecord, FilterStatus } from "@/types/indicadores";
+
+const STATUS_OPTIONS: Array<{ value: FilterStatus; label: string; accent: string }> = [
+  { value: "ativo", label: "Ativo", accent: "var(--green)" },
+  { value: "finalizado", label: "Finalizado", accent: "var(--link)" },
+  { value: "cancelado", label: "Cancelado", accent: "var(--red)" },
+];
 
 interface HotmartProduct {
   product_id: string;
@@ -46,6 +52,7 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
   const [captacaoLeadsEventos, setCaptacaoLeadsEventos] = useState<string[]>(
     editTarget?.captacao_leads_eventos ?? []
   );
+  const [status, setStatus] = useState<FilterStatus>(editTarget?.status ?? "ativo");
   const [availableEventos, setAvailableEventos] = useState<string[]>([]);
   const [loadingEventos, setLoadingEventos] = useState(false);
   const [productOptions, setProductOptions] = useState<HotmartProduct[]>([]);
@@ -158,7 +165,7 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
         : "/api/indicadores/filters";
       const method = editTarget ? "PUT" : "POST";
       const body = editTarget
-        ? { name: name.trim(), hotmart_products: hotmartProducts, meta_ads_terms: cleanTerms, captacao_leads_eventos: captacaoLeadsEventos }
+        ? { name: name.trim(), hotmart_products: hotmartProducts, meta_ads_terms: cleanTerms, captacao_leads_eventos: captacaoLeadsEventos, status }
         : { account_id: accountId, name: name.trim(), hotmart_products: hotmartProducts, meta_ads_terms: cleanTerms, captacao_leads_eventos: captacaoLeadsEventos };
 
       const res = await fetch(url, {
@@ -392,6 +399,55 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
             + Adicionar termo
           </button>
         </div>
+
+        {/* Status (somente edição — filtro novo nasce "ativo" no servidor) */}
+        {editTarget && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-2)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              Status
+            </label>
+            <div
+              style={{
+                display: "flex",
+                gap: 4,
+                padding: 3,
+                borderRadius: 8,
+                border: "1px solid var(--border-vis)",
+                background: "var(--surface-2)",
+              }}
+            >
+              {STATUS_OPTIONS.map((opt) => {
+                const selected = status === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    data-testid={`status-option-${opt.value}`}
+                    aria-pressed={selected}
+                    onClick={() => setStatus(opt.value)}
+                    style={{
+                      flex: 1,
+                      padding: "6px 0",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      borderRadius: 6,
+                      border: selected
+                        ? `1px solid color-mix(in srgb, ${opt.accent} 45%, transparent)`
+                        : "1px solid transparent",
+                      background: selected
+                        ? `color-mix(in srgb, ${opt.accent} 12%, transparent)`
+                        : "transparent",
+                      color: selected ? opt.accent : "var(--text-3)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Captação de Leads events */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

@@ -80,6 +80,8 @@ function input(overrides: Partial<StreamAgentInput> = {}): StreamAgentInput {
     hotmart_products: [{ product_id: "111", product_name: "Ingresso" }],
     meta_ads_terms: [],
     captacao_leads_eventos: [],
+    status: "ativo",
+    status_changed_at: null,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
   });

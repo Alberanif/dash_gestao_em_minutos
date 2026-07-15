@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiAuth } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import type { FilterRecord } from "@/types/indicadores";
+import { FILTER_STATUSES, type FilterRecord, type FilterStatus } from "@/types/indicadores";
 
 type Params = { id: string };
 
@@ -11,12 +11,41 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<Pa
 
   const { id } = await params;
   const body = await request.json();
-  const { name, hotmart_products, meta_ads_terms, captacao_leads_eventos } = body ?? {};
+  const { name, hotmart_products, meta_ads_terms, captacao_leads_eventos, status } = body ?? {};
+
+  if (status !== undefined && !FILTER_STATUSES.includes(status as FilterStatus)) {
+    return NextResponse.json(
+      { error: `status must be one of: ${FILTER_STATUSES.join(", ")}` },
+      { status: 400 }
+    );
+  }
 
   const supabase = createSupabaseServiceClient();
+
+  const update: Record<string, unknown> = {
+    name,
+    hotmart_products,
+    meta_ads_terms,
+    captacao_leads_eventos,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (status !== undefined) {
+    const { data: current } = await supabase
+      .from("dash_gestao_filters")
+      .select("status")
+      .eq("id", id)
+      .single();
+
+    update.status = status;
+    if (current && current.status !== status) {
+      update.status_changed_at = new Date().toISOString();
+    }
+  }
+
   const { data, error: dbError } = await supabase
     .from("dash_gestao_filters")
-    .update({ name, hotmart_products, meta_ads_terms, captacao_leads_eventos, updated_at: new Date().toISOString() })
+    .update(update)
     .eq("id", id)
     .select()
     .single();

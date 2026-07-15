@@ -9,6 +9,8 @@ const mockDeleteEq = jest.fn();
 const mockUpdateSelectSingle = jest.fn();
 const mockUpdateSelectEq = jest.fn();
 const mockUpdateEq = jest.fn();
+const mockUpdate = jest.fn();
+const mockCurrentSingle = jest.fn();
 const mockFrom = jest.fn();
 
 jest.mock("@/lib/supabase/server", () => ({
@@ -32,9 +34,12 @@ beforeEach(() => {
   mockUpdateSelectEq.mockReturnValue({ select: mockUpdateSelectSingle });
   mockUpdateEq.mockReturnValue({ select: mockUpdateSelectSingle });
   mockDeleteEq.mockResolvedValue({ error: null });
+  mockUpdate.mockReturnValue({ eq: mockUpdateEq });
+  mockCurrentSingle.mockResolvedValue({ data: { status: "ativo" }, error: null });
 
   mockFrom.mockReturnValue({
-    update: jest.fn().mockReturnValue({ eq: mockUpdateEq }),
+    select: jest.fn().mockReturnValue({ eq: jest.fn().mockReturnValue({ single: mockCurrentSingle }) }),
+    update: mockUpdate,
     delete: jest.fn().mockReturnValue({ eq: mockDeleteEq }),
   });
 });
@@ -89,6 +94,65 @@ describe("PUT /api/indicadores/filters/[id]", () => {
     expect(mockUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ captacao_leads_eventos: ["Evento A", "Evento B"] })
     );
+  });
+
+  it("mudança de status persiste o novo valor e seta status_changed_at", async () => {
+    mockSingle.mockResolvedValueOnce({ data: { id: "filter-uuid" }, error: null });
+    mockCurrentSingle.mockResolvedValueOnce({ data: { status: "ativo" }, error: null });
+
+    const { PUT } = await import("../route");
+    const req = makeRequest("PUT", "http://localhost/api/indicadores/filters/filter-uuid", {
+      name: "X",
+      meta_ads_terms: ["y"],
+      status: "finalizado",
+    });
+    await PUT(req, { params: Promise.resolve(params) });
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "finalizado", status_changed_at: expect.any(String) })
+    );
+  });
+
+  it("update com o mesmo status não altera status_changed_at", async () => {
+    mockSingle.mockResolvedValueOnce({ data: { id: "filter-uuid" }, error: null });
+    mockCurrentSingle.mockResolvedValueOnce({ data: { status: "finalizado" }, error: null });
+
+    const { PUT } = await import("../route");
+    const req = makeRequest("PUT", "http://localhost/api/indicadores/filters/filter-uuid", {
+      name: "X",
+      meta_ads_terms: ["y"],
+      status: "finalizado",
+    });
+    await PUT(req, { params: Promise.resolve(params) });
+
+    expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: "finalizado" }));
+    expect(mockUpdate.mock.calls[0][0]).not.toHaveProperty("status_changed_at");
+  });
+
+  it("update sem status no payload não toca status nem status_changed_at", async () => {
+    mockSingle.mockResolvedValueOnce({ data: { id: "filter-uuid" }, error: null });
+
+    const { PUT } = await import("../route");
+    const req = makeRequest("PUT", "http://localhost/api/indicadores/filters/filter-uuid", {
+      name: "X",
+      meta_ads_terms: ["y"],
+    });
+    await PUT(req, { params: Promise.resolve(params) });
+
+    expect(mockUpdate.mock.calls[0][0]).not.toHaveProperty("status");
+    expect(mockUpdate.mock.calls[0][0]).not.toHaveProperty("status_changed_at");
+  });
+
+  it("returns 400 para status inválido", async () => {
+    const { PUT } = await import("../route");
+    const req = makeRequest("PUT", "http://localhost/api/indicadores/filters/filter-uuid", {
+      name: "X",
+      meta_ads_terms: ["y"],
+      status: "arquivado",
+    });
+    const res = await PUT(req, { params: Promise.resolve(params) });
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("returns 404 when filter not found", async () => {

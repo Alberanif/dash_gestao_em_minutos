@@ -6,7 +6,7 @@ import { LeadsSection } from "@/components/indicadores/leads-section";
 import { ConversionSourcesCard } from "@/components/indicadores/conversion-sources-card";
 import { FilterDropdownList } from "@/components/indicadores/filter-dropdown";
 import { IndicadoresEmptyState } from "@/components/indicadores/indicadores-empty-state";
-import { getPartialFilterWarning } from "@/components/indicadores/filter-modal";
+import { getPartialFilterWarning, FilterModal } from "@/components/indicadores/filter-modal";
 import { MetaAdsPanel } from "@/components/indicadores/meta-ads-card";
 import { HotmartPanel } from "@/components/indicadores/hotmart-card";
 import { PlatformsCard } from "@/components/indicadores/platforms-card";
@@ -403,10 +403,35 @@ const sampleFilters: FilterRecord[] = [
     hotmart_products: [],
     meta_ads_terms: [],
     captacao_leads_eventos: [],
+    status: "ativo",
+    status_changed_at: null,
     created_at: "2024-01-01T00:00:00Z",
     updated_at: "2024-01-01T00:00:00Z",
   },
 ];
+
+// ── FilterModal status segmented control ─────────────────────────────────────
+
+describe("FilterModal — segmented control de status", () => {
+  it("edição exibe as 3 opções com o status atual selecionado", () => {
+    const editTarget: FilterRecord = { ...sampleFilters[0], status: "finalizado" };
+    const html = render(
+      <FilterModal accountId="acc1" editTarget={editTarget} onSave={noop} onCancel={noop} />
+    );
+    expect(html).toContain('data-testid="status-option-ativo"');
+    expect(html).toContain('data-testid="status-option-finalizado"');
+    expect(html).toContain('data-testid="status-option-cancelado"');
+    expect(html).toMatch(/data-testid="status-option-finalizado"[^>]*aria-pressed="true"/);
+    expect(html).toMatch(/data-testid="status-option-ativo"[^>]*aria-pressed="false"/);
+  });
+
+  it("criação não exibe o segmented control", () => {
+    const html = render(
+      <FilterModal accountId="acc1" editTarget={null} onSave={noop} onCancel={noop} />
+    );
+    expect(html).not.toContain('data-testid="status-option-ativo"');
+  });
+});
 
 describe("FilterDropdownList", () => {
   it("does not render 'Sem filtro' option", () => {
