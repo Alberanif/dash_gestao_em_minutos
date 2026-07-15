@@ -20,7 +20,9 @@ const MODULES = [
     restrictedTo: ["analista", "comum"] as UserRole[],
   },
   {
-    href: "/indicadores",
+    // Entrada do módulo é sempre o seletor de eventos; o dashboard (/indicadores)
+    // só é alcançado a partir de um card na tela de eventos.
+    href: "/indicadores/eventos",
     label: "Indicadores",
     description: "KPIs de campanhas, Meta Ads, Google Ads e leads orgânicos",
     icon: (
