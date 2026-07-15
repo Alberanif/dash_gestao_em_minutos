@@ -450,6 +450,27 @@ export default function IndicadoresPage() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <Link
+            href="/indicadores/eventos"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              padding: "8px 14px",
+              fontSize: 12,
+              fontWeight: 600,
+              background: "var(--surface)",
+              border: "1px solid var(--border-vis)",
+              borderRadius: 8,
+              color: "var(--text-2)",
+              textDecoration: "none",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            </svg>
+            Eventos
+          </Link>
           <PeriodControls
             startDate={startDate}
             endDate={endDate}
