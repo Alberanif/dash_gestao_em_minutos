@@ -7,8 +7,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FilterRecord, FilterStatus } from "@/types/indicadores";
 import { groupFiltersByStatus, statusSummaryCounts } from "@/lib/indicadores/eventos";
+import type { EventosMetricsMap } from "@/lib/indicadores/service/eventos-metrics";
 import { EventoFolder, FOLDER_CONFIGS } from "@/components/indicadores/evento-folder";
-import { EventoCard } from "@/components/indicadores/evento-card";
+import { EventoCard, EventoCardMetrics } from "@/components/indicadores/evento-card";
 
 // Mesma chave que o bootstrap do dashboard Indicadores restaura (page.tsx).
 const LS_FILTER_ID = "indicadores_active_filter_id";
@@ -17,6 +18,8 @@ export default function EventosPage() {
   const router = useRouter();
   const [filters, setFilters] = useState<FilterRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [metricsMap, setMetricsMap] = useState<EventosMetricsMap>({});
+  const [metricsLoading, setMetricsLoading] = useState(true);
   // Ativos aberta por padrão; estado session-only (não persistido).
   const [collapsed, setCollapsed] = useState<Record<FilterStatus, boolean>>({
     ativo: false,
@@ -34,11 +37,23 @@ export default function EventosPage() {
 
         const filtersRes = await fetch(`/api/indicadores/filters?account_id=${accounts[0].id}`);
         const data = await filtersRes.json();
-        if (!cancelled && Array.isArray(data)) setFilters(data);
+        if (cancelled || !Array.isArray(data)) return;
+        setFilters(data);
+        setLoading(false);
+
+        // métricas chegam depois, sem bloquear os cards (skeleton enquanto isso)
+        const metricsRes = await fetch(`/api/indicadores/eventos-metrics?account_id=${accounts[0].id}`);
+        const metrics = await metricsRes.json();
+        if (!cancelled && metrics && typeof metrics === "object" && !Array.isArray(metrics)) {
+          setMetricsMap(metrics);
+        }
       } catch {
         // rede fora — tela fica no estado vazio
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setMetricsLoading(false);
+        }
       }
     }
     bootstrap();
@@ -147,6 +162,9 @@ export default function EventosPage() {
                       filter={filter}
                       accent={config}
                       onOpenDashboard={handleOpenDashboard}
+                      metrics={
+                        <EventoCardMetrics metrics={metricsMap[filter.id]} loading={metricsLoading} />
+                      }
                     />
                   ))
                 )}
