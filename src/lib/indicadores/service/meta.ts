@@ -3,6 +3,7 @@ import type { ExpandedFilter, Period } from "../filter-expansion";
 import type { SupabaseLike } from "./types";
 
 const COLUMNS = "spend, impressions, link_clicks, leads_all, page_views, checkout";
+const PAGE_SIZE = 1000;
 
 export const ZEROED_META: GlobalMetrics = {
   meta_spend: 0,
@@ -43,11 +44,13 @@ export async function fetchMetaMetrics(
 ): Promise<GlobalMetrics> {
   if (!filter.sources.meta) return { ...ZEROED_META };
 
-  const query = baseQuery(period, supabase).or(
-    filter.metaTerms.map((t) => `campaign_name.ilike.%${t}%`).join(",")
+  const rows = await paginate(() =>
+    baseQuery(period, supabase).or(
+      filter.metaTerms.map((t) => `campaign_name.ilike.%${t}%`).join(",")
+    )
   );
 
-  return aggregate(await run(query));
+  return aggregate(rows);
 }
 
 /**
@@ -59,12 +62,12 @@ export async function fetchMetaMetricsUnscoped(
   { period }: MetaQuery,
   supabase: SupabaseLike
 ): Promise<GlobalMetrics> {
-  return aggregate(await run(baseQuery(period, supabase)));
+  return aggregate(await paginate(() => baseQuery(period, supabase)));
 }
 
 interface AwaitableQuery {
   or(expr: string): AwaitableQuery;
-  then: PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>["then"];
+  range(from: number, to: number): PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>;
 }
 
 function baseQuery(period: Period, supabase: SupabaseLike): AwaitableQuery {
@@ -75,10 +78,22 @@ function baseQuery(period: Period, supabase: SupabaseLike): AwaitableQuery {
     .lte("date", period.endDate);
 }
 
-async function run(query: AwaitableQuery): Promise<CampaignRow[]> {
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return (data ?? []) as CampaignRow[];
+/**
+ * O PostgREST trunca em 1000 linhas sem erro. Um período vitalício (tela
+ * Eventos) passa disso fácil; sem paginar, o investimento sai subestimado.
+ */
+async function paginate(buildQuery: () => AwaitableQuery): Promise<CampaignRow[]> {
+  const all: CampaignRow[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await buildQuery().range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+    all.push(...(data as CampaignRow[]));
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return all;
 }
 
 function aggregate(rows: CampaignRow[]): GlobalMetrics {

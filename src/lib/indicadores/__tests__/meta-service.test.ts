@@ -93,6 +93,23 @@ describe("fetchMetaMetrics", () => {
     expect(result.meta_cpl_traffic).toBeCloseTo(7.5);
   });
 
+  it("pagina além do cap de 1000 linhas do PostgREST — período vitalício não pode subestimar o investimento", async () => {
+    supabase.setRows(
+      "dash_gestao_meta_ads_campaigns_daily",
+      Array.from({ length: 1500 }, () => ({
+        spend: 1, impressions: 10, link_clicks: 1, leads_all: 1, page_views: 1, checkout: 0,
+      }))
+    );
+
+    const result = await fetchMetaMetrics(
+      { period: PERIOD, filter: expandFilter(filterWith(["PC Ao Vivo"])) },
+      supabase.client
+    );
+
+    expect(result.meta_spend).toBe(1500);
+    expect(result.meta_leads).toBe(1500);
+  });
+
   it("propaga o erro do banco em vez de devolver zero silenciosamente", async () => {
     supabase.setError("dash_gestao_meta_ads_campaigns_daily", "conexão perdida");
 

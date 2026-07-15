@@ -3,12 +3,16 @@
 // Sem I/O: entrada FilterRecord[], saída dados prontos para a UI.
 
 import type { FilterRecord, FilterStatus } from "@/types/indicadores";
+import { utcToBrtDate } from "./timezone";
 
 export type FilterGroups = Record<FilterStatus, FilterRecord[]>;
 
-/** "2026-07-01T12:00:00Z" → "01/07/2026" (parte de data do ISO, sem conversão de fuso). */
+/**
+ * "2026-07-02T01:00:00Z" → "01/07/2026". Timestamps chegam em UTC do PostgREST;
+ * sem converter para BRT, ações feitas entre 21h e meia-noite caem no dia seguinte.
+ */
 function formatDateBR(isoTimestamp: string): string {
-  const [year, month, day] = isoTimestamp.slice(0, 10).split("-");
+  const [year, month, day] = utcToBrtDate(isoTimestamp).split("-");
   return `${day}/${month}/${year}`;
 }
 

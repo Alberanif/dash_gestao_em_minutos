@@ -87,11 +87,14 @@ export function makeFakeSupabase(): FakeSupabase {
     };
     queries.push(query);
 
-    const resolve = (): Promise<QueryResult> => {
+    // Como o PostgREST real: sem .range() a resposta é truncada em 1000 linhas
+    // (max-rows padrão), silenciosamente. Com .range(), devolve a fatia pedida.
+    const resolve = (slice?: [number, number]): Promise<QueryResult> => {
       const message = errorsByTable.get(table);
       if (message) return Promise.resolve({ data: null, error: { message } });
       const rows = (rowsByTable.get(table) ?? []).filter((r) => matches(query, r));
-      return Promise.resolve({ data: rows, error: null });
+      const data = slice ? rows.slice(slice[0], slice[1] + 1) : rows.slice(0, 1000);
+      return Promise.resolve({ data, error: null });
     };
 
     const builder: FakeQueryBuilder = {
@@ -125,7 +128,7 @@ export function makeFakeSupabase(): FakeSupabase {
       },
       range(from: number, to: number) {
         query.range.push([from, to]);
-        return resolve();
+        return resolve([from, to]);
       },
       then(onFulfilled, onRejected) {
         return resolve().then(onFulfilled, onRejected);

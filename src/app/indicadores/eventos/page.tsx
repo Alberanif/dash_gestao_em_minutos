@@ -2,7 +2,7 @@
 
 import "../indicadores.css";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FilterRecord, FilterStatus } from "@/types/indicadores";
@@ -32,6 +32,9 @@ export default function EventosPage() {
     finalizado: true,
     cancelado: true,
   });
+  // Dois saves em sequência disparam dois GETs; só a resposta do mais recente
+  // pode escrever no mapa, senão a antiga sobrescreve métricas mais novas.
+  const metricsRequestSeq = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,16 +69,20 @@ export default function EventosPage() {
   }, []);
 
   async function refreshMetrics(account: string, isCancelled: () => boolean = () => false) {
+    const seq = ++metricsRequestSeq.current;
+    const isStale = () => isCancelled() || seq !== metricsRequestSeq.current;
     try {
       const res = await fetch(`/api/indicadores/eventos-metrics?account_id=${account}`);
+      // Erro do servidor devolve {"error": ...} — não pode apagar métricas já exibidas.
+      if (!res.ok) return;
       const metrics = await res.json();
-      if (!isCancelled() && metrics && typeof metrics === "object" && !Array.isArray(metrics)) {
+      if (!isStale() && metrics && typeof metrics === "object" && !Array.isArray(metrics)) {
         setMetricsMap(metrics);
       }
     } catch {
       // métricas indisponíveis — células ficam em "—"
     } finally {
-      if (!isCancelled()) setMetricsLoading(false);
+      if (!isStale()) setMetricsLoading(false);
     }
   }
 

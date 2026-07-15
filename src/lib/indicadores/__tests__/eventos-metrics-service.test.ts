@@ -92,19 +92,47 @@ describe("fetchEventosMetrics", () => {
     expect(supabase.rpcCalls()).toHaveLength(0);
   });
 
-  it("erro em um filtro vira null sem derrubar os demais", async () => {
+  it("erro em um filtro vira null sem derrubar os demais — e vai para o log do servidor", async () => {
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const supabase = makeFakeSupabase();
+      supabase.setError("dash_gestao_meta_ads_campaigns_daily", "boom");
+      supabase.setRpc("dash_gestao_leads_unique_total", 7);
+      supabase.setRpc("dash_gestao_leads_by_event_unique", []);
+      supabase.setRpc("dash_gestao_leads_by_source", []);
+
+      const comMeta = makeFilter({ id: "quebrado" });
+      const soLeads = makeFilter({ id: "saudavel", meta_ads_terms: [] });
+
+      const map = await fetchEventosMetrics([comMeta, soLeads], supabase.client, END_DATE);
+
+      expect(map["quebrado"]).toBeNull();
+      expect(map["saudavel"]).toEqual({ leads: 7, spend: null, cpl: null });
+      // Silêncio aqui é indistinguível de "sem dados" — o erro precisa aparecer no log.
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("quebrado"),
+        expect.any(Error)
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("processa contas com muitos filtros por inteiro — nenhum filtro fica de fora dos lotes", async () => {
     const supabase = makeFakeSupabase();
-    supabase.setError("dash_gestao_meta_ads_campaigns_daily", "boom");
-    supabase.setRpc("dash_gestao_leads_unique_total", 7);
+    supabase.setRpc("dash_gestao_leads_unique_total", 1);
     supabase.setRpc("dash_gestao_leads_by_event_unique", []);
     supabase.setRpc("dash_gestao_leads_by_source", []);
 
-    const comMeta = makeFilter({ id: "quebrado" });
-    const soLeads = makeFilter({ id: "saudavel", meta_ads_terms: [] });
+    const filters = Array.from({ length: 12 }, (_, i) =>
+      makeFilter({ id: `f-${i}`, meta_ads_terms: [] })
+    );
 
-    const map = await fetchEventosMetrics([comMeta, soLeads], supabase.client, END_DATE);
+    const map = await fetchEventosMetrics(filters, supabase.client, END_DATE);
 
-    expect(map["quebrado"]).toBeNull();
-    expect(map["saudavel"]).toEqual({ leads: 7, spend: null, cpl: null });
+    expect(Object.keys(map)).toHaveLength(12);
+    for (let i = 0; i < 12; i++) {
+      expect(map[`f-${i}`]).toEqual({ leads: 1, spend: null, cpl: null });
+    }
   });
 });

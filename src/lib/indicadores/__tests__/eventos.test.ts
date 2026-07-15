@@ -71,16 +71,23 @@ describe("eventoMetaLine", () => {
 
   it("cancelado usa a data da mudança de status", () => {
     const line = eventoMetaLine(
-      makeFilter({ status: "cancelado", status_changed_at: "2026-02-12T00:00:00Z" })
+      makeFilter({ status: "cancelado", status_changed_at: "2026-02-12T14:00:00Z" })
     );
     expect(line).toBe("Cancelado em 12/02/2026");
   });
 
   it("finalizado sem status_changed_at cai na data de criação", () => {
     const line = eventoMetaLine(
-      makeFilter({ status: "finalizado", status_changed_at: null, created_at: "2026-01-05T00:00:00Z" })
+      makeFilter({ status: "finalizado", status_changed_at: null, created_at: "2026-01-05T12:00:00Z" })
     );
     expect(line).toBe("Encerrado em 05/01/2026");
+  });
+
+  it("timestamp UTC da madrugada mostra o dia BRT anterior — finalizar às 22h de 01/07 não pode virar 02/07", () => {
+    const line = eventoMetaLine(
+      makeFilter({ status: "finalizado", status_changed_at: "2026-07-02T01:00:00Z" })
+    );
+    expect(line).toBe("Encerrado em 01/07/2026");
   });
 });
 
