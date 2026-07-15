@@ -3,6 +3,7 @@ import {
   eventoMetaLine,
   eventoCompositionSubtitle,
   statusSummaryCounts,
+  matchesEventoSearch,
 } from "../eventos";
 import type { FilterRecord, FilterStatus } from "@/types/indicadores";
 
@@ -121,6 +122,25 @@ describe("eventoCompositionSubtitle", () => {
       makeFilter({ hotmart_products: [], meta_ads_terms: ["  ", ""], captacao_leads_eventos: ["e1"] })
     );
     expect(subtitle).toBe("1 evento de captação");
+  });
+});
+
+describe("matchesEventoSearch", () => {
+  const filter = makeFilter({ name: "PC Ao Vivo 2026" });
+
+  it("match parcial e case-insensitive no nome", () => {
+    expect(matchesEventoSearch(filter, "ao vivo")).toBe(true);
+    expect(matchesEventoSearch(filter, "pc AO")).toBe(true);
+    expect(matchesEventoSearch(filter, "2026")).toBe(true);
+  });
+
+  it("sem resultado quando o termo não aparece no nome", () => {
+    expect(matchesEventoSearch(filter, "black friday")).toBe(false);
+  });
+
+  it("busca vazia ou só espaços casa com tudo", () => {
+    expect(matchesEventoSearch(filter, "")).toBe(true);
+    expect(matchesEventoSearch(filter, "   ")).toBe(true);
   });
 });
 

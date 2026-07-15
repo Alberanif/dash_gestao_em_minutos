@@ -6,10 +6,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FilterRecord, FilterStatus } from "@/types/indicadores";
-import { groupFiltersByStatus, statusSummaryCounts } from "@/lib/indicadores/eventos";
+import { groupFiltersByStatus, statusSummaryCounts, matchesEventoSearch } from "@/lib/indicadores/eventos";
 import type { EventosMetricsMap } from "@/lib/indicadores/service/eventos-metrics";
 import { EventoFolder, FOLDER_CONFIGS } from "@/components/indicadores/evento-folder";
 import { EventoCard, EventoCardMetrics } from "@/components/indicadores/evento-card";
+import { EventoCardMenu } from "@/components/indicadores/evento-card-menu";
+import { FilterModal } from "@/components/indicadores/filter-modal";
 
 // Mesma chave que o bootstrap do dashboard Indicadores restaura (page.tsx).
 const LS_FILTER_ID = "indicadores_active_filter_id";
@@ -20,6 +22,10 @@ export default function EventosPage() {
   const [loading, setLoading] = useState(true);
   const [metricsMap, setMetricsMap] = useState<EventosMetricsMap>({});
   const [metricsLoading, setMetricsLoading] = useState(true);
+  const [accountId, setAccountId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<FilterRecord | null>(null);
   // Ativos aberta por padrão; estado session-only (não persistido).
   const [collapsed, setCollapsed] = useState<Record<FilterStatus, boolean>>({
     ativo: false,
@@ -34,6 +40,7 @@ export default function EventosPage() {
         const accountsRes = await fetch("/api/accounts");
         const accounts = await accountsRes.json();
         if (!Array.isArray(accounts) || accounts.length === 0) return;
+        if (!cancelled) setAccountId(accounts[0].id);
 
         const filtersRes = await fetch(`/api/indicadores/filters?account_id=${accounts[0].id}`);
         const data = await filtersRes.json();
@@ -42,11 +49,7 @@ export default function EventosPage() {
         setLoading(false);
 
         // métricas chegam depois, sem bloquear os cards (skeleton enquanto isso)
-        const metricsRes = await fetch(`/api/indicadores/eventos-metrics?account_id=${accounts[0].id}`);
-        const metrics = await metricsRes.json();
-        if (!cancelled && metrics && typeof metrics === "object" && !Array.isArray(metrics)) {
-          setMetricsMap(metrics);
-        }
+        await refreshMetrics(accounts[0].id, () => cancelled);
       } catch {
         // rede fora — tela fica no estado vazio
       } finally {
@@ -62,16 +65,60 @@ export default function EventosPage() {
     };
   }, []);
 
+  async function refreshMetrics(account: string, isCancelled: () => boolean = () => false) {
+    try {
+      const res = await fetch(`/api/indicadores/eventos-metrics?account_id=${account}`);
+      const metrics = await res.json();
+      if (!isCancelled() && metrics && typeof metrics === "object" && !Array.isArray(metrics)) {
+        setMetricsMap(metrics);
+      }
+    } catch {
+      // métricas indisponíveis — células ficam em "—"
+    } finally {
+      if (!isCancelled()) setMetricsLoading(false);
+    }
+  }
+
   function handleOpenDashboard(filter: FilterRecord) {
     localStorage.setItem(LS_FILTER_ID, filter.id);
     router.push("/indicadores");
   }
 
-  const groups = groupFiltersByStatus(filters);
+  function handleSaved(saved: FilterRecord) {
+    setFilters((prev) =>
+      prev.some((f) => f.id === saved.id)
+        ? prev.map((f) => (f.id === saved.id ? saved : f))
+        : [...prev, saved]
+    );
+    setModalOpen(false);
+    setEditTarget(null);
+    if (accountId) refreshMetrics(accountId);
+  }
+
+  async function handleDelete(filter: FilterRecord) {
+    if (!window.confirm(`Excluir o evento "${filter.name}"? Essa ação não pode ser desfeita.`)) return;
+    const res = await fetch(`/api/indicadores/filters/${filter.id}`, { method: "DELETE" });
+    if (res.ok) {
+      setFilters((prev) => prev.filter((f) => f.id !== filter.id));
+    }
+  }
+
+  const searching = search.trim() !== "";
+  const visibleFilters = filters.filter((f) => matchesEventoSearch(f, search));
+  const groups = groupFiltersByStatus(visibleFilters);
   const counts = statusSummaryCounts(filters);
 
   return (
     <div className="ind-dark" style={{ maxWidth: 1220, margin: "0 auto", padding: "0 28px 72px" }}>
+      {modalOpen && accountId && (
+        <FilterModal
+          accountId={accountId}
+          editTarget={editTarget}
+          onSave={handleSaved}
+          onCancel={() => { setModalOpen(false); setEditTarget(null); }}
+        />
+      )}
+
       {/* Header */}
       <header
         style={{
@@ -102,8 +149,58 @@ export default function EventosPage() {
           <span style={{ fontSize: 12, color: "var(--text-3)" }}>Organizados por pastas</span>
         </div>
 
-        {/* Busca e "Novo evento" chegam na slice de ações */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ position: "relative" }}>
+            <svg
+              width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)"
+              strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+              style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4.3-4.3" />
+            </svg>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar evento"
+              data-testid="eventos-search"
+              style={{
+                fontFamily: "inherit",
+                fontSize: 12,
+                padding: "8px 12px 8px 32px",
+                width: 200,
+                background: "var(--surface)",
+                border: "1px solid var(--border-vis)",
+                borderRadius: 8,
+                color: "var(--text)",
+                outline: "none",
+              }}
+            />
+          </div>
+          <button
+            onClick={() => { setEditTarget(null); setModalOpen(true); }}
+            data-testid="eventos-novo"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              padding: "8px 14px",
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: "inherit",
+              background: "var(--text-strong)",
+              border: "1px solid var(--text-strong)",
+              borderRadius: 8,
+              color: "var(--bg)",
+              cursor: "pointer",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Novo evento
+          </button>
+        </div>
       </header>
 
       {/* Faixa de resumo */}
@@ -146,14 +243,14 @@ export default function EventosPage() {
                 key={config.status}
                 config={config}
                 count={eventos.length}
-                collapsed={collapsed[config.status]}
+                collapsed={searching ? false : collapsed[config.status]}
                 onToggle={() =>
                   setCollapsed((prev) => ({ ...prev, [config.status]: !prev[config.status] }))
                 }
               >
                 {eventos.length === 0 ? (
                   <p style={{ fontSize: 12, color: "var(--text-4)", margin: "4px 0" }}>
-                    Nenhum evento nesta pasta.
+                    {searching ? "Nenhum evento encontrado nesta pasta." : "Nenhum evento nesta pasta."}
                   </p>
                 ) : (
                   eventos.map((filter) => (
@@ -162,6 +259,12 @@ export default function EventosPage() {
                       filter={filter}
                       accent={config}
                       onOpenDashboard={handleOpenDashboard}
+                      menu={
+                        <EventoCardMenu
+                          onEdit={() => { setEditTarget(filter); setModalOpen(true); }}
+                          onDelete={() => handleDelete(filter)}
+                        />
+                      }
                       metrics={
                         <EventoCardMetrics metrics={metricsMap[filter.id]} loading={metricsLoading} />
                       }

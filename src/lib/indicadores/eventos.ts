@@ -50,6 +50,13 @@ export function groupFiltersByStatus(filters: FilterRecord[]): FilterGroups {
   return groups;
 }
 
+/** Busca client-side por nome: case-insensitive, match parcial; vazia casa com tudo. */
+export function matchesEventoSearch(filter: FilterRecord, query: string): boolean {
+  const term = query.trim().toLowerCase();
+  if (!term) return true;
+  return filter.name.toLowerCase().includes(term);
+}
+
 export function statusSummaryCounts(filters: FilterRecord[]): Record<FilterStatus, number> {
   const groups = groupFiltersByStatus(filters);
   return {
