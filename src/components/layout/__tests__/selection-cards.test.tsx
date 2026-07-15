@@ -39,8 +39,12 @@ describe("SelectionCards — role: gestor", () => {
     expect(html).toContain('href="/dashboard"');
   });
 
-  it("Indicadores é link acessível (href=/indicadores)", () => {
-    expect(html).toContain('href="/indicadores"');
+  it("Indicadores leva à tela de eventos (href=/indicadores/eventos)", () => {
+    expect(html).toContain('href="/indicadores/eventos"');
+  });
+
+  it("Indicadores NÃO aponta direto para o dashboard", () => {
+    expect(html).not.toContain('href="/indicadores"');
   });
 
   it("Base de Dados é link acessível (href=/base-de-dados)", () => {
@@ -70,7 +74,7 @@ describe("SelectionCards — role: analista", () => {
   });
 
   it("Indicadores NÃO é link (sem href=/indicadores)", () => {
-    expect(html).not.toContain('href="/indicadores"');
+    expect(html).not.toContain('href="/indicadores');
   });
 
   it("Base de Dados é link acessível (href=/base-de-dados)", () => {
@@ -100,7 +104,7 @@ describe("SelectionCards — role: comum", () => {
   });
 
   it("Indicadores NÃO é link (sem href=/indicadores)", () => {
-    expect(html).not.toContain('href="/indicadores"');
+    expect(html).not.toContain('href="/indicadores');
   });
 
   it("Base de Dados é link acessível (href=/base-de-dados)", () => {

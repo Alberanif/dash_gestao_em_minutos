@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
   const supabase = createSupabaseServiceClient();
   const { data, error: dbError } = await supabase
     .from("dash_gestao_filters")
-    .insert({ account_id, name, hotmart_products, meta_ads_terms, captacao_leads_eventos })
+    .insert({ account_id, name, hotmart_products, meta_ads_terms, captacao_leads_eventos, status: "ativo" })
     .select()
     .single();
 

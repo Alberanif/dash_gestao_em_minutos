@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 
 interface ChatInputProps {
   onSend: (text: string) => void;
+  /** Interrompe a resposta em andamento. Sem ele, não há botão de parar. */
+  onStop?: () => void;
   isStreaming: boolean;
 }
 
-export function ChatInput({ onSend, isStreaming }: ChatInputProps) {
+export function ChatInput({ onSend, onStop, isStreaming }: ChatInputProps) {
   const [value, setValue] = useState('');
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -56,25 +58,50 @@ export function ChatInput({ onSend, isStreaming }: ChatInputProps) {
           outline: 'none',
         }}
       />
-      <button
-        data-testid="chat-send"
-        onClick={handleSendClick}
-        disabled={isStreaming || !value.trim()}
-        aria-label="Enviar"
-        style={{
-          padding: '8px 14px',
-          background: 'var(--violet, #7c3aed)',
-          color: 'white',
-          border: 'none',
-          borderRadius: 8,
-          cursor: isStreaming ? 'not-allowed' : 'pointer',
-          fontSize: 13,
-          fontWeight: 600,
-          opacity: isStreaming ? 0.6 : 1,
-        }}
-      >
-        ↑
-      </button>
+      {/*
+        Enquanto o agente responde, o botão de enviar não serve para nada (o
+        envio está bloqueado) — o lugar dele é ocupado pelo único comando que
+        importa nesse instante: parar.
+      */}
+      {isStreaming && onStop ? (
+        <button
+          data-testid="chat-stop"
+          onClick={onStop}
+          aria-label="Parar geração"
+          style={{
+            padding: '8px 14px',
+            background: 'var(--surface, #18181b)',
+            color: 'var(--text, #e8e8ed)',
+            border: '1px solid var(--border, #2a2a2e)',
+            borderRadius: 8,
+            cursor: 'pointer',
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          ■
+        </button>
+      ) : (
+        <button
+          data-testid="chat-send"
+          onClick={handleSendClick}
+          disabled={isStreaming || !value.trim()}
+          aria-label="Enviar"
+          style={{
+            padding: '8px 14px',
+            background: 'var(--violet, #7c3aed)',
+            color: 'white',
+            border: 'none',
+            borderRadius: 8,
+            cursor: isStreaming ? 'not-allowed' : 'pointer',
+            fontSize: 13,
+            fontWeight: 600,
+            opacity: isStreaming ? 0.6 : 1,
+          }}
+        >
+          ↑
+        </button>
+      )}
     </div>
   );
 }

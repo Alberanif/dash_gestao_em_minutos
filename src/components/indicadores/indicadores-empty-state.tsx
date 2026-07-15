@@ -65,8 +65,8 @@ export function IndicadoresEmptyState({ onOpenFilter }: IndicadoresEmptyStatePro
           fontSize: 13,
           fontWeight: 600,
           borderRadius: 8,
-          border: "1.5px solid var(--violet)",
-          background: "rgba(144,112,232,0.12)",
+          border: "1px solid rgba(124,111,240,0.4)",
+          background: "rgba(124,111,240,0.12)",
           color: "var(--violet)",
           cursor: "pointer",
         }}

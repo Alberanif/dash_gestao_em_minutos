@@ -2,7 +2,11 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { collectYouTube } from "@/lib/services/youtube";
 import { collectInstagramDaily } from "@/lib/services/instagram";
 import { collectMetaAds } from "@/lib/services/meta-ads";
+import { collectHotmart } from "@/lib/services/hotmart";
 import type { Account } from "@/types/accounts";
+
+// Janela da coleta Hotmart: 3 dias para capturar confirmações tardias de PIX/boleto.
+const HOTMART_LOOKBACK_DAYS = 3;
 
 export interface SyncPlatformResult {
   account_id: string;
@@ -46,6 +50,15 @@ export async function syncPlatform(
       } else if (account.platform === "meta-ads") {
         const result = await collectMetaAds(account);
         records = result.dailyRecords + result.campaignDailyRecords;
+      } else if (account.platform === "hotmart") {
+        const endDate = new Date();
+        const startDate = new Date(
+          endDate.getTime() - HOTMART_LOOKBACK_DAYS * 24 * 60 * 60 * 1000
+        );
+        const result = await collectHotmart(account, { startDate, endDate });
+        records = result.salesRecords;
+      } else {
+        throw new Error(`Plataforma sem coletor implementado: ${account.platform}`);
       }
 
       await supabase.from("dash_gestao_cron_logs").insert({

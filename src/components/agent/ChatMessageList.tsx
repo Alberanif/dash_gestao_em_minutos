@@ -1,10 +1,26 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { Message } from '@/hooks/use-agent-chat';
+import type { ActiveQuery, Message } from '@/hooks/use-agent-chat';
+import { formatDayMonth } from '@/lib/agent/format-period';
 
 interface ChatMessageListProps {
   messages: Message[];
+  /** A consulta em andamento; ausente/`null` quando o agente não está consultando. */
+  activeQuery?: ActiveQuery | null;
+}
+
+/**
+ * O texto do indicador. O período entra quando é legível — e é ele que deixa o
+ * usuário perceber *na hora* que o agente entendeu errado a pergunta. Quando não
+ * é (o modelo chamou a tool com um argumento ilegível), o indicador ainda diz que
+ * há uma consulta em curso: melhor um aviso genérico do que um "Invalid Date".
+ */
+function queryLabel(query: ActiveQuery): string {
+  const start = query.period ? formatDayMonth(query.period.startDate) : null;
+  const end = query.period ? formatDayMonth(query.period.endDate) : null;
+  if (!start || !end) return 'Consultando dados...';
+  return `Consultando dados de ${start} a ${end}...`;
 }
 
 const markdownComponents: React.ComponentProps<typeof ReactMarkdown>['components'] = {
@@ -73,7 +89,7 @@ const markdownComponents: React.ComponentProps<typeof ReactMarkdown>['components
   ),
 };
 
-export function ChatMessageList({ messages }: ChatMessageListProps) {
+export function ChatMessageList({ messages, activeQuery }: ChatMessageListProps) {
   return (
     <div
       style={{
@@ -137,6 +153,25 @@ export function ChatMessageList({ messages }: ChatMessageListProps) {
           </div>
         );
       })}
+
+      {activeQuery ? (
+        <div
+          data-testid="agent-query-indicator"
+          role="status"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            alignSelf: 'flex-start',
+            color: 'var(--text-muted, #a1a1aa)',
+            fontSize: 12,
+            fontStyle: 'italic',
+          }}
+        >
+          <span aria-hidden="true">⏳</span>
+          <span>{queryLabel(activeQuery)}</span>
+        </div>
+      ) : null}
     </div>
   );
 }

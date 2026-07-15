@@ -3,11 +3,13 @@ import { HeroKpiCard } from "@/components/indicadores/hero-kpi-card";
 import { KpiCell } from "@/components/indicadores/kpi-cell";
 import { HorizontalFunnelFlow } from "@/components/indicadores/horizontal-funnel-flow";
 import { LeadsSection } from "@/components/indicadores/leads-section";
+import { ConversionSourcesCard } from "@/components/indicadores/conversion-sources-card";
 import { FilterDropdownList } from "@/components/indicadores/filter-dropdown";
 import { IndicadoresEmptyState } from "@/components/indicadores/indicadores-empty-state";
-import { getPartialFilterWarning } from "@/components/indicadores/filter-modal";
-import { MetaAdsCard } from "@/components/indicadores/meta-ads-card";
-import { HotmartCard } from "@/components/indicadores/hotmart-card";
+import { getPartialFilterWarning, FilterModal } from "@/components/indicadores/filter-modal";
+import { MetaAdsPanel } from "@/components/indicadores/meta-ads-card";
+import { HotmartPanel } from "@/components/indicadores/hotmart-card";
+import { PlatformsCard } from "@/components/indicadores/platforms-card";
 import { NotConfiguredBadge } from "@/components/indicadores/not-configured-badge";
 import type { FunnelStage, ConversionRate } from "@/lib/utils/funnel-metrics";
 import type { FilterRecord } from "@/types/indicadores";
@@ -31,57 +33,42 @@ function render(element: React.ReactElement): string {
 describe("HeroKpiCard", () => {
   it("renders label, value and subtitle", () => {
     const html = render(
-      HeroKpiCard({ label: "ROAS", value: "3.50", subtitle: "Receita ÷ Investimento", accent: "#8b5cf6" })
+      <HeroKpiCard label="ROAS" value="3.50" subtitle="Receita ÷ Investimento" dotColor="var(--violet)" />
     );
     expect(html).toContain("ROAS");
     expect(html).toContain("3.50");
     expect(html).toContain("Receita ÷ Investimento");
   });
 
-  it("does not render badge element when badge is undefined", () => {
+  it("renders the dot with the provided color", () => {
     const html = render(
-      HeroKpiCard({ label: "ROAS", value: "3.50", subtitle: "sub", accent: "#8b5cf6" })
+      <HeroKpiCard label="ROAS" value="3.50" subtitle="sub" dotColor="var(--violet)" />
     );
-    expect(html).not.toContain("positive");
-    expect(html).not.toContain("negative");
-    expect(html).not.toContain("neutral");
+    expect(html).toContain("var(--violet)");
   });
 
-  it("renders badge text when badge is provided", () => {
+  it("renders value monochrome (--text-strong) at 36px", () => {
     const html = render(
-      HeroKpiCard({ label: "ROAS", value: "3.50", subtitle: "sub", accent: "#8b5cf6", badge: { text: "+12%", variant: "positive" } })
+      <HeroKpiCard label="ROAS" value="3.50" subtitle="sub" dotColor="var(--violet)" />
     );
-    expect(html).toContain("+12%");
-  });
-
-  it("renders accent as top bar background", () => {
-    const html = render(
-      HeroKpiCard({ label: "ROAS", value: "3.50", subtitle: "sub", accent: "#8b5cf6" })
-    );
-    expect(html).toContain("#8b5cf6");
-  });
-
-  it("renders value with DM Mono and 40px", () => {
-    const html = render(
-      HeroKpiCard({ label: "ROAS", value: "3.50", subtitle: "sub", accent: "#8b5cf6" })
-    );
-    expect(html).toContain("DM Mono");
-    expect(html).toContain("3.50");
+    expect(html).toContain("var(--text-strong)");
+    expect(html).toContain("font-size:36px");
   });
 
   it("subtitle uses --text-3 color", () => {
     const html = render(
-      HeroKpiCard({ label: "ROAS", value: "3.50", subtitle: "sub", accent: "#8b5cf6" })
+      <HeroKpiCard label="ROAS" value="3.50" subtitle="sub" dotColor="var(--violet)" />
     );
     expect(html).toContain("var(--text-3)");
   });
 
   it("renders loading skeleton when loading is true", () => {
     const html = render(
-      HeroKpiCard({ label: "ROAS", value: "3.50", subtitle: "sub", accent: "#8b5cf6", loading: true })
+      <HeroKpiCard label="ROAS" value="3.50" subtitle="sub" dotColor="var(--violet)" loading />
     );
     expect(html).not.toContain("ROAS");
     expect(html).not.toContain("3.50");
+    expect(html).toContain("pulse");
   });
 });
 
@@ -89,35 +76,27 @@ describe("HeroKpiCard", () => {
 
 describe("KpiCell", () => {
   it("renders label and value", () => {
-    const html = render(KpiCell({ label: "Investimento", value: "R$ 1.000" }));
+    const html = render(<KpiCell label="Investimento" value="R$ 1.000" />);
     expect(html).toContain("Investimento");
     expect(html).toContain("R$ 1.000");
   });
 
-  it("applies accent color on value when accent is provided", () => {
-    const html = render(KpiCell({ label: "Leads", value: "42", accent: "#3b82f6" }));
-    expect(html).toContain("#3b82f6");
+  it("renders value in 24px when large is true", () => {
+    const html = render(<KpiCell label="X" value="Y" large />);
+    expect(html).toContain("font-size:24px");
+    expect(html).toContain("var(--text-strong)");
   });
 
-  it("uses --text color when accent is omitted", () => {
-    const html = render(KpiCell({ label: "CPM", value: "R$ 10" }));
-    expect(html).toContain("var(--text)");
-    expect(html).not.toContain("#3b82f6");
+  it("renders value in 15px secondary style when large is omitted", () => {
+    const html = render(<KpiCell label="X" value="Y" />);
+    expect(html).toContain("font-size:15px");
+    expect(html).toContain("var(--text-2)");
   });
 
-  it("uses DM Mono font for value", () => {
-    const html = render(KpiCell({ label: "Investimento", value: "R$ 1.000" }));
-    expect(html).toContain("DM Mono");
-  });
-
-  it("renders value in 22px when large is true", () => {
-    const html = render(KpiCell({ label: "X", value: "Y", large: true }));
-    expect(html).toContain("22px");
-  });
-
-  it("renders value in default fontSize when large is omitted", () => {
-    const html = render(KpiCell({ label: "X", value: "Y" }));
-    expect(html).not.toContain("22px");
+  it("renders large value muted when muted is true", () => {
+    const html = render(<KpiCell label="Vendas Ext." value="1" large muted />);
+    expect(html).toContain("font-size:24px");
+    expect(html).toContain("var(--text-2)");
   });
 });
 
@@ -139,8 +118,8 @@ const fourRates: ConversionRate[] = [
 ];
 
 describe("HorizontalFunnelFlow", () => {
-  it("renders 5 stage labels and 4 rate badges given valid input", () => {
-    const html = render(HorizontalFunnelFlow({ stages: fiveStages, rates: fourRates }));
+  it("renders 5 stage labels given valid input", () => {
+    const html = render(<HorizontalFunnelFlow stages={fiveStages} rates={fourRates} />);
     expect(html).toContain("Impressões");
     expect(html).toContain("Cliques no link");
     expect(html).toContain("Visualizações de LP");
@@ -150,37 +129,37 @@ describe("HorizontalFunnelFlow", () => {
 
   it("CTR 0,3% → rate-low (vermelho)", () => {
     const rates: ConversionRate[] = [{ label: "CTR", pct: 0.3 }, ...fourRates.slice(1)];
-    const html = render(HorizontalFunnelFlow({ stages: fiveStages, rates }));
+    const html = render(<HorizontalFunnelFlow stages={fiveStages} rates={rates} />);
     expect(html).toContain("rate-low");
   });
 
   it("CTR 0,8% → rate-warn (âmbar)", () => {
     const rates: ConversionRate[] = [{ label: "CTR", pct: 0.8 }, ...fourRates.slice(1)];
-    const html = render(HorizontalFunnelFlow({ stages: fiveStages, rates }));
+    const html = render(<HorizontalFunnelFlow stages={fiveStages} rates={rates} />);
     expect(html).toContain("rate-warn");
   });
 
   it("CTR 2,0% → rate-ok (verde)", () => {
     const rates: ConversionRate[] = [{ label: "CTR", pct: 2.0 }, ...fourRates.slice(1)];
-    const html = render(HorizontalFunnelFlow({ stages: fiveStages, rates }));
+    const html = render(<HorizontalFunnelFlow stages={fiveStages} rates={rates} />);
     expect(html).toContain("rate-ok");
   });
 
   it("Taxa de Fechamento 5% → rate-low", () => {
     const rates: ConversionRate[] = [...fourRates.slice(0, 3), { label: "Taxa de Fechamento", pct: 5 }];
-    const html = render(HorizontalFunnelFlow({ stages: fiveStages, rates }));
+    const html = render(<HorizontalFunnelFlow stages={fiveStages} rates={rates} />);
     expect(html).toContain("rate-low");
   });
 
   it("Taxa de Fechamento 20% → rate-warn", () => {
     const rates: ConversionRate[] = [...fourRates.slice(0, 3), { label: "Taxa de Fechamento", pct: 20 }];
-    const html = render(HorizontalFunnelFlow({ stages: fiveStages, rates }));
+    const html = render(<HorizontalFunnelFlow stages={fiveStages} rates={rates} />);
     expect(html).toContain("rate-warn");
   });
 
   it("Taxa de Fechamento 35% → rate-ok", () => {
     const rates: ConversionRate[] = [...fourRates.slice(0, 3), { label: "Taxa de Fechamento", pct: 35 }];
-    const html = render(HorizontalFunnelFlow({ stages: fiveStages, rates }));
+    const html = render(<HorizontalFunnelFlow stages={fiveStages} rates={rates} />);
     expect(html).toContain("rate-ok");
   });
 
@@ -191,7 +170,7 @@ describe("HorizontalFunnelFlow", () => {
       { label: "Conversão LP→Lead", pct: 25 },
       fourRates[3],
     ];
-    const html = render(HorizontalFunnelFlow({ stages: fiveStages, rates }));
+    const html = render(<HorizontalFunnelFlow stages={fiveStages} rates={rates} />);
     expect(html).toContain("rate-low");
   });
 
@@ -202,7 +181,7 @@ describe("HorizontalFunnelFlow", () => {
       { label: "Conversão LP→Lead", pct: 50 },
       fourRates[3],
     ];
-    const html = render(HorizontalFunnelFlow({ stages: fiveStages, rates }));
+    const html = render(<HorizontalFunnelFlow stages={fiveStages} rates={rates} />);
     expect(html).toContain("rate-warn");
   });
 
@@ -213,28 +192,29 @@ describe("HorizontalFunnelFlow", () => {
       { label: "Conversão LP→Lead", pct: 80 },
       fourRates[3],
     ];
-    const html = render(HorizontalFunnelFlow({ stages: fiveStages, rates }));
+    const html = render(<HorizontalFunnelFlow stages={fiveStages} rates={rates} />);
     expect(html).toContain("rate-ok");
   });
 
   it("does not throw when stages is empty", () => {
-    expect(() => render(HorizontalFunnelFlow({ stages: [], rates: [] }))).not.toThrow();
+    expect(() => render(<HorizontalFunnelFlow stages={[]} rates={[]} />)).not.toThrow();
   });
 
   it("displays — when rate.pct is null", () => {
     const rates: ConversionRate[] = [{ label: "CTR", pct: null }, ...fourRates.slice(1)];
-    const html = render(HorizontalFunnelFlow({ stages: fiveStages, rates }));
+    const html = render(<HorizontalFunnelFlow stages={fiveStages} rates={rates} />);
     expect(html).toContain("—");
   });
 
   it("does not render Funil de Conversão header text", () => {
-    const html = render(HorizontalFunnelFlow({ stages: fiveStages, rates: fourRates }));
+    const html = render(<HorizontalFunnelFlow stages={fiveStages} rates={fourRates} />);
     expect(html).not.toContain("Funil de Conversão");
   });
 
-  it("renders stage values with DM Mono font", () => {
-    const html = render(HorizontalFunnelFlow({ stages: fiveStages, rates: fourRates }));
-    expect(html).toContain("DM Mono");
+  it("highlights the last stage (Vendas) with the green accent", () => {
+    const html = render(<HorizontalFunnelFlow stages={fiveStages} rates={fourRates} />);
+    expect(html).toContain("var(--green)");
+    expect(html).toContain("#2b3a34");
   });
 });
 
@@ -293,28 +273,95 @@ describe("LeadsSection", () => {
   const loadedDaily = { data: [], loading: false, error: false };
 
   it("renders total captacoes value", () => {
-    const html = render(LeadsSection({ leadsState: loaded, dailyState: loadedDaily }));
+    const html = render(<LeadsSection leadsState={loaded} dailyState={loadedDaily} />);
     expect(html).toContain("100");
   });
 
   it("renders event name in cyan color", () => {
-    const html = render(LeadsSection({ leadsState: loaded, dailyState: loadedDaily }));
+    const html = render(<LeadsSection leadsState={loaded} dailyState={loadedDaily} />);
     expect(html).toContain("var(--cyan)");
   });
 
-  it("total captacoes uses DM Mono", () => {
-    const html = render(LeadsSection({ leadsState: loaded, dailyState: loadedDaily }));
-    expect(html).toContain("DM Mono");
-  });
-
   it("subtitle uses --text-3 color", () => {
-    const html = render(LeadsSection({ leadsState: loaded, dailyState: loadedDaily }));
+    const html = render(<LeadsSection leadsState={loaded} dailyState={loadedDaily} />);
     expect(html).toContain("var(--text-3)");
   });
 
   it("renders loading skeleton", () => {
     const loading = { data: null, loading: true, error: false };
-    const html = render(LeadsSection({ leadsState: loading, dailyState: loadedDaily }));
+    const html = render(<LeadsSection leadsState={loading} dailyState={loadedDaily} />);
+    expect(html).toContain("pulse");
+  });
+
+  it("shows all sources without toggle when 5 or fewer", () => {
+    const html = render(<LeadsSection leadsState={loaded} dailyState={loadedDaily} />);
+    expect(html).not.toContain("Outras fontes");
+    expect(html).not.toContain("Ver todas");
+  });
+
+  it("aggregates sources beyond top 5 into 'Outras fontes (N)' with toggle", () => {
+    const manySources = {
+      ...leadsData,
+      by_source: [
+        { source: "meta", count: 7 },
+        { source: "Email", count: 3 },
+        { source: "WhatsApp", count: 3 },
+        { source: "Youtube", count: 2 },
+        { source: "Instagram_Bio_GT", count: 1 },
+        { source: "organico", count: 1 },
+        { source: "indicacao", count: 1 },
+      ],
+    };
+    const state = { data: manySources, loading: false, error: false };
+    const html = render(<LeadsSection leadsState={state} dailyState={loadedDaily} />);
+    expect(html).toContain("Outras fontes (2)");
+    expect(html).toContain("Ver todas as 7 fontes");
+    expect(html).not.toContain("organico");
+  });
+});
+
+// ── ConversionSourcesCard ─────────────────────────────────────────────────────
+
+describe("ConversionSourcesCard", () => {
+  const rows = [
+    { source: "is-atendimentoXX", count: 16 },
+    { source: "oportunidade-pc26", count: 6 },
+    { source: "is-01", count: 4 },
+  ];
+
+  it("renders total and attribution subtitle", () => {
+    const html = render(<ConversionSourcesCard state={{ data: rows, loading: false, error: false }} />);
+    expect(html).toContain("26");
+    expect(html).toContain("vendas atribuídas");
+  });
+
+  it("shows all sources without toggle when 5 or fewer", () => {
+    const html = render(<ConversionSourcesCard state={{ data: rows, loading: false, error: false }} />);
+    expect(html).not.toContain("Outras origens");
+    expect(html).not.toContain("Ver todas");
+  });
+
+  it("aggregates sources beyond top 5 into 'Outras origens (N)' with toggle", () => {
+    const many = [
+      ...rows,
+      { source: "is-atendimento01", count: 2 },
+      { source: "Youtube", count: 1 },
+      { source: "WhatsApp", count: 1 },
+      { source: "Email", count: 1 },
+    ];
+    const html = render(<ConversionSourcesCard state={{ data: many, loading: false, error: false }} />);
+    expect(html).toContain("Outras origens (2)");
+    expect(html).toContain("Ver todas as 7 origens");
+    expect(html).not.toContain("Email");
+  });
+
+  it("renders empty message when there are no sources", () => {
+    const html = render(<ConversionSourcesCard state={{ data: [], loading: false, error: false }} />);
+    expect(html).toContain("Nenhuma venda encontrada no período.");
+  });
+
+  it("renders loading skeleton", () => {
+    const html = render(<ConversionSourcesCard state={{ data: null, loading: true, error: false }} />);
     expect(html).toContain("pulse");
   });
 });
@@ -325,63 +372,26 @@ const noop = () => {};
 
 describe("IndicadoresEmptyState", () => {
   it("renders orientative message guiding user to select a filter", () => {
-    const html = render(IndicadoresEmptyState({ onOpenFilter: noop }));
+    const html = render(<IndicadoresEmptyState onOpenFilter={noop} />);
     expect(html).toContain("Nenhum filtro selecionado");
     expect(html).toContain("Selecione ou crie um filtro");
   });
 
   it("renders a call-to-action button with actionable text", () => {
-    const html = render(IndicadoresEmptyState({ onOpenFilter: noop }));
+    const html = render(<IndicadoresEmptyState onOpenFilter={noop} />);
     expect(html).toContain("Criar ou selecionar filtro");
   });
 
   it("renders the filter icon SVG inside the button area", () => {
-    const html = render(IndicadoresEmptyState({ onOpenFilter: noop }));
+    const html = render(<IndicadoresEmptyState onOpenFilter={noop} />);
     // The component renders a plus-sign SVG inside the button
     expect(html).toContain("svg");
   });
 });
 
-// ── deriveSourceFlags ─────────────────────────────────────────────────────────
-
-import { deriveSourceFlags } from "@/app/indicadores/source-flags";
-
-describe("deriveSourceFlags", () => {
-  const base: FilterRecord = {
-    id: "f1", account_id: "acc1", name: "test",
-    meta_ads_terms: [], hotmart_products: [], captacao_leads_eventos: [],
-    created_at: "2024-01-01T00:00:00Z", updated_at: "2024-01-01T00:00:00Z",
-  };
-
-  it("only meta terms → hasMetaFilter true, others false", () => {
-    const filter = { ...base, meta_ads_terms: ["lançamento"] };
-    expect(deriveSourceFlags(filter)).toEqual({ hasMetaFilter: true, hasHotmartFilter: false, hasLeadsFilter: false });
-  });
-
-  it("only hotmart products → hasHotmartFilter true, others false", () => {
-    const filter = { ...base, hotmart_products: [{ product_id: "p1", product_name: "Curso" }] };
-    expect(deriveSourceFlags(filter)).toEqual({ hasMetaFilter: false, hasHotmartFilter: true, hasLeadsFilter: false });
-  });
-
-  it("only leads eventos → hasLeadsFilter true, others false", () => {
-    const filter = { ...base, captacao_leads_eventos: ["Inscricao Webinar"] };
-    expect(deriveSourceFlags(filter)).toEqual({ hasMetaFilter: false, hasHotmartFilter: false, hasLeadsFilter: true });
-  });
-
-  it("all three configured → all flags true", () => {
-    const filter = {
-      ...base,
-      meta_ads_terms: ["lançamento"],
-      hotmart_products: [{ product_id: "p1", product_name: "Curso" }],
-      captacao_leads_eventos: ["Inscricao Webinar"],
-    };
-    expect(deriveSourceFlags(filter)).toEqual({ hasMetaFilter: true, hasHotmartFilter: true, hasLeadsFilter: true });
-  });
-
-  it("neither configured → all flags false", () => {
-    expect(deriveSourceFlags(base)).toEqual({ hasMetaFilter: false, hasHotmartFilter: false, hasLeadsFilter: false });
-  });
-});
+// As flags de fonte configurada agora vivem em expandFilter().sources — única
+// definição de "o que um filtro significa". Cobertura em
+// src/lib/indicadores/__tests__/filter-expansion.test.ts.
 
 // ── FilterDropdownList ────────────────────────────────────────────────────────
 
@@ -393,70 +403,95 @@ const sampleFilters: FilterRecord[] = [
     hotmart_products: [],
     meta_ads_terms: [],
     captacao_leads_eventos: [],
+    status: "ativo",
+    status_changed_at: null,
     created_at: "2024-01-01T00:00:00Z",
     updated_at: "2024-01-01T00:00:00Z",
   },
 ];
 
+// ── FilterModal status segmented control ─────────────────────────────────────
+
+describe("FilterModal — segmented control de status", () => {
+  it("edição exibe as 3 opções com o status atual selecionado", () => {
+    const editTarget: FilterRecord = { ...sampleFilters[0], status: "finalizado" };
+    const html = render(
+      <FilterModal accountId="acc1" editTarget={editTarget} onSave={noop} onCancel={noop} />
+    );
+    expect(html).toContain('data-testid="status-option-ativo"');
+    expect(html).toContain('data-testid="status-option-finalizado"');
+    expect(html).toContain('data-testid="status-option-cancelado"');
+    expect(html).toMatch(/data-testid="status-option-finalizado"[^>]*aria-pressed="true"/);
+    expect(html).toMatch(/data-testid="status-option-ativo"[^>]*aria-pressed="false"/);
+  });
+
+  it("criação não exibe o segmented control", () => {
+    const html = render(
+      <FilterModal accountId="acc1" editTarget={null} onSave={noop} onCancel={noop} />
+    );
+    expect(html).not.toContain('data-testid="status-option-ativo"');
+  });
+});
+
 describe("FilterDropdownList", () => {
   it("does not render 'Sem filtro' option", () => {
     const html = render(
-      FilterDropdownList({
-        filters: sampleFilters,
-        activeFilter: null,
-        onSelect: noop,
-        onNew: noop,
-        onEdit: noop,
-        onDelete: noop,
-      })
+      <FilterDropdownList
+        filters={sampleFilters}
+        activeFilter={null}
+        onSelect={noop}
+        onNew={noop}
+        onEdit={noop}
+        onDelete={noop}
+      />
     );
     expect(html).not.toContain("Sem filtro");
   });
 
   it("renders '+ Novo filtro' button", () => {
     const html = render(
-      FilterDropdownList({
-        filters: sampleFilters,
-        activeFilter: null,
-        onSelect: noop,
-        onNew: noop,
-        onEdit: noop,
-        onDelete: noop,
-      })
+      <FilterDropdownList
+        filters={sampleFilters}
+        activeFilter={null}
+        onSelect={noop}
+        onNew={noop}
+        onEdit={noop}
+        onDelete={noop}
+      />
     );
     expect(html).toContain("+ Novo filtro");
   });
 
   it("renders filter names from the list", () => {
     const html = render(
-      FilterDropdownList({
-        filters: sampleFilters,
-        activeFilter: null,
-        onSelect: noop,
-        onNew: noop,
-        onEdit: noop,
-        onDelete: noop,
-      })
+      <FilterDropdownList
+        filters={sampleFilters}
+        activeFilter={null}
+        onSelect={noop}
+        onNew={noop}
+        onEdit={noop}
+        onDelete={noop}
+      />
     );
     expect(html).toContain("Filtro Alpha");
   });
 
   it("renders 'Nenhum filtro salvo' when filters list is empty", () => {
     const html = render(
-      FilterDropdownList({
-        filters: [],
-        activeFilter: null,
-        onSelect: noop,
-        onNew: noop,
-        onEdit: noop,
-        onDelete: noop,
-      })
+      <FilterDropdownList
+        filters={[]}
+        activeFilter={null}
+        onSelect={noop}
+        onNew={noop}
+        onEdit={noop}
+        onDelete={noop}
+      />
     );
     expect(html).toContain("Nenhum filtro salvo");
   });
 });
 
-// ── MetaAdsCard badge ─────────────────────────────────────────────────────────
+// ── MetaAdsPanel badge ────────────────────────────────────────────────────────
 
 const zeroedMeta = {
   data: {
@@ -470,17 +505,17 @@ const zeroedMeta = {
 };
 const emptyDaily = { data: [], loading: false, error: false };
 
-describe("MetaAdsCard — not-configured badge", () => {
+describe("MetaAdsPanel — not-configured badge", () => {
   it("shows 'Meta Ads não configurado' when hasMetaFilter is false", () => {
     const html = render(
-      MetaAdsCard({ metaState: zeroedMeta, dailyState: emptyDaily, hasMetaFilter: false })
+      <MetaAdsPanel metaState={zeroedMeta} dailyState={emptyDaily} hasMetaFilter={false} />
     );
     expect(html).toContain("Meta Ads não configurado");
   });
 
   it("does NOT show 'não configurado' when hasMetaFilter is true", () => {
     const html = render(
-      MetaAdsCard({ metaState: zeroedMeta, dailyState: emptyDaily, hasMetaFilter: true })
+      <MetaAdsPanel metaState={zeroedMeta} dailyState={emptyDaily} hasMetaFilter={true} />
     );
     expect(html).not.toContain("não configurado");
   });
@@ -490,35 +525,35 @@ describe("MetaAdsCard — not-configured badge", () => {
 
 describe("NotConfiguredBadge", () => {
   it("renders the provided text", () => {
-    const html = render(NotConfiguredBadge({ text: "Hotmart não configurado neste filtro — dados zerados" }));
+    const html = render(<NotConfiguredBadge text="Hotmart não configurado neste filtro — dados zerados" />);
     expect(html).toContain("Hotmart não configurado");
   });
 
   it("uses var(--text-3) color", () => {
-    const html = render(NotConfiguredBadge({ text: "Test badge" }));
+    const html = render(<NotConfiguredBadge text="Test badge" />);
     expect(html).toContain("var(--text-3)");
   });
 });
 
-// ── MetaAdsCard — chart visibility (#46) ─────────────────────────────────────
+// ── MetaAdsPanel — chart visibility (#46) ────────────────────────────────────
 
-describe("MetaAdsCard — chart visibility", () => {
+describe("MetaAdsPanel — chart visibility", () => {
   it("does NOT render MetaAdsInvestimentoLeadsChart when hasMetaFilter is false", () => {
     const html = render(
-      MetaAdsCard({ metaState: zeroedMeta, dailyState: emptyDaily, hasMetaFilter: false })
+      <MetaAdsPanel metaState={zeroedMeta} dailyState={emptyDaily} hasMetaFilter={false} />
     );
     expect(html).not.toContain('data-chart="meta"');
   });
 
   it("DOES render MetaAdsInvestimentoLeadsChart when hasMetaFilter is true", () => {
     const html = render(
-      MetaAdsCard({ metaState: zeroedMeta, dailyState: emptyDaily, hasMetaFilter: true })
+      <MetaAdsPanel metaState={zeroedMeta} dailyState={emptyDaily} hasMetaFilter={true} />
     );
     expect(html).toContain('data-chart="meta"');
   });
 });
 
-// ── HotmartCard — chart visibility (#46) ─────────────────────────────────────
+// ── HotmartPanel — chart visibility (#46) ────────────────────────────────────
 
 const zeroedHotmart: { data: import("@/types/indicadores").GlobalHotmartMetrics; loading: boolean; error: boolean } = {
   data: {
@@ -532,18 +567,50 @@ const zeroedHotmart: { data: import("@/types/indicadores").GlobalHotmartMetrics;
   error: false,
 };
 
-describe("HotmartCard — chart visibility", () => {
+describe("HotmartPanel — chart visibility", () => {
   it("does NOT render HotmartVendasChart when hasHotmartFilter is false", () => {
     const html = render(
-      <HotmartCard hotmartState={zeroedHotmart} dailyState={emptyDaily} hasHotmartFilter={false} />
+      <HotmartPanel hotmartState={zeroedHotmart} dailyState={emptyDaily} hasHotmartFilter={false} />
     );
     expect(html).not.toContain('data-chart="hotmart"');
   });
 
   it("DOES render HotmartVendasChart when hasHotmartFilter is true", () => {
     const html = render(
-      <HotmartCard hotmartState={zeroedHotmart} dailyState={emptyDaily} hasHotmartFilter={true} />
+      <HotmartPanel hotmartState={zeroedHotmart} dailyState={emptyDaily} hasHotmartFilter={true} />
     );
     expect(html).toContain('data-chart="hotmart"');
+  });
+});
+
+// ── PlatformsCard — tabs ─────────────────────────────────────────────────────
+
+describe("PlatformsCard", () => {
+  it("renders both platform tabs", () => {
+    const html = render(
+      <PlatformsCard
+        metaState={zeroedMeta}
+        hotmartState={zeroedHotmart}
+        dailyState={emptyDaily}
+        hasMetaFilter={true}
+        hasHotmartFilter={true}
+      />
+    );
+    expect(html).toContain("Meta Ads");
+    expect(html).toContain("Hotmart");
+  });
+
+  it("shows the Meta Ads panel by default (Hotmart panel hidden)", () => {
+    const html = render(
+      <PlatformsCard
+        metaState={zeroedMeta}
+        hotmartState={zeroedHotmart}
+        dailyState={emptyDaily}
+        hasMetaFilter={true}
+        hasHotmartFilter={true}
+      />
+    );
+    expect(html).toContain('data-chart="meta"');
+    expect(html).not.toContain('data-chart="hotmart"');
   });
 });

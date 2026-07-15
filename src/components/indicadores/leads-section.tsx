@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { LeadsCaptacoesChart } from "./trend-charts";
 import type { GlobalLeadsMetrics, DailyPoint } from "@/types/indicadores";
+
+const TOP_N = 5;
 
 interface SectionState<T> {
   data: T | null;
@@ -25,47 +28,30 @@ function Header() {
         display: "flex",
         alignItems: "center",
         gap: 10,
-        padding: "16px 20px",
+        padding: "15px 20px",
         borderBottom: "1px solid var(--border-vis)",
       }}
     >
       <svg
-        width="20"
-        height="20"
+        width="17"
+        height="17"
         viewBox="0 0 24 24"
         fill="none"
-        stroke="currentColor"
+        stroke="var(--green)"
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
-        style={{ color: "var(--green)", flexShrink: 0 }}
+        style={{ flexShrink: 0 }}
       >
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
         <circle cx="9" cy="7" r="4" />
         <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
         <path d="M16 3.13a4 4 0 0 1 0 7.75" />
       </svg>
-      <span
-        style={{
-          color: "var(--text)",
-          fontSize: 14,
-          fontWeight: 600,
-        }}
-      >
+      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-strong)" }}>
         Coleta de Leads
       </span>
-      <span
-        style={{
-          background: "rgba(34,197,94,0.1)",
-          border: "1px solid rgba(34,197,94,0.2)",
-          color: "var(--green)",
-          fontSize: 10,
-          borderRadius: 4,
-          padding: "2px 7px",
-        }}
-      >
-        Orgânico + Pago
-      </span>
+      <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Orgânico + Pago</span>
     </div>
   );
 }
@@ -74,7 +60,7 @@ export function LeadsSection({ leadsState, dailyState }: LeadsSectionProps) {
   const outerCard: React.CSSProperties = {
     background: "var(--surface)",
     border: "1px solid var(--border-vis)",
-    borderRadius: 10,
+    borderRadius: 11,
     overflow: "hidden",
     width: "100%",
   };
@@ -94,21 +80,13 @@ export function LeadsSection({ leadsState, dailyState }: LeadsSectionProps) {
     return (
       <div style={outerCard}>
         <Header />
-        <div
-          style={{
-            padding: 20,
-            display: "grid",
-            gridTemplateColumns: "200px 1fr 1fr",
-            gap: 20,
-            alignItems: "start",
-          }}
-        >
+        <div className="leads-grid" style={{ padding: 20 }}>
           {[180, undefined, undefined].map((height, i) => (
             <div
               key={i}
               style={{
                 height: height ?? 180,
-                borderRadius: 8,
+                borderRadius: 9,
                 background: "var(--surface-2)",
                 animation: "pulse 1.5s ease-in-out infinite",
               }}
@@ -125,51 +103,37 @@ export function LeadsSection({ leadsState, dailyState }: LeadsSectionProps) {
   return (
     <div style={outerCard}>
       <Header />
-      <div
-        style={{
-          padding: 20,
-          display: "grid",
-          gridTemplateColumns: "200px 1fr 1fr",
-          gap: 20,
-          alignItems: "start",
-        }}
-      >
+      <div className="leads-grid" style={{ padding: 20 }}>
         <div
           style={{
             background: "var(--surface-2)",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
+            border: "1px solid var(--border-vis)",
+            borderRadius: 9,
             padding: 20,
             display: "flex",
             flexDirection: "column",
-            gap: 8,
+            gap: 9,
           }}
         >
-          <span
+          <div
             style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
               fontSize: 9,
               fontWeight: 600,
+              letterSpacing: "0.07em",
               textTransform: "uppercase",
-              letterSpacing: "0.08em",
               color: "var(--text-3)",
             }}
           >
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--green)", flexShrink: 0 }} />
             Total de Captações
-          </span>
-          <span
-            style={{
-              fontFamily: "'DM Mono', monospace",
-              fontSize: 36,
-              fontWeight: 500,
-              color: "var(--green)",
-              lineHeight: 1,
-            }}
-          >
+          </div>
+          <span style={{ fontSize: 36, fontWeight: 600, color: "var(--text-strong)", lineHeight: 1 }}>
             {fmtNum(d.total)}
           </span>
-          <span style={{ fontSize: 12, color: "var(--text-3)" }}>
-            no período
-          </span>
+          <span style={{ fontSize: 12, color: "var(--text-3)" }}>no período</span>
         </div>
 
         <div>
@@ -189,10 +153,10 @@ export function LeadsSection({ leadsState, dailyState }: LeadsSectionProps) {
                     fontSize: 9,
                     fontWeight: 600,
                     textTransform: "uppercase",
-                    letterSpacing: "0.08em",
+                    letterSpacing: "0.07em",
                     color: "var(--text-3)",
                     borderBottom: "1px solid var(--border-vis)",
-                    paddingBottom: 8,
+                    paddingBottom: 9,
                   }}
                 >
                   Evento
@@ -203,10 +167,10 @@ export function LeadsSection({ leadsState, dailyState }: LeadsSectionProps) {
                     fontSize: 9,
                     fontWeight: 600,
                     textTransform: "uppercase",
-                    letterSpacing: "0.08em",
+                    letterSpacing: "0.07em",
                     color: "var(--text-3)",
                     borderBottom: "1px solid var(--border-vis)",
-                    paddingBottom: 8,
+                    paddingBottom: 9,
                   }}
                 >
                   Captações
@@ -221,21 +185,20 @@ export function LeadsSection({ leadsState, dailyState }: LeadsSectionProps) {
                 >
                   <td
                     style={{
-                      fontFamily: "'DM Mono', monospace",
+                      fontFamily: "var(--font-mono)",
                       color: "var(--cyan)",
                       fontSize: 12,
-                      padding: 8,
+                      padding: "10px 8px",
                     }}
                   >
                     {row.evento}
                   </td>
                   <td
                     style={{
-                      fontFamily: "'DM Mono', monospace",
                       fontWeight: 700,
                       textAlign: "right",
-                      color: "var(--text)",
-                      padding: 8,
+                      color: "var(--text-strong)",
+                      padding: "10px 8px",
                     }}
                   >
                     {fmtNum(row.count)}
@@ -255,13 +218,26 @@ export function LeadsSection({ leadsState, dailyState }: LeadsSectionProps) {
 }
 
 function SourcesChart({ sources }: { sources: Array<{ source: string; count: number }> }) {
+  const [expanded, setExpanded] = useState(false);
+
   const max = sources[0]?.count ?? 1;
+  const hasOverflow = sources.length > TOP_N;
+
+  let display: Array<{ source: string; count: number; isOther?: boolean }>;
+  if (expanded || !hasOverflow) {
+    display = sources;
+  } else {
+    const top = sources.slice(0, TOP_N);
+    const rest = sources.slice(TOP_N);
+    const restCount = rest.reduce((sum, r) => sum + r.count, 0);
+    display = [...top, { source: `Outras fontes (${rest.length})`, count: restCount, isOther: true }];
+  }
 
   return (
     <div
       style={{
         borderTop: "1px solid var(--border-vis)",
-        padding: "16px 20px 20px",
+        padding: "18px 22px 22px",
       }}
     >
       <span
@@ -269,7 +245,7 @@ function SourcesChart({ sources }: { sources: Array<{ source: string; count: num
           fontSize: 9,
           fontWeight: 600,
           textTransform: "uppercase",
-          letterSpacing: "0.08em",
+          letterSpacing: "0.07em",
           color: "var(--text-3)",
           display: "block",
           marginBottom: 14,
@@ -277,15 +253,16 @@ function SourcesChart({ sources }: { sources: Array<{ source: string; count: num
       >
         Fontes (utm_source)
       </span>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {sources.map((row) => (
-          <div key={row.source} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+        {display.map((row) => (
+          <div key={row.source} style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <span
               style={{
-                fontFamily: "'DM Mono', monospace",
+                fontFamily: "var(--font-mono)",
                 fontSize: 11,
-                color: "var(--text-2)",
-                width: 200,
+                color: row.isOther ? "var(--text-muted)" : "#a2a9b4",
+                fontStyle: row.isOther ? "italic" : "normal",
+                width: 210,
                 flexShrink: 0,
                 textAlign: "right",
                 whiteSpace: "nowrap",
@@ -295,42 +272,56 @@ function SourcesChart({ sources }: { sources: Array<{ source: string; count: num
             >
               {row.source}
             </span>
-            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+            <div
+              style={{
+                flex: 1,
+                height: 18,
+                background: "var(--surface-2)",
+                borderRadius: 3,
+                overflow: "hidden",
+              }}
+            >
               <div
                 style={{
-                  flex: 1,
-                  height: 20,
-                  background: "var(--surface-2)",
+                  width: `${(row.count / max) * 100}%`,
+                  height: "100%",
+                  background: row.isOther ? "#565d69" : "var(--green)",
                   borderRadius: 3,
-                  overflow: "hidden",
                 }}
-              >
-                <div
-                  style={{
-                    width: `${(row.count / max) * 100}%`,
-                    height: "100%",
-                    background: "var(--cyan)",
-                    borderRadius: 3,
-                  }}
-                />
-              </div>
-              <span
-                style={{
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "var(--text)",
-                  width: 48,
-                  flexShrink: 0,
-                  textAlign: "right",
-                }}
-              >
-                {fmtNum(row.count)}
-              </span>
+              />
             </div>
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: "var(--text-strong)",
+                width: 26,
+                flexShrink: 0,
+                textAlign: "right",
+              }}
+            >
+              {fmtNum(row.count)}
+            </span>
           </div>
         ))}
       </div>
+      {hasOverflow && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          style={{
+            marginTop: 14,
+            background: "none",
+            border: "none",
+            padding: 0,
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            color: "var(--cyan)",
+            cursor: "pointer",
+          }}
+        >
+          {expanded ? "Mostrar menos" : `Ver todas as ${sources.length} fontes`}
+        </button>
+      )}
     </div>
   );
 }

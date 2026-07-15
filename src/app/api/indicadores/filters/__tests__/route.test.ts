@@ -157,6 +157,23 @@ describe("POST /api/indicadores/filters", () => {
     );
   });
 
+  it("força status 'ativo' na criação mesmo quando o payload envia outro valor", async () => {
+    mockSingle.mockResolvedValueOnce({ data: { id: "x" }, error: null });
+
+    const { POST } = await import("../route");
+    const req = makeRequest("POST", "http://localhost/api/indicadores/filters", {
+      account_id: "acc",
+      name: "Evento Novo",
+      hotmart_products: [],
+      meta_ads_terms: ["campanha"],
+      captacao_leads_eventos: [],
+      status: "finalizado",
+    });
+    await POST(req);
+
+    expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ status: "ativo" }));
+  });
+
   it("creates filter and returns 201 with created record", async () => {
     const created = {
       id: "new-id",

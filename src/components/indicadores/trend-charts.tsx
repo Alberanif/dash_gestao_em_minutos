@@ -32,17 +32,27 @@ function fmtDate(dateStr: string) {
   return `${d}/${m}`;
 }
 
+const TICK = { fontSize: 9, fill: "var(--text-3)" };
+
+const TOOLTIP_STYLE: React.CSSProperties = {
+  background: "var(--surface)",
+  border: "1px solid var(--border-vis)",
+  borderRadius: 7,
+  fontSize: 12,
+};
+
+const TOOLTIP_LABEL_STYLE: React.CSSProperties = { color: "var(--text-2)" };
+
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 
 export function ChartSkeleton() {
   return (
     <div
       style={{
-        height: 180,
+        height: 170,
         borderRadius: 8,
         background: "var(--surface-2)",
         animation: "pulse 1.5s ease-in-out infinite",
-        marginTop: 16,
       }}
     />
   );
@@ -54,13 +64,12 @@ function EmptyChart() {
   return (
     <div
       style={{
-        height: 180,
+        height: 170,
         borderRadius: 8,
         border: "1px dashed var(--border-vis)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        marginTop: 16,
       }}
     >
       <p style={{ fontSize: 13, color: "var(--text-3)" }}>
@@ -76,13 +85,13 @@ function ChartLabel({ children }: { children: React.ReactNode }) {
   return (
     <p
       style={{
-        fontSize: 11,
+        fontSize: 9,
         fontWeight: 600,
         color: "var(--text-3)",
         textTransform: "uppercase",
-        letterSpacing: "0.06em",
-        marginTop: 20,
-        marginBottom: 4,
+        letterSpacing: "0.07em",
+        marginTop: 0,
+        marginBottom: 14,
       }}
     >
       {children}
@@ -115,19 +124,19 @@ export function MetaAdsInvestimentoLeadsChart({
   return (
     <>
       <ChartLabel>Investimento × Leads por dia</ChartLabel>
-      <ResponsiveContainer width="100%" height={260}>
+      <ResponsiveContainer width="100%" height={220}>
         <ComposedChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-vis)" vertical={false} />
+          <CartesianGrid stroke="var(--border)" vertical={false} />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 10, fill: "var(--text-3)" }}
+            tick={TICK}
             axisLine={false}
             tickLine={false}
             interval="preserveStartEnd"
           />
           <YAxis
             yAxisId="left"
-            tick={{ fontSize: 10, fill: "var(--text-3)" }}
+            tick={TICK}
             axisLine={false}
             tickLine={false}
             tickFormatter={(v) => fmtBRL(v)}
@@ -136,26 +145,22 @@ export function MetaAdsInvestimentoLeadsChart({
           <YAxis
             yAxisId="right"
             orientation="right"
-            tick={{ fontSize: 10, fill: "var(--text-3)" }}
+            tick={TICK}
             axisLine={false}
             tickLine={false}
             allowDecimals={false}
             width={32}
           />
           <Tooltip
-            contentStyle={{
-              background: "var(--surface)",
-              border: "1px solid var(--border-vis)",
-              borderRadius: 6,
-              fontSize: 12,
-            }}
+            contentStyle={TOOLTIP_STYLE}
+            labelStyle={TOOLTIP_LABEL_STYLE}
             formatter={(value, name) => {
               if (name === "Investimento") return [fmtBRL(Number(value)), String(name)];
               return [value, String(name)];
             }}
           />
-          <Bar yAxisId="left" dataKey="spend" name="Investimento" fill="#1877f2" opacity={0.85} radius={[3, 3, 0, 0]} maxBarSize={32} />
-          <Line yAxisId="right" dataKey="leads" name="Leads" stroke="#f97316" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+          <Bar yAxisId="left" dataKey="spend" name="Investimento" fill="var(--blue)" radius={[2, 2, 0, 0]} maxBarSize={32} />
+          <Line yAxisId="right" dataKey="leads" name="Leads" stroke="var(--orange)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
         </ComposedChart>
       </ResponsiveContainer>
     </>
@@ -187,31 +192,27 @@ export function MetaAdsCplChart({
       <ChartLabel>CPL diário</ChartLabel>
       <ResponsiveContainer width="100%" height={140}>
         <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-vis)" vertical={false} />
+          <CartesianGrid stroke="var(--border)" vertical={false} />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 10, fill: "var(--text-3)" }}
+            tick={TICK}
             axisLine={false}
             tickLine={false}
             interval="preserveStartEnd"
           />
           <YAxis
-            tick={{ fontSize: 10, fill: "var(--text-3)" }}
+            tick={TICK}
             axisLine={false}
             tickLine={false}
             tickFormatter={(v) => fmtBRL(v)}
             width={72}
           />
           <Tooltip
-            contentStyle={{
-              background: "var(--surface)",
-              border: "1px solid var(--border-vis)",
-              borderRadius: 6,
-              fontSize: 12,
-            }}
+            contentStyle={TOOLTIP_STYLE}
+            labelStyle={TOOLTIP_LABEL_STYLE}
             formatter={(value) => [fmtBRL(Number(value)), "CPL"]}
           />
-          <Line dataKey="cpl" name="CPL" stroke="#1877f2" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+          <Line dataKey="cpl" name="CPL" stroke="var(--blue)" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
         </LineChart>
       </ResponsiveContainer>
     </>
@@ -227,7 +228,7 @@ export function HotmartVendasChart({
   data: DailyPoint[];
   loading: boolean;
 }) {
-  if (loading) return <><ChartLabel>Vendas diárias</ChartLabel><ChartSkeleton /></>;
+  if (loading) return <><ChartLabel>Vendas Diárias</ChartLabel><ChartSkeleton /></>;
 
   const chartData = data
     .filter((d) => d.hotmart_sales > 0)
@@ -236,38 +237,34 @@ export function HotmartVendasChart({
       sales: d.hotmart_sales,
     }));
 
-  if (chartData.length === 0) return <><ChartLabel>Vendas diárias</ChartLabel><EmptyChart /></>;
+  if (chartData.length === 0) return <><ChartLabel>Vendas Diárias</ChartLabel><EmptyChart /></>;
 
   return (
     <>
-      <ChartLabel>Vendas diárias</ChartLabel>
+      <ChartLabel>Vendas Diárias</ChartLabel>
       <ResponsiveContainer width="100%" height={160}>
         <BarChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-vis)" vertical={false} />
+          <CartesianGrid stroke="var(--border)" vertical={false} />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 10, fill: "var(--text-3)" }}
+            tick={TICK}
             axisLine={false}
             tickLine={false}
             interval="preserveStartEnd"
           />
           <YAxis
-            tick={{ fontSize: 10, fill: "var(--text-3)" }}
+            tick={TICK}
             axisLine={false}
             tickLine={false}
             allowDecimals={false}
             width={32}
           />
           <Tooltip
-            contentStyle={{
-              background: "var(--surface)",
-              border: "1px solid var(--border-vis)",
-              borderRadius: 6,
-              fontSize: 12,
-            }}
+            contentStyle={TOOLTIP_STYLE}
+            labelStyle={TOOLTIP_LABEL_STYLE}
             formatter={(value) => [value, "Vendas"]}
           />
-          <Bar dataKey="sales" name="Vendas" fill="#f97316" opacity={0.85} radius={[3, 3, 0, 0]} maxBarSize={32} />
+          <Bar dataKey="sales" name="Vendas" fill="var(--orange)" radius={[2, 2, 0, 0]} maxBarSize={32} />
         </BarChart>
       </ResponsiveContainer>
     </>
@@ -283,7 +280,7 @@ export function LeadsCaptacoesChart({
   data: DailyPoint[];
   loading: boolean;
 }) {
-  if (loading) return <><ChartLabel>Captações diárias</ChartLabel><ChartSkeleton /></>;
+  if (loading) return <><ChartLabel>Captações Diárias</ChartLabel><ChartSkeleton /></>;
 
   const chartData = data
     .filter((d) => d.lead_captacoes > 0)
@@ -292,50 +289,46 @@ export function LeadsCaptacoesChart({
       captacoes: d.lead_captacoes,
     }));
 
-  if (chartData.length === 0) return <><ChartLabel>Captações diárias</ChartLabel><EmptyChart /></>;
+  if (chartData.length === 0) return <><ChartLabel>Captações Diárias</ChartLabel><EmptyChart /></>;
 
   return (
     <>
-      <ChartLabel>Captações diárias</ChartLabel>
-      <ResponsiveContainer width="100%" height={160}>
+      <ChartLabel>Captações Diárias</ChartLabel>
+      <ResponsiveContainer width="100%" height={140}>
         <AreaChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="leadGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#0891b2" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#0891b2" stopOpacity={0} />
+              <stop offset="5%" stopColor="#4fae82" stopOpacity={0.18} />
+              <stop offset="95%" stopColor="#4fae82" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-vis)" vertical={false} />
+          <CartesianGrid stroke="var(--border)" vertical={false} />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 10, fill: "var(--text-3)" }}
+            tick={TICK}
             axisLine={false}
             tickLine={false}
             interval="preserveStartEnd"
           />
           <YAxis
-            tick={{ fontSize: 10, fill: "var(--text-3)" }}
+            tick={TICK}
             axisLine={false}
             tickLine={false}
             allowDecimals={false}
             width={32}
           />
           <Tooltip
-            contentStyle={{
-              background: "var(--surface)",
-              border: "1px solid var(--border-vis)",
-              borderRadius: 6,
-              fontSize: 12,
-            }}
+            contentStyle={TOOLTIP_STYLE}
+            labelStyle={TOOLTIP_LABEL_STYLE}
             formatter={(value) => [value, "Captações"]}
           />
           <Area
             dataKey="captacoes"
             name="Captações"
-            stroke="#0891b2"
+            stroke="var(--green)"
             strokeWidth={2}
             fill="url(#leadGradient)"
-            dot={false}
+            dot={{ r: 3.5, stroke: "var(--green)", strokeWidth: 2, fill: "var(--bg)" }}
             activeDot={{ r: 4 }}
           />
         </AreaChart>

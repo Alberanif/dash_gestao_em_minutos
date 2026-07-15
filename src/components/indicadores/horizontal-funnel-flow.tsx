@@ -41,17 +41,9 @@ function getRateClass(label: string, pct: number): string {
   }
 }
 
-const STAGE_COLORS = [
-  "var(--text-2)",
-  "var(--blue)",
-  "var(--cyan)",
-  "var(--green)",
-  "var(--orange)",
-];
-
 function IconImpressions() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <svg width="17" height="17" viewBox="0 0 16 16" fill="none">
       <path
         d="M1 8C1 8 3.5 3 8 3C12.5 3 15 8 15 8C15 8 12.5 13 8 13C3.5 13 1 8 1 8Z"
         stroke="currentColor"
@@ -65,7 +57,7 @@ function IconImpressions() {
 
 function IconCliques() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <svg width="17" height="17" viewBox="0 0 16 16" fill="none">
       <path
         d="M4 2L4 11L6.5 8.5L8.5 13L10 12.3L8 7.5L11.5 7.5L4 2Z"
         stroke="currentColor"
@@ -79,7 +71,7 @@ function IconCliques() {
 
 function IconVisualizacoes() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <svg width="17" height="17" viewBox="0 0 16 16" fill="none">
       <rect x="1.5" y="2.5" width="13" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.4" />
       <path d="M5.5 13.5H10.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
       <path d="M8 11.5V13.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
@@ -89,7 +81,7 @@ function IconVisualizacoes() {
 
 function IconLeads() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <svg width="17" height="17" viewBox="0 0 16 16" fill="none">
       <circle cx="8" cy="5.5" r="2.5" stroke="currentColor" strokeWidth="1.4" />
       <path
         d="M2.5 13.5C2.5 10.7 5 8.5 8 8.5C11 8.5 13.5 10.7 13.5 13.5"
@@ -103,7 +95,7 @@ function IconLeads() {
 
 function IconVendas() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <svg width="17" height="17" viewBox="0 0 16 16" fill="none">
       <path
         d="M5.5 6.5V4.5C5.5 3.12 6.62 2 8 2C9.38 2 10.5 3.12 10.5 4.5V6.5"
         stroke="currentColor"
@@ -117,18 +109,6 @@ function IconVendas() {
 }
 
 const STAGE_ICONS = [IconImpressions, IconCliques, IconVisualizacoes, IconLeads, IconVendas];
-
-function hexToRgba(cssVar: string, opacity: number): string {
-  const map: Record<string, string> = {
-    "var(--text-2)": `148,163,184`,
-    "var(--blue)": `59,130,246`,
-    "var(--cyan)": `8,145,178`,
-    "var(--green)": `34,197,94`,
-    "var(--orange)": `249,115,22`,
-  };
-  const rgb = map[cssVar] ?? "148,163,184";
-  return `rgba(${rgb},${opacity})`;
-}
 
 export function HorizontalFunnelFlow({
   stages,
@@ -148,13 +128,13 @@ export function HorizontalFunnelFlow({
       style={{
         background: "var(--surface)",
         border: "1px solid var(--border-vis)",
-        borderRadius: 10,
+        borderRadius: 11,
         padding: 20,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
         {stages.map((stage, idx) => {
-          const color = STAGE_COLORS[idx] ?? "var(--text-2)";
+          const isLast = idx === stages.length - 1;
           const Icon = STAGE_ICONS[idx] ?? IconImpressions;
           const rate = showConnectors && idx < rates.length ? rates[idx] : null;
 
@@ -165,40 +145,25 @@ export function HorizontalFunnelFlow({
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
-                  gap: 6,
+                  gap: 9,
                   flex: 1,
                   minWidth: 0,
-                  position: "relative",
+                  textAlign: "center",
                   background: "var(--surface-2)",
-                  border: "1px solid var(--border-vis)",
-                  borderRadius: 8,
-                  padding: "12px 8px 0 8px",
-                  overflow: "hidden",
+                  border: `1px solid ${isLast ? "#2b3a34" : "var(--border-vis)"}`,
+                  borderRadius: 9,
+                  padding: "15px 8px",
                 }}
               >
-                <div
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 6,
-                    background: hexToRgba(color, 0.1),
-                    border: `1px solid ${hexToRgba(color, 0.2)}`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color,
-                    flexShrink: 0,
-                  }}
-                >
+                <span style={{ color: isLast ? "var(--green)" : "var(--text-label)", display: "flex", flexShrink: 0 }}>
                   <Icon />
-                </div>
+                </span>
 
                 <span
                   style={{
-                    fontFamily: "'DM Mono', monospace",
-                    fontSize: 16,
+                    fontSize: 21,
                     fontWeight: 600,
-                    color,
+                    color: "var(--text-strong)",
                     lineHeight: 1,
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -212,12 +177,10 @@ export function HorizontalFunnelFlow({
                 <span
                   style={{
                     fontSize: 9,
+                    letterSpacing: "0.06em",
                     textTransform: "uppercase",
                     color: "var(--text-3)",
-                    letterSpacing: "0.06em",
-                    textAlign: "center",
                     lineHeight: 1.3,
-                    paddingBottom: 10,
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
@@ -226,17 +189,6 @@ export function HorizontalFunnelFlow({
                 >
                   {stage.label}
                 </span>
-
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: 3,
-                    background: color,
-                  }}
-                />
               </div>
 
               {showConnectors && idx < stages.length - 1 && rate && (
@@ -246,36 +198,19 @@ export function HorizontalFunnelFlow({
                     flexDirection: "column",
                     alignItems: "center",
                     gap: 4,
-                    padding: "0 4px",
+                    padding: "0 7px",
                     flexShrink: 0,
                   }}
                 >
-                  <span style={{ color: "var(--text-3)", fontSize: 14, lineHeight: 1 }}>›</span>
+                  <span style={{ color: "var(--arrow)", fontSize: 13, lineHeight: 1 }}>›</span>
                   {rate.pct === null ? (
-                    <span
-                      style={{
-                        fontSize: 9,
-                        fontFamily: "'DM Mono', monospace",
-                        color: "var(--text-3)",
-                        background: "rgba(71,85,105,0.15)",
-                        border: "1px solid rgba(71,85,105,0.3)",
-                        borderRadius: 4,
-                        padding: "1px 4px",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
+                    <span style={{ fontSize: 10, fontWeight: 600, color: "var(--text-3)", whiteSpace: "nowrap" }}>
                       —
                     </span>
                   ) : (
                     <span
                       className={getRateClass(rate.label, rate.pct)}
-                      style={{
-                        fontSize: 9,
-                        fontFamily: "'DM Mono', monospace",
-                        borderRadius: 4,
-                        padding: "1px 4px",
-                        whiteSpace: "nowrap",
-                      }}
+                      style={{ fontSize: 10, fontWeight: 600, whiteSpace: "nowrap" }}
                     >
                       {fmtPct(rate.pct)}
                     </span>
@@ -290,10 +225,9 @@ export function HorizontalFunnelFlow({
       <div
         style={{
           borderTop: "1px solid var(--border-vis)",
-          marginTop: 16,
-          paddingTop: 12,
+          marginTop: 18,
+          paddingTop: 14,
           display: "flex",
-          gap: 0,
         }}
       >
         {[
@@ -308,7 +242,7 @@ export function HorizontalFunnelFlow({
               flex: 1,
               display: "flex",
               flexDirection: "column",
-              gap: 4,
+              gap: 5,
               alignItems: "center",
               borderLeft: idx > 0 ? "1px solid var(--border-vis)" : "none",
               padding: "0 12px",
@@ -324,13 +258,7 @@ export function HorizontalFunnelFlow({
             >
               {metric.label}
             </span>
-            <span
-              style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: 13,
-                color: "var(--text-2)",
-              }}
-            >
+            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-2)" }}>
               {metric.value}
             </span>
           </div>

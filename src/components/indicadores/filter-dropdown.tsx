@@ -60,7 +60,7 @@ export function FilterDropdownList({
             justifyContent: "space-between",
             padding: "8px 14px",
             borderBottom: "1px solid var(--border)",
-            background: activeFilter?.id === f.id ? "rgba(144,112,232,0.08)" : "transparent",
+            background: activeFilter?.id === f.id ? "rgba(124,111,240,0.08)" : "transparent",
           }}
         >
           <button
@@ -155,26 +155,29 @@ export function FilterDropdown({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 6,
-          padding: "6px 12px",
+          gap: 8,
+          padding: "7px 13px",
           fontSize: 12,
           fontWeight: 600,
+          fontFamily: "inherit",
           borderRadius: 8,
-          border: activeFilter
-            ? "1.5px solid var(--violet)"
-            : "1.5px solid var(--border-vis)",
-          background: activeFilter ? "rgba(144,112,232,0.12)" : "var(--surface)",
-          color: activeFilter ? "var(--violet)" : "var(--text-2)",
+          border: "1px solid var(--border-strong)",
+          background: "var(--surface)",
+          color: activeFilter ? "var(--text)" : "var(--text-2)",
           cursor: "pointer",
           whiteSpace: "nowrap",
         }}
       >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-        </svg>
+        {activeFilter ? (
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--violet)", flexShrink: 0 }} />
+        ) : (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+          </svg>
+        )}
         {activeFilter ? activeFilter.name : "Filtros"}
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="6 9 12 15 18 9" />
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
 

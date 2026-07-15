@@ -39,6 +39,11 @@ interface HotmartSaleItem {
       fixed?: number;
       currency_code?: string;
     };
+    tracking?: {
+      source_sck?: string;
+      source?: string;
+      external_code?: string;
+    };
   };
 }
 
@@ -114,6 +119,9 @@ export async function collectHotmart(
       ? new Date(item.purchase.approved_date).toISOString()
       : null,
     buyer_email: item.buyer.email,
+    tracking_source_sck: item.purchase.tracking?.source_sck ?? null,
+    tracking_source: item.purchase.tracking?.source ?? null,
+    tracking_external_code: item.purchase.tracking?.external_code ?? null,
     collected_at: now.toISOString(),
   }));
 
