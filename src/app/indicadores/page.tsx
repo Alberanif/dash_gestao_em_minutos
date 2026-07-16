@@ -406,6 +406,7 @@ export default function IndicadoresPage() {
   const funnelStages = calcFunnelStages(
     hasMetaFilter ? metaData : null,
     hasHotmartFilter ? hotmartData : null,
+    leadsState.data?.total ?? 0,
   );
   const funnelRates = funnelStages ? calcConversionRates(funnelStages) : null;
 
