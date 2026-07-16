@@ -198,15 +198,15 @@ const hotmartData: GlobalHotmartMetrics = {
 describe("calcFunnelStages — source guard", () => {
   it("returns null when hasMetaFilter=false (Meta not configured)", () => {
     // Guard: Meta not configured → pass null instead of stale/zeroed metaData
-    expect(calcFunnelStages(null, hotmartData)).toBeNull();
+    expect(calcFunnelStages(null, hotmartData, 0)).toBeNull();
   });
 
   it("returns null when hasHotmartFilter=false (Hotmart not configured)", () => {
     // Guard: Hotmart not configured → pass null instead of stale/zeroed hotmartData
-    expect(calcFunnelStages(metaData, null)).toBeNull();
+    expect(calcFunnelStages(metaData, null, 0)).toBeNull();
   });
 
   it("returns non-null when both sources are configured", () => {
-    expect(calcFunnelStages(metaData, hotmartData)).not.toBeNull();
+    expect(calcFunnelStages(metaData, hotmartData, 42)).not.toBeNull();
   });
 });

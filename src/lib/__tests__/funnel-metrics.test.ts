@@ -23,22 +23,27 @@ const baseHotmart: GlobalHotmartMetrics = {
   total_revenue: 5000,
 };
 
+// Total real de leads coletados (card "Coleta de Leads"), fonte do stage 4.
+// Distinto de meta_leads (50) de propósito, pra provar que a troca de fonte
+// aconteceu.
+const baseLeads = 300;
+
 describe("calcFunnelStages()", () => {
   it("returns null when metrics is null", () => {
-    expect(calcFunnelStages(null, baseHotmart)).toBeNull();
+    expect(calcFunnelStages(null, baseHotmart, baseLeads)).toBeNull();
   });
 
   it("returns null when hotmartMetrics is null", () => {
-    expect(calcFunnelStages(baseMetrics, null)).toBeNull();
+    expect(calcFunnelStages(baseMetrics, null, baseLeads)).toBeNull();
   });
 
   it("returns null when meta_impressions is null", () => {
     const metrics = { ...baseMetrics, meta_impressions: null as unknown as number };
-    expect(calcFunnelStages(metrics, baseHotmart)).toBeNull();
+    expect(calcFunnelStages(metrics, baseHotmart, baseLeads)).toBeNull();
   });
 
   it("returns 5 stages with correct labels", () => {
-    const stages = calcFunnelStages(baseMetrics, baseHotmart);
+    const stages = calcFunnelStages(baseMetrics, baseHotmart, baseLeads);
     expect(stages).not.toBeNull();
     expect(stages!.map((s) => s.label)).toEqual([
       "Impressões",
@@ -50,33 +55,56 @@ describe("calcFunnelStages()", () => {
   });
 
   it("maps each stage to the correct source field", () => {
-    const stages = calcFunnelStages(baseMetrics, baseHotmart)!;
+    const stages = calcFunnelStages(baseMetrics, baseHotmart, baseLeads)!;
     expect(stages[0].value).toBe(100_000); // impressions
     expect(stages[1].value).toBe(2000);    // link_clicks
     expect(stages[2].value).toBe(1500);    // page_views
-    expect(stages[3].value).toBe(50);      // leads
+    expect(stages[3].value).toBe(300);     // leadsTotal (coleta real), não meta_leads
     expect(stages[4].value).toBe(10);      // hotmart total_sales
+  });
+
+  it("uses leadsTotal for stage 4, ignoring meta_leads", () => {
+    const stages = calcFunnelStages(baseMetrics, baseHotmart, 777)!;
+    expect(stages[3].value).toBe(777);
+    expect(stages[3].value).not.toBe(baseMetrics.meta_leads);
   });
 });
 
 describe("calcConversionRates()", () => {
   it("returns 4 rates for a 5-stage funnel", () => {
-    const stages = calcFunnelStages(baseMetrics, baseHotmart)!;
+    const stages = calcFunnelStages(baseMetrics, baseHotmart, baseLeads)!;
     const rates = calcConversionRates(stages);
     expect(rates).toHaveLength(4);
   });
 
   it("calculates CTR as link_clicks / impressions × 100", () => {
-    const stages = calcFunnelStages(baseMetrics, baseHotmart)!;
+    const stages = calcFunnelStages(baseMetrics, baseHotmart, baseLeads)!;
     const rates = calcConversionRates(stages);
     // 2000 / 100000 * 100 = 2
     expect(rates[0].label).toBe("CTR");
     expect(rates[0].pct).toBeCloseTo(2, 5);
   });
 
+  it("calculates Conversão LP→Lead from leadsTotal / page_views", () => {
+    const stages = calcFunnelStages(baseMetrics, baseHotmart, baseLeads)!;
+    const rates = calcConversionRates(stages);
+    // 300 / 1500 * 100 = 20
+    expect(rates[2].label).toBe("Conversão LP→Lead");
+    expect(rates[2].pct).toBeCloseTo(20, 5);
+  });
+
+  it("returns null pct when numerator exceeds denominator (>100%)", () => {
+    // leadsTotal (5000) coletado fora do escopo Meta pode superar page_views (1500).
+    const stages = calcFunnelStages(baseMetrics, baseHotmart, 5000)!;
+    const rates = calcConversionRates(stages);
+    // Conversão LP→Lead: 5000 / 1500 seria 333% → null
+    expect(rates[2].label).toBe("Conversão LP→Lead");
+    expect(rates[2].pct).toBeNull();
+  });
+
   it("returns null pct when the denominator stage is 0", () => {
     const metricsZeroClicks: GlobalMetrics = { ...baseMetrics, meta_link_clicks: 0 };
-    const stages = calcFunnelStages(metricsZeroClicks, baseHotmart)!;
+    const stages = calcFunnelStages(metricsZeroClicks, baseHotmart, baseLeads)!;
     const rates = calcConversionRates(stages);
     // CTR denominator is impressions (100000) — still fine
     // Taxa LP: page_views / link_clicks; link_clicks = 0 → null
@@ -89,7 +117,7 @@ describe("calcConversionRates()", () => {
       meta_impressions: 0,
       meta_link_clicks: 0,
     };
-    const stages = calcFunnelStages(zeroImpressions, baseHotmart)!;
+    const stages = calcFunnelStages(zeroImpressions, baseHotmart, baseLeads)!;
     const rates = calcConversionRates(stages);
     expect(rates[0].pct).toBeNull();
   });
