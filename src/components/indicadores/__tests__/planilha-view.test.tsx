@@ -109,11 +109,11 @@ function rowByName(name: RegExp | string): HTMLElement {
 }
 
 describe("PlanilhaView — estrutura", () => {
-  it("renderiza os 4 blocos na ordem: Resumo, Meta Ads, Leads por origem, Vendas por origem (RF-1)", () => {
+  it("renderiza os 4 blocos na ordem: Meta Ads, Leads por origem, Vendas por origem, Resumo", () => {
     renderView();
 
     const headers = screen.getAllByTestId("planilha-block-title").map((el) => el.textContent);
-    expect(headers).toEqual(["Resumo", "Meta Ads", "Leads por origem", "Vendas por origem"]);
+    expect(headers).toEqual(["Meta Ads", "Leads por origem", "Vendas por origem", "Resumo"]);
   });
 
   it("renderiza a coluna Total e uma coluna por semana com o intervalo no cabeçalho", () => {

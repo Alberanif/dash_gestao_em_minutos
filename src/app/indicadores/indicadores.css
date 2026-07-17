@@ -57,6 +57,12 @@
   color: #85b0ff;
 }
 
+/* Planilha — realce da linha sob o cursor. As células leem esta custom
+   property no background inline (fallback = fundo de repouso da coluna). */
+.ind-dark tr.planilha-row:hover {
+  --planilha-row-bg: var(--surface-2);
+}
+
 .ind-dark input[type='date'] {
   color-scheme: dark;
 }

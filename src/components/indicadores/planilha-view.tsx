@@ -71,10 +71,13 @@ interface RowSpec {
 
 // ── Estilos ───────────────────────────────────────────────────────────────────
 
+// `--planilha-row-bg` é definida no tr:hover (indicadores.css); o fallback é o
+// fundo de repouso de cada coluna — assim o realce da linha cobre inclusive a
+// célula sticky e a coluna Total, que precisam de fundo próprio.
 const STICKY_CELL: React.CSSProperties = {
   position: "sticky",
   left: 0,
-  background: "var(--surface)",
+  background: "var(--planilha-row-bg, var(--surface))",
   textAlign: "left",
   padding: "9px 16px",
   borderBottom: "1px solid var(--border)",
@@ -92,12 +95,37 @@ const VALUE_CELL: React.CSSProperties = {
   color: "var(--text)",
 };
 
+/** Fundo de repouso da coluna Total — meio-tom entre surface e surface-2. */
+const TOTAL_BG = "color-mix(in srgb, var(--surface-2) 60%, var(--surface))";
+
+/**
+ * Estilo da célula de valor na coluna `i` (0 = Total, 1.. = semanas):
+ * divisória vertical por semana, divisória forte separando Total das semanas
+ * e fundo diferenciado no Total.
+ */
+function valueCellAt(i: number): React.CSSProperties {
+  if (i === 0) {
+    return {
+      ...VALUE_CELL,
+      borderLeft: "1px solid var(--border-vis)",
+      background: `var(--planilha-row-bg, ${TOTAL_BG})`,
+    };
+  }
+  return {
+    ...VALUE_CELL,
+    borderLeft: `1px solid var(--border-${i === 1 ? "strong" : "vis"})`,
+    background: "var(--planilha-row-bg, transparent)",
+  };
+}
+
 function BlockHeaderRow({
   title,
+  accent,
   columns,
   notConfigured,
 }: {
   title: string;
+  accent: string;
   columns: number;
   notConfigured?: boolean;
 }) {
@@ -108,7 +136,8 @@ function BlockHeaderRow({
         style={{
           ...STICKY_CELL,
           position: "static",
-          background: "var(--surface-2)",
+          background: `color-mix(in srgb, ${accent} 8%, transparent)`,
+          boxShadow: `inset 3px 0 0 0 ${accent}`,
           padding: "10px 16px",
           borderBottom: "1px solid var(--border-vis)",
         }}
@@ -116,7 +145,7 @@ function BlockHeaderRow({
         <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
           <span
             data-testid="planilha-block-title"
-            style={{ fontSize: 13, fontWeight: 600, color: "var(--text-strong)" }}
+            style={{ fontSize: 13, fontWeight: 600, color: accent }}
           >
             {title}
           </span>
@@ -131,13 +160,22 @@ function BlockHeaderRow({
   );
 }
 
+/** Faixa de respiro entre blocos — sem bordas para não emendar as divisórias. */
+function SpacerRow({ columns }: { columns: number }) {
+  return (
+    <tr aria-hidden="true">
+      <td colSpan={columns} style={{ height: 10, padding: 0, border: 0 }} />
+    </tr>
+  );
+}
+
 function SkeletonRows({ rows, columns }: { rows: number; columns: number }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, r) => (
         <tr key={r}>
           {Array.from({ length: columns }).map((_, c) => (
-            <td key={c} style={c === 0 ? STICKY_CELL : VALUE_CELL}>
+            <td key={c} style={c === 0 ? STICKY_CELL : valueCellAt(c - 1)}>
               <div
                 data-testid="planilha-skeleton"
                 style={{
@@ -167,7 +205,7 @@ function ErrorRow({ message, columns }: { message: string; columns: number }) {
 
 function DataRow({ row }: { row: RowSpec }) {
   return (
-    <tr data-testid={row.testid}>
+    <tr data-testid={row.testid} className="planilha-row">
       <td
         style={{
           ...STICKY_CELL,
@@ -183,7 +221,7 @@ function DataRow({ row }: { row: RowSpec }) {
         <td
           key={i}
           style={{
-            ...VALUE_CELL,
+            ...valueCellAt(i),
             fontWeight: i === 0 || row.isTotal ? 600 : 400,
             color: i === 0 ? "var(--text-strong)" : VALUE_CELL.color,
           }}
@@ -197,24 +235,29 @@ function DataRow({ row }: { row: RowSpec }) {
 
 function Block({
   title,
+  accent,
   state,
   rows,
   columns,
   errorMessage,
   notConfigured,
   skeletonRows,
+  first,
 }: {
   title: string;
+  accent: string;
   state: { loading: boolean; error: boolean };
   rows: RowSpec[];
   columns: number;
   errorMessage: string;
   notConfigured?: boolean;
   skeletonRows: number;
+  first?: boolean;
 }) {
   return (
     <tbody>
-      <BlockHeaderRow title={title} columns={columns} notConfigured={notConfigured} />
+      {!first && <SpacerRow columns={columns} />}
+      <BlockHeaderRow title={title} accent={accent} columns={columns} notConfigured={notConfigured} />
       {state.loading ? (
         <SkeletonRows rows={skeletonRows} columns={columns} />
       ) : state.error ? (
@@ -378,13 +421,13 @@ export function PlanilhaView({
             <th style={{ ...STICKY_CELL, fontSize: 11, fontWeight: 600, color: "var(--text-label)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
               Métrica
             </th>
-            <th style={{ ...VALUE_CELL, fontSize: 11, fontWeight: 600, color: "var(--text-label)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+            <th style={{ ...valueCellAt(0), fontSize: 11, fontWeight: 600, color: "var(--text-label)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
               Total
             </th>
-            {weeks.map((week) => (
+            {weeks.map((week, i) => (
               <th
                 key={week.index}
-                style={{ ...VALUE_CELL, fontSize: 11, fontWeight: 600, color: "var(--text-label)" }}
+                style={{ ...valueCellAt(i + 1), fontSize: 11, fontWeight: 600, color: "var(--text-label)" }}
               >
                 {`Semana ${week.index} · ${fmtDay(week.startDate)} – ${fmtDay(week.endDate)}`}
               </th>
@@ -392,26 +435,21 @@ export function PlanilhaView({
           </tr>
         </thead>
 
-        <Block
-          title="Resumo"
-          state={resumoState}
-          rows={resumoRows}
-          columns={columns}
-          errorMessage="Erro ao carregar dados da Hotmart."
-          notConfigured={!hasHotmartFilter}
-          skeletonRows={3}
-        />
+        {/* Ordem-funil: investimento → captação → conversão, Resumo consolida no fim. */}
         <Block
           title="Meta Ads"
+          accent="var(--blue)"
           state={metaState}
           rows={metaRows}
           columns={columns}
           errorMessage="Erro ao carregar dados do Meta Ads."
           notConfigured={!hasMetaFilter}
           skeletonRows={8}
+          first
         />
         <Block
           title="Leads por origem"
+          accent="var(--green)"
           state={leadsState}
           rows={leadsRows}
           columns={columns}
@@ -421,12 +459,23 @@ export function PlanilhaView({
         />
         <Block
           title="Vendas por origem"
+          accent="var(--orange)"
           state={sourcesState}
           rows={vendasRows}
           columns={columns}
           errorMessage="Erro ao carregar origens de conversão."
           notConfigured={!hasHotmartFilter}
           skeletonRows={4}
+        />
+        <Block
+          title="Resumo"
+          accent="var(--violet)"
+          state={resumoState}
+          rows={resumoRows}
+          columns={columns}
+          errorMessage="Erro ao carregar dados da Hotmart."
+          notConfigured={!hasHotmartFilter}
+          skeletonRows={3}
         />
       </table>
     </div>
