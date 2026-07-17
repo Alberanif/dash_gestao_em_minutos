@@ -1,14 +1,28 @@
 "use client";
 
 import "./indicadores.css";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { calcPresetDates, getActivePreset, type PresetKey } from "@/lib/utils/period-presets";
 import { calcROAS, calcCPA, calcConversionRate } from "@/lib/utils/cross-metrics";
 import { calcFunnelStages, calcConversionRates } from "@/lib/utils/funnel-metrics";
-import type { GlobalMetrics, GlobalHotmartMetrics, GlobalLeadsMetrics, DailyPoint, FilterRecord, ConversionSourceRow } from "@/types/indicadores";
+import type {
+  GlobalMetrics,
+  GlobalHotmartMetrics,
+  GlobalLeadsMetrics,
+  DailyPoint,
+  FilterRecord,
+  ConversionSourceRow,
+  GlobalMetricsWithWeeks,
+  GlobalHotmartMetricsWithWeeks,
+  GlobalLeadsMetricsWithWeeks,
+  ConversionSourcesWithWeeks,
+  WeekWindow,
+} from "@/types/indicadores";
 import { expandFilter, toSearchParams } from "@/lib/indicadores/filter-expansion";
+import { partitionWeeks } from "@/lib/indicadores/week-partition";
+import { PlanilhaView } from "@/components/indicadores/planilha-view";
 import { HeroKpiCard } from "@/components/indicadores/hero-kpi-card";
 import { HorizontalFunnelFlow } from "@/components/indicadores/horizontal-funnel-flow";
 import { PlatformsCard } from "@/components/indicadores/platforms-card";
@@ -91,6 +105,38 @@ const ZEROED_HOTMART: GlobalHotmartMetrics = {
   total_sales_foreign: 0,
   total_revenue: 0,
 };
+
+// Zerados com semanas, para fontes não configuradas na Planilha — a estrutura
+// de blocos é sempre a mesma, com o aviso de não configurado.
+function zeroedMetaWeeks(weeks: WeekWindow[]): GlobalMetricsWithWeeks {
+  return { ...ZEROED_META, weeks: weeks.map((w) => ({ ...w, ...ZEROED_META })) };
+}
+
+function zeroedHotmartWeeks(weeks: WeekWindow[]): GlobalHotmartMetricsWithWeeks {
+  return {
+    ...ZEROED_HOTMART,
+    weeks: weeks.map((w) => ({
+      ...w,
+      total_sales: 0,
+      total_sales_brl: 0,
+      total_sales_foreign: 0,
+      total_revenue: 0,
+    })),
+  };
+}
+
+function zeroedLeadsWeeks(weeks: WeekWindow[]): GlobalLeadsMetricsWithWeeks {
+  return {
+    total: 0,
+    by_event: [],
+    by_source: [],
+    weeks: weeks.map((w) => ({ ...w, total: 0, by_source: [] })),
+  };
+}
+
+function zeroedSourcesWeeks(weeks: WeekWindow[]): ConversionSourcesWithWeeks {
+  return { sources: [], weeks: weeks.map((w) => ({ ...w, sources: [] })) };
+}
 
 // ── Period controls ───────────────────────────────────────────────────────────
 
@@ -269,6 +315,15 @@ export default function IndicadoresPage() {
   const [dailyState, setDailyState] = useState<SectionState<DailyPoint[]>>(initialSection());
   const [conversionSourcesState, setConversionSourcesState] = useState<SectionState<ConversionSourceRow[]>>(initialSection());
 
+  // Estados da Planilha (breakdown semanal) — independentes dos cards para que
+  // trocar de aba nunca dispare refetch do Dashboard, e vice-versa.
+  const [metaWeeklyState, setMetaWeeklyState] = useState<SectionState<GlobalMetricsWithWeeks>>(initialSection());
+  const [hotmartWeeklyState, setHotmartWeeklyState] = useState<SectionState<GlobalHotmartMetricsWithWeeks>>(initialSection());
+  const [leadsWeeklyState, setLeadsWeeklyState] = useState<SectionState<GlobalLeadsMetricsWithWeeks>>(initialSection());
+  const [sourcesWeeklyState, setSourcesWeeklyState] = useState<SectionState<ConversionSourcesWithWeeks>>(initialSection());
+  // RF-6: chave do último fetch da Planilha — mesma chave, nenhum refetch.
+  const planilhaKeyRef = useRef<string | null>(null);
+
   const [accountId, setAccountId] = useState<string>("");
   const [filters, setFilters] = useState<FilterRecord[]>([]);
   const [activeFilter, setActiveFilter] = useState<FilterRecord | null>(null);
@@ -389,6 +444,74 @@ export default function IndicadoresPage() {
     fetchAll(startDate, endDate, activeFilter, activeOfferCode);
   }, [startDate, endDate, activeFilter, activeOfferCode, fetchAll]);
 
+  const fetchPlanilha = useCallback(async (
+    start: string,
+    end: string,
+    filter: FilterRecord,
+    offerCode: string | null,
+  ) => {
+    const expanded = expandFilter(filter, offerCode);
+    const { meta: hasMeta, hotmart: hasHotmart, leads: hasLeads } = expanded.sources;
+    const weeks = partitionWeeks(start, end);
+    const period = { startDate: start, endDate: end };
+    const params = `?${toSearchParams(expanded, period)}&breakdown=weekly`;
+
+    // O endpoint de leads só filtra por evento — mesmo escopo do Dashboard.
+    const leadsParams = `?${toSearchParams(
+      { ...expanded, metaTerms: [], productIds: [], offerCode: null },
+      period,
+    )}&breakdown=weekly`;
+
+    // Fontes não configuradas nascem zeradas com semanas, sem consulta.
+    setMetaWeeklyState(hasMeta ? initialSection() : { data: zeroedMetaWeeks(weeks), loading: false, error: false });
+    setHotmartWeeklyState(hasHotmart ? initialSection() : { data: zeroedHotmartWeeks(weeks), loading: false, error: false });
+    setLeadsWeeklyState(hasLeads ? initialSection() : { data: zeroedLeadsWeeks(weeks), loading: false, error: false });
+    setSourcesWeeklyState(hasHotmart ? initialSection() : { data: zeroedSourcesWeeks(weeks), loading: false, error: false });
+
+    const jsonOrThrow = (r: Response) => {
+      if (!r.ok) throw new Error(`API error ${r.status}`);
+      return r.json();
+    };
+
+    const [metaRes, hotmartRes, leadsRes, sourcesRes] = await Promise.allSettled([
+      hasMeta ? fetch(`/api/indicadores/metrics${params}`).then(jsonOrThrow) : Promise.resolve(null),
+      hasHotmart ? fetch(`/api/indicadores/hotmart${params}`).then(jsonOrThrow) : Promise.resolve(null),
+      hasLeads ? fetch(`/api/indicadores/leads${leadsParams}`).then(jsonOrThrow) : Promise.resolve(null),
+      hasHotmart ? fetch(`/api/indicadores/conversion-sources${params}`).then(jsonOrThrow) : Promise.resolve(null),
+    ]);
+
+    setMetaWeeklyState({
+      data: metaRes.status === "fulfilled" && metaRes.value !== null ? metaRes.value : zeroedMetaWeeks(weeks),
+      loading: false,
+      error: metaRes.status === "rejected",
+    });
+    setHotmartWeeklyState({
+      data: hotmartRes.status === "fulfilled" && hotmartRes.value !== null ? hotmartRes.value : zeroedHotmartWeeks(weeks),
+      loading: false,
+      error: hotmartRes.status === "rejected",
+    });
+    setLeadsWeeklyState({
+      data: leadsRes.status === "fulfilled" && leadsRes.value !== null ? leadsRes.value : zeroedLeadsWeeks(weeks),
+      loading: false,
+      error: leadsRes.status === "rejected",
+    });
+    setSourcesWeeklyState({
+      data: sourcesRes.status === "fulfilled" && sourcesRes.value !== null ? sourcesRes.value : zeroedSourcesWeeks(weeks),
+      loading: false,
+      error: sourcesRes.status === "rejected",
+    });
+  }, []);
+
+  // Busca o detalhamento semanal só com a Planilha visível, e só quando a
+  // combinação Evento + período + oferta mudou desde o último fetch (RF-6).
+  useEffect(() => {
+    if (view !== "planilha" || !activeFilter) return;
+    const key = [startDate, endDate, activeFilter.id, activeOfferCode ?? ""].join("|");
+    if (planilhaKeyRef.current === key) return;
+    planilhaKeyRef.current = key;
+    fetchPlanilha(startDate, endDate, activeFilter, activeOfferCode);
+  }, [view, startDate, endDate, activeFilter, activeOfferCode, fetchPlanilha]);
+
   function handleSelectFilter(filter: FilterRecord | null) {
     setActiveFilter(filter);
     if (filter) localStorage.setItem(LS_FILTER_ID, filter.id);
@@ -450,7 +573,11 @@ export default function IndicadoresPage() {
 
   // ── Derived source flags ──────────────────────────────────────────────────
 
-  const { meta: hasMetaFilter, hotmart: hasHotmartFilter } = expandFilter(activeFilter).sources;
+  const {
+    meta: hasMetaFilter,
+    hotmart: hasHotmartFilter,
+    leads: hasLeadsFilter,
+  } = expandFilter(activeFilter).sources;
 
   // ── Derived data for Z-1 and Z-2 ──────────────────────────────────────────
 
@@ -579,7 +706,18 @@ export default function IndicadoresPage() {
           onOpenFilter={() => { setFilterEditTarget(null); setFilterModalOpen(true); }}
         />
       ) : view === "planilha" ? (
-        <div data-testid="planilha-view" />
+        <div data-testid="planilha-view">
+          <PlanilhaView
+            weeks={partitionWeeks(startDate, endDate)}
+            metaState={metaWeeklyState}
+            hotmartState={hotmartWeeklyState}
+            leadsState={leadsWeeklyState}
+            sourcesState={sourcesWeeklyState}
+            hasMetaFilter={hasMetaFilter}
+            hasHotmartFilter={hasHotmartFilter}
+            hasLeadsFilter={hasLeadsFilter}
+          />
+        </div>
       ) : (
         <div className="z-layout">
 

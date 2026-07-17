@@ -29,23 +29,23 @@ export interface PlanilhaViewProps {
 
 // ── Formatters — mesmas convenções dos cards do Dashboard ────────────────────
 
-function fmtBRL(n: number | null): string {
-  if (n === null) return "—";
+function fmtBRL(n: number | null | undefined): string {
+  if (n === null || n === undefined) return "—";
   return Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(n);
 }
 
-function fmtNum(n: number | null): string {
-  if (n === null) return "—";
+function fmtNum(n: number | null | undefined): string {
+  if (n === null || n === undefined) return "—";
   return Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(n);
 }
 
-function fmtPct(n: number | null): string {
-  if (n === null) return "—";
+function fmtPct(n: number | null | undefined): string {
+  if (n === null || n === undefined) return "—";
   return `${n.toFixed(2)}%`;
 }
 
-function fmtRoas(n: number | null): string {
-  if (n === null) return "—";
+function fmtRoas(n: number | null | undefined): string {
+  if (n === null || n === undefined) return "—";
   return `${n.toFixed(2)}×`;
 }
 
@@ -57,7 +57,7 @@ function fmtDay(dateStr: string): string {
 
 // ── Modelo de linha ───────────────────────────────────────────────────────────
 
-type Fmt = (n: number | null) => string;
+type Fmt = (n: number | null | undefined) => string;
 
 interface RowSpec {
   label: string;
@@ -264,20 +264,20 @@ export function PlanilhaView({
       fmt: fmtRoas,
       values: perColumn(
         roasAt(meta?.meta_spend ?? null, hotmart?.total_revenue ?? null),
-        (i) => roasAt(meta?.weeks[i]?.meta_spend ?? null, hotmart?.weeks[i]?.total_revenue ?? null)
+        (i) => roasAt(meta?.weeks?.[i]?.meta_spend ?? null, hotmart?.weeks?.[i]?.total_revenue ?? null)
       ),
     },
     {
       label: "Receita BRL",
       unit: "R$",
       fmt: fmtBRL,
-      values: perColumn(hotmart?.total_revenue ?? null, (i) => hotmart?.weeks[i]?.total_revenue ?? null),
+      values: perColumn(hotmart?.total_revenue ?? null, (i) => hotmart?.weeks?.[i]?.total_revenue ?? null),
     },
     {
       label: "Total de Vendas",
       unit: "n°",
       fmt: fmtNum,
-      values: perColumn(hotmart?.total_sales ?? null, (i) => hotmart?.weeks[i]?.total_sales ?? null),
+      values: perColumn(hotmart?.total_sales ?? null, (i) => hotmart?.weeks?.[i]?.total_sales ?? null),
     },
   ];
 
@@ -291,7 +291,7 @@ export function PlanilhaView({
     label,
     unit,
     fmt,
-    values: perColumn(meta ? pick(meta) : null, (i) => (meta?.weeks[i] ? pick(meta.weeks[i]) : null)),
+    values: perColumn(meta ? pick(meta) : null, (i) => (meta?.weeks?.[i] ? pick(meta.weeks[i]) : null)),
   });
 
   const metaRows: RowSpec[] = [
@@ -316,7 +316,7 @@ export function PlanilhaView({
         testid: "planilha-leads-row",
         values: perColumn(
           count,
-          (i) => leads?.weeks[i]?.by_source.find((s) => s.source === source)?.count ?? 0
+          (i) => leads?.weeks?.[i]?.by_source.find((s) => s.source === source)?.count ?? 0
         ),
       })
     ),
@@ -325,13 +325,14 @@ export function PlanilhaView({
       unit: "n°",
       fmt: fmtNum,
       isTotal: true,
-      values: perColumn(leads?.total ?? null, (i) => leads?.weeks[i]?.total ?? null),
+      values: perColumn(leads?.total ?? null, (i) => leads?.weeks?.[i]?.total ?? null),
     },
   ];
 
   // ── Bloco 4 · Vendas por origem — todas as origens, desc pelo Total ─────────
   const saleOrigins = [...(sources?.sources ?? [])].sort((a, b) => b.count - a.count);
-  const sumCounts = (rows: Array<{ count: number }>) => rows.reduce((sum, r) => sum + r.count, 0);
+  const sumCounts = (rows?: Array<{ count: number }>) =>
+    (rows ?? []).reduce((sum, r) => sum + r.count, 0);
   const vendasRows: RowSpec[] = [
     ...saleOrigins.map(
       ({ source, count }): RowSpec => ({
@@ -341,7 +342,7 @@ export function PlanilhaView({
         testid: "planilha-vendas-row",
         values: perColumn(
           count,
-          (i) => sources?.weeks[i]?.sources.find((s) => s.source === source)?.count ?? 0
+          (i) => sources?.weeks?.[i]?.sources.find((s) => s.source === source)?.count ?? 0
         ),
       })
     ),
@@ -352,7 +353,7 @@ export function PlanilhaView({
       isTotal: true,
       testid: "planilha-vendas-total",
       values: perColumn(sources ? sumCounts(sources.sources) : null, (i) =>
-        sources?.weeks[i] ? sumCounts(sources.weeks[i].sources) : null
+        sources?.weeks?.[i] ? sumCounts(sources.weeks[i].sources) : null
       ),
     },
   ];
