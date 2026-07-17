@@ -5,6 +5,7 @@ import { expandFromSearchParams } from "@/lib/indicadores/filter-expansion";
 import {
   fetchConversionSources,
   fetchConversionSourcesUnscoped,
+  fetchConversionSourcesWeekly,
 } from "@/lib/indicadores/service/conversion-sources";
 
 export async function GET(request: NextRequest) {
@@ -24,6 +25,11 @@ export async function GET(request: NextRequest) {
   const query = { period: { startDate, endDate }, filter };
 
   try {
+    // Opt-in da Planilha: com breakdown=weekly a resposta vira um objeto
+    // { sources, weeks } — sem o parâmetro, segue o array de sempre.
+    if (searchParams.get("breakdown") === "weekly") {
+      return NextResponse.json(await fetchConversionSourcesWeekly(query, supabase));
+    }
     const sources = filter.sources.hotmart
       ? await fetchConversionSources(query, supabase)
       : await fetchConversionSourcesUnscoped(query, supabase);

@@ -1,5 +1,6 @@
-import type { GlobalMetrics } from "@/types/indicadores";
+import type { GlobalMetrics, GlobalMetricsWithWeeks } from "@/types/indicadores";
 import type { ExpandedFilter, Period } from "../filter-expansion";
+import { partitionWeeks } from "../week-partition";
 import type { SupabaseLike } from "./types";
 
 const COLUMNS = "spend, impressions, link_clicks, leads_all, page_views, checkout";
@@ -33,6 +34,10 @@ interface CampaignRow {
   checkout: number | null;
 }
 
+interface DatedCampaignRow extends CampaignRow {
+  date: string;
+}
+
 /**
  * Investimento e tráfego Meta Ads no escopo do filtro. Note que as datas vão
  * cruas: a tabela diária guarda `date` já em BRT, ao contrário de
@@ -51,6 +56,43 @@ export async function fetchMetaMetrics(
   );
 
   return aggregate(rows);
+}
+
+/**
+ * Variante da Planilha: além do agregado, devolve os mesmos campos por semana
+ * quinta→quarta. Uma única consulta (com a coluna `date`) alimenta Total e
+ * semanas — calcular as duas pontas dos mesmos brutos evita divergência de
+ * arredondamento entre a coluna Total e a soma das colunas semanais.
+ */
+export async function fetchMetaMetricsWeekly(
+  { period, filter }: MetaQuery,
+  supabase: SupabaseLike
+): Promise<GlobalMetricsWithWeeks> {
+  const weeks = partitionWeeks(period.startDate, period.endDate);
+
+  if (!filter.sources.meta) {
+    return {
+      ...ZEROED_META,
+      weeks: weeks.map((week) => ({ ...week, ...ZEROED_META })),
+    };
+  }
+
+  const rows = await paginate(() =>
+    supabase
+      .from("dash_gestao_meta_ads_campaigns_daily")
+      .select(`date, ${COLUMNS}`)
+      .gte("date", period.startDate)
+      .lte("date", period.endDate)
+      .or(filter.metaTerms.map((t) => `campaign_name.ilike.%${t}%`).join(","))
+  ) as DatedCampaignRow[];
+
+  return {
+    ...aggregate(rows),
+    weeks: weeks.map((week) => ({
+      ...week,
+      ...aggregate(rows.filter((r) => r.date >= week.startDate && r.date <= week.endDate)),
+    })),
+  };
 }
 
 /**

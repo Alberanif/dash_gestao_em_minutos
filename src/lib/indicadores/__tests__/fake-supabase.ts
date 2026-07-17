@@ -48,6 +48,7 @@ export interface FakeSupabase {
   rpcCalls(fn?: string): RecordedRpc[];
   setRows(table: string, rows: Row[]): void;
   setError(table: string, message: string): void;
+  /** `data` pode ser uma função (args) => dados, para respostas que dependem do período pedido. */
   setRpc(fn: string, data: unknown): void;
   setRpcError(fn: string, message: string): void;
 }
@@ -144,7 +145,9 @@ export function makeFakeSupabase(): FakeSupabase {
       rpcs.push({ fn, args });
       const message = rpcErrors.get(fn);
       if (message) return Promise.resolve({ data: null, error: { message } });
-      return Promise.resolve({ data: rpcData.get(fn) ?? null, error: null });
+      const stored = rpcData.get(fn);
+      const data = typeof stored === "function" ? stored(args) : stored;
+      return Promise.resolve({ data: data ?? null, error: null });
     },
   };
 

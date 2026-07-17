@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateApiAuth } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { expandFromSearchParams } from "@/lib/indicadores/filter-expansion";
-import { fetchMetaMetrics, fetchMetaMetricsUnscoped } from "@/lib/indicadores/service/meta";
+import {
+  fetchMetaMetrics,
+  fetchMetaMetricsUnscoped,
+  fetchMetaMetricsWeekly,
+} from "@/lib/indicadores/service/meta";
 
 export async function GET(request: NextRequest) {
   const { error } = await validateApiAuth();
@@ -21,6 +25,11 @@ export async function GET(request: NextRequest) {
   const query = { period: { startDate, endDate }, filter };
 
   try {
+    // Opt-in da Planilha: agrega também por semana quinta→quarta. Sem o
+    // parâmetro, a resposta permanece exatamente a de sempre.
+    if (searchParams.get("breakdown") === "weekly") {
+      return NextResponse.json(await fetchMetaMetricsWeekly(query, supabase));
+    }
     const metrics = filter.sources.meta
       ? await fetchMetaMetrics(query, supabase)
       : await fetchMetaMetricsUnscoped(query, supabase);

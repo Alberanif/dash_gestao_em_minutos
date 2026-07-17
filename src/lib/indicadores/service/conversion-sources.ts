@@ -1,6 +1,7 @@
-import type { ConversionSourceRow } from "@/types/indicadores";
+import type { ConversionSourceRow, ConversionSourcesWithWeeks } from "@/types/indicadores";
 import type { ExpandedFilter, Period } from "../filter-expansion";
 import { brtToUtc } from "../timezone";
+import { partitionWeeks } from "../week-partition";
 import type { SupabaseLike } from "./types";
 
 export interface ConversionSourcesQuery {
@@ -23,6 +24,53 @@ export async function fetchConversionSources(
   if (!filter.sources.hotmart) return [];
 
   return query(period, filter.productIds, filter.eventos, supabase);
+}
+
+/**
+ * Variante da Planilha: origens do período mais a contagem por origem por
+ * semana quinta→quarta, via a mesma RPC com as datas de cada semana. Toda
+ * semana lista a união das origens do período; origem sem venda na semana sai
+ * com 0 (a linha existe na planilha, a célula é 0).
+ */
+export async function fetchConversionSourcesWeekly(
+  { period, filter }: ConversionSourcesQuery,
+  supabase: SupabaseLike
+): Promise<ConversionSourcesWithWeeks> {
+  const weeks = partitionWeeks(period.startDate, period.endDate);
+
+  if (!filter.sources.hotmart) {
+    return { sources: [], weeks: weeks.map((week) => ({ ...week, sources: [] })) };
+  }
+
+  const [aggregate, ...weekly] = await Promise.all([
+    query(period, filter.productIds, filter.eventos, supabase),
+    ...weeks.map((week) =>
+      query(
+        { startDate: week.startDate, endDate: week.endDate },
+        filter.productIds,
+        filter.eventos,
+        supabase
+      )
+    ),
+  ]);
+
+  const sourceUnion = [...aggregate.map((s) => s.source)];
+  for (const slice of weekly) {
+    for (const { source } of slice) {
+      if (!sourceUnion.includes(source)) sourceUnion.push(source);
+    }
+  }
+
+  return {
+    sources: aggregate,
+    weeks: weeks.map((week, i) => ({
+      ...week,
+      sources: sourceUnion.map((source) => ({
+        source,
+        count: weekly[i].find((s) => s.source === source)?.count ?? 0,
+      })),
+    })),
+  };
 }
 
 /**

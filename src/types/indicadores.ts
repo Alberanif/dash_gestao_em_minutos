@@ -34,6 +34,48 @@ export interface GlobalLeadsMetrics {
   by_source: Array<{ source: string; count: number }>;
 }
 
+/**
+ * Quebra semanal (quinta→quarta) da visualização Planilha. Cada entrada em
+ * `weeks` repete os campos do agregado, calculados só com os dados daquela
+ * semana — razões derivadas dos brutos da própria semana, nunca média de médias.
+ */
+export interface WeekWindow {
+  index: number;
+  startDate: string;
+  endDate: string;
+}
+
+export type GlobalMetricsWeek = WeekWindow & GlobalMetrics;
+
+export interface GlobalMetricsWithWeeks extends GlobalMetrics {
+  weeks: GlobalMetricsWeek[];
+}
+
+export type HotmartTotalsWeek = WeekWindow &
+  Omit<GlobalHotmartMetrics, "products">;
+
+export interface GlobalHotmartMetricsWithWeeks extends GlobalHotmartMetrics {
+  weeks: HotmartTotalsWeek[];
+}
+
+export type LeadsWeek = WeekWindow & {
+  total: number;
+  by_source: Array<{ source: string; count: number }>;
+};
+
+export interface GlobalLeadsMetricsWithWeeks extends GlobalLeadsMetrics {
+  weeks: LeadsWeek[];
+}
+
+export type ConversionSourcesWeek = WeekWindow & {
+  sources: ConversionSourceRow[];
+};
+
+export interface ConversionSourcesWithWeeks {
+  sources: ConversionSourceRow[];
+  weeks: ConversionSourcesWeek[];
+}
+
 export const FILTER_STATUSES = ["ativo", "finalizado", "cancelado"] as const;
 export type FilterStatus = (typeof FILTER_STATUSES)[number];
 
