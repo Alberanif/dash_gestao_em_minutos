@@ -58,6 +58,24 @@ export interface GlobalHotmartMetricsWithWeeks extends GlobalHotmartMetrics {
   weeks: HotmartTotalsWeek[];
 }
 
+export type LeadsWeek = WeekWindow & {
+  total: number;
+  by_source: Array<{ source: string; count: number }>;
+};
+
+export interface GlobalLeadsMetricsWithWeeks extends GlobalLeadsMetrics {
+  weeks: LeadsWeek[];
+}
+
+export type ConversionSourcesWeek = WeekWindow & {
+  sources: ConversionSourceRow[];
+};
+
+export interface ConversionSourcesWithWeeks {
+  sources: ConversionSourceRow[];
+  weeks: ConversionSourcesWeek[];
+}
+
 export const FILTER_STATUSES = ["ativo", "finalizado", "cancelado"] as const;
 export type FilterStatus = (typeof FILTER_STATUSES)[number];
 
