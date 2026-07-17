@@ -3,6 +3,7 @@
 import "./indicadores.css";
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { calcPresetDates, getActivePreset, type PresetKey } from "@/lib/utils/period-presets";
 import { calcROAS, calcCPA, calcConversionRate } from "@/lib/utils/cross-metrics";
 import { calcFunnelStages, calcConversionRates } from "@/lib/utils/funnel-metrics";
@@ -166,6 +167,55 @@ function PeriodControls({ startDate, endDate, activePreset, onPreset, onStartDat
   );
 }
 
+// ── View tabs (Dashboard | Planilha) ──────────────────────────────────────────
+
+type ViewKey = "dashboard" | "planilha";
+
+const VIEWS: { key: ViewKey; label: string }[] = [
+  { key: "dashboard", label: "Dashboard" },
+  { key: "planilha", label: "Planilha" },
+];
+
+function ViewTabs({ view, onView }: { view: ViewKey; onView: (v: ViewKey) => void }) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Visualização"
+      style={{
+        display: "flex",
+        gap: 2,
+        background: "var(--surface)",
+        border: "1px solid var(--border-vis)",
+        borderRadius: 9,
+        padding: 3,
+      }}
+    >
+      {VIEWS.map(({ key, label }) => (
+        <button
+          key={key}
+          role="tab"
+          aria-selected={view === key}
+          onClick={() => onView(key)}
+          style={{
+            padding: "6px 12px",
+            fontSize: 12,
+            fontWeight: 600,
+            fontFamily: "inherit",
+            border: "none",
+            borderRadius: 6,
+            cursor: "pointer",
+            background: view === key ? "#2a2f38" : "transparent",
+            color: view === key ? "var(--text-strong)" : "var(--text-muted)",
+            transition: "background 150ms ease, color 150ms ease",
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ── Section header ────────────────────────────────────────────────────────────
 
 function SectionHeader({ index, title, desc }: { index: string; title: string; desc: string }) {
@@ -189,6 +239,26 @@ export default function IndicadoresPage() {
   const [startDate, setStartDate] = useState(defaultDates.startDate);
   const [endDate, setEndDate] = useState(defaultDates.endDate);
   const [activePreset, setActivePreset] = useState<PresetKey | null>("28d");
+
+  // A aba ativa vive na URL (?view=planilha) para links compartilháveis; valor
+  // ausente ou inválido cai no Dashboard. Evento e período NÃO vivem aqui —
+  // trocar de aba não os reseta.
+  const searchParams = useSearchParams();
+  const urlView: ViewKey = searchParams.get("view") === "planilha" ? "planilha" : "dashboard";
+  const [view, setView] = useState<ViewKey>(urlView);
+  useEffect(() => {
+    setView(urlView);
+  }, [urlView]);
+
+  function handleViewChange(next: ViewKey) {
+    if (next === view) return;
+    setView(next);
+    const params = new URLSearchParams(window.location.search);
+    if (next === "planilha") params.set("view", "planilha");
+    else params.delete("view");
+    const qs = params.toString();
+    window.history.pushState(null, "", qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
+  }
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { messages, isStreaming, activeQuery, sendMessage, stop, clearHistory } = useAgentChat();
@@ -451,6 +521,7 @@ export default function IndicadoresPage() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <ViewTabs view={view} onView={handleViewChange} />
           <Link
             href="/indicadores/eventos"
             style={{
@@ -502,11 +573,13 @@ export default function IndicadoresPage() {
         />
       )}
 
-      {/* Dashboard content or empty state */}
+      {/* Dashboard | Planilha content, or empty state */}
       {activeFilter === null ? (
         <IndicadoresEmptyState
           onOpenFilter={() => { setFilterEditTarget(null); setFilterModalOpen(true); }}
         />
+      ) : view === "planilha" ? (
+        <div data-testid="planilha-view" />
       ) : (
         <div className="z-layout">
 
