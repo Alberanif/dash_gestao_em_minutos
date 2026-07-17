@@ -25,14 +25,17 @@ export interface SixDadosItem {
 }
 
 /** Reuse canonical AiReportRecord type via Pick — avoids silent drift. */
-type AiReportRow = Pick<AiReportRecord, "filter_id" | "report_text" | "kpi_snapshot" | "generated_at">;
+export type AiReportRow = Pick<AiReportRecord, "filter_id" | "report_text" | "kpi_snapshot" | "generated_at">;
 
 /**
  * RF-3: vencido quando `generated_at` tem mais de 1h, ou quando o filtro foi
  * editado depois da geração. `generated_at` ausente/inválido também é stale
  * (relatório inexistente ou nunca concluído).
+ *
+ * Exportada para o serviço de geração (POST /generate) reusar a MESMA regra de
+ * validade — a idempotência do endpoint não pode divergir do `stale` da listagem.
  */
-function isStale(filter: FilterRecord, report: AiReportRow | undefined, now: Date): boolean {
+export function isStale(filter: FilterRecord, report: AiReportRow | undefined, now: Date): boolean {
   if (!report?.generated_at) return true;
 
   const generatedAt = new Date(report.generated_at).getTime();
