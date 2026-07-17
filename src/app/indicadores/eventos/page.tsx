@@ -12,6 +12,8 @@ import { EventoFolder, FOLDER_CONFIGS } from "@/components/indicadores/evento-fo
 import { EventoCard, EventoCardMetrics } from "@/components/indicadores/evento-card";
 import { EventoCardMenu } from "@/components/indicadores/evento-card-menu";
 import { FilterModal } from "@/components/indicadores/filter-modal";
+import { SixDadosCarousel } from "@/components/indicadores/six-dados-carousel";
+import { useSixDados } from "@/hooks/use-six-dados";
 
 // Mesma chave que o bootstrap do dashboard Indicadores restaura (page.tsx).
 const LS_FILTER_ID = "indicadores_active_filter_id";
@@ -35,6 +37,8 @@ export default function EventosPage() {
   // Dois saves em sequência disparam dois GETs; só a resposta do mais recente
   // pode escrever no mapa, senão a antiga sobrescreve métricas mais novas.
   const metricsRequestSeq = useRef(0);
+  // Six Dados (PRD seção 5.4): GET + POSTs progressivos, um card por Evento ativo.
+  const { items: sixDadosItems } = useSixDados(accountId);
 
   useEffect(() => {
     let cancelled = false;
@@ -237,6 +241,14 @@ export default function EventosPage() {
           </div>
         ))}
       </div>
+
+      {/* Six Dados — resumos de IA dos Eventos ativos (acima das pastas).
+          Carrossel some do DOM com 0 itens; envolve num wrapper só quando há cards. */}
+      {sixDadosItems.length > 0 && (
+        <div style={{ marginBottom: 30 }}>
+          <SixDadosCarousel items={sixDadosItems} />
+        </div>
+      )}
 
       {/* Pastas */}
       {loading ? (
