@@ -1,6 +1,11 @@
-import type { GlobalHotmartMetrics, HotmartProductMetrics } from "@/types/indicadores";
+import type {
+  GlobalHotmartMetrics,
+  GlobalHotmartMetricsWithWeeks,
+  HotmartProductMetrics,
+} from "@/types/indicadores";
 import type { ExpandedFilter, Period } from "../filter-expansion";
-import { brtToUtc } from "../timezone";
+import { brtToUtc, utcToBrtDate } from "../timezone";
+import { partitionWeeks } from "../week-partition";
 import type { SupabaseLike } from "./types";
 
 const STATUS_APPROVED = ["COMPLETE", "APPROVED"];
@@ -20,6 +25,8 @@ export interface HotmartQuery {
 }
 
 type SaleRow = { product_id: string; product_name: string | null; price?: number | null };
+
+type DatedSaleRow = SaleRow & { purchase_date: string };
 
 /**
  * Receita e vendas Hotmart no escopo do filtro. Fonte não configurada (filtro
@@ -54,6 +61,79 @@ export async function fetchHotmartMetrics(
   ]);
 
   return aggregate(brlRows, foreignRows);
+}
+
+const ZEROED_WEEK_TOTALS = {
+  total_sales: 0,
+  total_sales_brl: 0,
+  total_sales_foreign: 0,
+  total_revenue: 0,
+};
+
+/**
+ * Variante da Planilha: agregado do período mais vendas/receita por semana
+ * quinta→quarta. Uma única consulta (com `purchase_date`) alimenta Total e
+ * semanas; a alocação de cada venda na semana usa a data BRT, não a UTC —
+ * o mesmo deslocamento tratado em `timezone.ts`.
+ */
+export async function fetchHotmartMetricsWeekly(
+  { period, filter }: HotmartQuery,
+  supabase: SupabaseLike
+): Promise<GlobalHotmartMetricsWithWeeks> {
+  const weeks = partitionWeeks(period.startDate, period.endDate);
+
+  if (!filter.sources.hotmart) {
+    return {
+      ...ZEROED_HOTMART,
+      products: [],
+      weeks: weeks.map((week) => ({ ...week, ...ZEROED_WEEK_TOTALS })),
+    };
+  }
+
+  const startUtc = brtToUtc(period.startDate, false);
+  const endUtc = brtToUtc(period.endDate, true);
+
+  const scoped = (currency: { column: "eq" | "neq" }, columns: string) => {
+    let query = supabase
+      .from("dash_gestao_hotmart_sales")
+      .select(columns)
+      [currency.column]("currency", "BRL")
+      .in("status", STATUS_APPROVED)
+      .gte("purchase_date", startUtc)
+      .lte("purchase_date", endUtc)
+      .in("product_id", filter.productIds);
+    if (filter.offerCode) query = query.eq("offer_code", filter.offerCode);
+    return query;
+  };
+
+  const [brlRows, foreignRows] = await Promise.all([
+    paginate<DatedSaleRow>(() =>
+      scoped({ column: "eq" }, "product_id, product_name, price, purchase_date")
+    ),
+    paginate<DatedSaleRow>(() =>
+      scoped({ column: "neq" }, "product_id, product_name, purchase_date")
+    ),
+  ]);
+
+  const inWeek = (row: DatedSaleRow, week: { startDate: string; endDate: string }) => {
+    const brtDate = utcToBrtDate(row.purchase_date);
+    return brtDate >= week.startDate && brtDate <= week.endDate;
+  };
+
+  return {
+    ...aggregate(brlRows, foreignRows),
+    weeks: weeks.map((week) => {
+      const brl = brlRows.filter((r) => inWeek(r, week));
+      const foreign = foreignRows.filter((r) => inWeek(r, week));
+      return {
+        ...week,
+        total_sales: brl.length + foreign.length,
+        total_sales_brl: brl.length,
+        total_sales_foreign: foreign.length,
+        total_revenue: brl.reduce((sum, row) => sum + (row.price ?? 0), 0),
+      };
+    }),
+  };
 }
 
 /**
