@@ -24,6 +24,17 @@ const LOCK_TTL_MS = 2 * 60 * 1000;
 /** Intervalo entre polls do perdedor da corrida enquanto espera o vencedor. */
 const POLL_INTERVAL_MS = 500;
 
+/**
+ * Teto do tempo TOTAL que o perdedor da corrida fica bloqueado fazendo poll
+ * nesta invocação. Deliberadamente menor que `LOCK_TTL_MS`: o TTL do lock
+ * continua ~2min (semântica de "quando um lock preso pode ser roubado" não
+ * muda), mas uma invocação serverless não pode ficar 2min de poll bloqueante —
+ * estouraria o `maxDuration` da rota. Ao esgotar `MAX_WAIT_MS` sem o vencedor
+ * ter liberado o lock, `waitForWinner` devolve o estado vigente (mesmo
+ * comportamento de hoje ao esgotar tentativas — ver `status: "waited"`).
+ */
+const MAX_WAIT_MS = 30 * 1000;
+
 const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 export interface SixDadosGenerateDeps {
@@ -96,7 +107,7 @@ async function waitForWinner(
   clock: () => Date,
   sleep: (ms: number) => Promise<void>
 ): Promise<SixDadosItem> {
-  const maxAttempts = Math.ceil(LOCK_TTL_MS / POLL_INTERVAL_MS);
+  const maxAttempts = Math.ceil(MAX_WAIT_MS / POLL_INTERVAL_MS);
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const report = await readReport(supabase, filter.id);
     if (!report?.generating_at) {

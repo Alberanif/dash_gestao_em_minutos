@@ -257,6 +257,40 @@ test("seam 4b: resposta não-ok (500) também vira error", async () => {
   expect(byId(result.current.items, "f1").status).toBe("error");
 });
 
+test("seam 4c: POST 200 com report null e stale true (vencedor da corrida falhou) vira error, não ready vazio", async () => {
+  const items = [listItem({ filterId: "f1", stale: true, report: null })];
+  routeFetch({
+    get: () => jsonResponse(items),
+    post: () => jsonResponse({ filterId: "f1", name: "Evento 1", report: null, stale: true }),
+  });
+
+  const { result } = renderHook(() => useSixDados("acc-1"));
+  await flush();
+
+  expect(byId(result.current.items, "f1").status).toBe("error");
+  expect(byId(result.current.items, "f1").reportText).toBeNull();
+});
+
+test("seam 4d: POST 200 com stale true e relatório antigo (vencedor falhou, mas havia texto anterior) vira error preservando o texto", async () => {
+  const items = [listItem({ filterId: "f1", stale: true, report: report("texto antigo") })];
+  routeFetch({
+    get: () => jsonResponse(items),
+    post: () =>
+      jsonResponse({
+        filterId: "f1",
+        name: "Evento 1",
+        report: report("texto antigo"),
+        stale: true,
+      }),
+  });
+
+  const { result } = renderHook(() => useSixDados("acc-1"));
+  await flush();
+
+  expect(byId(result.current.items, "f1").status).toBe("error");
+  expect(byId(result.current.items, "f1").reportText).toBe("texto antigo");
+});
+
 // --- seam 6 (unmount) -------------------------------------------------------
 
 test("seam 6: unmount durante POST pendente não faz setState (sem warning)", async () => {

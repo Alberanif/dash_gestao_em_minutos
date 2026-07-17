@@ -271,6 +271,46 @@ describe("generateSixDadosForFilter", () => {
     expect(row.generated_at).toBe("2026-07-16T10:00:00Z"); // preservado
   });
 
+  it("seam 3b: perdedor com lock preso (vencedor nunca libera) desiste em ~30s de poll, não nos ~2min do TTL", async () => {
+    const supabase = makeFakeSupabase();
+    setFilters(supabase, [makeFilter()]);
+    supabase.setRows("dash_gestao_ai_reports", [
+      makeReportRow({
+        generated_at: null, // nunca gerado ⇒ stale, entra na disputa do lock
+        // lock adquirido há 10s — bem dentro do TTL de ~2min, nunca expira
+        // durante o teste (o relógio fica congelado em NOW) e o "vencedor"
+        // nunca libera o lock (simula uma invocação travada/derrubada).
+        generating_at: "2026-07-16T11:59:50Z",
+      }),
+    ]);
+    const gen = makeGenerator();
+
+    let sleepCalls = 0;
+    const countedSleep = async (ms: number) => {
+      sleepCalls++;
+      void ms;
+    };
+
+    const outcome = await generateSixDadosForFilter(FILTER_ID, {
+      supabase: supabase.client,
+      generate: gen.generate,
+      now: clock,
+      sleep: countedSleep,
+    });
+
+    // Nunca deveria gerar: esta execução é sempre o perdedor (o lock nunca fica livre).
+    expect(gen.calls()).toBe(0);
+    expect(outcome.status).toBe("waited");
+
+    // Orçamento de poll do perdedor: ~30s / 500ms = 60 tentativas — bem abaixo
+    // das 240 (~2min) que o TTL do lock sozinho permitiria. Serverless não pode
+    // ficar bloqueado 2min numa invocação.
+    const POLL_INTERVAL_MS = 500;
+    const MAX_WAIT_MS = 30_000;
+    expect(sleepCalls).toBe(MAX_WAIT_MS / POLL_INTERVAL_MS);
+    expect(sleepCalls * POLL_INTERVAL_MS).toBeLessThanOrEqual(MAX_WAIT_MS);
+  });
+
   it("seam 6a: filtro inexistente ⇒ not_found sem tocar no lock nem gerar", async () => {
     const supabase = makeFakeSupabase();
     setFilters(supabase, []);

@@ -63,8 +63,13 @@ export function useSixDados(accountId: string | null): UseSixDadosResult {
         }
         const fresh = (await res.json()) as SixDadosItem;
         if (cancelled) return;
+        // 200 não garante sucesso: o perdedor da corrida (`waited`) pode devolver
+        // o resultado do vencedor mesmo quando este falhou ao gerar — nesse caso
+        // `report` vem `null`/vencido e `stale` continua `true`. Renderizar isso
+        // como "ready" mostraria um card vazio; trata como falha de geração.
+        const status = fresh.stale || !fresh.report ? "error" : "ready";
         setItems((prev) =>
-          prev.map((card) => (card.filterId === item.filterId ? itemToCard(fresh, "ready") : card))
+          prev.map((card) => (card.filterId === item.filterId ? itemToCard(fresh, status) : card))
         );
       } catch {
         // Aborto do unmount ou falha de rede: só reflete se ainda montado.

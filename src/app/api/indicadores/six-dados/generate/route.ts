@@ -12,6 +12,11 @@ import { generateSixDadosForFilter } from "@/lib/indicadores/service/six-dados-g
  * Escreve via service_role (a tabela só permite escrita fora da RLS). Cada POST
  * é uma invocação serverless independente (o cliente dispara um por Evento stale).
  */
+// Perdedor da corrida pode ficar em poll bloqueante por até ~30s (MAX_WAIT_MS
+// em six-dados-generate.ts) + o tempo de geração do vencedor em si; folga
+// acima disso para não ser cortado pela plataforma antes de devolver o item.
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   const { error } = await validateApiAuth();
   if (error) return error;
