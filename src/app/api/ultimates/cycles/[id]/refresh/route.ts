@@ -4,6 +4,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import {
   fetchHotmartToken,
   mapHotmartSaleItem,
+  upsertPlaceholderOffers,
   HOTMART_SALES_URL,
   type HotmartSaleItem,
 } from "@/lib/services/hotmart";
@@ -151,6 +152,12 @@ export async function POST(
         mapHotmartSaleItem(item, cycle.account_id, collectedAt)
       );
 
+      // Garante que os offer_codes das vendas existam em hotmart_offers antes do
+      // upsert (FK offer_code -> dash_gestao_hotmart_offers) — mesmo pré-upsert
+      // usado por collectHotmart. Necessário para ofertas novas ainda não
+      // sincronizadas por syncHotmartProducts.
+      await upsertPlaceholderOffers(supabase, rows, collectedAt);
+
       const { error: upsertErr } = await supabase
         .from("dash_gestao_hotmart_sales")
         .upsert(rows, { onConflict: "transaction_code" });
@@ -167,6 +174,9 @@ export async function POST(
   } finally {
     // Libera o lock e grava last_refresh_at SEMPRE — inclusive em erro
     // (sem lock preso; o throttle passa a valer a partir desta tentativa).
+    // O release incondicional é seguro porque maxDuration (60s) < LOCK_TTL
+    // (120s): a invocação não pode passar do TTL e ter seu lock roubado por
+    // outra antes de chegar aqui, então este clear nunca apaga lock alheio.
     await supabase
       .from("dash_gestao_ultimates_cycles")
       .update({ refresh_started_at: null, last_refresh_at: new Date().toISOString() })

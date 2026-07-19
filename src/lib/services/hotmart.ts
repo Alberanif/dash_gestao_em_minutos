@@ -92,6 +92,57 @@ export function mapHotmartSaleItem(
   };
 }
 
+// Garante que todos os offer_codes referenciados por um conjunto de linhas de
+// venda existam em dash_gestao_hotmart_offers ANTES do upsert das vendas — a
+// FK offer_code -> dash_gestao_hotmart_offers rejeitaria vendas com ofertas
+// ainda não sincronizadas (ex.: oferta nova criada entre dois syncs). Idempotente
+// (ignoreDuplicates preserva ofertas já sincronizadas com preço/nome reais).
+// Compartilhada por collectHotmart e pela busca escopada "Atualizar agora" (#120).
+export async function upsertPlaceholderOffers(
+  supabase: ReturnType<typeof createSupabaseServiceClient>,
+  rows: Array<{
+    account_id: string;
+    product_id: string;
+    offer_code: string | null;
+    offer_name: string | null;
+  }>,
+  updatedAt: string
+): Promise<void> {
+  const offerMap = new Map<
+    string,
+    { account_id: string; product_id: string; offer_name: string }
+  >();
+  for (const row of rows) {
+    const code = row.offer_code;
+    if (code && !offerMap.has(code)) {
+      offerMap.set(code, {
+        account_id: row.account_id,
+        product_id: row.product_id,
+        offer_name: row.offer_name ?? code,
+      });
+    }
+  }
+
+  if (offerMap.size === 0) return;
+
+  const placeholderOffers = Array.from(offerMap.entries()).map(([code, meta]) => ({
+    account_id: meta.account_id,
+    product_id: meta.product_id,
+    offer_code: code,
+    offer_name: meta.offer_name,
+    price: null,
+    currency: null,
+    is_main_offer: false,
+    updated_at: updatedAt,
+  }));
+
+  const { error: offersErr } = await supabase
+    .from("dash_gestao_hotmart_offers")
+    .upsert(placeholderOffers, { onConflict: "offer_code", ignoreDuplicates: true });
+
+  if (offersErr) throw new Error(`Hotmart offers pre-upsert error: ${offersErr.message}`);
+}
+
 export async function collectHotmart(
   account: Account,
   { startDate, endDate }: { startDate: Date; endDate: Date }
@@ -139,35 +190,7 @@ export async function collectHotmart(
 
   // Garantir que todos os offer_codes referenciados existam em hotmart_offers
   // antes do upsert de vendas (evita violação de FK com ofertas históricas).
-  const offerMap = new Map<string, { product_id: string; offer_name: string }>();
-  for (const item of allItems) {
-    const code = item.purchase.offer?.code;
-    if (code && !offerMap.has(code)) {
-      offerMap.set(code, {
-        product_id: String(item.product.id),
-        offer_name: item.purchase.offer?.name ?? code,
-      });
-    }
-  }
-
-  if (offerMap.size > 0) {
-    const placeholderOffers = Array.from(offerMap.entries()).map(([code, meta]) => ({
-      account_id: account.id,
-      product_id: meta.product_id,
-      offer_code: code,
-      offer_name: meta.offer_name,
-      price: null,
-      currency: null,
-      is_main_offer: false,
-      updated_at: now.toISOString(),
-    }));
-
-    const { error: offersErr } = await supabase
-      .from("dash_gestao_hotmart_offers")
-      .upsert(placeholderOffers, { onConflict: "offer_code", ignoreDuplicates: true });
-
-    if (offersErr) throw new Error(`Hotmart offers pre-upsert error: ${offersErr.message}`);
-  }
+  await upsertPlaceholderOffers(supabase, rows, collectedAt);
 
   const { error } = await supabase
     .from("dash_gestao_hotmart_sales")

@@ -19,8 +19,17 @@ let upsertError: { message: string } | null;
 
 // Captura os payloads passados para cycles.update (lock e finally).
 let cycleUpdatePayloads: Array<Record<string, unknown>>;
+// Ordem em que os upserts de offers/sales aconteceram (verifica o pré-upsert de FK).
+let upsertOrder: string[];
 
-const salesUpsert = jest.fn(() => Promise.resolve({ error: upsertError }));
+const offersUpsert = jest.fn((...args: unknown[]) => {
+  upsertOrder.push("offers");
+  return Promise.resolve({ error: null, args });
+});
+const salesUpsert = jest.fn((...args: unknown[]) => {
+  upsertOrder.push("sales");
+  return Promise.resolve({ error: upsertError, args });
+});
 
 function makeRequest(): NextRequest {
   return new NextRequest("http://localhost/api/ultimates/cycles/cycle-1/refresh", {
@@ -45,6 +54,7 @@ beforeEach(() => {
   accountRow = { id: "acc-1", credentials: { client_id: "cid", client_secret: "csecret" } };
   upsertError = null;
   cycleUpdatePayloads = [];
+  upsertOrder = [];
 
   (global.fetch as jest.Mock) = jest.fn();
 
@@ -79,6 +89,9 @@ beforeEach(() => {
         }),
       };
     }
+    if (table === "dash_gestao_hotmart_offers") {
+      return { upsert: offersUpsert };
+    }
     if (table === "dash_gestao_hotmart_sales") {
       return { upsert: salesUpsert };
     }
@@ -112,7 +125,7 @@ function mockTokenAndSales(items: unknown[]) {
     });
 }
 
-function saleItem() {
+function saleItem(offer?: { code: string; name?: string }) {
   return {
     product: { id: 99, name: "Produto Ultimate" },
     buyer: { email: "buyer@example.com" },
@@ -122,6 +135,7 @@ function saleItem() {
       status: "APPROVED",
       price: { value: 497, currency_code: "BRL" },
       hotmart_fee: { base: 497, total: 50, fixed: 1 },
+      ...(offer ? { offer } : {}),
     },
   };
 }
@@ -192,6 +206,36 @@ describe("POST /api/ultimates/cycles/[id]/refresh", () => {
     const clearing = cycleUpdatePayloads.find((p) => p.refresh_started_at === null);
     expect(clearing).toBeDefined();
     expect(clearing?.last_refresh_at).toEqual(expect.any(String));
+  });
+
+  it("pre-upserts placeholder offers before the sales upsert when a sale has an offer_code", async () => {
+    cycleRow = activeCycle();
+    lockData = [activeCycle()];
+    mockTokenAndSales([saleItem({ code: "OFF-NEW", name: "Oferta Nova" })]);
+
+    const res = await callRoute();
+    expect(res.status).toBe(200);
+
+    // offers upsert aconteceu ANTES do sales upsert (evita violação de FK)
+    expect(upsertOrder).toEqual(["offers", "sales"]);
+
+    expect(offersUpsert).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ offer_code: "OFF-NEW", product_id: "99" }),
+      ]),
+      expect.objectContaining({ onConflict: "offer_code", ignoreDuplicates: true })
+    );
+  });
+
+  it("skips offers upsert when no sale has an offer_code", async () => {
+    cycleRow = activeCycle();
+    lockData = [activeCycle()];
+    mockTokenAndSales([saleItem()]);
+
+    const res = await callRoute();
+    expect(res.status).toBe(200);
+    expect(offersUpsert).not.toHaveBeenCalled();
+    expect(upsertOrder).toEqual(["sales"]);
   });
 
   it("clears the lock even when Hotmart fetch fails (502)", async () => {
