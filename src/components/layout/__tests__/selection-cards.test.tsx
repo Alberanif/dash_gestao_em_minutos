@@ -58,6 +58,10 @@ describe("SelectionCards — role: gestor", () => {
   it("nenhum módulo é marcado como Restrito", () => {
     expect(html).not.toContain("Restrito");
   });
+
+  it("Dash Ultimates é link acessível (href=/ultimates)", () => {
+    expect(html).toContain('href="/ultimates"');
+  });
 });
 
 describe("SelectionCards — role: analista", () => {
@@ -83,6 +87,10 @@ describe("SelectionCards — role: analista", () => {
 
   it("Ajustes é link acessível (href=/ajustes)", () => {
     expect(html).toContain('href="/ajustes"');
+  });
+
+  it("Dash Ultimates é link acessível (href=/ultimates)", () => {
+    expect(html).toContain('href="/ultimates"');
   });
 
   it("módulos restritos exibem badge Restrito", () => {
@@ -115,9 +123,13 @@ describe("SelectionCards — role: comum", () => {
     expect(html).not.toContain('href="/ajustes"');
   });
 
+  it("Dash Ultimates NÃO é link (sem href=/ultimates)", () => {
+    expect(html).not.toContain('href="/ultimates"');
+  });
+
   it("módulos restritos exibem badge Restrito", () => {
-    // Gestão à Vista, Indicadores e Ajustes são restritos — badge aparece pelo menos 3 vezes
+    // Gestão à Vista, Indicadores, Ajustes e Dash Ultimates são restritos — badge aparece pelo menos 4 vezes
     const matches = html.match(/Restrito/g) ?? [];
-    expect(matches.length).toBeGreaterThanOrEqual(3);
+    expect(matches.length).toBeGreaterThanOrEqual(4);
   });
 });
