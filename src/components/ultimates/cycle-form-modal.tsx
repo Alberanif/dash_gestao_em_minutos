@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { UltimatesCycleStatus } from "@/types/ultimates";
 import type { CycleWithProduct, HotmartProductOption } from "./types";
 
@@ -15,10 +15,13 @@ interface CycleFormModalProps {
 // monta este modal para role gestor). Espelha o padrão de
 // src/components/indicadores/filter-modal.tsx: form + confirmação em duas
 // etapas para a ação sensível (aqui, encerrar o ciclo).
+// A escolha de produto usa busca + lista (padrão de link-buyer-modal.tsx),
+// com seleção explícita — sem pré-seleção.
 export function CycleFormModal({ products, editTarget, onSave, onCancel }: CycleFormModalProps) {
   const isEdit = !!editTarget;
   const [name, setName] = useState(editTarget?.name ?? "");
-  const [productId, setProductId] = useState(editTarget?.product_id ?? products[0]?.product_id ?? "");
+  const [productId, setProductId] = useState(editTarget?.product_id ?? "");
+  const [productSearch, setProductSearch] = useState("");
   const [goalPercentInput, setGoalPercentInput] = useState(
     editTarget?.goal_percent != null ? String(editTarget.goal_percent) : ""
   );
@@ -26,6 +29,16 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel }: Cycle
   const [confirmEncerrar, setConfirmEncerrar] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  // Filtro local (nome ou ID, case-insensitive) — a lista completa de produtos
+  // ativos já chega via props, então não há round-trip de API na busca.
+  const filteredProducts = useMemo(() => {
+    const q = productSearch.trim().toLowerCase();
+    if (q === "") return products;
+    return products.filter(
+      (p) => p.product_name.toLowerCase().includes(q) || p.product_id.toLowerCase().includes(q)
+    );
+  }, [products, productSearch]);
 
   useEffect(() => {
     setConfirmEncerrar(false);
@@ -153,19 +166,49 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel }: Cycle
             <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
               Produto Hotmart
             </label>
-            <select
-              value={productId}
-              onChange={(e) => setProductId(e.target.value)}
+            <input
+              value={productSearch}
+              onChange={(e) => setProductSearch(e.target.value)}
+              placeholder="Buscar por nome ou ID..."
               className="field-control"
-              data-testid="cycle-form-product"
+              data-testid="cycle-form-product-search"
+            />
+            <ul
+              style={{
+                listStyle: "none",
+                margin: "8px 0 0",
+                padding: 0,
+                maxHeight: 200,
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+              }}
             >
-              {products.length === 0 && <option value="">Nenhum produto disponível</option>}
-              {products.map((p) => (
-                <option key={p.product_id} value={p.product_id}>
-                  {p.product_name}
-                </option>
+              {filteredProducts.map((p) => (
+                <li key={p.product_id}>
+                  <button
+                    type="button"
+                    aria-pressed={productId === p.product_id}
+                    className={productId === p.product_id ? "btn-primary" : "btn-secondary"}
+                    data-testid={`cycle-form-product-option-${p.product_id}`}
+                    onClick={() => setProductId(p.product_id)}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      fontSize: 13,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <span>{p.product_name}</span>
+                    <span style={{ opacity: 0.7 }}>{p.product_id}</span>
+                  </button>
+                </li>
               ))}
-            </select>
+            </ul>
             <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "4px 0 0" }}>
               Produto recém-criado não aparece? Rode o sync em{" "}
               <code>/api/hotmart/sync-products</code> e tente novamente.
