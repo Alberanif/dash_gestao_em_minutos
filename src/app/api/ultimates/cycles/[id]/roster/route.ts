@@ -28,7 +28,7 @@ export async function GET(
     .single();
 
   if (cycleError || !cycle) {
-    return NextResponse.json({ error: "Cycle not found" }, { status: 404 });
+    return NextResponse.json({ error: "Ciclo não encontrado" }, { status: 404 });
   }
 
   const { data, error: rpcError } = await supabase.rpc("dash_gestao_ultimates_roster", {

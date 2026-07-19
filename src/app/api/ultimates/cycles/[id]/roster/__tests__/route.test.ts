@@ -56,8 +56,10 @@ describe("GET /api/ultimates/cycles/[id]/roster", () => {
 
     const { GET } = await import("../route");
     const res = await GET(makeRequest("http://localhost/api/ultimates/cycles/missing/roster"), makeParams("missing"));
+    const body = await res.json();
 
     expect(res.status).toBe(404);
+    expect(body.error).toBe("Ciclo não encontrado");
     expect(mockRpc).not.toHaveBeenCalled();
   });
 
