@@ -57,3 +57,17 @@ describe("CycleFormModal — busca de produto", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe("CycleFormModal — estados vazios", () => {
+  it("sem produtos cadastrados, mostra 'Nenhum produto disponível'", () => {
+    renderCreate([]);
+    expect(screen.getByText("Nenhum produto disponível")).toBeInTheDocument();
+    expect(screen.queryByTestId("cycle-form-product-search")).not.toBeInTheDocument();
+  });
+
+  it("busca sem resultado mostra 'Nenhum produto encontrado.'", () => {
+    renderCreate();
+    fireEvent.change(screen.getByTestId("cycle-form-product-search"), { target: { value: "zzz" } });
+    expect(screen.getByText("Nenhum produto encontrado.")).toBeInTheDocument();
+  });
+});

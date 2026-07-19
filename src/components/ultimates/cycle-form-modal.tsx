@@ -166,49 +166,62 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel }: Cycle
             <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
               Produto Hotmart
             </label>
-            <input
-              value={productSearch}
-              onChange={(e) => setProductSearch(e.target.value)}
-              placeholder="Buscar por nome ou ID..."
-              className="field-control"
-              data-testid="cycle-form-product-search"
-            />
-            <ul
-              style={{
-                listStyle: "none",
-                margin: "8px 0 0",
-                padding: 0,
-                maxHeight: 200,
-                overflowY: "auto",
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-              }}
-            >
-              {filteredProducts.map((p) => (
-                <li key={p.product_id}>
-                  <button
-                    type="button"
-                    aria-pressed={productId === p.product_id}
-                    className={productId === p.product_id ? "btn-primary" : "btn-secondary"}
-                    data-testid={`cycle-form-product-option-${p.product_id}`}
-                    onClick={() => setProductId(p.product_id)}
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      fontSize: 13,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: 8,
-                    }}
-                  >
-                    <span>{p.product_name}</span>
-                    <span style={{ opacity: 0.7 }}>{p.product_id}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            {products.length === 0 ? (
+              <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: 0 }}>
+                Nenhum produto disponível
+              </p>
+            ) : (
+              <>
+                <input
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  placeholder="Buscar por nome ou ID..."
+                  className="field-control"
+                  data-testid="cycle-form-product-search"
+                />
+                <ul
+                  style={{
+                    listStyle: "none",
+                    margin: "8px 0 0",
+                    padding: 0,
+                    maxHeight: 200,
+                    overflowY: "auto",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                  }}
+                >
+                  {filteredProducts.length === 0 && (
+                    <li style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                      Nenhum produto encontrado.
+                    </li>
+                  )}
+                  {filteredProducts.map((p) => (
+                    <li key={p.product_id}>
+                      <button
+                        type="button"
+                        aria-pressed={productId === p.product_id}
+                        className={productId === p.product_id ? "btn-primary" : "btn-secondary"}
+                        data-testid={`cycle-form-product-option-${p.product_id}`}
+                        onClick={() => setProductId(p.product_id)}
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          fontSize: 13,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: 8,
+                        }}
+                      >
+                        <span>{p.product_name}</span>
+                        <span style={{ opacity: 0.7 }}>{p.product_id}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
             <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "4px 0 0" }}>
               Produto recém-criado não aparece? Rode o sync em{" "}
               <code>/api/hotmart/sync-products</code> e tente novamente.
