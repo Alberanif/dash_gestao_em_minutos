@@ -44,3 +44,38 @@ export type UltimatesCategory =
   | "renovacao_reembolsada"
   | "novo_comprador"
   | "novo_reembolsado";
+
+// Retornos das RPCs de leitura (migration 050). Consumidos pelas próximas
+// tasks (APIs) — os nomes espelham as colunas de RETURNS TABLE das funções.
+
+// Uma linha por comprador da base (buyer_id preenchido) OU por novo comprador
+// (buyer_id null), vinda de dash_gestao_ultimates_roster.
+export interface UltimatesRosterRow {
+  buyer_id: string | null;
+  name: string | null;
+  email: string;
+  phone: string | null;
+  extra: Record<string, unknown>;
+  category: UltimatesCategory;
+  // Menor approved_date entre as vendas aprovadas da pessoa; null se nenhuma.
+  renewed_at: string | null;
+  // Soma do price das vendas aprovadas; null se nenhuma. PostgREST pode
+  // serializar numeric como number ou string — normalize ao consumir.
+  total_value: number | null;
+  // transaction_code da primeira venda aprovada; null se nenhuma.
+  transaction_code: string | null;
+}
+
+// Renovações aprovadas de compradores da base por dia (não acumuladas — o
+// acúmulo é feito no cliente), vinda de dash_gestao_ultimates_daily.
+export interface UltimatesDailyRow {
+  day: string; // date ISO (YYYY-MM-DD)
+  renewals: number;
+}
+
+// Contadores devolvidos por dash_gestao_ultimates_replace_buyers.
+export interface UltimatesReplaceResult {
+  removed: number;
+  updated: number;
+  inserted: number;
+}
