@@ -220,6 +220,18 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel }: Cycle
                     </li>
                   ))}
                 </ul>
+                {productId && (
+                  <p
+                    data-testid="cycle-form-product-selected"
+                    style={{ fontSize: 12, color: "var(--color-text)", margin: "6px 0 0" }}
+                  >
+                    Selecionado:{" "}
+                    <strong>
+                      {products.find((p) => p.product_id === productId)?.product_name ?? productId}
+                    </strong>{" "}
+                    ({productId})
+                  </p>
+                )}
               </>
             )}
             <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "4px 0 0" }}>

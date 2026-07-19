@@ -56,6 +56,16 @@ describe("CycleFormModal — busca de produto", () => {
     expect(screen.getByText("Selecione um produto.")).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("mostra o produto selecionado mesmo quando a busca o filtra da lista", () => {
+    renderCreate();
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    fireEvent.change(screen.getByTestId("cycle-form-product-search"), { target: { value: "curso" } });
+    expect(screen.queryByTestId("cycle-form-product-option-4567890")).not.toBeInTheDocument();
+    const selected = screen.getByTestId("cycle-form-product-selected");
+    expect(selected).toHaveTextContent("Mentoria Ultimates");
+    expect(selected).toHaveTextContent("4567890");
+  });
 });
 
 describe("CycleFormModal — estados vazios", () => {
