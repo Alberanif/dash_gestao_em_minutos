@@ -131,7 +131,7 @@ export function RosterTable({ rows, role, onLinkClick, onUnlinkClick }: RosterTa
                     className="btn-secondary"
                     data-testid={`ultimates-link-buyer-${row.email}`}
                     disabled={!onLinkClick}
-                    title={!onLinkClick ? "Em breve" : undefined}
+                    title={!onLinkClick ? "Indisponível" : undefined}
                     onClick={() => onLinkClick?.(row)}
                     style={{ fontSize: 12, padding: "5px 10px" }}
                   >

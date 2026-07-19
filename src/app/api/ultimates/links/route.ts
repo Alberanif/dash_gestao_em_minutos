@@ -41,11 +41,11 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (cycleError || !cycle) {
-    return NextResponse.json({ error: "Cycle not found" }, { status: 404 });
+    return NextResponse.json({ error: "Ciclo não encontrado" }, { status: 404 });
   }
 
   if (cycle.status === "encerrado") {
-    return NextResponse.json({ error: "Cycle is encerrado" }, { status: 409 });
+    return NextResponse.json({ error: "Ciclo encerrado" }, { status: 409 });
   }
 
   const { data: buyer, error: buyerError } = await supabase
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (buyerError || !buyer || buyer.cycle_id !== cycleId) {
-    return NextResponse.json({ error: "Buyer not found" }, { status: 404 });
+    return NextResponse.json({ error: "Comprador não encontrado" }, { status: 404 });
   }
 
   const { data: sale, error: saleError } = await supabase
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
 
   if (saleError || !sale || sale.product_id !== cycle.product_id) {
     return NextResponse.json(
-      { error: "Transaction not found for this cycle's product" },
+      { error: "Transação não encontrada para o produto deste ciclo" },
       { status: 400 }
     );
   }
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (existingLink) {
-    return NextResponse.json({ error: "Transaction already linked" }, { status: 409 });
+    return NextResponse.json({ error: "Transação já vinculada" }, { status: 409 });
   }
 
   const { data: link, error: insertError } = await supabase
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
 
   if (insertError || !link) {
     return NextResponse.json(
-      { error: insertError?.message ?? "Failed to create link" },
+      { error: insertError?.message ?? "Falha ao criar vínculo" },
       { status: 500 }
     );
   }
@@ -125,11 +125,11 @@ export async function DELETE(request: NextRequest) {
     .single();
 
   if (cycleError || !cycle) {
-    return NextResponse.json({ error: "Cycle not found" }, { status: 404 });
+    return NextResponse.json({ error: "Ciclo não encontrado" }, { status: 404 });
   }
 
   if (cycle.status === "encerrado") {
-    return NextResponse.json({ error: "Cycle is encerrado" }, { status: 409 });
+    return NextResponse.json({ error: "Ciclo encerrado" }, { status: 409 });
   }
 
   const { data: link, error: linkError } = await supabase
@@ -140,7 +140,7 @@ export async function DELETE(request: NextRequest) {
     .single();
 
   if (linkError || !link) {
-    return NextResponse.json({ error: "Link not found" }, { status: 404 });
+    return NextResponse.json({ error: "Vínculo não encontrado" }, { status: 404 });
   }
 
   const { error: deleteError } = await supabase

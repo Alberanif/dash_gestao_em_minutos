@@ -60,6 +60,7 @@ describe("RosterTable — slot 'Vincular à base' (task #124)", () => {
     render(<RosterTable rows={ROWS} role="gestor" />);
     const btn = screen.getByTestId("ultimates-link-buyer-ana@example.com");
     expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute("title", "Indisponível");
     expect(screen.queryByTestId("ultimates-link-buyer-maria@example.com")).not.toBeInTheDocument();
   });
 

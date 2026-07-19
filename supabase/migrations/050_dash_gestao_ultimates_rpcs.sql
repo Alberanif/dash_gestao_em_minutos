@@ -303,16 +303,22 @@ as $$
 $$;
 
 -- ── Grants ──────────────────────────────────────────────────────────────────
--- Leituras: estáveis, liberadas a authenticated. Rodam como SECURITY DEFINER
--- com search_path pinado (mesmo idioma de get_hotmart_metrics, migration 035):
+-- Leituras: apenas service_role. Rodam como SECURITY DEFINER com search_path
+-- pinado (mesmo idioma de get_hotmart_metrics, migration 035):
 -- dash_gestao_hotmart_sales foi criada fora do controle de migrations e não há
 -- policy de SELECT para authenticated nela, então uma rota que chame estas RPCs
 -- com o client de sessão do usuário veria zero linhas do join sob RLS
 -- (todos virariam nao_renovado silenciosamente). O definer contorna isso; todos
 -- os identificadores já são schema-qualified e o search_path fica pinado como
--- defesa extra.
-grant execute on function public.dash_gestao_ultimates_roster(uuid) to authenticated, service_role;
-grant execute on function public.dash_gestao_ultimates_daily(uuid)  to authenticated, service_role;
+-- defesa extra. Todas as rotas da aplicação chamam estas RPCs com o service
+-- client — não há caminho de código que precise de authenticated direto, e
+-- liberar authenticated permitiria qualquer usuário autenticado (inclusive
+-- role comum, sem acesso ao módulo) ler dados de compradores e vendas via
+-- PostgREST. Por isso authenticated é revogado explicitamente.
+revoke execute on function public.dash_gestao_ultimates_roster(uuid) from public, anon, authenticated;
+revoke execute on function public.dash_gestao_ultimates_daily(uuid)  from public, anon, authenticated;
+grant  execute on function public.dash_gestao_ultimates_roster(uuid) to service_role;
+grant  execute on function public.dash_gestao_ultimates_daily(uuid)  to service_role;
 
 -- Escrita: apenas service_role (é operação de substituição da base).
 revoke execute on function public.dash_gestao_ultimates_replace_buyers(uuid, jsonb) from public, anon, authenticated;

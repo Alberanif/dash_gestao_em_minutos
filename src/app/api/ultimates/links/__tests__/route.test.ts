@@ -75,8 +75,10 @@ describe("POST /api/ultimates/links", () => {
 
     const { POST } = await import("../route");
     const res = await POST(makeRequest("POST", { cycleId: "missing", buyerId: "b1", transactionCode: "T1" }));
+    const body = await res.json();
 
     expect(res.status).toBe(404);
+    expect(body.error).toBe("Ciclo não encontrado");
   });
 
   it("returns 409 when cycle is encerrado", async () => {
@@ -87,8 +89,10 @@ describe("POST /api/ultimates/links", () => {
 
     const { POST } = await import("../route");
     const res = await POST(makeRequest("POST", { cycleId: "c1", buyerId: "b1", transactionCode: "T1" }));
+    const body = await res.json();
 
     expect(res.status).toBe(409);
+    expect(body.error).toBe("Ciclo encerrado");
   });
 
   it("returns 404 when buyer does not exist", async () => {
@@ -98,8 +102,10 @@ describe("POST /api/ultimates/links", () => {
 
     const { POST } = await import("../route");
     const res = await POST(makeRequest("POST", { cycleId: "c1", buyerId: "missing", transactionCode: "T1" }));
+    const body = await res.json();
 
     expect(res.status).toBe(404);
+    expect(body.error).toBe("Comprador não encontrado");
   });
 
   it("returns 404 when buyer belongs to a different cycle", async () => {
@@ -109,8 +115,10 @@ describe("POST /api/ultimates/links", () => {
 
     const { POST } = await import("../route");
     const res = await POST(makeRequest("POST", { cycleId: "c1", buyerId: "b1", transactionCode: "T1" }));
+    const body = await res.json();
 
     expect(res.status).toBe(404);
+    expect(body.error).toBe("Comprador não encontrado");
   });
 
   it("returns 400 when the transaction does not exist", async () => {
@@ -121,8 +129,10 @@ describe("POST /api/ultimates/links", () => {
 
     const { POST } = await import("../route");
     const res = await POST(makeRequest("POST", { cycleId: "c1", buyerId: "b1", transactionCode: "T1" }));
+    const body = await res.json();
 
     expect(res.status).toBe(400);
+    expect(body.error).toBe("Transação não encontrada para o produto deste ciclo");
   });
 
   it("returns 400 when the transaction belongs to a different product", async () => {
@@ -133,8 +143,10 @@ describe("POST /api/ultimates/links", () => {
 
     const { POST } = await import("../route");
     const res = await POST(makeRequest("POST", { cycleId: "c1", buyerId: "b1", transactionCode: "T1" }));
+    const body = await res.json();
 
     expect(res.status).toBe(400);
+    expect(body.error).toBe("Transação não encontrada para o produto deste ciclo");
   });
 
   it("returns 409 when the transaction is already linked", async () => {
@@ -146,8 +158,10 @@ describe("POST /api/ultimates/links", () => {
 
     const { POST } = await import("../route");
     const res = await POST(makeRequest("POST", { cycleId: "c1", buyerId: "b1", transactionCode: "T1" }));
+    const body = await res.json();
 
     expect(res.status).toBe(409);
+    expect(body.error).toBe("Transação já vinculada");
   });
 
   it("creates the link with linked_by set to the authenticated user and returns 201", async () => {
@@ -213,8 +227,10 @@ describe("DELETE /api/ultimates/links", () => {
 
     const { DELETE } = await import("../route");
     const res = await DELETE(makeRequest("DELETE", { cycleId: "missing", transactionCode: "T1" }));
+    const body = await res.json();
 
     expect(res.status).toBe(404);
+    expect(body.error).toBe("Ciclo não encontrado");
   });
 
   it("returns 409 when cycle is encerrado", async () => {
@@ -222,8 +238,10 @@ describe("DELETE /api/ultimates/links", () => {
 
     const { DELETE } = await import("../route");
     const res = await DELETE(makeRequest("DELETE", { cycleId: "c1", transactionCode: "T1" }));
+    const body = await res.json();
 
     expect(res.status).toBe(409);
+    expect(body.error).toBe("Ciclo encerrado");
   });
 
   it("returns 404 when the link does not exist", async () => {
@@ -233,8 +251,10 @@ describe("DELETE /api/ultimates/links", () => {
 
     const { DELETE } = await import("../route");
     const res = await DELETE(makeRequest("DELETE", { cycleId: "c1", transactionCode: "missing" }));
+    const body = await res.json();
 
     expect(res.status).toBe(404);
+    expect(body.error).toBe("Vínculo não encontrado");
   });
 
   it("removes the link, logs the unlink audit trail, and returns 204", async () => {
