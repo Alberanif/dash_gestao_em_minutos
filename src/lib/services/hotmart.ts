@@ -2,10 +2,10 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import type { Account, HotmartCredentials } from "@/types/accounts";
 
 const HOTMART_TOKEN_URL = "https://api-sec-vlc.hotmart.com/security/oauth/token";
-const HOTMART_SALES_URL = "https://developers.hotmart.com/payments/api/v1/sales/history";
+export const HOTMART_SALES_URL = "https://developers.hotmart.com/payments/api/v1/sales/history";
 const HOTMART_PRODUCTS_URL = "https://developers.hotmart.com/products/api/v1/products";
 
-async function fetchHotmartToken(clientId: string, clientSecret: string): Promise<string> {
+export async function fetchHotmartToken(clientId: string, clientSecret: string): Promise<string> {
   const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
   const res = await fetch(HOTMART_TOKEN_URL, {
     method: "POST",
@@ -22,7 +22,7 @@ async function fetchHotmartToken(clientId: string, clientSecret: string): Promis
   return data.access_token as string;
 }
 
-interface HotmartSaleItem {
+export interface HotmartSaleItem {
   product: { id: number; name: string };
   buyer: { email: string; name?: string };
   purchase: {
@@ -52,6 +52,43 @@ interface HotmartSalesResponse {
   page_info?: {
     next_page_token?: string;
     total_results?: number;
+  };
+}
+
+// Mapeia um item da API sales/history da Hotmart para uma linha de
+// dash_gestao_hotmart_sales. Função pura (sem I/O) — extraída de collectHotmart
+// para ser reutilizada pela busca escopada do Dash Ultimates ("Atualizar agora").
+export function mapHotmartSaleItem(
+  item: HotmartSaleItem,
+  accountId: string,
+  collectedAt: string
+) {
+  return {
+    account_id: accountId,
+    transaction_code: item.purchase.transaction,
+    product_id: String(item.product.id),
+    product_name: item.product.name,
+    offer_code: item.purchase.offer?.code ?? null,
+    offer_name: item.purchase.offer?.name ?? null,
+    status: item.purchase.status,
+    // hotmart_fee.base é o preço da oferta antes dos encargos da Hotmart.
+    // hotmart_fee.total é apenas a taxa percentual da plataforma.
+    // hotmart_fee.fixed é a taxa fixa (ex: R$ 0,99 por transação HotPay).
+    // Preço da Oferta (painel Hotmart) = base - total - fixed.
+    // price.value inclui juros do parcelamento ("Parcelado Hotmart"), inflando o valor.
+    price: item.purchase.hotmart_fee
+      ? Math.round((item.purchase.hotmart_fee.base - item.purchase.hotmart_fee.total - (item.purchase.hotmart_fee.fixed ?? 0)) * 100) / 100
+      : item.purchase.price.value,
+    currency: item.purchase.price.currency_code,
+    purchase_date: new Date(item.purchase.order_date).toISOString(),
+    approved_date: item.purchase.approved_date
+      ? new Date(item.purchase.approved_date).toISOString()
+      : null,
+    buyer_email: item.buyer.email,
+    tracking_source_sck: item.purchase.tracking?.source_sck ?? null,
+    tracking_source: item.purchase.tracking?.source ?? null,
+    tracking_external_code: item.purchase.tracking?.external_code ?? null,
+    collected_at: collectedAt,
   };
 }
 
@@ -97,33 +134,8 @@ export async function collectHotmart(
   }
 
   // Map to DB rows
-  const rows = allItems.map((item) => ({
-    account_id: account.id,
-    transaction_code: item.purchase.transaction,
-    product_id: String(item.product.id),
-    product_name: item.product.name,
-    offer_code: item.purchase.offer?.code ?? null,
-    offer_name: item.purchase.offer?.name ?? null,
-    status: item.purchase.status,
-    // hotmart_fee.base é o preço da oferta antes dos encargos da Hotmart.
-    // hotmart_fee.total é apenas a taxa percentual da plataforma.
-    // hotmart_fee.fixed é a taxa fixa (ex: R$ 0,99 por transação HotPay).
-    // Preço da Oferta (painel Hotmart) = base - total - fixed.
-    // price.value inclui juros do parcelamento ("Parcelado Hotmart"), inflando o valor.
-    price: item.purchase.hotmart_fee
-      ? Math.round((item.purchase.hotmart_fee.base - item.purchase.hotmart_fee.total - (item.purchase.hotmart_fee.fixed ?? 0)) * 100) / 100
-      : item.purchase.price.value,
-    currency: item.purchase.price.currency_code,
-    purchase_date: new Date(item.purchase.order_date).toISOString(),
-    approved_date: item.purchase.approved_date
-      ? new Date(item.purchase.approved_date).toISOString()
-      : null,
-    buyer_email: item.buyer.email,
-    tracking_source_sck: item.purchase.tracking?.source_sck ?? null,
-    tracking_source: item.purchase.tracking?.source ?? null,
-    tracking_external_code: item.purchase.tracking?.external_code ?? null,
-    collected_at: now.toISOString(),
-  }));
+  const collectedAt = now.toISOString();
+  const rows = allItems.map((item) => mapHotmartSaleItem(item, account.id, collectedAt));
 
   // Garantir que todos os offer_codes referenciados existam em hotmart_offers
   // antes do upsert de vendas (evita violação de FK com ofertas históricas).
