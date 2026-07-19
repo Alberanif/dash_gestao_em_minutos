@@ -74,6 +74,8 @@ returns table (
 )
 language sql
 stable
+security definer
+set search_path = public
 as $$
   with cyc as (
     select c.product_id
@@ -194,6 +196,8 @@ returns table (
 )
 language sql
 stable
+security definer
+set search_path = public
 as $$
   with cyc as (
     select c.product_id
@@ -299,8 +303,14 @@ as $$
 $$;
 
 -- ── Grants ──────────────────────────────────────────────────────────────────
--- Leituras: estáveis, liberadas a authenticated (RLS já permite select nas
--- tabelas envolvidas — security definer não é necessário).
+-- Leituras: estáveis, liberadas a authenticated. Rodam como SECURITY DEFINER
+-- com search_path pinado (mesmo idioma de get_hotmart_metrics, migration 035):
+-- dash_gestao_hotmart_sales foi criada fora do controle de migrations e não há
+-- policy de SELECT para authenticated nela, então uma rota que chame estas RPCs
+-- com o client de sessão do usuário veria zero linhas do join sob RLS
+-- (todos virariam nao_renovado silenciosamente). O definer contorna isso; todos
+-- os identificadores já são schema-qualified e o search_path fica pinado como
+-- defesa extra.
 grant execute on function public.dash_gestao_ultimates_roster(uuid) to authenticated, service_role;
 grant execute on function public.dash_gestao_ultimates_daily(uuid)  to authenticated, service_role;
 
