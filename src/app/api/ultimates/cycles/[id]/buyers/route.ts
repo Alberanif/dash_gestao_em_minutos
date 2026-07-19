@@ -114,7 +114,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<P
     .eq("id", id)
     .single();
 
-  if (cycleError || !cycle) {
+  if (cycleError) {
+    if (cycleError.code === "PGRST116") {
+      return NextResponse.json({ error: "Ciclo não encontrado" }, { status: 404 });
+    }
+    return NextResponse.json({ error: cycleError.message }, { status: 500 });
+  }
+
+  if (!cycle) {
     return NextResponse.json({ error: "Ciclo não encontrado" }, { status: 404 });
   }
 
