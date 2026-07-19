@@ -15,6 +15,10 @@ interface RosterTableProps {
   // botão "Vincular à base" fica desabilitado (slot deixado de propósito —
   // ver PRD issue #114, seção 3.4, critério 7).
   onLinkClick?: (row: UltimatesRosterRow) => void;
+  // Desfazer vínculo manual de uma renovação de comprador da base (critério
+  // 6). Oferecido em qualquer renovação; o DELETE trata 404 quando a linha não
+  // veio de vínculo. Ausente ⇒ ação não disponível (ex.: ciclo encerrado).
+  onUnlinkClick?: (row: UltimatesRosterRow) => void;
 }
 
 const CATEGORY_OPTIONS: CategoryFilter[] = [
@@ -28,6 +32,16 @@ const CATEGORY_OPTIONS: CategoryFilter[] = [
 
 function isNewBuyerRow(row: UltimatesRosterRow): boolean {
   return row.buyer_id === null;
+}
+
+// Renovação de comprador da base (pode ter vindo de venda por email OU de
+// vínculo manual — o roster não distingue; ver unlink-buyer-modal.tsx).
+function isRenewedBaseRow(row: UltimatesRosterRow): boolean {
+  return (
+    row.buyer_id !== null &&
+    row.transaction_code !== null &&
+    (row.category === "renovado" || row.category === "renovacao_reembolsada")
+  );
 }
 
 // DataTable<T> exige T extends Record<string, unknown> (índice de string) —
@@ -53,7 +67,7 @@ function downloadCsv(csv: string, filename: string) {
 // filtro de categoria são client-side sobre a MESMA lista usada pelos KPIs
 // (aggregateRosterKpis) e pelo gráfico, garantindo que os números batam. A
 // exportação CSV usa exatamente a visão filtrada atual.
-export function RosterTable({ rows, role, onLinkClick }: RosterTableProps) {
+export function RosterTable({ rows, role, onLinkClick, onUnlinkClick }: RosterTableProps) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<CategoryFilter>("todas");
 
@@ -109,22 +123,37 @@ export function RosterTable({ rows, role, onLinkClick }: RosterTableProps) {
           {
             key: "buyer_id" as keyof TableRow,
             label: "Ação",
-            render: (_value: unknown, row: TableRow) =>
-              isNewBuyerRow(row) ? (
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  data-testid={`ultimates-link-buyer-${row.email}`}
-                  disabled={!onLinkClick}
-                  title={!onLinkClick ? "Em breve" : undefined}
-                  onClick={() => onLinkClick?.(row)}
-                  style={{ fontSize: 12, padding: "5px 10px" }}
-                >
-                  Vincular à base
-                </button>
-              ) : (
-                "—"
-              ),
+            render: (_value: unknown, row: TableRow) => {
+              if (isNewBuyerRow(row)) {
+                return (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    data-testid={`ultimates-link-buyer-${row.email}`}
+                    disabled={!onLinkClick}
+                    title={!onLinkClick ? "Em breve" : undefined}
+                    onClick={() => onLinkClick?.(row)}
+                    style={{ fontSize: 12, padding: "5px 10px" }}
+                  >
+                    Vincular à base
+                  </button>
+                );
+              }
+              if (isRenewedBaseRow(row) && onUnlinkClick) {
+                return (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    data-testid={`ultimates-unlink-buyer-${row.email}`}
+                    onClick={() => onUnlinkClick(row)}
+                    style={{ fontSize: 12, padding: "5px 10px" }}
+                  >
+                    Desfazer vínculo
+                  </button>
+                );
+              }
+              return "—";
+            },
           },
         ]
       : []),

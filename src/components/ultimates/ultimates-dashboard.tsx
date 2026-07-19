@@ -11,6 +11,9 @@ import { GoalProgressBar } from "./goal-progress-bar";
 import { CumulativeRenewalsChart } from "./cumulative-renewals-chart";
 import { RosterTable } from "./roster-table";
 import { RefreshControls } from "./refresh-controls";
+import { UploadBuyersModal } from "./upload-buyers-modal";
+import { LinkBuyerModal } from "./link-buyer-modal";
+import { UnlinkBuyerModal } from "./unlink-buyer-modal";
 import { SkeletonCard, SkeletonChart, SkeletonTable } from "@/components/ui/skeleton";
 
 // Dashboard do ciclo selecionado (PRD issue #114, seções 3.2–3.4/3.6, task
@@ -32,6 +35,10 @@ export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
   // sucedido — reexecuta o efeito de carga abaixo (mesmo padrão de
   // ultimates-screen.tsx: fetch inline no efeito + flag de cancelamento).
   const [reloadToken, setReloadToken] = useState(0);
+  // Fluxos de escrita (task #124) — só montados para gestor em ciclo ativo.
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [linkTarget, setLinkTarget] = useState<UltimatesRosterRow | null>(null);
+  const [unlinkTarget, setUnlinkTarget] = useState<UltimatesRosterRow | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,6 +82,17 @@ export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
 
   const loading = roster === null || daily === null;
   const kpis = roster ? aggregateRosterKpis(roster) : null;
+  // Escrita só para gestor e ciclo ativo (critério 11: ciclo encerrado tem
+  // dashboard acessível, mas upload/vínculo/atualização bloqueados).
+  const canWrite = role === "gestor" && cycle.status !== "encerrado";
+  const baseRows = roster ? roster.filter((r) => r.buyer_id !== null) : [];
+
+  function handleWriteDone() {
+    setUploadOpen(false);
+    setLinkTarget(null);
+    setUnlinkTarget(null);
+    setReloadToken((t) => t + 1);
+  }
 
   return (
     <div data-testid="ultimates-dashboard-slot" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -98,12 +116,24 @@ export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
             {cycle.product_name ?? "Produto não identificado"}
           </p>
         </div>
-        <RefreshControls
-          cycleId={cycle.id}
-          cycleStatus={cycle.status}
-          lastRefreshAt={cycle.last_refresh_at}
-          onRefreshed={handleRefreshed}
-        />
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          {canWrite && (
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setUploadOpen(true)}
+              data-testid="ultimates-upload-btn"
+            >
+              Carregar base
+            </button>
+          )}
+          <RefreshControls
+            cycleId={cycle.id}
+            cycleStatus={cycle.status}
+            lastRefreshAt={cycle.last_refresh_at}
+            onRefreshed={handleRefreshed}
+          />
+        </div>
       </div>
 
       {loadError && (
@@ -141,8 +171,40 @@ export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
             <GoalProgressBar goalPercent={cycle.goal_percent} currentPercent={kpis.renovadosPercent} />
           )}
           <CumulativeRenewalsChart data={buildCumulativeSeries(daily ?? [])} />
-          <RosterTable rows={roster ?? []} role={role} />
+          <RosterTable
+            rows={roster ?? []}
+            role={role}
+            onLinkClick={canWrite ? setLinkTarget : undefined}
+            onUnlinkClick={canWrite ? setUnlinkTarget : undefined}
+          />
         </>
+      )}
+
+      {uploadOpen && canWrite && (
+        <UploadBuyersModal
+          cycleId={cycle.id}
+          onCommitted={handleWriteDone}
+          onCancel={() => setUploadOpen(false)}
+        />
+      )}
+
+      {linkTarget && canWrite && (
+        <LinkBuyerModal
+          cycleId={cycle.id}
+          newBuyerRow={linkTarget}
+          baseRows={baseRows}
+          onLinked={handleWriteDone}
+          onCancel={() => setLinkTarget(null)}
+        />
+      )}
+
+      {unlinkTarget && canWrite && (
+        <UnlinkBuyerModal
+          cycleId={cycle.id}
+          targetRow={unlinkTarget}
+          onUnlinked={handleWriteDone}
+          onCancel={() => setUnlinkTarget(null)}
+        />
       )}
     </div>
   );

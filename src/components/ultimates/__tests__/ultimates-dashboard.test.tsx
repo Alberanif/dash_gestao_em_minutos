@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { UltimatesDashboard } from "../ultimates-dashboard";
 import type { CycleWithProduct } from "../types";
@@ -111,5 +111,61 @@ describe("UltimatesDashboard — wiring de KPIs/meta/gráfico/tabela sobre a mes
     global.fetch = jest.fn().mockResolvedValue({ ok: false, json: async () => ({}) }) as unknown as typeof global.fetch;
     render(<UltimatesDashboard cycle={makeCycle()} role="gestor" />);
     expect(await screen.findByTestId("ultimates-dashboard-error")).toBeInTheDocument();
+  });
+});
+
+const WRITE_ROSTER: UltimatesRosterRow[] = [
+  row({ buyer_id: "b1", name: "Renovou", email: "r1@example.com", category: "renovado", transaction_code: "HP-TX-1" }),
+  row({ buyer_id: null, name: "Compra Nova", email: "novo@example.com", category: "novo_comprador", transaction_code: "HP-TX-2" }),
+];
+
+function mockWriteRosterFetch() {
+  global.fetch = jest.fn((url: string) => {
+    if (url.includes("/roster")) return Promise.resolve({ ok: true, json: async () => ({ rows: WRITE_ROSTER }) });
+    if (url.includes("/daily")) return Promise.resolve({ ok: true, json: async () => ({ days: [] }) });
+    return Promise.resolve({ ok: false, json: async () => ({}) });
+  }) as unknown as typeof global.fetch;
+}
+
+describe("UltimatesDashboard — fluxos de escrita (critérios 6 e 11)", () => {
+  it("gestor em ciclo ativo vê 'Carregar base' e pode abrir vínculo/desfazer", async () => {
+    mockWriteRosterFetch();
+    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" />);
+
+    await screen.findByTestId("ultimates-kpi-row");
+    expect(screen.getByTestId("ultimates-upload-btn")).toBeInTheDocument();
+
+    // Vínculo manual: botão na linha de novo comprador abre o modal.
+    const linkBtn = screen.getByTestId("ultimates-link-buyer-novo@example.com");
+    expect(linkBtn).not.toBeDisabled();
+    fireEvent.click(linkBtn);
+    expect(screen.getByTestId("ultimates-link-search")).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    // Desfazer vínculo: botão na renovação da base abre o modal.
+    fireEvent.click(screen.getByTestId("ultimates-unlink-buyer-r1@example.com"));
+    expect(screen.getByTestId("ultimates-unlink-confirm-btn")).toBeInTheDocument();
+  });
+
+  it("ciclo encerrado: dashboard acessível mas escrita bloqueada (sem Carregar base nem ações)", async () => {
+    mockWriteRosterFetch();
+    render(<UltimatesDashboard cycle={makeCycle({ status: "encerrado" })} role="gestor" />);
+
+    await screen.findByTestId("ultimates-kpi-row");
+    // Dashboard segue acessível (tabela renderiza).
+    expect(screen.getByText("Compra Nova")).toBeInTheDocument();
+    // Mas nenhuma ação de escrita é oferecida.
+    expect(screen.queryByTestId("ultimates-upload-btn")).not.toBeInTheDocument();
+    const linkBtn = screen.getByTestId("ultimates-link-buyer-novo@example.com");
+    expect(linkBtn).toBeDisabled();
+    expect(screen.queryByTestId("ultimates-unlink-buyer-r1@example.com")).not.toBeInTheDocument();
+  });
+
+  it("analista não vê ações de escrita mesmo em ciclo ativo", async () => {
+    mockWriteRosterFetch();
+    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="analista" />);
+    await screen.findByTestId("ultimates-kpi-row");
+    expect(screen.queryByTestId("ultimates-upload-btn")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-link-buyer-novo@example.com")).not.toBeInTheDocument();
   });
 });
