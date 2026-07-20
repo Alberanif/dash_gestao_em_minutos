@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 interface Column<T> {
   key: keyof T;
@@ -50,11 +50,16 @@ export function DataTable<T extends Record<string, unknown>>({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
 
-  // Novos dados (busca/filtro/refresh no pai) voltam à página 1. Ordenar não
-  // passa por aqui — sortKey/sortDir não mudam `data` — logo mantém a página.
-  useEffect(() => {
+  // Novos dados (busca/filtro/refresh no pai) voltam à página 1. Ajuste feito
+  // durante o render (padrão react.dev "Adjusting some state when a prop
+  // changes"), pois a regra react-hooks/set-state-in-effect do repo proíbe
+  // setState síncrono em efeito. Ordenar não passa por aqui — sortKey/sortDir
+  // não mudam `data` — logo mantém a página.
+  const [prevData, setPrevData] = useState(data);
+  if (prevData !== data) {
+    setPrevData(data);
     setPage(1);
-  }, [data]);
+  }
 
   function handleSort(key: keyof T) {
     if (sortKey === key) {
