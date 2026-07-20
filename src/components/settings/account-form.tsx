@@ -200,7 +200,7 @@ export function AccountForm({ account, onSave, onCancel }: AccountFormProps) {
           {platform === "youtube" && (
             <>
               {isYouTubeConnected && (
-                <div className="rounded-[var(--radius-sm)] border px-3 py-2 text-sm" style={{ color: "var(--color-success)", background: "#DCFCE7", borderColor: "#BBF7D0" }}>
+                <div className="rounded-[var(--radius-sm)] border px-3 py-2 text-sm" style={{ color: "var(--badge-green-fg, var(--color-success))", background: "var(--badge-green-bg, #DCFCE7)", borderColor: "var(--badge-green-fg, #BBF7D0)" }}>
                   <span>●</span>
                   <span>Conectado — canal: {ytCreds?.channel_id}</span>
                 </div>

@@ -29,6 +29,8 @@ export function PageHeader({ title, subtitle, actions, back }: PageHeaderProps) 
                 border: "1px solid var(--color-primary)",
                 textDecoration: "none",
                 outlineColor: "var(--color-primary)",
+                // inline para vencer `.dash-dark a { color: var(--link) }`
+                color: "#fff",
               }}
             >
               <span aria-hidden="true">←</span>

@@ -231,7 +231,7 @@ export default function HotmartPage() {
     return (
       <div className="flex h-64 flex-col items-center justify-center" style={{ color: "var(--color-text-muted)" }}>
         <p className="mb-2 text-lg">Nenhuma conta Hotmart cadastrada</p>
-        <a href="/dashboard/settings" style={{ color: "var(--color-primary)" }} className="text-sm hover:underline">
+        <a href="/ajustes/configuracoes" style={{ color: "var(--color-primary)" }} className="text-sm hover:underline">
           Cadastrar conta em Configurações →
         </a>
       </div>
