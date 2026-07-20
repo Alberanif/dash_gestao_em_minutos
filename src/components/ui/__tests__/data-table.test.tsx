@@ -57,7 +57,7 @@ describe("DataTable — paginação com pageSize", () => {
     expect(screen.queryByTestId("data-table-page-info")).not.toBeInTheDocument();
   });
 
-  it("ordena o conjunto completo (não só a página) e manter a página ao ordenar", () => {
+  it("ordena o conjunto completo (não só a página) e mantém a página ao ordenar", () => {
     render(<DataTable<Row> data={makeRows(12)} columns={COLUMNS} pageSize={10} />);
     fireEvent.click(screen.getByTestId("data-table-next"));
     // Primeiro clique numa coluna ordena desc sobre TODAS as linhas; a página
@@ -77,5 +77,14 @@ describe("DataTable — paginação com pageSize", () => {
     expect(screen.getByTestId("data-table-page-info")).toHaveTextContent("Página 2 de 3");
     rerender(<DataTable<Row> data={makeRows(15)} columns={COLUMNS} pageSize={10} />);
     expect(screen.getByTestId("data-table-page-info")).toHaveTextContent("Página 1 de 2");
+  });
+
+  it("pageSize={0} desativa a paginação sem renderizar '0' solto", () => {
+    const { container } = render(
+      <DataTable<Row> data={makeRows(3)} columns={COLUMNS} pageSize={0} />
+    );
+    expect(screen.getByText("Item 03")).toBeInTheDocument();
+    expect(screen.queryByTestId("data-table-page-info")).not.toBeInTheDocument();
+    expect(container.textContent?.endsWith("0")).toBe(false);
   });
 });

@@ -186,7 +186,7 @@ export function DataTable<T extends Record<string, unknown>>({
           </tbody>
         </table>
       </div>
-      {pageSize && sorted.length > pageSize && (
+      {!!pageSize && sorted.length > pageSize && (
         <div
           className="flex items-center justify-between px-4 py-3"
           style={{ borderTop: "1px solid var(--color-border)" }}
