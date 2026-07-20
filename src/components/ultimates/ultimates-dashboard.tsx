@@ -11,10 +11,10 @@ import { GoalProgressBar } from "./goal-progress-bar";
 import { CumulativeRenewalsChart } from "./cumulative-renewals-chart";
 import { RosterTable } from "./roster-table";
 import { RefreshControls } from "./refresh-controls";
+import { SectionHeader } from "./section-header";
 import { UploadBuyersModal } from "./upload-buyers-modal";
 import { LinkBuyerModal } from "./link-buyer-modal";
 import { UnlinkBuyerModal } from "./unlink-buyer-modal";
-import { SkeletonCard, SkeletonChart, SkeletonTable } from "@/components/ui/skeleton";
 
 // Dashboard do ciclo selecionado (PRD issue #114, seções 3.2–3.4/3.6, task
 // #123). UMA chamada ao roster + UMA ao daily alimentam KPIs (agregados no
@@ -25,6 +25,21 @@ import { SkeletonCard, SkeletonChart, SkeletonTable } from "@/components/ui/skel
 export interface UltimatesDashboardProps {
   cycle: CycleWithProduct;
   role: UserRole;
+}
+
+// Bloco de pulso do skeleton no tema escuro (o skeleton compartilhado de
+// src/components/ui/skeleton.tsx tem cores claras fixas — não serve aqui).
+function SkeletonBlock({ height, radius = 11 }: { height: number; radius?: number }) {
+  return (
+    <div
+      style={{
+        height,
+        background: "var(--surface-2)",
+        borderRadius: radius,
+        animation: "pulse 1.5s ease-in-out infinite",
+      }}
+    />
+  );
 }
 
 export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
@@ -95,28 +110,20 @@ export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
   }
 
   return (
-    <div data-testid="ultimates-dashboard-slot" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 12,
-        }}
-      >
+    <div data-testid="ultimates-dashboard-slot" style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <div className="ult-cycle-head">
         <div>
           <h2
             data-testid="ultimates-selected-cycle"
-            style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text)", margin: 0 }}
+            style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--text-strong)", margin: 0 }}
           >
             {cycle.name}
           </h2>
-          <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "2px 0 0" }}>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "2px 0 0" }}>
             {cycle.product_name ?? "Produto não identificado"}
           </p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div className="ult-cycle-actions">
           {canWrite && (
             <button
               type="button"
@@ -137,47 +144,66 @@ export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
       </div>
 
       {loadError && (
-        <div data-testid="ultimates-dashboard-error" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <p style={{ fontSize: 13, color: "var(--color-danger)", margin: 0 }}>
+        <div
+          data-testid="ultimates-dashboard-error"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 12,
+            padding: "56px 24px",
+            textAlign: "center",
+          }}
+        >
+          <p style={{ fontSize: 13, color: "var(--red)", margin: 0 }}>
             Não foi possível carregar os dados do ciclo.
           </p>
-          <button
-            type="button"
-            onClick={() => setReloadToken((t) => t + 1)}
-            className="btn-secondary"
-            style={{ alignSelf: "flex-start" }}
-          >
+          <button type="button" onClick={() => setReloadToken((t) => t + 1)} className="btn-secondary">
             Tentar novamente
           </button>
         </div>
       )}
 
       {!loadError && loading && (
-        <div data-testid="ultimates-dashboard-loading" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
+        <div data-testid="ultimates-dashboard-loading" className="z-layout">
+          <div className="ult-kpi-grid">
             {Array.from({ length: 5 }).map((_, i) => (
-              <SkeletonCard key={i} />
+              <SkeletonBlock key={i} height={104} />
             ))}
           </div>
-          <SkeletonChart />
-          <SkeletonTable />
+          <SkeletonBlock height={252} />
+          <SkeletonBlock height={320} />
         </div>
       )}
 
       {!loadError && !loading && kpis && (
-        <>
-          <KpiRow kpis={kpis} />
-          {cycle.goal_percent != null && (
-            <GoalProgressBar goalPercent={cycle.goal_percent} currentPercent={kpis.renovadosPercent} />
-          )}
-          <CumulativeRenewalsChart data={buildCumulativeSeries(daily ?? [])} />
-          <RosterTable
-            rows={roster ?? []}
-            role={role}
-            onLinkClick={canWrite ? setLinkTarget : undefined}
-            onUnlinkClick={canWrite ? setUnlinkTarget : undefined}
-          />
-        </>
+        <div className="z-layout">
+          <section>
+            <SectionHeader index="01" title="Visão do ciclo" desc="Base, renovações e novos compradores" />
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <KpiRow kpis={kpis} />
+              {cycle.goal_percent != null && (
+                <GoalProgressBar goalPercent={cycle.goal_percent} currentPercent={kpis.renovadosPercent} />
+              )}
+            </div>
+          </section>
+
+          <section>
+            <SectionHeader index="02" title="Evolução" desc="Renovações acumuladas dia a dia" />
+            <CumulativeRenewalsChart data={buildCumulativeSeries(daily ?? [])} />
+          </section>
+
+          <section>
+            <SectionHeader index="03" title="Roster" desc="Compradores do ciclo, busca e exportação" />
+            <RosterTable
+              rows={roster ?? []}
+              role={role}
+              onLinkClick={canWrite ? setLinkTarget : undefined}
+              onUnlinkClick={canWrite ? setUnlinkTarget : undefined}
+            />
+          </section>
+        </div>
       )}
 
       {uploadOpen && canWrite && (

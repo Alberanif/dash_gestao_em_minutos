@@ -68,13 +68,13 @@ export function UnlinkBuyerModal({ cycleId, targetRow, onUnlinked, onCancel }: U
       role="dialog"
       aria-modal="true"
       aria-label="Desfazer vínculo"
-      style={overlayStyle}
+      className="ult-modal-overlay"
       onClick={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
     >
-      <div style={panelStyle}>
-        <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text)", margin: 0 }}>
+      <div className="ult-modal-panel" style={{ maxWidth: 440 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-strong)", margin: 0 }}>
           Desfazer vínculo
         </h3>
         <p style={{ fontSize: 13, color: "var(--color-text)", margin: 0, lineHeight: 1.6 }}>
@@ -89,7 +89,7 @@ export function UnlinkBuyerModal({ cycleId, targetRow, onUnlinked, onCancel }: U
           </p>
         )}
 
-        <div className="flex gap-3" style={{ justifyContent: "flex-end" }}>
+        <div className="ult-modal-actions">
           <button type="button" onClick={onCancel} className="btn-secondary" disabled={busy}>
             Cancelar
           </button>
@@ -107,29 +107,6 @@ export function UnlinkBuyerModal({ cycleId, targetRow, onUnlinked, onCancel }: U
     </div>
   );
 }
-
-const overlayStyle: React.CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  background: "rgba(0,0,0,0.5)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 200,
-  padding: 16,
-};
-
-const panelStyle: React.CSSProperties = {
-  background: "var(--color-surface)",
-  borderRadius: "var(--radius-lg)",
-  padding: 24,
-  width: "100%",
-  maxWidth: 440,
-  boxShadow: "var(--shadow-md)",
-  display: "flex",
-  flexDirection: "column",
-  gap: 16,
-};
 
 function feedbackStyle(color: string): React.CSSProperties {
   return {

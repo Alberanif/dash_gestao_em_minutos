@@ -1,3 +1,5 @@
+import "../dash-theme.css";
+import "./ultimates.css";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { UltimatesScreen } from "@/components/ultimates/ultimates-screen";

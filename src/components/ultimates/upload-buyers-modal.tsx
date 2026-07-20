@@ -107,13 +107,13 @@ export function UploadBuyersModal({ cycleId, onCommitted, onCancel }: UploadBuye
       role="dialog"
       aria-modal="true"
       aria-label="Carregar base de compradores"
-      style={overlayStyle}
+      className="ult-modal-overlay"
       onClick={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
     >
-      <div style={panelStyle}>
-        <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text)", margin: 0 }}>
+      <div className="ult-modal-panel" style={{ maxWidth: 520 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-strong)", margin: 0 }}>
           {step === "input" ? "Carregar base de compradores" : "Confirmar substituição da base"}
         </h3>
 
@@ -203,7 +203,7 @@ export function UploadBuyersModal({ cycleId, onCommitted, onCancel }: UploadBuye
               </p>
             )}
 
-            <div className="flex gap-3" style={{ justifyContent: "flex-end" }}>
+            <div className="ult-modal-actions">
               <button type="button" onClick={onCancel} className="btn-secondary">
                 Cancelar
               </button>
@@ -279,7 +279,7 @@ export function UploadBuyersModal({ cycleId, onCommitted, onCancel }: UploadBuye
               </p>
             )}
 
-            <div className="flex gap-3" style={{ justifyContent: "flex-end" }}>
+            <div className="ult-modal-actions">
               <button
                 type="button"
                 onClick={() => {
@@ -307,31 +307,6 @@ export function UploadBuyersModal({ cycleId, onCommitted, onCancel }: UploadBuye
     </div>
   );
 }
-
-const overlayStyle: React.CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  background: "rgba(0,0,0,0.5)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 200,
-  padding: 16,
-};
-
-const panelStyle: React.CSSProperties = {
-  background: "var(--color-surface)",
-  borderRadius: "var(--radius-lg)",
-  padding: 24,
-  width: "100%",
-  maxWidth: 520,
-  maxHeight: "90vh",
-  overflowY: "auto",
-  boxShadow: "var(--shadow-md)",
-  display: "flex",
-  flexDirection: "column",
-  gap: 16,
-};
 
 const emailListStyle: React.CSSProperties = {
   margin: "6px 0 0",

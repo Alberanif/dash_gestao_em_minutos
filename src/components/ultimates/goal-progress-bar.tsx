@@ -13,16 +13,24 @@ export function GoalProgressBar({ goalPercent, currentPercent }: GoalProgressBar
   const reachedGoal = currentPercent >= goalPercent;
 
   return (
-    <div data-testid="ultimates-goal-bar" className="surface-card" style={{ padding: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)" }}>
+    <div
+      data-testid="ultimates-goal-bar"
+      style={{
+        background: "var(--surface)",
+        border: "1px solid var(--border-vis)",
+        borderRadius: 11,
+        padding: "16px 18px",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-2)" }}>
           Meta {fmtPercent1(goalPercent)}
         </span>
         <span
           style={{
             fontSize: 13,
             fontWeight: 600,
-            color: reachedGoal ? "var(--color-success)" : "var(--color-text-muted)",
+            color: reachedGoal ? "var(--green)" : "var(--text-muted)",
           }}
         >
           {fmtPercent1(currentPercent)} renovados
@@ -33,7 +41,7 @@ export function GoalProgressBar({ goalPercent, currentPercent }: GoalProgressBar
           position: "relative",
           height: 8,
           borderRadius: 999,
-          background: "var(--color-border)",
+          background: "var(--surface-2)",
           overflow: "hidden",
         }}
       >
@@ -43,7 +51,7 @@ export function GoalProgressBar({ goalPercent, currentPercent }: GoalProgressBar
             inset: 0,
             width: `${clampedWidth}%`,
             borderRadius: 999,
-            background: reachedGoal ? "var(--color-success)" : "var(--color-primary)",
+            background: reachedGoal ? "var(--green)" : "var(--blue)",
             transition: "width 200ms ease",
           }}
         />
@@ -56,8 +64,8 @@ export function GoalProgressBar({ goalPercent, currentPercent }: GoalProgressBar
               bottom: 0,
               left: `${Math.min(100, Math.max(0, goalPercent))}%`,
               width: 2,
-              background: "var(--color-text)",
-              opacity: 0.5,
+              background: "var(--text-2)",
+              opacity: 0.7,
             }}
           />
         )}

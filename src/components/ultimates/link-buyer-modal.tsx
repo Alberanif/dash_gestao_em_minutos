@@ -78,13 +78,13 @@ export function LinkBuyerModal({ cycleId, newBuyerRow, baseRows, onLinked, onCan
       role="dialog"
       aria-modal="true"
       aria-label="Vincular comprador à base"
-      style={overlayStyle}
+      className="ult-modal-overlay"
       onClick={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
     >
-      <div style={panelStyle}>
-        <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text)", margin: 0 }}>
+      <div className="ult-modal-panel" style={{ maxWidth: 460 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-strong)", margin: 0 }}>
           Vincular à base
         </h3>
         <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0, lineHeight: 1.5 }}>
@@ -155,7 +155,7 @@ export function LinkBuyerModal({ cycleId, newBuyerRow, baseRows, onLinked, onCan
           </p>
         )}
 
-        <div className="flex gap-3" style={{ justifyContent: "flex-end" }}>
+        <div className="ult-modal-actions">
           {selected ? (
             <>
               <button
@@ -189,31 +189,6 @@ export function LinkBuyerModal({ cycleId, newBuyerRow, baseRows, onLinked, onCan
     </div>
   );
 }
-
-const overlayStyle: React.CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  background: "rgba(0,0,0,0.5)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 200,
-  padding: 16,
-};
-
-const panelStyle: React.CSSProperties = {
-  background: "var(--color-surface)",
-  borderRadius: "var(--radius-lg)",
-  padding: 24,
-  width: "100%",
-  maxWidth: 460,
-  maxHeight: "90vh",
-  overflowY: "auto",
-  boxShadow: "var(--shadow-md)",
-  display: "flex",
-  flexDirection: "column",
-  gap: 16,
-};
 
 function feedbackStyle(color: string): React.CSSProperties {
   return {

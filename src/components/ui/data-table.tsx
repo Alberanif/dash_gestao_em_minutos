@@ -119,7 +119,7 @@ export function DataTable<T extends Record<string, unknown>>({
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr style={{ background: "#F8FAFC", borderBottom: "1px solid var(--color-border)" }}>
+            <tr style={{ background: "var(--table-header-bg, #F8FAFC)", borderBottom: "1px solid var(--color-border)" }}>
               {columns.map((col) => {
                 const isActive = sortKey === col.key;
                 return (
@@ -164,7 +164,7 @@ export function DataTable<T extends Record<string, unknown>>({
                   borderBottom: i < visible.length - 1 ? "1px solid var(--color-border)" : undefined,
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = "#F8FAFC";
+                  (e.currentTarget as HTMLElement).style.background = "var(--table-row-hover, #F8FAFC)";
                 }}
                 onMouseLeave={(e) => {
                   (e.currentTarget as HTMLElement).style.background = "var(--color-surface)";

@@ -117,34 +117,11 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel }: Cycle
     <div
       role="dialog"
       aria-modal="true"
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 200,
-        padding: 16,
-      }}
+      className="ult-modal-overlay"
       onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
     >
-      <div
-        style={{
-          background: "var(--color-surface)",
-          borderRadius: "var(--radius-lg)",
-          padding: 24,
-          width: "100%",
-          maxWidth: 440,
-          maxHeight: "90vh",
-          overflowY: "auto",
-          boxShadow: "var(--shadow-md)",
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
-        <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text)", margin: 0 }}>
+      <div className="ult-modal-panel" style={{ maxWidth: 440 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-strong)", margin: 0 }}>
           {isEdit ? "Editar ciclo" : "Novo ciclo"}
         </h3>
 
@@ -299,7 +276,7 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel }: Cycle
 
         {error && <p style={{ fontSize: 12, color: "var(--color-danger)", margin: 0 }}>{error}</p>}
 
-        <div className="flex gap-3" style={{ justifyContent: "flex-end" }}>
+        <div className="ult-modal-actions">
           <button type="button" onClick={onCancel} className="btn-secondary" data-testid="cycle-form-cancel">
             Cancelar
           </button>

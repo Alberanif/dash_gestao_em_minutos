@@ -1,0 +1,150 @@
+/* Regras específicas do módulo Dash Ultimates. Tokens e identidade escura
+   vêm de src/app/dash-theme.css (.dash-dark) — este arquivo só cuida de
+   layout e responsividade do módulo. */
+
+.ult-container {
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: 0 28px 64px;
+}
+
+@media (max-width: 640px) {
+  .ult-container {
+    padding: 0 16px 48px;
+  }
+}
+
+.ult-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 22px 0 18px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 28px;
+}
+
+/* Sub-header do ciclo (nome/produto à esquerda, ações à direita) */
+.ult-cycle-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.ult-cycle-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .ult-cycle-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ult-cycle-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* KPIs — auto-fit no desktop, grade 2×N no celular */
+.ult-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 640px) {
+  .ult-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+}
+
+/* Corpo do gráfico — altura via CSS para o mobile reduzir sem re-render */
+.ult-chart-body {
+  width: 100%;
+  height: 220px;
+}
+
+@media (max-width: 640px) {
+  .ult-chart-body {
+    height: 170px;
+  }
+}
+
+/* Toolbar do roster (busca + categoria) */
+.ult-roster-toolbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ult-roster-toolbar .field-control {
+  flex: 1 1 180px;
+}
+
+@media (min-width: 641px) {
+  .ult-roster-toolbar .ult-roster-search {
+    max-width: 280px;
+  }
+
+  .ult-roster-toolbar .ult-roster-category {
+    max-width: 220px;
+  }
+}
+
+/* Modais — dialog centralizado; no celular, margem lateral garantida,
+   altura limitada pela viewport dinâmica (teclado aberto) e ações em
+   coluna com largura total. */
+.ult-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 16px;
+}
+
+.ult-modal-panel {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  padding: 24px;
+  width: 100%;
+  max-height: min(90vh, calc(100dvh - 32px));
+  overflow-y: auto;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .ult-modal-panel {
+    padding: 18px 16px;
+  }
+}
+
+.ult-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+@media (max-width: 520px) {
+  .ult-modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .ult-modal-actions > button {
+    width: 100%;
+  }
+}

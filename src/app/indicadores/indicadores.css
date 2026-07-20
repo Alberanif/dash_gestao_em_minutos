@@ -1,86 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
-
-.ind-dark {
-  /* Superfícies */
-  --bg: #0d0f12;
-  --surface: #15181d;
-  --surface-2: #1a1e24;
-
-  /* Bordas */
-  --border: #1e2229;
-  --border-vis: #23272f;
-  --border-strong: #2c313b;
-
-  /* Texto */
-  --text: #e8eaed;
-  --text-strong: #f2f4f7;
-  --text-2: #c2c8d0;
-  --text-label: #7c8492;
-  --text-muted: #8891a0;
-  --text-3: #6c7480;
-  --text-4: #4a515c;
-  --arrow: #3f4650;
-
-  /* Acentos */
-  --violet: #7c6ff0;
-  --orange: #e8853f;
-  --green: #4fae82;
-  --emerald: #4fae82;
-  --blue: #4c8dff;
-  --link: #5b93ff;
-  --amber: #cf9b45;
-  --red: #d76767;
-  --cyan: #7fb9d6;
-
-  /* Tipografia */
-  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', monospace;
-
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-sans);
-  font-feature-settings: 'tnum' 1;
-  -webkit-font-smoothing: antialiased;
-  min-height: 100vh;
-}
-
-.ind-dark * {
-  box-sizing: border-box;
-}
-
-.ind-dark a {
-  color: var(--link);
-  text-decoration: none;
-}
-
-.ind-dark a:hover {
-  color: #85b0ff;
-}
+/* Regras específicas do módulo Indicadores. Os tokens da identidade escura e
+   o layout compartilhado (z-layout/z-row/z-row-3col) vivem em
+   src/app/dash-theme.css (.dash-dark) — o root deste módulo usa as duas
+   classes: "dash-dark ind-dark". */
 
 /* Planilha — realce da linha sob o cursor. As células leem esta custom
    property no background inline (fallback = fundo de repouso da coluna). */
 .ind-dark tr.planilha-row:hover {
   --planilha-row-bg: var(--surface-2);
-}
-
-.ind-dark input[type='date'] {
-  color-scheme: dark;
-}
-
-.ind-dark .z-layout {
-  display: flex;
-  flex-direction: column;
-  gap: 34px;
-}
-
-.ind-dark .z-row {
-  width: 100%;
-}
-
-.ind-dark .z-row-3col {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
 }
 
 .ind-dark .hotmart-grid {
@@ -105,18 +31,6 @@
 
 @media (max-width: 900px) {
   .ind-dark .leads-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 760px) {
-  .ind-dark .z-row-3col {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 480px) {
-  .ind-dark .z-row-3col {
     grid-template-columns: 1fr;
   }
 }

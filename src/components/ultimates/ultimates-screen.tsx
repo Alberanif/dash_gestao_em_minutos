@@ -17,6 +17,8 @@ interface UltimatesScreenProps {
 // ciclos via GET /api/ultimates/cycles, decide o estado (vazio / seletor +
 // dashboard) e monta os modais de gestão de ciclo — só para role gestor,
 // espelhando o gate real dos endpoints (analista só lê).
+// Identidade visual: tema escuro compartilhado (src/app/dash-theme.css) +
+// layout do módulo (src/app/ultimates/ultimates.css), no padrão do Indicadores.
 export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
   const isGestor = role === "gestor";
 
@@ -72,31 +74,20 @@ export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
       : null;
 
   return (
-    <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 24px 64px" }}>
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 16,
-          padding: "22px 0 18px",
-          borderBottom: "1px solid var(--color-border)",
-          marginBottom: 24,
-        }}
-      >
+    <div className="dash-dark ult-container">
+      <header className="ult-header">
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <Link
             href="/"
-            style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--color-text-muted)", textDecoration: "none" }}
+            style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text-muted)", textDecoration: "none" }}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M19 12H5M12 5l-7 7 7 7" />
             </svg>
             Módulos
           </Link>
-          <div style={{ width: 1, height: 18, background: "var(--color-border)" }} />
-          <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--color-text)", margin: 0 }}>
+          <div style={{ width: 1, height: 18, background: "var(--border-strong)" }} />
+          <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-strong)", margin: 0 }}>
             Dash Ultimates
           </h1>
         </div>
@@ -120,14 +111,28 @@ export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
       )}
 
       {cycles === null && !loadError && (
-        <p style={{ fontSize: 13, color: "var(--color-text-muted)" }} data-testid="ultimates-loading">
+        <p
+          data-testid="ultimates-loading"
+          style={{ fontSize: 13, color: "var(--text-muted)", textAlign: "center", padding: "72px 24px", margin: 0 }}
+        >
           Carregando ciclos...
         </p>
       )}
 
       {loadError && (
-        <div data-testid="ultimates-error" style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}>
-          <p style={{ fontSize: 13, color: "var(--color-danger)", margin: 0 }}>
+        <div
+          data-testid="ultimates-error"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 12,
+            padding: "72px 24px",
+            textAlign: "center",
+          }}
+        >
+          <p style={{ fontSize: 13, color: "var(--red)", margin: 0 }}>
             Não foi possível carregar os ciclos.
           </p>
           <button onClick={() => setReloadToken((t) => t + 1)} className="btn-secondary">
@@ -149,10 +154,10 @@ export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
             textAlign: "center",
           }}
         >
-          <p style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text)", margin: 0 }}>
+          <p style={{ fontSize: 15, fontWeight: 600, color: "var(--text-strong)", margin: 0 }}>
             Nenhum ciclo criado ainda
           </p>
-          <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: 0, maxWidth: 380, lineHeight: 1.6 }}>
+          <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0, maxWidth: 380, lineHeight: 1.6 }}>
             {isGestor
               ? "Crie o primeiro ciclo de renovação para acompanhar recompra, receita e roster de compradores."
               : "Assim que um gestor criar o primeiro ciclo de renovação, ele aparecerá aqui."}
@@ -169,7 +174,7 @@ export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
         <>
           <div
             data-testid="ultimates-cycle-selector"
-            style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 20 }}
+            style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 24 }}
           >
             {cycles.map((cycle) => {
               const selected = cycle.id === selectedCycle.id;
@@ -187,11 +192,13 @@ export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
                     padding: "6px 12px",
                     fontSize: 12,
                     fontWeight: 600,
+                    fontFamily: "inherit",
                     borderRadius: 20,
-                    border: selected ? "1px solid var(--color-primary)" : "1px solid var(--color-border)",
-                    background: selected ? "var(--color-primary-light)" : "var(--color-surface)",
-                    color: selected ? "var(--color-primary-dark)" : "var(--color-text-muted)",
+                    border: selected ? "1px solid rgba(76, 141, 255, 0.55)" : "1px solid var(--border-vis)",
+                    background: selected ? "rgba(76, 141, 255, 0.14)" : "var(--surface)",
+                    color: selected ? "#a8c4ff" : "var(--text-muted)",
                     cursor: "pointer",
+                    transition: "background 150ms ease, color 150ms ease, border-color 150ms ease",
                   }}
                 >
                   {cycle.name}
@@ -202,8 +209,8 @@ export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
                         fontWeight: 600,
                         padding: "1px 6px",
                         borderRadius: 10,
-                        background: "#F1F5F9",
-                        color: "var(--color-text-muted)",
+                        background: "var(--surface-2)",
+                        color: "var(--text-3)",
                       }}
                     >
                       Encerrado
@@ -227,9 +234,9 @@ export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
                   width: 28,
                   height: 28,
                   borderRadius: "50%",
-                  border: "1px solid var(--color-border)",
-                  background: "var(--color-surface)",
-                  color: "var(--color-text-muted)",
+                  border: "1px solid var(--border-vis)",
+                  background: "var(--surface)",
+                  color: "var(--text-muted)",
                   cursor: "pointer",
                 }}
               >
