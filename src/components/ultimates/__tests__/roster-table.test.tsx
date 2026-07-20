@@ -101,3 +101,32 @@ describe("RosterTable — exportação CSV usa a visão filtrada atual", () => {
     URL.revokeObjectURL = originalRevoke;
   });
 });
+
+describe("RosterTable — paginação (10 por página)", () => {
+  const MANY: UltimatesRosterRow[] = Array.from({ length: 12 }, (_, i) =>
+    row({
+      buyer_id: `pb${i + 1}`,
+      name: `Participante ${String(i + 1).padStart(2, "0")}`,
+      email: `p${String(i + 1).padStart(2, "0")}@example.com`,
+    })
+  );
+
+  it("mostra só 10 linhas na primeira página e o rodapé de paginação", () => {
+    render(<RosterTable rows={MANY} role="gestor" />);
+    expect(screen.getByText("Participante 01")).toBeInTheDocument();
+    expect(screen.getByText("Participante 10")).toBeInTheDocument();
+    expect(screen.queryByText("Participante 11")).not.toBeInTheDocument();
+    expect(screen.getByTestId("data-table-page-info")).toHaveTextContent("Página 1 de 2");
+  });
+
+  it("buscar reseta para a página 1", () => {
+    render(<RosterTable rows={MANY} role="gestor" />);
+    fireEvent.click(screen.getByTestId("data-table-next"));
+    expect(screen.getByText("Participante 11")).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("ultimates-table-search"), {
+      target: { value: "participante" },
+    });
+    expect(screen.getByTestId("data-table-page-info")).toHaveTextContent("Página 1 de 2");
+    expect(screen.getByText("Participante 01")).toBeInTheDocument();
+  });
+});

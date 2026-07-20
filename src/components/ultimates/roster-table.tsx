@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { DataTable } from "@/components/ui/data-table";
 import type { UserRole } from "@/types/auth";
 import type { UltimatesCategory, UltimatesRosterRow } from "@/types/ultimates";
@@ -71,7 +71,13 @@ export function RosterTable({ rows, role, onLinkClick, onUnlinkClick }: RosterTa
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<CategoryFilter>("todas");
 
-  const filtered = filterRosterRows(rows, { search, category });
+  // Memoizado para o reset de página do DataTable (que observa a referência
+  // de `data`) disparar só quando linhas/busca/categoria mudam de verdade, e
+  // não em re-renders alheios (ex.: abrir um modal do dashboard).
+  const filtered = useMemo(
+    () => filterRosterRows(rows, { search, category }),
+    [rows, search, category]
+  );
   const isGestor = role === "gestor";
 
   function handleExportCsv() {
@@ -189,6 +195,7 @@ export function RosterTable({ rows, role, onLinkClick, onUnlinkClick }: RosterTa
         data={filtered as TableRow[]}
         columns={columns}
         onExportCsv={handleExportCsv}
+        pageSize={10}
       />
     </div>
   );
