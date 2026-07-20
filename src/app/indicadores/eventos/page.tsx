@@ -1,5 +1,6 @@
 "use client";
 
+import "../../dash-theme.css";
 import "../indicadores.css";
 
 import { useEffect, useRef, useState } from "react";
@@ -116,7 +117,7 @@ export default function EventosPage() {
   const counts = statusSummaryCounts(filters);
 
   return (
-    <div className="ind-dark" style={{ maxWidth: 1220, margin: "0 auto", padding: "0 28px 72px" }}>
+    <div className="dash-dark ind-dark" style={{ maxWidth: 1220, margin: "0 auto", padding: "0 28px 72px" }}>
       {modalOpen && accountId && (
         <FilterModal
           accountId={accountId}

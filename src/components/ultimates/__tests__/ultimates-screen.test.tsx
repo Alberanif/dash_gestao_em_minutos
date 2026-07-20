@@ -1,0 +1,117 @@
+/** @jest-environment jsdom */
+import React from "react";
+import { render, screen, within } from "@testing-library/react";
+import "@testing-library/jest-dom";
+import { UltimatesScreen } from "../ultimates-screen";
+import type { CycleWithProduct, HotmartProductOption } from "../types";
+
+const PRODUCTS: HotmartProductOption[] = [{ product_id: "p1", product_name: "Produto Um" }];
+
+function makeCycle(overrides: Partial<CycleWithProduct> = {}): CycleWithProduct {
+  return {
+    id: "c1",
+    name: "Ciclo 1",
+    account_id: "acc-1",
+    product_id: "p1",
+    product_name: "Produto Um",
+    goal_percent: 50,
+    status: "ativo",
+    refresh_started_at: null,
+    last_refresh_at: null,
+    created_by: "user-1",
+    created_at: "2026-07-19T00:00:00Z",
+    updated_at: "2026-07-19T00:00:00Z",
+    ...overrides,
+  };
+}
+
+function mockCyclesFetch(cycles: CycleWithProduct[]) {
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ cycles }),
+  }) as unknown as typeof global.fetch;
+}
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+describe("UltimatesScreen — estado vazio", () => {
+  it("gestor vê CTA para criar o primeiro ciclo", async () => {
+    mockCyclesFetch([]);
+    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
+
+    expect(await screen.findByTestId("ultimates-empty-state")).toBeInTheDocument();
+    expect(screen.getByTestId("ultimates-create-cta")).toBeInTheDocument();
+  });
+
+  it("analista vê mensagem informativa, sem CTA de criação", async () => {
+    mockCyclesFetch([]);
+    render(<UltimatesScreen role="analista" products={PRODUCTS} />);
+
+    expect(await screen.findByTestId("ultimates-empty-state")).toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-create-cta")).not.toBeInTheDocument();
+  });
+});
+
+describe("UltimatesScreen — gates de papel com ciclos existentes", () => {
+  it("gestor vê botão Novo ciclo e botão de editar o ciclo selecionado", async () => {
+    mockCyclesFetch([makeCycle()]);
+    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
+
+    expect(await screen.findByTestId("ultimates-new-cycle-btn")).toBeInTheDocument();
+    expect(screen.getByTestId("ultimates-edit-cycle-btn")).toBeInTheDocument();
+  });
+
+  it("analista não vê botão Novo ciclo nem botão de editar", async () => {
+    mockCyclesFetch([makeCycle()]);
+    render(<UltimatesScreen role="analista" products={PRODUCTS} />);
+
+    expect(await screen.findByTestId("ultimates-dashboard-slot")).toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-new-cycle-btn")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-edit-cycle-btn")).not.toBeInTheDocument();
+  });
+});
+
+describe("UltimatesScreen — seletor de ciclo", () => {
+  it("abre no ciclo ativo mais recente, mesmo quando não é o primeiro/mais recente da lista", async () => {
+    // Ordenado created_at desc, como o contrato de GET /api/ultimates/cycles: o
+    // primeiro (mais recente) está encerrado; o ativo mais recente vem depois.
+    const cycles = [
+      makeCycle({ id: "c3", name: "Ciclo Mais Recente (encerrado)", status: "encerrado", created_at: "2026-07-19T00:00:00Z" }),
+      makeCycle({ id: "c2", name: "Ciclo Ativo Recente", status: "ativo", created_at: "2026-07-18T00:00:00Z" }),
+      makeCycle({ id: "c1", name: "Ciclo Ativo Antigo", status: "ativo", created_at: "2026-07-01T00:00:00Z" }),
+    ];
+    mockCyclesFetch(cycles);
+    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
+
+    expect(await screen.findByTestId("ultimates-selected-cycle")).toHaveTextContent("Ciclo Ativo Recente");
+  });
+
+  it("cai no ciclo mais recente (mesmo encerrado) quando não há nenhum ativo", async () => {
+    const cycles = [
+      makeCycle({ id: "c2", name: "Encerrado Recente", status: "encerrado", created_at: "2026-07-19T00:00:00Z" }),
+      makeCycle({ id: "c1", name: "Encerrado Antigo", status: "encerrado", created_at: "2026-07-01T00:00:00Z" }),
+    ];
+    mockCyclesFetch(cycles);
+    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
+
+    expect(await screen.findByTestId("ultimates-selected-cycle")).toHaveTextContent("Encerrado Recente");
+  });
+
+  it("ciclo encerrado exibe badge 'Encerrado' no seletor; ciclo ativo convive com ele e ambos ficam disponíveis", async () => {
+    const cycles = [
+      makeCycle({ id: "c2", name: "Ciclo Encerrado", status: "encerrado", created_at: "2026-07-19T00:00:00Z" }),
+      makeCycle({ id: "c1", name: "Ciclo Ativo", status: "ativo", created_at: "2026-07-18T00:00:00Z" }),
+    ];
+    mockCyclesFetch(cycles);
+    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
+
+    await screen.findByTestId("ultimates-dashboard-slot");
+
+    const selector = screen.getByTestId("ultimates-cycle-selector");
+    const encerradoOption = within(selector).getByTestId("ultimates-cycle-option-c2");
+    expect(within(encerradoOption).getByText("Encerrado")).toBeInTheDocument();
+    expect(within(selector).getByTestId("ultimates-cycle-option-c1")).toBeInTheDocument();
+  });
+});

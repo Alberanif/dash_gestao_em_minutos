@@ -1,5 +1,6 @@
 "use client";
 
+import "../dash-theme.css";
 import "./indicadores.css";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
@@ -610,7 +611,7 @@ export default function IndicadoresPage() {
   const heroLoading = metaState.loading || hotmartState.loading;
 
   return (
-    <div className="ind-dark" style={{ maxWidth: 1220, margin: "0 auto", padding: "0 28px 64px" }}>
+    <div className="dash-dark ind-dark" style={{ maxWidth: 1220, margin: "0 auto", padding: "0 28px 64px" }}>
       {/* Header / control bar */}
       <header
         style={{

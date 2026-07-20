@@ -1,0 +1,142 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+/* Identidade visual escura compartilhada pelos dashboards (Indicadores e Dash
+   Ultimates). Fonte única dos tokens: um ajuste aqui vale para todos os
+   módulos escuros. O root de cada módulo recebe a classe .dash-dark (o
+   Indicadores mantém .ind-dark ao lado, para as regras específicas dele em
+   indicadores.css). */
+.dash-dark {
+  /* Superfícies */
+  --bg: #0d0f12;
+  --surface: #15181d;
+  --surface-2: #1a1e24;
+
+  /* Bordas */
+  --border: #1e2229;
+  --border-vis: #23272f;
+  --border-strong: #2c313b;
+
+  /* Texto */
+  --text: #e8eaed;
+  --text-strong: #f2f4f7;
+  --text-2: #c2c8d0;
+  --text-label: #7c8492;
+  --text-muted: #8891a0;
+  --text-3: #6c7480;
+  --text-4: #4a515c;
+  --arrow: #3f4650;
+
+  /* Acentos */
+  --violet: #7c6ff0;
+  --orange: #e8853f;
+  --green: #4fae82;
+  --emerald: #4fae82;
+  --blue: #4c8dff;
+  --link: #5b93ff;
+  --amber: #cf9b45;
+  --red: #d76767;
+  --cyan: #7fb9d6;
+
+  /* Tipografia */
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  /* Tokens legados de globals.css remapeados para o escuro — componentes e
+     classes globais (btn-primary/btn-secondary/field-control/surface-card)
+     que leem var(--color-*) ficam corretos dentro de .dash-dark sem tocar os
+     módulos claros. */
+  --color-primary: var(--blue);
+  --color-primary-dark: #6ba3ff;
+  --color-primary-light: rgba(76, 141, 255, 0.14);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-border: var(--border-vis);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-success: var(--green);
+  --color-danger: var(--red);
+  --color-warning: var(--amber);
+  --shadow-card: none;
+  --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.45);
+
+  /* DataTable (src/components/ui/data-table.tsx) — fallback claro fora daqui */
+  --table-header-bg: var(--surface-2);
+  --table-row-hover: var(--surface-2);
+
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-feature-settings: 'tnum' 1;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+.dash-dark * {
+  box-sizing: border-box;
+}
+
+.dash-dark a {
+  color: var(--link);
+  text-decoration: none;
+}
+
+.dash-dark a:hover {
+  color: #85b0ff;
+}
+
+.dash-dark input[type='date'] {
+  color-scheme: dark;
+}
+
+.dash-dark ::selection {
+  background: rgba(76, 141, 255, 0.35);
+}
+
+/* Overrides das classes globais de globals.css cujos estados usam cores
+   claras fixas (não resolvíveis via remapeamento de tokens). */
+.dash-dark .btn-secondary {
+  color: var(--text-2);
+}
+
+.dash-dark .btn-secondary:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text-strong);
+}
+
+.dash-dark .field-control:focus {
+  box-shadow: 0 0 0 3px rgba(76, 141, 255, 0.22);
+}
+
+.dash-dark .field-control:disabled {
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+/* Layout compartilhado das seções numeradas (padrão Z do Indicadores) */
+.dash-dark .z-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 34px;
+}
+
+.dash-dark .z-row {
+  width: 100%;
+}
+
+.dash-dark .z-row-3col {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 760px) {
+  .dash-dark .z-row-3col {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .dash-dark .z-row-3col {
+    grid-template-columns: 1fr;
+  }
+}
