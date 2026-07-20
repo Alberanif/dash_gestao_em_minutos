@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { UserRole } from "@/types/auth";
+import type { AccountRole, UserRole } from "@/types/auth";
 
 export async function validateApiAuth(): Promise<{
   error: NextResponse | null;
   userId: string | null;
-  role: UserRole;
+  role: AccountRole;
 }> {
   const supabase = await createSupabaseServerClient();
   const {
@@ -16,11 +16,22 @@ export async function validateApiAuth(): Promise<{
     return {
       error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
       userId: null,
-      role: "gestor",
+      role: "pendente",
     };
   }
 
-  const role = (user.app_metadata?.role as UserRole) ?? "gestor";
+  // Fallback seguro: role ausente ou desconhecida vale como `pendente` (bloqueio),
+  // nunca como `gestor`.
+  const role = (user.app_metadata?.role as AccountRole) ?? "pendente";
+
+  // Conta aguardando aprovação: autentica, mas nenhuma API de negócio é liberada.
+  if (role === "pendente") {
+    return {
+      error: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+      userId: user.id,
+      role,
+    };
+  }
 
   return { error: null, userId: user.id, role };
 }
@@ -51,15 +62,19 @@ export async function validateCronApiKey(request: NextRequest): Promise<{
   return { error: null };
 }
 
+/**
+ * Sem `error`, a role devolvida está garantidamente em `allowedRoles` — ou seja,
+ * é sempre uma `UserRole` de acesso, nunca `pendente`.
+ */
 export async function requireRole(allowedRoles: UserRole[]): Promise<{
   error: NextResponse | null;
   userId: string | null;
-  role: UserRole;
+  role: AccountRole;
 }> {
   const result = await validateApiAuth();
   if (result.error) return result;
 
-  if (!allowedRoles.includes(result.role)) {
+  if (!allowedRoles.includes(result.role as UserRole)) {
     return {
       error: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
       userId: null,

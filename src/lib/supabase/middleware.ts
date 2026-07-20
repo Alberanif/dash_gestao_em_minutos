@@ -1,6 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import type { UserRole } from "@/types/auth";
+import type { AccountRole } from "@/types/auth";
+
+/** Única página acessível a uma conta aguardando aprovação do gestor. */
+const PENDING_PATH = "/aguardando-aprovacao";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -39,6 +42,8 @@ export async function updateSession(request: NextRequest) {
   if (
     !user &&
     !pathname.startsWith("/login") &&
+    !pathname.startsWith("/cadastro") &&
+    !pathname.startsWith("/api/auth/signup") &&
     !pathname.startsWith("/api/cron") &&
     !pathname.startsWith("/api/auth/youtube/callback")
   ) {
@@ -48,7 +53,29 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user) {
-    const role = (user.app_metadata?.role as UserRole) ?? "gestor";
+    // Fallback seguro: role ausente ou desconhecida vale como `pendente` (bloqueio),
+    // nunca como `gestor`.
+    const role = (user.app_metadata?.role as AccountRole) ?? "pendente";
+
+    if (role === "pendente") {
+      // Nenhuma API de negócio é liberada; só o signout, para a pessoa poder sair.
+      if (pathname.startsWith("/api/")) {
+        if (!pathname.startsWith("/api/auth/signout")) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+      } else if (pathname !== PENDING_PATH) {
+        const url = request.nextUrl.clone();
+        url.pathname = PENDING_PATH;
+        return NextResponse.redirect(url);
+      }
+    }
+
+    // Conta já ativa não tem o que fazer na página de espera.
+    if (role !== "pendente" && pathname === PENDING_PATH) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/";
+      return NextResponse.redirect(url);
+    }
 
     if (role === "comum") {
       // Block Comum from dashboard and indicadores UI

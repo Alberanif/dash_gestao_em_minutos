@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import type { UserRole } from "@/types/auth";
+import type { AccountRole, UserRole } from "@/types/auth";
 
 export async function PATCH(
   request: NextRequest,
@@ -48,6 +48,6 @@ export async function PATCH(
   return NextResponse.json({
     id: data.user.id,
     email: data.user.email,
-    role: (data.user.app_metadata?.role as UserRole) ?? "gestor",
+    role: (data.user.app_metadata?.role as AccountRole) ?? "pendente",
   });
 }
