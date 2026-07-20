@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface Column<T> {
   key: keyof T;
@@ -12,6 +12,9 @@ interface DataTableProps<T> {
   data: T[];
   columns: Column<T>[];
   onExportCsv?: () => void;
+  // Paginação client-side opt-in: aplicada DEPOIS da ordenação, sobre o
+  // conjunto completo. Ausente ⇒ renderiza tudo (comportamento original).
+  pageSize?: number;
 }
 
 function SortIcon({ direction }: { direction?: "asc" | "desc" }) {
@@ -41,9 +44,17 @@ export function DataTable<T extends Record<string, unknown>>({
   data,
   columns,
   onExportCsv,
+  pageSize,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<keyof T | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [page, setPage] = useState(1);
+
+  // Novos dados (busca/filtro/refresh no pai) voltam à página 1. Ordenar não
+  // passa por aqui — sortKey/sortDir não mudam `data` — logo mantém a página.
+  useEffect(() => {
+    setPage(1);
+  }, [data]);
 
   function handleSort(key: keyof T) {
     if (sortKey === key) {
@@ -65,6 +76,12 @@ export function DataTable<T extends Record<string, unknown>>({
       ? String(aVal).localeCompare(String(bVal))
       : String(bVal).localeCompare(String(aVal));
   });
+
+  const totalPages = pageSize ? Math.max(1, Math.ceil(sorted.length / pageSize)) : 1;
+  const currentPage = Math.min(page, totalPages);
+  const visible = pageSize
+    ? sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+    : sorted;
 
   return (
     <div
@@ -134,12 +151,12 @@ export function DataTable<T extends Record<string, unknown>>({
                 </td>
               </tr>
             )}
-            {sorted.map((row, i) => (
+            {visible.map((row, i) => (
               <tr
                 key={i}
                 style={{
                   background: "var(--color-surface)",
-                  borderBottom: i < sorted.length - 1 ? "1px solid var(--color-border)" : undefined,
+                  borderBottom: i < visible.length - 1 ? "1px solid var(--color-border)" : undefined,
                 }}
                 onMouseEnter={(e) => {
                   (e.currentTarget as HTMLElement).style.background = "#F8FAFC";
@@ -164,6 +181,44 @@ export function DataTable<T extends Record<string, unknown>>({
           </tbody>
         </table>
       </div>
+      {pageSize && sorted.length > pageSize && (
+        <div
+          className="flex items-center justify-between px-4 py-3"
+          style={{ borderTop: "1px solid var(--color-border)" }}
+        >
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+            {sorted.length} registros
+          </span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="btn-secondary"
+              data-testid="data-table-prev"
+              disabled={currentPage === 1}
+              onClick={() => setPage(currentPage - 1)}
+              style={{ fontSize: 12, padding: "5px 10px" }}
+            >
+              Anterior
+            </button>
+            <span
+              data-testid="data-table-page-info"
+              style={{ fontSize: 12, color: "var(--color-text-muted)" }}
+            >
+              Página {currentPage} de {totalPages}
+            </span>
+            <button
+              type="button"
+              className="btn-secondary"
+              data-testid="data-table-next"
+              disabled={currentPage === totalPages}
+              onClick={() => setPage(currentPage + 1)}
+              style={{ fontSize: 12, padding: "5px 10px" }}
+            >
+              Próxima
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
