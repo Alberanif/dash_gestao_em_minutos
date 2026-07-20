@@ -75,6 +75,28 @@ describe("buildRosterCsv", () => {
     expect(lines[2]).toBe("B;b@example.com;;Renovado;—;—;;123");
   });
 
+  it("neutraliza fórmulas (CSV injection): campo começando com = + - @ ganha apóstrofo à frente", () => {
+    const csv = buildRosterCsv([
+      row({
+        name: '=HYPERLINK("http://evil.com";"clique")',
+        email: "a@example.com",
+        extra: { obs: "+55 11 99999-0000", nota: "-1", arroba: "@menção" },
+      }),
+    ]);
+    const lines = csv.slice(1).split("\r\n");
+    expect(lines[1]).toBe(
+      "\"'=HYPERLINK(\"\"http://evil.com\"\";\"\"clique\"\")\";a@example.com;;Renovado;—;—;'+55 11 99999-0000;'-1;'@menção"
+    );
+  });
+
+  it("neutraliza fórmula também com quebra de linha no campo (quoting preserva o apóstrofo)", () => {
+    const csv = buildRosterCsv([
+      row({ name: "=1+1\nlinha2", email: "a@example.com" }),
+    ]);
+    const lines = csv.slice(1).split("\r\n");
+    expect(lines[1]).toBe("\"'=1+1\nlinha2\";a@example.com;;Renovado;—;—");
+  });
+
   it("compõe com o filtro da tabela: exportar só 'nao_renovado' gera CSV apenas dessa categoria", () => {
     const rows = [
       row({ name: "Renovou", email: "r@example.com", category: "renovado" }),

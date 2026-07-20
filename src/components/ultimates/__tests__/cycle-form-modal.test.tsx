@@ -57,6 +57,30 @@ describe("CycleFormModal — busca de produto", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("falha de rede no salvar mostra erro em vez de falhar em silêncio", async () => {
+    const fetchMock = jest.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+    global.fetch = fetchMock as unknown as typeof global.fetch;
+    renderCreate();
+    fireEvent.change(screen.getByTestId("cycle-form-name"), { target: { value: "Ciclo Julho" } });
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+    expect(await screen.findByText("Falha de rede ao salvar o ciclo.")).toBeInTheDocument();
+    expect(screen.getByTestId("cycle-form-save")).not.toBeDisabled();
+  });
+
+  it("resposta 2xx sem cycle no corpo mostra erro genérico em vez de quebrar", async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.reject(new Error("empty body")),
+    });
+    global.fetch = fetchMock as unknown as typeof global.fetch;
+    renderCreate();
+    fireEvent.change(screen.getByTestId("cycle-form-name"), { target: { value: "Ciclo Julho" } });
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+    expect(await screen.findByText("Erro ao salvar ciclo.")).toBeInTheDocument();
+  });
+
   it("mostra o produto selecionado mesmo quando a busca o filtra da lista", () => {
     renderCreate();
     fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));

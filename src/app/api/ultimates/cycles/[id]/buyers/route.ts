@@ -187,6 +187,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<P
     });
   }
 
+  // Commit com zero linhas válidas apagaria a base inteira do ciclo (e os
+  // manual_links em cascata, sem volta). Upload vazio é sempre erro de
+  // parsing/operação — nunca intenção; rejeita antes de tocar o banco.
+  if (dedupedRows.length === 0) {
+    return NextResponse.json(
+      { error: "Nenhuma linha válida no upload — commit abortado para não apagar a base atual", invalidRows, duplicates },
+      { status: 400 }
+    );
+  }
+
   const { data: rpcData, error: rpcError } = await supabase.rpc("dash_gestao_ultimates_replace_buyers", {
     p_cycle_id: id,
     p_rows: dedupedRows.map(({ email, name, phone, extra }) => ({ email, name, phone, extra })),

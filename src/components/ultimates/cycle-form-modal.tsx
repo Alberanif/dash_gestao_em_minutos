@@ -102,12 +102,18 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel }: Cycle
         return;
       }
 
-      const savedRaw = data.cycle as CycleWithProduct;
+      const savedRaw = data?.cycle as CycleWithProduct | undefined;
+      if (!savedRaw) {
+        setError("Erro ao salvar ciclo.");
+        return;
+      }
       const productName =
         products.find((p) => p.product_id === savedRaw.product_id)?.product_name ??
         editTarget?.product_name ??
         null;
       onSave({ ...savedRaw, product_name: productName });
+    } catch {
+      setError("Falha de rede ao salvar o ciclo.");
     } finally {
       setSaving(false);
     }

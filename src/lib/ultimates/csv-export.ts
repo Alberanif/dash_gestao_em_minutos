@@ -16,7 +16,15 @@ function needsQuoting(value: string): boolean {
   return /[;,"\n\r]/.test(value);
 }
 
-function escapeCsvField(value: string): string {
+// Campos começando com = + - @ TAB ou CR seriam interpretados como fórmula
+// pelo Excel/LibreOffice (CSV injection) — dados de upload/Hotmart não são
+// confiáveis. Neutraliza com apóstrofo à frente (recomendação OWASP).
+function neutralizeFormula(value: string): string {
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+}
+
+function escapeCsvField(rawValue: string): string {
+  const value = neutralizeFormula(rawValue);
   if (!needsQuoting(value)) return value;
   return `"${value.replace(/"/g, '""')}"`;
 }

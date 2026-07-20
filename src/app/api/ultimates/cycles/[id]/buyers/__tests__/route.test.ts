@@ -268,6 +268,29 @@ describe("POST /api/ultimates/cycles/[id]/buyers — mode: commit", () => {
     });
   });
 
+  it("returns 400 and never calls the RPC when the commit has zero valid rows (would wipe the base)", async () => {
+    const { POST } = await import("../route");
+    const req = makeRequest(URL, {
+      mode: "commit",
+      rows: [{ email: "not-an-email" }, { email: "" }],
+    });
+    const res = await POST(req, makeParams(CYCLE_ID));
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(mockRpc).not.toHaveBeenCalled();
+    expect(body.invalidRows).toHaveLength(2);
+  });
+
+  it("returns 400 and never calls the RPC when the commit rows array is empty", async () => {
+    const { POST } = await import("../route");
+    const req = makeRequest(URL, { mode: "commit", rows: [] });
+    const res = await POST(req, makeParams(CYCLE_ID));
+
+    expect(res.status).toBe(400);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
   it("returns 500 when the RPC errors", async () => {
     mockRpc.mockResolvedValue({ data: null, error: { message: "db exploded" } });
 

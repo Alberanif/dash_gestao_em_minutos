@@ -49,11 +49,11 @@ create index idx_ultimates_buyers_cycle_id on dash_gestao_ultimates_buyers (cycl
 
 alter table dash_gestao_ultimates_buyers enable row level security;
 
-create policy "Authenticated users can read ultimates buyers"
-  on dash_gestao_ultimates_buyers
-  for select
-  to authenticated
-  using (true);
+-- Sem policy de select para authenticated: a tabela contém dados pessoais
+-- (email/telefone/extra) e toda leitura do app passa pelo service_role nas
+-- rotas /api/ultimates (com gate de papel). Uma policy `using (true)` deixaria
+-- qualquer usuário autenticado (inclusive comum) ler a base via PostgREST
+-- direto — mesmo risco que motivou o revoke de execute nas RPCs (migration 050).
 
 create table dash_gestao_ultimates_manual_links (
   id               uuid        not null default gen_random_uuid() primary key,
@@ -68,16 +68,14 @@ create index idx_ultimates_manual_links_cycle_id on dash_gestao_ultimates_manual
 
 alter table dash_gestao_ultimates_manual_links enable row level security;
 
-create policy "Authenticated users can read ultimates manual links"
-  on dash_gestao_ultimates_manual_links
-  for select
-  to authenticated
-  using (true);
+-- Sem policy de select para authenticated — mesma razão da tabela buyers.
 
 -- Sustenta o cruzamento por email entre buyers do ciclo e vendas Hotmart
 -- do mesmo produto (dash_gestao_hotmart_sales já existe, criada fora do
--- controle de migrations — ver seção 6 de conventions.md).
-create index idx_hotmart_sales_product_buyer_email on dash_gestao_hotmart_sales (product_id, lower(buyer_email));
+-- controle de migrations — ver seção 6 de conventions.md). A expressão
+-- precisa ser idêntica à usada no join das RPCs (migration 050):
+-- lower(btrim(buyer_email)) — o coletor grava o email cru da Hotmart.
+create index idx_hotmart_sales_product_buyer_email on dash_gestao_hotmart_sales (product_id, lower(btrim(buyer_email)));
 
 -- DOWN
 -- drop index if exists idx_hotmart_sales_product_buyer_email;
