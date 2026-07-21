@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
@@ -165,7 +166,7 @@ export function LoginForm() {
                 Acesso ao sistema
               </h2>
               <p className="text-[#94A3B8] text-sm mt-1">
-                Use as credenciais fornecidas pelo seu gestor
+                Entre com seu e-mail e senha
               </p>
             </div>
 
@@ -262,8 +263,14 @@ export function LoginForm() {
             </form>
           </div>
 
-          {/* Below card: support note */}
+          {/* Below card: signup entry point + support note */}
           <p className="text-center text-[#94A3B8] text-xs mt-5">
+            Não tem conta?{" "}
+            <Link href="/cadastro" className="font-medium" style={{ color: IGT_BLUE }}>
+              Solicitar acesso
+            </Link>
+          </p>
+          <p className="text-center text-[#94A3B8] text-xs mt-2">
             Problemas com acesso? Fale com o administrador do sistema.
           </p>
         </div>

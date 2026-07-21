@@ -85,6 +85,10 @@
   /* Linhas de lista sutis (contas/usuários em Ajustes) */
   --row-subtle-bg: var(--surface-2);
 
+  /* Fila de solicitações pendentes (user-management) — acento âmbar translúcido */
+  --row-pending-bg: rgba(207, 155, 69, 0.1);
+  --row-pending-border: rgba(207, 155, 69, 0.35);
+
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
