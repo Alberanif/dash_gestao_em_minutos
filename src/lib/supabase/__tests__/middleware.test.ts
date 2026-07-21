@@ -76,6 +76,21 @@ describe("conta pendente", () => {
 
     expect(response.headers.get("location")).toContain("/aguardando-aprovacao");
   });
+
+  it("trata role desconhecida como pendente — não pode escapar do bloqueio", async () => {
+    signedInAs({ role: "admin" });
+
+    const response = await visit("/dashboard/posicionamento");
+
+    expect(response.headers.get("location")).toContain("/aguardando-aprovacao");
+  });
+
+  it("role desconhecida também não alcança as APIs de negócio", async () => {
+    signedInAs({ role: "superuser" });
+
+    expect((await visit("/api/admin/users")).status).toBe(403);
+    expect((await visit("/api/base-de-dados/planilha")).status).toBe(403);
+  });
 });
 
 describe("visitante não autenticado", () => {

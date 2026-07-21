@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { AccountRole, UserRole } from "@/types/auth";
+import { resolveAccountRole, type AccountRole, type UserRole } from "@/types/auth";
 
 export async function validateApiAuth(): Promise<{
   error: NextResponse | null;
@@ -22,7 +22,7 @@ export async function validateApiAuth(): Promise<{
 
   // Fallback seguro: role ausente ou desconhecida vale como `pendente` (bloqueio),
   // nunca como `gestor`.
-  const role = (user.app_metadata?.role as AccountRole) ?? "pendente";
+  const role = resolveAccountRole(user.app_metadata?.role);
 
   // Conta aguardando aprovação: autentica, mas nenhuma API de negócio é liberada.
   if (role === "pendente") {

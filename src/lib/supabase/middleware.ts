@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import type { AccountRole } from "@/types/auth";
+import { resolveAccountRole } from "@/types/auth";
 
 /** Única página acessível a uma conta aguardando aprovação do gestor. */
 const PENDING_PATH = "/aguardando-aprovacao";
@@ -55,7 +55,7 @@ export async function updateSession(request: NextRequest) {
   if (user) {
     // Fallback seguro: role ausente ou desconhecida vale como `pendente` (bloqueio),
     // nunca como `gestor`.
-    const role = (user.app_metadata?.role as AccountRole) ?? "pendente";
+    const role = resolveAccountRole(user.app_metadata?.role);
 
     if (role === "pendente") {
       // Nenhuma API de negócio é liberada; só o signout, para a pessoa poder sair.

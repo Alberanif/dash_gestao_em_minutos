@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { UltimatesScreen } from "@/components/ultimates/ultimates-screen";
 import { sortProductsByName } from "@/lib/utils/hotmart-products";
-import type { UserRole } from "@/types/auth";
+import { resolveAccountRole } from "@/types/auth";
 
 // Guard server-side por papel (PRD issue #114, critério 1) — mesmo padrão de
 // src/app/dashboard/layout.tsx e src/app/indicadores/layout.tsx: role "comum"
@@ -17,7 +17,8 @@ export default async function UltimatesPage() {
 
   if (!user) redirect("/login");
 
-  const role = (user.app_metadata?.role as UserRole) ?? "gestor";
+  const role = resolveAccountRole(user.app_metadata?.role);
+  if (role === "pendente") redirect("/aguardando-aprovacao");
   if (role === "comum") redirect("/base-de-dados");
 
   // Lista de produtos para o dropdown do modal de criação de ciclo. Sem rota

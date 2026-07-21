@@ -58,11 +58,33 @@ novo login) para refletir a aprovação. A página de espera orienta a pessoa a
 - [ ] **"Enable sign ups" DESABILITADO** no projeto Supabase. Todo o fluxo
   passa pela nossa API com service role; signup público habilitado pularia o
   estado `pendente`.
-- [ ] **Nenhum usuário ativo sem `app_metadata.role`** antes do deploy. Com o
-  novo fallback `pendente`, um legado sem role cairia em "aguardando
-  aprovação" (recuperável pelo gestor trocando a role, mas melhor prevenir).
-  O `first-time-setup` já migrou contas sem role para `gestor`; confirmar em
-  staging.
+- [ ] **Nenhum usuário ativo sem `app_metadata.role`** antes do deploy.
+  **Bloqueante — não é "melhor prevenir", é pré-requisito.** Com o novo
+  fallback `pendente`, toda conta legada sem role cai em "aguardando
+  aprovação" no primeiro login, **inclusive os gestores**. E como
+  `/api/admin/users` exige role `gestor`, ninguém sobra para aprovar
+  ninguém: o lockout é total e **não tem recuperação pela UI**. Confirmado
+  em 2026-07-21 (conta legada do owner caiu na tela de espera em ambiente
+  local).
+
+  Rode o backfill **antes** de subir esta branch, e confirme que o dry-run
+  final acusa zero contas sem role:
+
+  ```
+  node scripts/backfill-user-roles.mjs            # dry-run: lista as contas legadas
+  node scripts/backfill-user-roles.mjs --apply    # grava a role explícita
+  node scripts/backfill-user-roles.mjs            # deve reportar "contas sem role: 0"
+  ```
+
+  O script roda fora do app, com service role, justamente para funcionar com
+  o acesso web já bloqueado. Ele é idempotente e só toca em contas sem role —
+  cadastros novos gravam `pendente` explicitamente e nunca são afetados.
+
+  > O antigo `POST /api/admin/first-time-setup` foi **removido**. Ele
+  > promovia a `gestor` toda conta sem role e era gated por
+  > `requireRole(["gestor"])` — inacessível exatamente no cenário em que
+  > seria necessário, e um caminho de escalonamento de privilégio sob o novo
+  > fallback. O backfill acima o substitui.
 
 ## Riscos aceitos (registrar, não resolver — PRD §8)
 

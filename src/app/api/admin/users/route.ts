@@ -1,24 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, validateApiAuth } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import type { AccountRole, UserRole } from "@/types/auth";
+import { listAllUsers } from "@/lib/supabase/list-all-users";
+import { resolveAccountRole, type UserRole } from "@/types/auth";
 
 export async function GET() {
   const { error, userId } = await requireRole(["gestor"]);
   if (error) return error;
 
   const supabase = createSupabaseServiceClient();
-  const { data, error: adminError } = await supabase.auth.admin.listUsers();
+  // Precisa da lista inteira: uma solicitação pendente fora da primeira página
+  // sumiria da fila de aprovação e nunca seria aprovada.
+  const { users: allUsers, error: adminError } = await listAllUsers(supabase);
 
   if (adminError) {
-    return NextResponse.json({ error: adminError.message }, { status: 500 });
+    return NextResponse.json({ error: adminError }, { status: 500 });
   }
 
-  const users = data.users.map((u) => ({
+  const users = allUsers.map((u) => ({
     id: u.id,
     email: u.email,
     name: (u.user_metadata?.name as string | undefined) ?? null,
-    role: (u.app_metadata?.role as AccountRole) ?? "pendente",
+    role: resolveAccountRole(u.app_metadata?.role),
     created_at: u.created_at,
     last_sign_in_at: u.last_sign_in_at,
   }));

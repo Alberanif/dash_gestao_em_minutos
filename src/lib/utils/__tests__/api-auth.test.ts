@@ -37,6 +37,16 @@ describe("validateApiAuth", () => {
     expect(result.error?.status).toBe(403);
   });
 
+  it("trata role desconhecida como pendente e bloqueia com 403", async () => {
+    signedInAs({ role: "admin" });
+
+    const { validateApiAuth } = await import("../api-auth");
+    const result = await validateApiAuth();
+
+    expect(result.role).toBe("pendente");
+    expect(result.error?.status).toBe(403);
+  });
+
   it("mantém intacto o acesso de uma conta com role válida", async () => {
     signedInAs({ role: "analista" });
 

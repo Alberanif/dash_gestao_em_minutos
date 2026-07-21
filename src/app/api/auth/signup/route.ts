@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import { listAllUsers } from "@/lib/supabase/list-all-users";
 
 /** Teto duro de solicitações aguardando decisão do gestor. */
 const MAX_PENDING = 20;
@@ -20,9 +21,24 @@ function clientIp(request: NextRequest): string {
   return request.headers.get("x-real-ip") ?? "desconhecido";
 }
 
+/**
+ * Descarta IPs cuja janela já expirou. Sem isso o mapa só cresce: um IP que
+ * tentou uma vez e nunca voltou fica registrado para sempre, e a rota é
+ * pública — o conjunto de IPs que a alcançam não é limitado.
+ */
+function evictExpired(now: number): void {
+  for (const [ip, attempts] of attemptsByIp) {
+    if (attempts.every((at) => now - at >= RATE_LIMIT_WINDOW_MS)) {
+      attemptsByIp.delete(ip);
+    }
+  }
+}
+
 /** Registra a tentativa e diz se o IP estourou a janela. */
 function isRateLimited(ip: string): boolean {
   const now = Date.now();
+  evictExpired(now);
+
   const recent = (attemptsByIp.get(ip) ?? []).filter(
     (at) => now - at < RATE_LIMIT_WINDOW_MS
   );
@@ -92,12 +108,14 @@ export async function POST(request: NextRequest) {
 
   const supabase = createSupabaseServiceClient();
 
-  const { data: listed, error: listError } = await supabase.auth.admin.listUsers();
+  // O teto só protege se contar a fila inteira: contando uma página só, o
+  // limite deixaria de valer assim que a base passasse do tamanho da página.
+  const { users: allUsers, error: listError } = await listAllUsers(supabase);
   if (listError) {
-    return NextResponse.json({ error: listError.message }, { status: 500 });
+    return NextResponse.json({ error: listError }, { status: 500 });
   }
 
-  const pendingCount = listed.users.filter(
+  const pendingCount = allUsers.filter(
     (u) => u.app_metadata?.role === "pendente"
   ).length;
 
