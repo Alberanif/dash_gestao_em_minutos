@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { UserRole } from "@/types/auth";
+import { resolveAccountRole } from "@/types/auth";
 
 export default async function AjustesLayout({
   children,
@@ -12,7 +12,8 @@ export default async function AjustesLayout({
 
   if (!user) redirect("/login");
 
-  const role = (user.app_metadata?.role as UserRole) ?? "gestor";
+  const role = resolveAccountRole(user.app_metadata?.role);
+  if (role === "pendente") redirect("/aguardando-aprovacao");
   if (role === "comum") redirect("/");
 
   return (

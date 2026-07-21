@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { SelectionCards } from "@/components/layout/selection-cards";
-import type { UserRole } from "@/types/auth";
+import { resolveAccountRole } from "@/types/auth";
 
 export default async function SelectionPage() {
   const supabase = await createSupabaseServerClient();
@@ -13,7 +13,8 @@ export default async function SelectionPage() {
     redirect("/login");
   }
 
-  const role = (user.app_metadata?.role as UserRole) ?? "gestor";
+  const role = resolveAccountRole(user.app_metadata?.role);
+  if (role === "pendente") redirect("/aguardando-aprovacao");
 
   return (
     <main style={{ minHeight: "100vh", background: "#07101f" }}>

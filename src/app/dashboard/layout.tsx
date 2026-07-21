@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { DashboardSidebar } from "@/components/layout/dashboard-sidebar";
-import type { UserRole } from "@/types/auth";
+import { resolveAccountRole } from "@/types/auth";
 import "./gestao-vista.css";
 
 export const metadata: Metadata = {
@@ -23,7 +23,8 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  const role = (user.app_metadata?.role as UserRole) ?? "gestor";
+  const role = resolveAccountRole(user.app_metadata?.role);
+  if (role === "pendente") redirect("/aguardando-aprovacao");
   if (role === "comum") redirect("/base-de-dados");
 
   return (
