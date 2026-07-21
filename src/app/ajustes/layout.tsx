@@ -1,3 +1,4 @@
+import "../dash-theme.css";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { resolveAccountRole } from "@/types/auth";
@@ -18,12 +19,12 @@ export default async function AjustesLayout({
 
   return (
     <main
+      className="dash-dark"
       style={{
         display: "flex",
         alignItems: "flex-start",
         justifyContent: "center",
         minHeight: "100vh",
-        backgroundColor: "var(--color-background)",
         padding: "20px",
       }}
     >

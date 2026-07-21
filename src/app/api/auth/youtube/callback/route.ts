@@ -5,7 +5,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { exchangeCodeForTokens } from "@/lib/youtube/auth";
 import type { YouTubeCredentials } from "@/types/accounts";
 
-const SETTINGS_URL = "/dashboard/settings";
+const SETTINGS_URL = "/ajustes/configuracoes";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;

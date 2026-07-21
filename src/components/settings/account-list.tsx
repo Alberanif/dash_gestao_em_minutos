@@ -96,7 +96,7 @@ export function AccountList({ initialAccounts }: AccountListProps) {
                 <div
                   key={account.id}
                   className="flex items-center gap-3 rounded-[var(--radius-card)] px-4 py-4"
-                  style={{ background: "#F8FAFC", border: "1px solid var(--color-border)" }}
+                  style={{ background: "var(--row-subtle-bg, #F8FAFC)", border: "1px solid var(--color-border)" }}
                 >
                   <StatusBadge tone="analysis" label={PLATFORM_LABELS[platform]} />
                   <div className="flex-1">

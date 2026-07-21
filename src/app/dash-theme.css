@@ -63,6 +63,32 @@
   --table-header-bg: var(--surface-2);
   --table-row-hover: var(--surface-2);
 
+  /* StatusBadge (src/components/ui/status-badge.tsx) e badges de papel —
+     fundo translúcido do acento + texto clareado para contraste no escuro.
+     Fora de .dash-dark os componentes usam os pastéis claros de fallback. */
+  --badge-green-bg: rgba(79, 174, 130, 0.15);
+  --badge-green-fg: #67c295;
+  --badge-amber-bg: rgba(207, 155, 69, 0.15);
+  --badge-amber-fg: #d9ad5e;
+  --badge-red-bg: rgba(215, 103, 103, 0.15);
+  --badge-red-fg: #e08585;
+  --badge-blue-bg: rgba(76, 141, 255, 0.15);
+  --badge-blue-fg: #7aa9ff;
+  --badge-violet-bg: rgba(124, 111, 240, 0.16);
+  --badge-violet-fg: #9c92f5;
+  --badge-gray-bg: rgba(136, 145, 160, 0.14);
+  --badge-gray-fg: #a5adba;
+
+  /* Skeleton (src/components/ui/skeleton.tsx) — fallback claro fora daqui */
+  --skeleton-bone: #232830;
+
+  /* Linhas de lista sutis (contas/usuários em Ajustes) */
+  --row-subtle-bg: var(--surface-2);
+
+  /* Fila de solicitações pendentes (user-management) — acento âmbar translúcido */
+  --row-pending-bg: rgba(207, 155, 69, 0.1);
+  --row-pending-border: rgba(207, 155, 69, 0.35);
+
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);

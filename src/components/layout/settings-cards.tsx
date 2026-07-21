@@ -15,7 +15,7 @@ export function SettingsCards() {
           <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
         </svg>
       ),
-      accent: "var(--color-primary)",
+      accent: "var(--blue, var(--color-primary))",
       accentBg: "var(--color-primary-light)",
     },
     {
@@ -29,8 +29,8 @@ export function SettingsCards() {
           <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3" />
         </svg>
       ),
-      accent: "#059669",
-      accentBg: "#ecfdf5",
+      accent: "var(--green, #059669)",
+      accentBg: "var(--badge-green-bg, #ecfdf5)",
     },
   ];
 

@@ -141,9 +141,9 @@ export function UserManagement() {
   const activeUsers = users.filter((u) => u.role !== "pendente");
 
   const roleColors: Record<UserRole, { bg: string; text: string }> = {
-    gestor: { bg: "#fef08a", text: "#a16207" },
-    analista: { bg: "#e0e7ff", text: "#4f46e5" },
-    comum: { bg: "#dbeafe", text: "#0369a1" },
+    gestor: { bg: "var(--badge-amber-bg, #fef08a)", text: "var(--badge-amber-fg, #a16207)" },
+    analista: { bg: "var(--badge-violet-bg, #e0e7ff)", text: "var(--badge-violet-fg, #4f46e5)" },
+    comum: { bg: "var(--badge-blue-bg, #dbeafe)", text: "var(--badge-blue-fg, #0369a1)" },
   };
 
   const roleLabels: Record<UserRole, string> = {
@@ -180,7 +180,10 @@ export function UserManagement() {
               <li
                 key={user.id}
                 className="flex items-center gap-3 rounded-[var(--radius-card)] px-4 py-4"
-                style={{ background: "#FFFBEB", border: "1px solid #FDE68A" }}
+                style={{
+                  background: "var(--row-pending-bg, #FFFBEB)",
+                  border: "1px solid var(--row-pending-border, #FDE68A)",
+                }}
               >
                 <div className="flex-1">
                   {user.name && (
@@ -241,7 +244,7 @@ export function UserManagement() {
             key={user.id}
             role="listitem"
             className="flex items-center gap-3 rounded-[var(--radius-card)] px-4 py-4"
-            style={{ background: "#F8FAFC", border: "1px solid var(--color-border)" }}
+            style={{ background: "var(--row-subtle-bg, #F8FAFC)", border: "1px solid var(--color-border)" }}
           >
             <div className="flex-1">
               {user.name && (
@@ -390,7 +393,7 @@ export function UserManagement() {
                   <option value="gestor">Gestor</option>
                 </select>
               </div>
-              {error && <p className="text-sm text-red-600">{error}</p>}
+              {error && <p className="text-sm" style={{ color: "var(--color-danger)" }}>{error}</p>}
               <div className="flex gap-3 pt-2">
                 <button
                   type="submit"
@@ -447,7 +450,11 @@ export function UserManagement() {
                   <option value="gestor">Gestor</option>
                 </select>
               </div>
-              {error && <p className="text-sm text-red-600">{error}</p>}
+              {error && (
+                <p className="text-sm" style={{ color: "var(--color-danger)" }}>
+                  {error}
+                </p>
+              )}
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => handleApprove(approving, approveRole)}
@@ -494,7 +501,7 @@ export function UserManagement() {
                 <option value="analista">Analista</option>
                 <option value="gestor">Gestor</option>
               </select>
-              {error && <p className="text-sm text-red-600">{error}</p>}
+              {error && <p className="text-sm" style={{ color: "var(--color-danger)" }}>{error}</p>}
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => handleChangeRole(showChangeRole, newRole)}
