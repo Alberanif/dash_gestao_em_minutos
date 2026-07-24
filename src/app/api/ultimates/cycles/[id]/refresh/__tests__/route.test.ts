@@ -20,6 +20,9 @@ let upsertError: { message: string } | null;
 
 // Captura os payloads passados para cycles.update (lock e finally).
 let cycleUpdatePayloads: Array<Record<string, unknown>>;
+// Captura o 2º argumento (options) de cada cycles.update — para afirmar que o
+// acquire pede { count: "exact" } em vez de depender de .select().
+let cycleUpdateOptions: Array<unknown>;
 // Captura o filtro do release condicional no finally: update().eq("id").eq(<aqui>).
 let releaseFilter: { col: unknown; val: unknown } | null;
 // Ordem em que os upserts de offers/sales aconteceram (verifica o pré-upsert de FK).
@@ -68,6 +71,7 @@ beforeEach(() => {
   accountRow = { id: "acc-1", credentials: { client_id: "cid", client_secret: "csecret" } };
   upsertError = null;
   cycleUpdatePayloads = [];
+  cycleUpdateOptions = [];
   releaseFilter = null;
   upsertOrder = [];
 
@@ -81,13 +85,14 @@ beforeEach(() => {
             single: () => Promise.resolve({ data: cycleRow, error: cycleSelectError }),
           }),
         }),
-        update: (payload: Record<string, unknown>) => {
+        update: (payload: Record<string, unknown>, options?: unknown) => {
           cycleUpdatePayloads.push(payload);
+          cycleUpdateOptions.push(options);
           const afterFirstEq = {
-            // Aquisição de lock: update().eq("id").or().select()
-            or: () => ({
-              select: () => Promise.resolve({ data: lockData, error: lockError }),
-            }),
+            // Aquisição de lock: update(payload, { count }).eq("id").or() — aguardado
+            // direto, retorna { count }. NÃO usa .select() (o RETURNING reavaliaria o
+            // filtro sobre a linha já atualizada e voltaria []). count = linhas afetadas.
+            or: () => Promise.resolve({ count: lockData.length, error: lockError }),
             // finally: update().eq("id").eq("refresh_started_at", val) aguardado direto
             eq: (col: unknown, val: unknown) => {
               releaseFilter = { col, val };
@@ -203,6 +208,19 @@ describe("POST /api/ultimates/cycles/[id]/refresh", () => {
     const body = await res.json();
     expect(body.error).toBe("refresh em andamento");
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("acquire usa { count: 'exact' } e NÃO .select() (RETURNING reavaliaria o filtro e voltaria vazio → 409 + lock órfão)", async () => {
+    cycleRow = activeCycle();
+    lockData = [activeCycle()]; // vencedor (count = 1)
+    mockTokenAndSales([saleItem()]);
+
+    await callRoute();
+
+    // O 1º update (aquisição) precisa pedir contagem exata das linhas AFETADAS —
+    // não pode depender das linhas devolvidas por .select(), que o PostgREST filtra
+    // pelo valor JÁ atualizado (não-nulo) e devolve []. Regressão do 409 permanente.
+    expect(cycleUpdateOptions[0]).toEqual({ count: "exact" });
   });
 
   it("winner fetches product-scoped sales, upserts, returns 200 and clears lock", async () => {

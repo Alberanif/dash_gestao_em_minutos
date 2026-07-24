@@ -100,18 +100,25 @@ export async function POST(
   // Só o primeiro a ver refresh_started_at nulo/expirado vence.
   const lockedAtIso = now.toISOString();
   const expiryIso = new Date(now.getTime() - LOCK_TTL_MS).toISOString();
-  const { data: locked, error: lockErr } = await supabase
+  // CUIDADO: usamos { count } — NÃO .select() — para saber se vencemos. O UPDATE
+  // seta refresh_started_at para um valor que deixa de satisfazer o filtro .or()
+  // (não é mais nulo nem < expiry). Com .select() (RETURNING return=representation),
+  // o PostgREST reavalia o filtro sobre a linha JÁ ATUALIZADA e a exclui da
+  // representação: o UPDATE grava o lock, mas .select() volta [] — wonLock ficava
+  // sempre false, respondia 409 e o lock nascia órfão (o refresh NUNCA funcionou por
+  // isso). count reflete linhas AFETADAS (estado pré-update) e é imune a essa
+  // reavaliação. NÃO troque de volta para .select().
+  const { count, error: lockErr } = await supabase
     .from("dash_gestao_ultimates_cycles")
-    .update({ refresh_started_at: lockedAtIso })
+    .update({ refresh_started_at: lockedAtIso }, { count: "exact" })
     .eq("id", id)
-    .or(`refresh_started_at.is.null,refresh_started_at.lt.${expiryIso}`)
-    .select();
+    .or(`refresh_started_at.is.null,refresh_started_at.lt.${expiryIso}`);
 
   if (lockErr) {
     return NextResponse.json({ error: lockErr.message }, { status: 500 });
   }
 
-  const wonLock = Array.isArray(locked) && locked.length > 0;
+  const wonLock = (count ?? 0) > 0;
   if (!wonLock) {
     return NextResponse.json({ error: "refresh em andamento" }, { status: 409 });
   }
