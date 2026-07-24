@@ -111,7 +111,8 @@ export async function upsertPlaceholderOffers(
     offer_code: string | null;
     offer_name: string | null;
   }>,
-  updatedAt: string
+  updatedAt: string,
+  signal?: AbortSignal
 ): Promise<void> {
   const offerMap = new Map<
     string,
@@ -141,9 +142,12 @@ export async function upsertPlaceholderOffers(
     updated_at: updatedAt,
   }));
 
-  const { error: offersErr } = await supabase
+  const offersQuery = supabase
     .from("dash_gestao_hotmart_offers")
     .upsert(placeholderOffers, { onConflict: "offer_code", ignoreDuplicates: true });
+  const { error: offersErr } = await (signal
+    ? offersQuery.abortSignal(signal)
+    : offersQuery);
 
   if (offersErr) throw new Error(`Hotmart offers pre-upsert error: ${offersErr.message}`);
 }

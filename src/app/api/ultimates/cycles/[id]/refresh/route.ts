@@ -37,9 +37,11 @@ import type { HotmartCredentials } from "@/types/accounts";
 // não este limite.
 export const maxDuration = 60;
 
-// Prazo total gasto falando com a Hotmart (token + páginas de vendas). Fica bem
-// abaixo do LOCK_TTL para que um refresh nunca ultrapasse a janela do lock.
-const HOTMART_BUDGET_MS = 45 * 1000;
+// Prazo total de TODO o I/O externo da seção crítica — Hotmart (token + páginas)
+// E as escritas no banco (upsert de offers/sales). Fica abaixo do LOCK_TTL para
+// que um refresh legítimo termine e libere o lock antes que a janela expire, e
+// nenhuma chamada pendurada (Hotmart OU banco lento) possa travar o handler.
+const REFRESH_BUDGET_MS = 45 * 1000;
 // Janela mínima entre dois refreshes bem-sucedidos do mesmo ciclo.
 const THROTTLE_MS = 60 * 1000;
 // Lock mais velho que isto é considerado órfão e pode ser roubado. Precisa ser
@@ -116,19 +118,21 @@ export async function POST(
 
   // 5. Vencedor: busca escopada + upsert. finally SEMPRE libera o lock.
   try {
-    // Prazo para toda a conversa com a Hotmart: aborta se estourar o orçamento
-    // OU se o cliente desconectar. Sem isto, um fetch pendurado trava o handler
-    // antes do finally e vaza o lock (causa raiz do 409 "refresh em andamento").
-    // Dentro do try: se AbortSignal.any/timeout lançar, o finally ainda libera.
-    const hotmartSignal = AbortSignal.any([
+    // Prazo de todo o I/O externo (Hotmart + escritas no banco): aborta se
+    // estourar o orçamento OU se o cliente desconectar. Sem isto, uma chamada
+    // pendurada trava o handler antes do finally e vaza o lock (causa raiz do
+    // 409 "refresh em andamento"). Dentro do try: se AbortSignal.any/timeout
+    // lançar, o finally ainda libera o lock.
+    const deadline = AbortSignal.any([
       request.signal,
-      AbortSignal.timeout(HOTMART_BUDGET_MS),
+      AbortSignal.timeout(REFRESH_BUDGET_MS),
     ]);
 
     const { data: account, error: accountErr } = await supabase
       .from("dash_gestao_accounts")
       .select("id, credentials")
       .eq("id", cycle.account_id)
+      .abortSignal(deadline)
       .single();
 
     if (accountErr || !account) {
@@ -136,7 +140,7 @@ export async function POST(
     }
 
     const { client_id, client_secret } = account.credentials as HotmartCredentials;
-    const accessToken = await fetchHotmartToken(client_id, client_secret, hotmartSignal);
+    const accessToken = await fetchHotmartToken(client_id, client_secret, deadline);
 
     // Período do ciclo: da criação até agora. Escopo por product_id (parâmetro
     // nativo da API sales/history) — busca só as vendas do produto do ciclo.
@@ -156,7 +160,7 @@ export async function POST(
 
       const res = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${accessToken}` },
-        signal: hotmartSignal,
+        signal: deadline,
       });
 
       if (!res.ok) {
@@ -179,11 +183,12 @@ export async function POST(
       // upsert (FK offer_code -> dash_gestao_hotmart_offers) — mesmo pré-upsert
       // usado por collectHotmart. Necessário para ofertas novas ainda não
       // sincronizadas por syncHotmartProducts.
-      await upsertPlaceholderOffers(supabase, rows, collectedAt);
+      await upsertPlaceholderOffers(supabase, rows, collectedAt, deadline);
 
       const { error: upsertErr } = await supabase
         .from("dash_gestao_hotmart_sales")
-        .upsert(rows, { onConflict: "transaction_code" });
+        .upsert(rows, { onConflict: "transaction_code" })
+        .abortSignal(deadline);
 
       if (upsertErr) throw new Error(`Hotmart upsert error: ${upsertErr.message}`);
       upserted = rows.length;
@@ -192,21 +197,22 @@ export async function POST(
     const lastRefreshAt = new Date().toISOString();
     return NextResponse.json({ upserted, lastRefreshAt });
   } catch (err) {
-    // AbortError = estouramos o orçamento da Hotmart (ou o cliente desconectou):
-    // mensagem clara em vez do erro cru de fetch abortado.
+    // Timeout/Abort = estouramos o orçamento (Hotmart ou banco lentos) ou o
+    // cliente desconectou: mensagem clara em vez do erro cru de I/O abortado.
     const message =
       err instanceof Error
         ? err.name === "TimeoutError" || err.name === "AbortError"
-          ? "A Hotmart não respondeu a tempo. Tente novamente."
+          ? "A atualização demorou demais e foi interrompida. Tente novamente."
           : err.message
         : "Erro desconhecido";
     return NextResponse.json({ error: message }, { status: 502 });
   } finally {
-    // Libera o lock e grava last_refresh_at SEMPRE — inclusive em erro
-    // (sem lock preso; o throttle passa a valer a partir desta tentativa).
-    // Release CONDICIONAL (refresh_started_at = lockedAtIso): se o TTL já tiver
-    // expirado e outra invocação roubado o lock, o eq() não casa e não apagamos
-    // o lock alheio — correção independente de qualquer premissa de timing.
+    // Libera o lock e grava last_refresh_at — inclusive em erro (sem lock preso;
+    // o throttle passa a valer a partir desta tentativa). Release CONDICIONAL
+    // (refresh_started_at = lockedAtIso): se o TTL já tiver expirado e outra
+    // invocação roubado o lock, o eq() não casa — o release é best-effort e não
+    // apaga o lock alheio. Nesse caso raro, last_refresh_at desta tentativa não é
+    // gravado (o roubador grava o dele); correção independente de premissa de timing.
     const { error: releaseErr } = await supabase
       .from("dash_gestao_ultimates_cycles")
       .update({ refresh_started_at: null, last_refresh_at: new Date().toISOString() })

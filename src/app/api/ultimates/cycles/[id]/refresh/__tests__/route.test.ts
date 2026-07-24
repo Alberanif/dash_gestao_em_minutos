@@ -20,16 +20,28 @@ let upsertError: { message: string } | null;
 
 // Captura os payloads passados para cycles.update (lock e finally).
 let cycleUpdatePayloads: Array<Record<string, unknown>>;
+// Captura o filtro do release condicional no finally: update().eq("id").eq(<aqui>).
+let releaseFilter: { col: unknown; val: unknown } | null;
 // Ordem em que os upserts de offers/sales aconteceram (verifica o pré-upsert de FK).
 let upsertOrder: string[];
 
+// Builder thenable que tolera .abortSignal() encadeado antes do await — espelha
+// o PostgrestFilterBuilder real, onde .abortSignal(signal) devolve o próprio
+// builder aguardável.
+function thenableResult(result: { error: { message: string } | null; args: unknown[] }) {
+  const builder = {
+    abortSignal: () => builder,
+    then: (resolve: (v: typeof result) => void) => resolve(result),
+  };
+  return builder;
+}
 const offersUpsert = jest.fn((...args: unknown[]) => {
   upsertOrder.push("offers");
-  return Promise.resolve({ error: null, args });
+  return thenableResult({ error: null, args });
 });
 const salesUpsert = jest.fn((...args: unknown[]) => {
   upsertOrder.push("sales");
-  return Promise.resolve({ error: upsertError, args });
+  return thenableResult({ error: upsertError, args });
 });
 
 function makeRequest(): NextRequest {
@@ -56,6 +68,7 @@ beforeEach(() => {
   accountRow = { id: "acc-1", credentials: { client_id: "cid", client_secret: "csecret" } };
   upsertError = null;
   cycleUpdatePayloads = [];
+  releaseFilter = null;
   upsertOrder = [];
 
   (global.fetch as jest.Mock) = jest.fn();
@@ -75,11 +88,14 @@ beforeEach(() => {
             or: () => ({
               select: () => Promise.resolve({ data: lockData, error: lockError }),
             }),
-            // finally: update().eq("id").eq("refresh_started_at") aguardado direto
-            eq: () => ({
-              then: (resolve: (v: { error: { message: string } | null }) => void) =>
-                resolve({ error: releaseError }),
-            }),
+            // finally: update().eq("id").eq("refresh_started_at", val) aguardado direto
+            eq: (col: unknown, val: unknown) => {
+              releaseFilter = { col, val };
+              return {
+                then: (resolve: (v: { error: { message: string } | null }) => void) =>
+                  resolve({ error: releaseError }),
+              };
+            },
           };
           return { eq: () => afterFirstEq };
         },
@@ -88,9 +104,14 @@ beforeEach(() => {
     if (table === "dash_gestao_accounts") {
       return {
         select: () => ({
-          eq: () => ({
-            single: () => Promise.resolve({ data: accountRow, error: null }),
-          }),
+          // .eq("id").abortSignal(deadline).single()
+          eq: () => {
+            const afterEq = {
+              single: () => Promise.resolve({ data: accountRow, error: null }),
+              abortSignal: () => afterEq,
+            };
+            return afterEq;
+          },
         }),
       };
     }
@@ -286,7 +307,62 @@ describe("POST /api/ultimates/cycles/[id]/refresh", () => {
     const res = await callRoute();
     expect(res.status).toBe(502);
     const body = await res.json();
-    expect(body.error).toContain("não respondeu");
+    expect(body.error).toContain("demorou demais");
+
+    const clearing = cycleUpdatePayloads.find((p) => p.refresh_started_at === null);
+    expect(clearing).toBeDefined();
+  });
+
+  it("release do lock no finally é condicional ao timestamp adquirido (não apaga lock alheio)", async () => {
+    cycleRow = activeCycle();
+    lockData = [activeCycle()];
+    mockTokenAndSales([saleItem()]);
+
+    await callRoute();
+
+    // O UPDATE de aquisição gravou refresh_started_at = <lockedAtIso>; o release
+    // no finally precisa filtrar exatamente por esse mesmo valor, senão apagaria
+    // um lock que outra invocação tenha roubado após o TTL.
+    const acquire = cycleUpdatePayloads.find(
+      (p) => typeof p.refresh_started_at === "string"
+    );
+    expect(acquire?.refresh_started_at).toEqual(expect.any(String));
+    expect(releaseFilter).toEqual({
+      col: "refresh_started_at",
+      val: acquire?.refresh_started_at,
+    });
+  });
+
+  it("returns 502 and clears the lock when a DB upsert aborts (deadline)", async () => {
+    cycleRow = activeCycle();
+    lockData = [activeCycle()];
+    // Token + sales ok, mas a escrita no banco estoura o orçamento: antes ficava
+    // pendurada sem timeout; agora o deadline aborta o upsert -> 502 + libera lock.
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ access_token: "tok-abc" }),
+        text: () => Promise.resolve(""),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ items: [saleItem()], page_info: {} }),
+        text: () => Promise.resolve(""),
+      });
+    (salesUpsert as jest.Mock).mockImplementationOnce(() => {
+      upsertOrder.push("sales");
+      const builder = {
+        abortSignal: () => builder,
+        then: (_res: unknown, reject: (e: Error) => void) =>
+          reject(Object.assign(new Error("aborted"), { name: "AbortError" })),
+      };
+      return builder;
+    });
+
+    const res = await callRoute();
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.error).toContain("demorou demais");
 
     const clearing = cycleUpdatePayloads.find((p) => p.refresh_started_at === null);
     expect(clearing).toBeDefined();
