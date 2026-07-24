@@ -5,7 +5,11 @@ const HOTMART_TOKEN_URL = "https://api-sec-vlc.hotmart.com/security/oauth/token"
 export const HOTMART_SALES_URL = "https://developers.hotmart.com/payments/api/v1/sales/history";
 const HOTMART_PRODUCTS_URL = "https://developers.hotmart.com/products/api/v1/products";
 
-export async function fetchHotmartToken(clientId: string, clientSecret: string): Promise<string> {
+export async function fetchHotmartToken(
+  clientId: string,
+  clientSecret: string,
+  signal?: AbortSignal
+): Promise<string> {
   const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
   const res = await fetch(HOTMART_TOKEN_URL, {
     method: "POST",
@@ -14,6 +18,7 @@ export async function fetchHotmartToken(clientId: string, clientSecret: string):
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: "grant_type=client_credentials",
+    signal,
   });
   if (!res.ok) {
     throw new Error(`Hotmart OAuth error: ${res.status} ${await res.text()}`);
@@ -106,7 +111,8 @@ export async function upsertPlaceholderOffers(
     offer_code: string | null;
     offer_name: string | null;
   }>,
-  updatedAt: string
+  updatedAt: string,
+  signal?: AbortSignal
 ): Promise<void> {
   const offerMap = new Map<
     string,
@@ -136,9 +142,12 @@ export async function upsertPlaceholderOffers(
     updated_at: updatedAt,
   }));
 
-  const { error: offersErr } = await supabase
+  const offersQuery = supabase
     .from("dash_gestao_hotmart_offers")
     .upsert(placeholderOffers, { onConflict: "offer_code", ignoreDuplicates: true });
+  const { error: offersErr } = await (signal
+    ? offersQuery.abortSignal(signal)
+    : offersQuery);
 
   if (offersErr) throw new Error(`Hotmart offers pre-upsert error: ${offersErr.message}`);
 }
