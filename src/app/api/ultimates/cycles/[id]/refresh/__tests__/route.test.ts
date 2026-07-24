@@ -14,6 +14,7 @@ let cycleRow: Record<string, unknown> | null;
 let cycleSelectError: { code?: string; message?: string } | null;
 let lockData: unknown[];
 let lockError: { message: string } | null;
+let releaseError: { message: string } | null;
 let accountRow: Record<string, unknown> | null;
 let upsertError: { message: string } | null;
 
@@ -51,6 +52,7 @@ beforeEach(() => {
   cycleSelectError = null;
   lockData = [];
   lockError = null;
+  releaseError = null;
   accountRow = { id: "acc-1", credentials: { client_id: "cid", client_secret: "csecret" } };
   upsertError = null;
   cycleUpdatePayloads = [];
@@ -68,15 +70,18 @@ beforeEach(() => {
         }),
         update: (payload: Record<string, unknown>) => {
           cycleUpdatePayloads.push(payload);
-          const afterEq = {
-            // Aquisição de lock: update().eq().or().select()
+          const afterFirstEq = {
+            // Aquisição de lock: update().eq("id").or().select()
             or: () => ({
               select: () => Promise.resolve({ data: lockData, error: lockError }),
             }),
-            // finally: update().eq() aguardado diretamente
-            then: (resolve: (v: { error: null }) => void) => resolve({ error: null }),
+            // finally: update().eq("id").eq("refresh_started_at") aguardado direto
+            eq: () => ({
+              then: (resolve: (v: { error: { message: string } | null }) => void) =>
+                resolve({ error: releaseError }),
+            }),
           };
-          return { eq: () => afterEq };
+          return { eq: () => afterFirstEq };
         },
       };
     }
@@ -250,6 +255,38 @@ describe("POST /api/ultimates/cycles/[id]/refresh", () => {
 
     const res = await callRoute();
     expect(res.status).toBe(502);
+
+    const clearing = cycleUpdatePayloads.find((p) => p.refresh_started_at === null);
+    expect(clearing).toBeDefined();
+  });
+
+  it("passes an abort signal to every Hotmart fetch (bounds the call)", async () => {
+    cycleRow = activeCycle();
+    lockData = [activeCycle()];
+    mockTokenAndSales([saleItem()]);
+
+    await callRoute();
+
+    const calls = (global.fetch as jest.Mock).mock.calls;
+    expect(calls.length).toBe(2); // token + sales
+    for (const [, options] of calls) {
+      expect(options.signal).toBeInstanceOf(AbortSignal);
+    }
+  });
+
+  it("returns 502 and clears the lock when a Hotmart fetch aborts (timeout)", async () => {
+    cycleRow = activeCycle();
+    lockData = [activeCycle()];
+    // Sem timeout, este fetch pendurado travaria o handler e vazaria o lock — a
+    // causa raiz do 409 "refresh em andamento". Agora vira 502 e libera o lock.
+    (global.fetch as jest.Mock).mockRejectedValueOnce(
+      Object.assign(new Error("The operation was aborted"), { name: "TimeoutError" })
+    );
+
+    const res = await callRoute();
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.error).toContain("não respondeu");
 
     const clearing = cycleUpdatePayloads.find((p) => p.refresh_started_at === null);
     expect(clearing).toBeDefined();

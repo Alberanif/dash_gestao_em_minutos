@@ -5,7 +5,11 @@ const HOTMART_TOKEN_URL = "https://api-sec-vlc.hotmart.com/security/oauth/token"
 export const HOTMART_SALES_URL = "https://developers.hotmart.com/payments/api/v1/sales/history";
 const HOTMART_PRODUCTS_URL = "https://developers.hotmart.com/products/api/v1/products";
 
-export async function fetchHotmartToken(clientId: string, clientSecret: string): Promise<string> {
+export async function fetchHotmartToken(
+  clientId: string,
+  clientSecret: string,
+  signal?: AbortSignal
+): Promise<string> {
   const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
   const res = await fetch(HOTMART_TOKEN_URL, {
     method: "POST",
@@ -14,6 +18,7 @@ export async function fetchHotmartToken(clientId: string, clientSecret: string):
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: "grant_type=client_credentials",
+    signal,
   });
   if (!res.ok) {
     throw new Error(`Hotmart OAuth error: ${res.status} ${await res.text()}`);

@@ -17,21 +17,34 @@ import type { HotmartCredentials } from "@/types/accounts";
  * crons globais. Protegida por dois mecanismos:
  *  - Throttle: bloqueia refreshes em rajada (< THROTTLE_MS desde last_refresh_at).
  *  - Lock atômico: um único UPDATE condicional em refresh_started_at resolve a
- *    corrida no Postgres (padrão Six Dados, conventions.md §12). Perdedor sai
- *    imediatamente com 409, sem chamar a Hotmart.
+ *    corrida no Postgres. Perdedor sai imediatamente com 409, sem chamar a Hotmart.
  *
- * O lock é sempre liberado no finally (mesmo em erro), gravando last_refresh_at.
+ * Toda conversa com a Hotmart tem prazo (HOTMART_BUDGET_MS): uma API lenta ou
+ * inalcançável vira um erro rápido (502) em vez de travar o handler. Isso é o
+ * que garante que o finally rode e o lock seja liberado — sem timeout, um fetch
+ * pendurado deixava refresh_started_at preso e todo clique seguinte batia em 409.
+ *
+ * O finally libera o lock de forma CONDICIONAL (só se ainda for o nosso lock) e
+ * grava last_refresh_at. Se mesmo assim o processo morrer antes do finally (ex.:
+ * recompilação do `next dev`, kill de cold start — maxDuration não vale em dev),
+ * o TTL do lock é a rede de segurança: outra invocação o rouba após LOCK_TTL_MS.
  * Escrita via service_role (a tabela só permite escrita fora da RLS).
  */
 
 // A busca escopada pagina a API da Hotmart; folga para não ser cortado pela
-// plataforma serverless durante uma sincronização mais longa.
+// plataforma serverless durante uma sincronização mais longa. ATENÇÃO: isto é
+// ignorado pelo `next dev` (localhost) — a rede de segurança real é o LOCK_TTL,
+// não este limite.
 export const maxDuration = 60;
 
+// Prazo total gasto falando com a Hotmart (token + páginas de vendas). Fica bem
+// abaixo do LOCK_TTL para que um refresh nunca ultrapasse a janela do lock.
+const HOTMART_BUDGET_MS = 45 * 1000;
 // Janela mínima entre dois refreshes bem-sucedidos do mesmo ciclo.
 const THROTTLE_MS = 60 * 1000;
-// Lock com mais de 2 min é considerado travado e pode ser roubado.
-const LOCK_TTL_MS = 2 * 60 * 1000;
+// Lock mais velho que isto é considerado órfão e pode ser roubado. Precisa ser
+// > HOTMART_BUDGET_MS para que um refresh legítimo não tenha o lock roubado no meio.
+const LOCK_TTL_MS = 90 * 1000;
 
 type Params = { id: string };
 
@@ -103,6 +116,15 @@ export async function POST(
 
   // 5. Vencedor: busca escopada + upsert. finally SEMPRE libera o lock.
   try {
+    // Prazo para toda a conversa com a Hotmart: aborta se estourar o orçamento
+    // OU se o cliente desconectar. Sem isto, um fetch pendurado trava o handler
+    // antes do finally e vaza o lock (causa raiz do 409 "refresh em andamento").
+    // Dentro do try: se AbortSignal.any/timeout lançar, o finally ainda libera.
+    const hotmartSignal = AbortSignal.any([
+      request.signal,
+      AbortSignal.timeout(HOTMART_BUDGET_MS),
+    ]);
+
     const { data: account, error: accountErr } = await supabase
       .from("dash_gestao_accounts")
       .select("id, credentials")
@@ -114,7 +136,7 @@ export async function POST(
     }
 
     const { client_id, client_secret } = account.credentials as HotmartCredentials;
-    const accessToken = await fetchHotmartToken(client_id, client_secret);
+    const accessToken = await fetchHotmartToken(client_id, client_secret, hotmartSignal);
 
     // Período do ciclo: da criação até agora. Escopo por product_id (parâmetro
     // nativo da API sales/history) — busca só as vendas do produto do ciclo.
@@ -134,6 +156,7 @@ export async function POST(
 
       const res = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${accessToken}` },
+        signal: hotmartSignal,
       });
 
       if (!res.ok) {
@@ -169,17 +192,30 @@ export async function POST(
     const lastRefreshAt = new Date().toISOString();
     return NextResponse.json({ upserted, lastRefreshAt });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Erro desconhecido";
+    // AbortError = estouramos o orçamento da Hotmart (ou o cliente desconectou):
+    // mensagem clara em vez do erro cru de fetch abortado.
+    const message =
+      err instanceof Error
+        ? err.name === "TimeoutError" || err.name === "AbortError"
+          ? "A Hotmart não respondeu a tempo. Tente novamente."
+          : err.message
+        : "Erro desconhecido";
     return NextResponse.json({ error: message }, { status: 502 });
   } finally {
     // Libera o lock e grava last_refresh_at SEMPRE — inclusive em erro
     // (sem lock preso; o throttle passa a valer a partir desta tentativa).
-    // O release incondicional é seguro porque maxDuration (60s) < LOCK_TTL
-    // (120s): a invocação não pode passar do TTL e ter seu lock roubado por
-    // outra antes de chegar aqui, então este clear nunca apaga lock alheio.
-    await supabase
+    // Release CONDICIONAL (refresh_started_at = lockedAtIso): se o TTL já tiver
+    // expirado e outra invocação roubado o lock, o eq() não casa e não apagamos
+    // o lock alheio — correção independente de qualquer premissa de timing.
+    const { error: releaseErr } = await supabase
       .from("dash_gestao_ultimates_cycles")
       .update({ refresh_started_at: null, last_refresh_at: new Date().toISOString() })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("refresh_started_at", lockedAtIso);
+    if (releaseErr) {
+      // Não relança (não pode sobrescrever a resposta já formada); loga para o
+      // TTL não ser a única pista de que o release falhou.
+      console.error(`[ultimates/refresh] falha ao liberar lock do ciclo ${id}: ${releaseErr.message}`);
+    }
   }
 }
