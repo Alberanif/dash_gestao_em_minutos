@@ -12,7 +12,7 @@ jest.mock("@/lib/supabase/server", () => ({
 // ── Mutable test state (reset per test) ───────────────────────────────────────
 let cycleRow: Record<string, unknown> | null;
 let cycleSelectError: { code?: string; message?: string } | null;
-let lockData: unknown[];
+let lockCount: number; // nº de linhas afetadas pelo UPDATE de aquisição (0 = perdeu, 1 = venceu)
 let lockError: { message: string } | null;
 let releaseError: { message: string } | null;
 let accountRow: Record<string, unknown> | null;
@@ -65,7 +65,7 @@ beforeEach(() => {
 
   cycleRow = null;
   cycleSelectError = null;
-  lockData = [];
+  lockCount = 0;
   lockError = null;
   releaseError = null;
   accountRow = { id: "acc-1", credentials: { client_id: "cid", client_secret: "csecret" } };
@@ -92,7 +92,7 @@ beforeEach(() => {
             // Aquisição de lock: update(payload, { count }).eq("id").or() — aguardado
             // direto, retorna { count }. NÃO usa .select() (o RETURNING reavaliaria o
             // filtro sobre a linha já atualizada e voltaria []). count = linhas afetadas.
-            or: () => Promise.resolve({ count: lockData.length, error: lockError }),
+            or: () => Promise.resolve({ count: lockCount, error: lockError }),
             // finally: update().eq("id").eq("refresh_started_at", val) aguardado direto
             eq: (col: unknown, val: unknown) => {
               releaseFilter = { col, val };
@@ -201,7 +201,7 @@ describe("POST /api/ultimates/cycles/[id]/refresh", () => {
 
   it("returns 409 without calling Hotmart when lock is lost (empty update result)", async () => {
     cycleRow = activeCycle();
-    lockData = []; // perdedor da corrida
+    lockCount = 0; // perdedor da corrida
 
     const res = await callRoute();
     expect(res.status).toBe(409);
@@ -212,7 +212,7 @@ describe("POST /api/ultimates/cycles/[id]/refresh", () => {
 
   it("acquire usa { count: 'exact' } e NÃO .select() (RETURNING reavaliaria o filtro e voltaria vazio → 409 + lock órfão)", async () => {
     cycleRow = activeCycle();
-    lockData = [activeCycle()]; // vencedor (count = 1)
+    lockCount = 1; // vencedor (count = 1)
     mockTokenAndSales([saleItem()]);
 
     await callRoute();
@@ -225,7 +225,7 @@ describe("POST /api/ultimates/cycles/[id]/refresh", () => {
 
   it("winner fetches product-scoped sales, upserts, returns 200 and clears lock", async () => {
     cycleRow = activeCycle();
-    lockData = [activeCycle()]; // vencedor
+    lockCount = 1; // vencedor
     mockTokenAndSales([saleItem()]);
 
     const res = await callRoute();
@@ -254,7 +254,7 @@ describe("POST /api/ultimates/cycles/[id]/refresh", () => {
 
   it("pre-upserts placeholder offers before the sales upsert when a sale has an offer_code", async () => {
     cycleRow = activeCycle();
-    lockData = [activeCycle()];
+    lockCount = 1;
     mockTokenAndSales([saleItem({ code: "OFF-NEW", name: "Oferta Nova" })]);
 
     const res = await callRoute();
@@ -273,7 +273,7 @@ describe("POST /api/ultimates/cycles/[id]/refresh", () => {
 
   it("skips offers upsert when no sale has an offer_code", async () => {
     cycleRow = activeCycle();
-    lockData = [activeCycle()];
+    lockCount = 1;
     mockTokenAndSales([saleItem()]);
 
     const res = await callRoute();
@@ -284,7 +284,7 @@ describe("POST /api/ultimates/cycles/[id]/refresh", () => {
 
   it("clears the lock even when Hotmart fetch fails (502)", async () => {
     cycleRow = activeCycle();
-    lockData = [activeCycle()];
+    lockCount = 1;
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: false,
       status: 500,
@@ -301,7 +301,7 @@ describe("POST /api/ultimates/cycles/[id]/refresh", () => {
 
   it("passes an abort signal to every Hotmart fetch (bounds the call)", async () => {
     cycleRow = activeCycle();
-    lockData = [activeCycle()];
+    lockCount = 1;
     mockTokenAndSales([saleItem()]);
 
     await callRoute();
@@ -315,7 +315,7 @@ describe("POST /api/ultimates/cycles/[id]/refresh", () => {
 
   it("returns 502 and clears the lock when a Hotmart fetch aborts (timeout)", async () => {
     cycleRow = activeCycle();
-    lockData = [activeCycle()];
+    lockCount = 1;
     // Sem timeout, este fetch pendurado travaria o handler e vazaria o lock — a
     // causa raiz do 409 "refresh em andamento". Agora vira 502 e libera o lock.
     (global.fetch as jest.Mock).mockRejectedValueOnce(
@@ -333,7 +333,7 @@ describe("POST /api/ultimates/cycles/[id]/refresh", () => {
 
   it("release do lock no finally é condicional ao timestamp adquirido (não apaga lock alheio)", async () => {
     cycleRow = activeCycle();
-    lockData = [activeCycle()];
+    lockCount = 1;
     mockTokenAndSales([saleItem()]);
 
     await callRoute();
@@ -353,7 +353,7 @@ describe("POST /api/ultimates/cycles/[id]/refresh", () => {
 
   it("returns 502 and clears the lock when a DB upsert aborts (deadline)", async () => {
     cycleRow = activeCycle();
-    lockData = [activeCycle()];
+    lockCount = 1;
     // Token + sales ok, mas a escrita no banco estoura o orçamento: antes ficava
     // pendurada sem timeout; agora o deadline aborta o upsert -> 502 + libera lock.
     (global.fetch as jest.Mock)
