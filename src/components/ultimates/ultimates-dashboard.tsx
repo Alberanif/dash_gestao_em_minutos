@@ -5,10 +5,10 @@ import type { UserRole } from "@/types/auth";
 import type { UltimatesDailyRow, UltimatesRosterRow } from "@/types/ultimates";
 import type { CycleWithProduct } from "./types";
 import { aggregateRosterKpis } from "@/lib/ultimates/kpi-aggregation";
-import { buildCumulativeSeries } from "@/lib/ultimates/cumulative-chart";
+import { buildCumulativeSeries, type UltimatesSeries } from "@/lib/ultimates/cumulative-chart";
 import { KpiRow } from "./kpi-row";
 import { GoalProgressBar } from "./goal-progress-bar";
-import { CumulativeRenewalsChart } from "./cumulative-renewals-chart";
+import { CumulativeChart } from "./cumulative-chart";
 import { RosterTable } from "./roster-table";
 import { RefreshControls } from "./refresh-controls";
 import { SectionHeader } from "./section-header";
@@ -54,6 +54,11 @@ export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [linkTarget, setLinkTarget] = useState<UltimatesRosterRow | null>(null);
   const [unlinkTarget, setUnlinkTarget] = useState<UltimatesRosterRow | null>(null);
+  // Série exibida no card "Evolução". Mora aqui (e não dentro do gráfico)
+  // para sobreviver à troca de ciclo — ultimates-screen.tsx renderiza este
+  // componente sem key, então quem compara a mesma métrica entre ciclos não
+  // precisa reclicar o switch a cada troca.
+  const [series, setSeries] = useState<UltimatesSeries>("renovacoes");
 
   useEffect(() => {
     let cancelled = false;
@@ -190,8 +195,12 @@ export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
           </section>
 
           <section>
-            <SectionHeader index="02" title="Evolução" desc="Renovações acumuladas dia a dia" />
-            <CumulativeRenewalsChart data={buildCumulativeSeries(daily ?? [])} />
+            <SectionHeader index="02" title="Evolução" desc="Renovações e novos compradores, dia a dia" />
+            <CumulativeChart
+              data={buildCumulativeSeries(daily ?? [], series)}
+              series={series}
+              onSeriesChange={setSeries}
+            />
           </section>
 
           <section>

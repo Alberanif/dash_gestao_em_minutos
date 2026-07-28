@@ -46,8 +46,8 @@ const ROSTER: UltimatesRosterRow[] = [
 ];
 
 const DAILY: UltimatesDailyRow[] = [
-  { day: "2026-07-01", renewals: 1 },
-  { day: "2026-07-02", renewals: 1 },
+  { day: "2026-07-01", renewals: 1, new_buyers: 2 },
+  { day: "2026-07-02", renewals: 1, new_buyers: 0 },
 ];
 
 function mockRosterAndDailyFetch() {
@@ -97,7 +97,25 @@ describe("UltimatesDashboard — wiring de KPIs/meta/gráfico/tabela sobre a mes
   it("renderiza o gráfico de renovações acumuladas a partir do daily", async () => {
     mockRosterAndDailyFetch();
     render(<UltimatesDashboard cycle={makeCycle()} role="gestor" />);
-    expect(await screen.findByTestId("ultimates-cumulative-chart")).toBeInTheDocument();
+    const chart = await screen.findByTestId("ultimates-cumulative-chart");
+    expect(chart).toBeInTheDocument();
+    expect(chart).toHaveAttribute("data-series", "renovacoes");
+  });
+
+  it("o switch do card 02 troca a visualização para novos compradores, sem refetch", async () => {
+    mockRosterAndDailyFetch();
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" />);
+
+    await screen.findByTestId("ultimates-cumulative-chart");
+    const fetchCallsBefore = (global.fetch as jest.Mock).mock.calls.length;
+
+    fireEvent.click(screen.getByTestId("ultimates-cumulative-series-novos"));
+
+    expect(screen.getByTestId("ultimates-cumulative-chart")).toHaveAttribute("data-series", "novos");
+    expect(screen.getByText("Novos compradores acumulados")).toBeInTheDocument();
+    // As duas séries vêm da MESMA carga do daily (critério 9) — alternar não
+    // dispara chamada nova.
+    expect((global.fetch as jest.Mock).mock.calls.length).toBe(fetchCallsBefore);
   });
 
   it("mantém o testid de slot e o nome do ciclo selecionado (contrato da task #122)", async () => {
