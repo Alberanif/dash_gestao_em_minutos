@@ -66,11 +66,16 @@ export interface UltimatesRosterRow {
   transaction_code: string | null;
 }
 
-// Renovações aprovadas de compradores da base por dia (não acumuladas — o
-// acúmulo é feito no cliente), vinda de dash_gestao_ultimates_daily.
+// Vendas aprovadas do produto do ciclo por dia (não acumuladas — o acúmulo é
+// feito no cliente), vinda de dash_gestao_ultimates_daily. As duas contagens
+// saem da mesma agregação (migration 051), então todo dia com venda aparece
+// aqui uma única vez, ainda que uma das séries seja 0 nele.
 export interface UltimatesDailyRow {
   day: string; // date ISO (YYYY-MM-DD)
+  // Vendas de compradores da base (renovações).
   renewals: number;
+  // Vendas de emails fora da base e sem vínculo manual.
+  new_buyers: number;
 }
 
 // Contadores devolvidos por dash_gestao_ultimates_replace_buyers.

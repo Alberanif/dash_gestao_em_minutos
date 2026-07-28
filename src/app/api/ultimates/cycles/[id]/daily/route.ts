@@ -6,9 +6,11 @@ import type { UltimatesDailyRow } from "@/types/ultimates";
 type Params = { id: string };
 
 // Linha bruta como devolvida pela RPC via PostgREST — bigint pode chegar
-// como string (mesmo cuidado do numeric, ver conventions.md).
-type RawDailyRow = Omit<UltimatesDailyRow, "renewals"> & {
+// como string (mesmo cuidado do numeric, ver conventions.md). new_buyers é
+// opcional porque a versão pré-051 da RPC não devolve a coluna.
+type RawDailyRow = Omit<UltimatesDailyRow, "renewals" | "new_buyers"> & {
   renewals: number | string;
+  new_buyers?: number | string | null;
 };
 
 export async function GET(
@@ -42,6 +44,12 @@ export async function GET(
   const days: UltimatesDailyRow[] = ((data as RawDailyRow[]) ?? []).map((row) => ({
     ...row,
     renewals: Number(row.renewals),
+    // ?? 0 é ponte para o ambiente onde a migration 051 ainda não foi
+    // aplicada: sem ela a RPC não devolve new_buyers e Number(undefined)
+    // viraria NaN, quebrando o eixo Y das DUAS séries do gráfico. Assim a
+    // série de novos compradores só fica vazia. Remover quando 051 estiver
+    // aplicada em produção.
+    new_buyers: Number(row.new_buyers ?? 0),
   }));
 
   return NextResponse.json({ days });
