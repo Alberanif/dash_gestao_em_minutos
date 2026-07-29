@@ -7,8 +7,9 @@ type Params = { id: string };
 
 // Linha bruta como devolvida pela RPC via PostgREST — bigint pode chegar
 // como string (mesmo cuidado do numeric, ver conventions.md).
-type RawDailyRow = Omit<UltimatesDailyRow, "renewals"> & {
+type RawDailyRow = Omit<UltimatesDailyRow, "renewals" | "new_buyers"> & {
   renewals: number | string;
+  new_buyers: number | string;
 };
 
 export async function GET(
@@ -42,6 +43,7 @@ export async function GET(
   const days: UltimatesDailyRow[] = ((data as RawDailyRow[]) ?? []).map((row) => ({
     ...row,
     renewals: Number(row.renewals),
+    new_buyers: Number(row.new_buyers),
   }));
 
   return NextResponse.json({ days });

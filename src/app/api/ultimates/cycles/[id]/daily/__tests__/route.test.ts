@@ -66,8 +66,8 @@ describe("GET /api/ultimates/cycles/[id]/daily", () => {
   it("calls the daily RPC with the cycle id and returns days", async () => {
     mockRpc.mockResolvedValueOnce({
       data: [
-        { day: "2026-07-01", renewals: 3 },
-        { day: "2026-07-02", renewals: 5 },
+        { day: "2026-07-01", renewals: 3, new_buyers: 1 },
+        { day: "2026-07-02", renewals: 5, new_buyers: 0 },
       ],
       error: null,
     });
@@ -79,14 +79,14 @@ describe("GET /api/ultimates/cycles/[id]/daily", () => {
     expect(res.status).toBe(200);
     expect(mockRpc).toHaveBeenCalledWith("dash_gestao_ultimates_daily", { p_cycle_id: "cycle-1" });
     expect(body.days).toEqual([
-      { day: "2026-07-01", renewals: 3 },
-      { day: "2026-07-02", renewals: 5 },
+      { day: "2026-07-01", renewals: 3, new_buyers: 1 },
+      { day: "2026-07-02", renewals: 5, new_buyers: 0 },
     ]);
   });
 
-  it("coerces renewals from a bigint string returned by PostgREST", async () => {
+  it("coerces renewals and new_buyers from bigint strings returned by PostgREST", async () => {
     mockRpc.mockResolvedValueOnce({
-      data: [{ day: "2026-07-01", renewals: "3" }],
+      data: [{ day: "2026-07-01", renewals: "3", new_buyers: "2" }],
       error: null,
     });
 
@@ -96,6 +96,8 @@ describe("GET /api/ultimates/cycles/[id]/daily", () => {
 
     expect(body.days[0].renewals).toBe(3);
     expect(typeof body.days[0].renewals).toBe("number");
+    expect(body.days[0].new_buyers).toBe(2);
+    expect(typeof body.days[0].new_buyers).toBe("number");
   });
 
   it("returns 500 when the RPC errors", async () => {
