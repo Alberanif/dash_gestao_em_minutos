@@ -68,7 +68,9 @@ describe("buildCumulativeSeries", () => {
     expect(novos.map((p) => p.cumulative)).toEqual([0, 3, 4]);
   });
 
-  it("trata new_buyers ausente (RPC pré-051) como zero, sem virar NaN", () => {
+  // Guarda de runtime: se alguma linha chegar sem a contagem, o acúmulo não
+  // pode virar NaN — um único NaN apaga o eixo Y do gráfico inteiro.
+  it("trata a contagem ausente como zero, sem virar NaN", () => {
     const days = [
       { day: "2026-07-01", renewals: 2 },
       { day: "2026-07-02", renewals: 1 },
