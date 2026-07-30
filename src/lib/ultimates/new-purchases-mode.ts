@@ -11,7 +11,7 @@
 //
 // Com counts_new_buyers = true devolvem a MESMA referência recebida (não uma
 // cópia), para não invalidar memoização de quem consome.
-import type { UltimatesCategory, UltimatesDailyRow, UltimatesRosterRow } from "@/types/ultimates";
+import type { UltimatesCategory, UltimatesRosterRow } from "@/types/ultimates";
 
 // Regra sem caso especial: aprovada vira renovação sem vínculo, estornada vira
 // renovação sem vínculo reembolsada. Nenhuma outra categoria é tocada.
@@ -32,18 +32,22 @@ export function applyNewPurchasesModeToRoster(
   });
 }
 
-// O gráfico do card "Evolução" passa a ter uma série só, então as vendas sem
-// vínculo entram na curva de renovações. Zerar new_buyers (em vez de apagar o
-// campo) mantém o tipo intacto e deixa buildCumulativeSeries inalterado.
-export function applyNewPurchasesModeToDaily(
-  days: UltimatesDailyRow[],
-  countsNewBuyers: boolean
-): UltimatesDailyRow[] {
-  if (countsNewBuyers) return days;
+// As séries do card "Evolução" passam a ter uma métrica só, então as vendas
+// sem vínculo entram na curva de renovações. Zerar new_buyers (em vez de
+// apagar o campo) mantém o tipo intacto e deixa quem acumula inalterado.
+//
+// Genérica sobre as duas contagens, e não sobre UltimatesDailyRow, porque a
+// mesma regra vale para a série horária: duplicá-la seria a primeira forma de
+// as duas granularidades do card discordarem entre si. O tipo de entrada volta
+// intacto, então a chave temporal (`day` ou `hour`) atravessa sem ser tocada.
+export function applyNewPurchasesModeToCounts<
+  T extends { renewals: number; new_buyers: number }
+>(rows: T[], countsNewBuyers: boolean): T[] {
+  if (countsNewBuyers) return rows;
 
-  return days.map((day) => ({
-    ...day,
-    renewals: day.renewals + day.new_buyers,
+  return rows.map((row) => ({
+    ...row,
+    renewals: row.renewals + row.new_buyers,
     new_buyers: 0,
   }));
 }

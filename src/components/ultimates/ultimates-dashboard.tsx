@@ -8,7 +8,7 @@ import { aggregateRosterKpis } from "@/lib/ultimates/kpi-aggregation";
 import { buildCumulativeSeries, type UltimatesSeries } from "@/lib/ultimates/cumulative-chart";
 import {
   applyNewPurchasesModeToRoster,
-  applyNewPurchasesModeToDaily,
+  applyNewPurchasesModeToCounts,
 } from "@/lib/ultimates/new-purchases-mode";
 import { KpiRow } from "./kpi-row";
 import { GoalProgressBar } from "./goal-progress-bar";
@@ -156,7 +156,7 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
     [roster, countsNewBuyers]
   );
   const viewDaily = useMemo(
-    () => applyNewPurchasesModeToDaily(daily ?? [], countsNewBuyers),
+    () => applyNewPurchasesModeToCounts(daily ?? [], countsNewBuyers),
     [daily, countsNewBuyers]
   );
   const kpis = roster ? aggregateRosterKpis(viewRoster) : null;

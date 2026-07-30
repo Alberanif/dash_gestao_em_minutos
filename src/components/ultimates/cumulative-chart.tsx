@@ -18,7 +18,7 @@ interface CumulativeChartProps {
   onSeriesChange: (series: UltimatesSeries) => void;
   // Política do ciclo (migration 053). Com ela false só existe uma métrica —
   // as vendas sem vínculo já vieram somadas em `data` por
-  // applyNewPurchasesModeToDaily —, então o switch de séries não tem o que
+  // applyNewPurchasesModeToCounts —, então o switch de séries não tem o que
   // alternar e é escondido em vez de mostrar uma curva zerada.
   countsNewBuyers: boolean;
 }
