@@ -4,6 +4,7 @@ import { render, screen, fireEvent, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { RosterTable } from "../roster-table";
 import type { UltimatesRosterRow } from "@/types/ultimates";
+import { applyNewPurchasesModeToRoster } from "@/lib/ultimates/new-purchases-mode";
 
 function row(overrides: Partial<UltimatesRosterRow>): UltimatesRosterRow {
   return {
@@ -159,5 +160,69 @@ describe("RosterTable — categorias de renovação sem vínculo", () => {
       <RosterTable rows={rows} role="gestor" countsNewBuyers={false} onLinkClick={jest.fn()} />
     );
     expect(screen.getByTestId("ultimates-link-buyer-outro@example.com")).toBeEnabled();
+  });
+});
+
+describe("RosterTable — troca de modo (countsNewBuyers) com filtro de categoria ativo", () => {
+  // Linhas cruas como a RPC devolve (só as 5 categorias de fato) — o
+  // dashboard reetiqueta com applyNewPurchasesModeToRoster ANTES de passar
+  // para RosterTable; aqui simulamos exatamente esse fluxo via rerender,
+  // como ultimates-dashboard.tsx faz na troca de switch/ciclo.
+  const rawRows: UltimatesRosterRow[] = [
+    row({ buyer_id: "b1", name: "Maria Silva", email: "maria@example.com", category: "renovado" }),
+    row({ buyer_id: null, name: "Ana Nova", email: "ana@example.com", category: "novo_comprador" }),
+  ];
+
+  it("filtro 'Novo Comprador' não fica preso ao desligar o switch (rerender)", () => {
+    const { rerender } = render(
+      <RosterTable rows={rawRows} role="gestor" countsNewBuyers />
+    );
+
+    fireEvent.change(screen.getByTestId("ultimates-table-category"), {
+      target: { value: "novo_comprador" },
+    });
+    expect(screen.getByText("Ana Nova")).toBeInTheDocument();
+    expect(screen.queryByText("Maria Silva")).not.toBeInTheDocument();
+
+    // Ciclo desliga "conta novo comprador" — o pai reetiqueta as linhas
+    // (novo_comprador -> renovacao_sem_vinculo) e passa countsNewBuyers=false.
+    rerender(
+      <RosterTable
+        rows={applyNewPurchasesModeToRoster(rawRows, false)}
+        role="gestor"
+        countsNewBuyers={false}
+      />
+    );
+
+    expect(screen.getByTestId("ultimates-table-category")).toHaveValue("todas");
+    // Com o filtro de volta a "todas", as duas linhas voltam a aparecer —
+    // Ana Nova já reetiquetada como "Renovação sem vínculo".
+    expect(screen.getByText("Maria Silva")).toBeInTheDocument();
+    expect(screen.getByText("Ana Nova")).toBeInTheDocument();
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("Renovação sem vínculo")).toBeInTheDocument();
+  });
+
+  it("filtro 'Renovação sem vínculo' não fica preso ao religar o switch (rerender)", () => {
+    const offRows = applyNewPurchasesModeToRoster(rawRows, false);
+    const { rerender } = render(
+      <RosterTable rows={offRows} role="gestor" countsNewBuyers={false} />
+    );
+
+    fireEvent.change(screen.getByTestId("ultimates-table-category"), {
+      target: { value: "renovacao_sem_vinculo" },
+    });
+    expect(screen.getByText("Ana Nova")).toBeInTheDocument();
+    expect(screen.queryByText("Maria Silva")).not.toBeInTheDocument();
+
+    // Ciclo religa "conta novo comprador" — o pai volta a passar as linhas
+    // cruas (referência estável quando countsNewBuyers=true) e countsNewBuyers=true.
+    rerender(<RosterTable rows={rawRows} role="gestor" countsNewBuyers />);
+
+    expect(screen.getByTestId("ultimates-table-category")).toHaveValue("todas");
+    expect(screen.getByText("Maria Silva")).toBeInTheDocument();
+    expect(screen.getByText("Ana Nova")).toBeInTheDocument();
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("Novo Comprador")).toBeInTheDocument();
   });
 });

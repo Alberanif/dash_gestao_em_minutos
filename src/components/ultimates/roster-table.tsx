@@ -328,6 +328,21 @@ export function RosterTable({ rows, role, countsNewBuyers, onLinkClick, onUnlink
   const isMobile = useMediaQuery("(max-width: 640px)");
   const categoryOptions = CATEGORY_OPTIONS_BY_MODE[countsNewBuyers ? "admite" : "nao_admite"];
 
+  // RosterTable não é remontada quando `countsNewBuyers` muda (nem o
+  // dashboard nem esta tabela têm `key`) — troca de switch ou de ciclo entre
+  // um modo e outro. Se o filtro estiver preso numa categoria que só existe
+  // no modo anterior (ex.: "novo_comprador" com o switch recém-desligado),
+  // ela vira uma categoria impossível: o <select> perde o valor selecionado
+  // e a tabela mostra "Nenhum dado encontrado" enquanto os KPIs continuam
+  // com números. Ajuste no render (mesmo padrão de RosterCards acima) —
+  // `CATEGORY_OPTIONS_BY_MODE` tem referências estáveis de módulo, então a
+  // comparação só dispara exatamente na troca de modo.
+  const [prevOptions, setPrevOptions] = useState(categoryOptions);
+  if (prevOptions !== categoryOptions) {
+    setPrevOptions(categoryOptions);
+    if (!categoryOptions.includes(category)) setCategory("todas");
+  }
+
   // Memoizado para o reset de página do DataTable (que observa a referência
   // de `data`) disparar só quando linhas/busca/categoria mudam de verdade, e
   // não em re-renders alheios (ex.: abrir um modal do dashboard).
