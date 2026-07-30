@@ -16,6 +16,11 @@ interface CumulativeChartProps {
   data: CumulativeRenewalPoint[];
   series: UltimatesSeries;
   onSeriesChange: (series: UltimatesSeries) => void;
+  // Política do ciclo (migration 053). Com ela false só existe uma métrica —
+  // as vendas sem vínculo já vieram somadas em `data` por
+  // applyNewPurchasesModeToDaily —, então o switch de séries não tem o que
+  // alternar e é escondido em vez de mostrar uma curva zerada.
+  countsNewBuyers: boolean;
 }
 
 const TICK = { fontSize: 10, fill: "var(--text-3)" };
@@ -98,7 +103,7 @@ function SeriesSwitch({
 // acumulados de buildCumulativeSeries — aqui só formatamos eixos (pt-BR,
 // dd/mm) e desenhamos. A altura vive em .ult-chart-body (ultimates.css) para
 // o mobile reduzir via media query.
-export function CumulativeChart({ data, series, onSeriesChange }: CumulativeChartProps) {
+export function CumulativeChart({ data, series, onSeriesChange, countsNewBuyers }: CumulativeChartProps) {
   const config = SERIES_CONFIG[series];
   const chartData = data.map((d) => ({ date: fmtDateShort(d.day), cumulative: d.cumulative }));
   // O eixo de dias é compartilhado pelas duas séries (a RPC agrega as duas
@@ -145,7 +150,7 @@ export function CumulativeChart({ data, series, onSeriesChange }: CumulativeChar
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: config.color, flexShrink: 0 }} />
           {config.title}
         </p>
-        <SeriesSwitch series={series} onSeriesChange={onSeriesChange} />
+        {countsNewBuyers && <SeriesSwitch series={series} onSeriesChange={onSeriesChange} />}
       </div>
 
       {isEmpty ? (
