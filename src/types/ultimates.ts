@@ -36,6 +36,18 @@ export interface UltimatesManualLinkRecord {
   created_at: string;
 }
 
+// Oferta Hotmart cujas compras não contam para a contabilidade do ciclo
+// (migration 052). A exclusão é por ciclo e não altera nenhuma venda — é um
+// filtro aplicado em leitura dentro das RPCs.
+export interface UltimatesExcludedOfferRecord {
+  id: string;
+  cycle_id: string;
+  offer_code: string;
+  note: string | null;
+  excluded_by: string;
+  created_at: string;
+}
+
 // Categorias de classificação do cruzamento base-de-compradores x vendas
 // Hotmart, usadas pelo restante da feature (RPCs, API, UI).
 export type UltimatesCategory =
@@ -76,6 +88,17 @@ export interface UltimatesDailyRow {
   renewals: number;
   // Vendas de emails fora da base e sem vínculo manual.
   new_buyers: number;
+}
+
+// Uma linha por oferta do produto do ciclo, vinda de
+// dash_gestao_ultimates_offer_options (migration 052). Alimenta o seletor do
+// modal "Ofertas excluídas": sales_count conta vendas em qualquer status e
+// serve para o gestor reconhecer a oferta, não para contabilidade.
+export interface UltimatesOfferOption {
+  offer_code: string;
+  offer_name: string;
+  sales_count: number;
+  is_excluded: boolean;
 }
 
 // Contadores devolvidos por dash_gestao_ultimates_replace_buyers.
