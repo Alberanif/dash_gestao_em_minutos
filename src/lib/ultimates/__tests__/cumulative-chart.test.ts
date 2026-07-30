@@ -175,4 +175,78 @@ describe("buildHourlyCumulativeSeries", () => {
     const hours = [hour("2026-07-01T10", 2), hour("2026-07-01T10", 3)];
     expect(buildHourlyCumulativeSeries(hours)).toEqual([{ key: "2026-07-01T10", cumulative: 5 }]);
   });
+
+  // Converte epoch ms -> "YYYY-MM-DDTHH" com getters UTC, espelhando
+  // msParaHora do próprio módulo, só para montar fixtures de vão largo sem
+  // contar datas de calendário na mão.
+  function horaDeMs(ms: number): string {
+    const d = new Date(ms);
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    const h = String(d.getUTCHours()).padStart(2, "0");
+    return `${y}-${m}-${day}T${h}`;
+  }
+  const HORA_MS = 3_600_000;
+  const inicioMs = Date.UTC(2026, 6, 1, 0);
+
+  // Teto defensivo: um vão maior que TETO_HORAS_PREENCHIDAS (2000h) degrada
+  // para o comportamento da curva diária — só os pontos recebidos,
+  // acumulados, sem preencher o intervalo. Vão de 2001 horas (índice 0..2000)
+  // ultrapassa o teto de 2000.
+  it("acima do teto de horas, devolve só os pontos recebidos acumulados, sem preencher", () => {
+    const fimMs = inicioMs + 2000 * HORA_MS; // índice 0..2000 => vão de 2001 horas
+    const hours = [hour(horaDeMs(inicioMs), 4), hour(horaDeMs(fimMs), 1)];
+
+    expect(buildHourlyCumulativeSeries(hours)).toEqual([
+      { key: horaDeMs(inicioMs), cumulative: 4 },
+      { key: horaDeMs(fimMs), cumulative: 5 },
+    ]);
+  });
+
+  // Mesmo teto, do outro lado: vão de exatamente 2000 horas (índice 0..1999)
+  // ainda preenche normalmente — o teto não pode disparar cedo demais.
+  it("no teto exato de 2000 horas, ainda preenche normalmente", () => {
+    const fimMs = inicioMs + 1999 * HORA_MS; // índice 0..1999 => vão de exatamente 2000 horas
+    const hours = [hour(horaDeMs(inicioMs), 4), hour(horaDeMs(fimMs), 1)];
+
+    const pontos = buildHourlyCumulativeSeries(hours);
+    expect(pontos).toHaveLength(2000);
+    expect(pontos[0]).toEqual({ key: horaDeMs(inicioMs), cumulative: 4 });
+    expect(pontos[pontos.length - 1]).toEqual({ key: horaDeMs(fimMs), cumulative: 5 });
+    // patamar plano no meio do intervalo, prova de que o preenchimento rodou
+    expect(pontos[1]).toEqual({ key: horaDeMs(inicioMs + HORA_MS), cumulative: 4 });
+  });
+
+  // Guarda de runtime: Number(...) na rota vira NaN para valor não-numérico,
+  // e `?? 0` deixa passar porque NaN não é null/undefined. Um único NaN apaga
+  // o eixo Y inteiro no Recharts.
+  it("trata NaN na contagem como zero, sem propagar para cumulative", () => {
+    const hours = [
+      { hour: "2026-07-01T10", renewals: NaN, new_buyers: 1 },
+      { hour: "2026-07-01T11", renewals: 2, new_buyers: NaN },
+    ] as unknown as UltimatesHourlyRow[];
+
+    expect(buildHourlyCumulativeSeries(hours, "renovacoes")).toEqual([
+      { key: "2026-07-01T10", cumulative: 0 },
+      { key: "2026-07-01T11", cumulative: 2 },
+    ]);
+    expect(buildHourlyCumulativeSeries(hours, "novos")).toEqual([
+      { key: "2026-07-01T10", cumulative: 1 },
+      { key: "2026-07-01T11", cumulative: 1 },
+    ]);
+  });
+
+  // Uma chave `hour` malformada na última linha não pode derrubar a série
+  // inteira: antes do fix, `fim` virava NaN, a primeira comparação do loop
+  // era falsa, e a função devolvia [] mesmo com dados válidos no meio.
+  it("hour malformado na última linha devolve os pontos recebidos, não []", () => {
+    const hours = [hour("2026-07-01T10", 2), hour("2026-07-01T11", 1), hour("zzzz-invalida", 3)];
+
+    expect(buildHourlyCumulativeSeries(hours)).toEqual([
+      { key: "2026-07-01T10", cumulative: 2 },
+      { key: "2026-07-01T11", cumulative: 3 },
+      { key: "zzzz-invalida", cumulative: 6 },
+    ]);
+  });
 });

@@ -62,6 +62,31 @@ function msParaHora(ms: number): string {
   return `${y}-${m}-${day}T${h}`;
 }
 
+// Teto de horas que o preenchimento tem permissão de materializar. O ciclo
+// (dash_gestao_ultimates_cycles) não tem colunas de início/fim, e a RPC
+// (migration 054) filtra só por produto + status — ela devolve toda hora com
+// venda no histórico INTEIRO do produto, não só do ciclo corrente. Um produto
+// com dois anos de vendas já gera ~17.500h de vão; uma única approved_date
+// corrompida (ano 2999, por exemplo) gera um vão de milhões de horas e trava
+// a aba preenchendo o array. 2000h (~83 dias) cobre qualquer ciclo real com
+// folga generosa sem abrir essa porta.
+const TETO_HORAS_PREENCHIDAS = 2000;
+
+// Acumula os pontos recebidos, sem preencher as horas entre eles — o mesmo
+// contrato da curva diária. É o fallback usado quando preencher não é seguro
+// (vão maior que o teto, ou uma chave `hour` malformada): devolver os dados
+// crus e honestos é sempre melhor do que travar a aba ou devolver [] e
+// esconder uma série que era válida.
+function semPreencher(contagens: Map<string, number>): CumulativePoint[] {
+  const pontos: CumulativePoint[] = [];
+  let running = 0;
+  for (const [key, valor] of contagens) {
+    running += valor;
+    pontos.push({ key, cumulative: running });
+  }
+  return pontos;
+}
+
 // Mesma curva acumulada, com bucket de hora. Diferente da versão diária, esta
 // PREENCHE as horas sem venda entre a primeira e a última recebidas: o eixo do
 // Recharts é categórico, então uma hora ausente não vira platô — ela some, e a
@@ -78,14 +103,34 @@ export function buildHourlyCumulativeSeries(
 
   // Soma em vez de sobrescrever: a RPC agrupa por hora, então duplicata não
   // deveria existir — mas somar é a única resposta que não perde uma venda.
+  // `Number.isFinite`, não `?? 0`: a rota passa a contagem por Number(...)
+  // antes de chegar aqui, então um valor não-numérico vira NaN, não
+  // null/undefined — e `??` não intercepta NaN. Um único NaN acumulado apaga
+  // o eixo Y inteiro no Recharts.
   const contagens = new Map<string, number>();
   for (const h of sorted) {
-    const valor = (series === "novos" ? h.new_buyers : h.renewals) ?? 0;
+    const bruto = series === "novos" ? h.new_buyers : h.renewals;
+    const valor = Number.isFinite(bruto) ? bruto : 0;
     contagens.set(h.hour, (contagens.get(h.hour) ?? 0) + valor);
   }
 
   const inicio = horaParaMs(sorted[0].hour);
   const fim = horaParaMs(sorted[sorted.length - 1].hour);
+
+  // `fim` (ou `inicio`) pode vir NaN se a chave `hour` de alguma ponta for
+  // malformada — só as duas pontas são parseadas, o meio nunca é validado.
+  // Sem essa guarda, a primeira comparação do loop abaixo já seria falsa e a
+  // função devolveria [], jogando fora uma série cujos dados eram válidos.
+  //
+  // O tamanho do vão é calculado ANTES de qualquer alocação: comparamos o
+  // número de horas que o loop emitiria contra o teto antes de criar o array
+  // que o preenchimento produziria.
+  const vaoHoras = Math.round((fim - inicio) / HORA_MS) + 1;
+  const vaoValido = Number.isFinite(inicio) && Number.isFinite(fim);
+
+  if (!vaoValido || vaoHoras > TETO_HORAS_PREENCHIDAS) {
+    return semPreencher(contagens);
+  }
 
   const pontos: CumulativePoint[] = [];
   let running = 0;
