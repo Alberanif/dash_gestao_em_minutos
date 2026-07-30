@@ -92,6 +92,74 @@ describe("ExcludedOffersModal — leitura", () => {
   });
 });
 
+describe("ExcludedOffersModal — busca de oferta", () => {
+  const SEARCHABLE = [
+    { offer_code: "PRINCIPAL", offer_name: "Oferta principal", sales_count: 412, is_excluded: false },
+    { offer_code: "XYZ123", offer_name: "Cortesia equipe", sales_count: 2, is_excluded: false },
+    { offer_code: "OFERTA_TESTE", offer_name: "Oferta interna", sales_count: 3, is_excluded: true },
+  ];
+
+  async function renderWithSearch() {
+    installFetch({ options: SEARCHABLE });
+    render(
+      <ExcludedOffersModal cycleId="c1" canWrite onChanged={jest.fn()} onClose={jest.fn()} />
+    );
+    return (await screen.findByTestId("ultimates-excluded-offer-select")) as HTMLSelectElement;
+  }
+
+  function search(term: string) {
+    fireEvent.change(screen.getByTestId("ultimates-excluded-offer-search"), {
+      target: { value: term },
+    });
+  }
+
+  function optionValues(select: HTMLSelectElement) {
+    return Array.from(select.options)
+      .map((o) => o.value)
+      .filter((v) => v !== "");
+  }
+
+  it("filtra as ofertas pelo código digitado", async () => {
+    const select = await renderWithSearch();
+    search("XYZ");
+
+    expect(optionValues(select)).toEqual(["XYZ123"]);
+  });
+
+  it("filtra também pelo nome, ignorando caixa e espaços nas pontas", async () => {
+    const select = await renderWithSearch();
+    search("  cortesia  ");
+
+    expect(optionValues(select)).toEqual(["XYZ123"]);
+  });
+
+  it("nunca traz de volta uma oferta já excluída, mesmo que o código case com a busca", async () => {
+    const select = await renderWithSearch();
+    search("OFERTA_TESTE");
+
+    expect(optionValues(select)).toEqual([]);
+  });
+
+  it("limpa a seleção quando a oferta escolhida sai do filtro", async () => {
+    const select = await renderWithSearch();
+    fireEvent.change(select, { target: { value: "PRINCIPAL" } });
+    expect(select.value).toBe("PRINCIPAL");
+
+    // Sem isso o gestor excluiria uma oferta que não está mais visível.
+    search("XYZ");
+
+    expect(select.value).toBe("");
+    expect(screen.getByTestId("ultimates-excluded-offer-add-btn")).toBeDisabled();
+  });
+
+  it("avisa quando nenhuma oferta casa com a busca", async () => {
+    await renderWithSearch();
+    search("nao-existe");
+
+    expect(screen.getByTestId("ultimates-excluded-offer-search-empty")).toBeInTheDocument();
+  });
+});
+
 describe("ExcludedOffersModal — escrita", () => {
   it("envia código e nota ao excluir e avisa o pai", async () => {
     const fetchMock = installFetch({});

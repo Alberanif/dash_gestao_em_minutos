@@ -36,6 +36,7 @@ export function ExcludedOffersModal({
   const [offers, setOffers] = useState<ExcludedOffer[] | null>(null);
   const [options, setOptions] = useState<UltimatesOfferOption[]>([]);
   const [selected, setSelected] = useState("");
+  const [search, setSearch] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -88,6 +89,7 @@ export function ExcludedOffersModal({
         return;
       }
       setSelected("");
+      setSearch("");
       setNote("");
       await load();
       onChanged();
@@ -114,6 +116,17 @@ export function ExcludedOffersModal({
   // Ofertas já excluídas saem do seletor — o POST as recusaria com 409, e
   // oferecer a opção seria convidar o gestor ao erro.
   const available = options.filter((o) => !o.is_excluded);
+  const visible = available.filter((o) => matchesSearch(o, search));
+
+  // Trocar a busca pode esconder a oferta que estava selecionada. Manter a
+  // seleção invisível deixaria o gestor excluir uma oferta que não está mais
+  // na tela — some com ela junto.
+  function handleSearchChange(term: string) {
+    setSearch(term);
+    setError("");
+    const current = available.find((o) => o.offer_code === selected);
+    if (current && !matchesSearch(current, term)) setSelected("");
+  }
 
   return (
     <div
@@ -214,6 +227,18 @@ export function ExcludedOffersModal({
             <label className="mb-1 block text-sm font-medium" style={{ color: "var(--text-muted)" }}>
               Excluir uma oferta
             </label>
+
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Buscar por código ou nome da oferta"
+              aria-label="Buscar oferta por código ou nome"
+              className="field-control"
+              data-testid="ultimates-excluded-offer-search"
+              style={{ fontSize: 13 }}
+            />
+
             <select
               value={selected}
               onChange={(e) => {
@@ -225,12 +250,21 @@ export function ExcludedOffersModal({
               style={{ fontSize: 13 }}
             >
               <option value="">Selecione a oferta...</option>
-              {available.map((option) => (
+              {visible.map((option) => (
                 <option key={option.offer_code} value={option.offer_code}>
                   {option.offer_name} · {option.offer_code} · {option.sales_count} venda(s)
                 </option>
               ))}
             </select>
+
+            {search.trim() !== "" && visible.length === 0 && (
+              <p
+                data-testid="ultimates-excluded-offer-search-empty"
+                style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}
+              >
+                Nenhuma oferta deste produto corresponde à busca.
+              </p>
+            )}
 
             <input
               type="text"
@@ -269,6 +303,17 @@ export function ExcludedOffersModal({
         </div>
       </div>
     </div>
+  );
+}
+
+// Busca por código OU nome: o gestor às vezes tem o código em mãos (copiado
+// da Hotmart) e às vezes só sabe como a oferta se chama.
+function matchesSearch(option: UltimatesOfferOption, term: string): boolean {
+  const needle = term.trim().toLowerCase();
+  if (needle === "") return true;
+  return (
+    option.offer_code.toLowerCase().includes(needle) ||
+    (option.offer_name ?? "").toLowerCase().includes(needle)
   );
 }
 
