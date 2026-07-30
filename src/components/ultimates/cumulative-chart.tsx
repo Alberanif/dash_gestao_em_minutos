@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   AreaChart,
   Area,
@@ -35,6 +36,38 @@ interface CumulativeChartProps {
 }
 
 const TICK = { fontSize: 10, fill: "var(--text-3)" };
+
+// Uma linha do dataset que vai para o Recharts. `x` é o rótulo do eixo,
+// `tooltip` o do balão — separados porque o eixo precisa ser curto e o balão
+// pode ser lido por extenso.
+export interface CumulativeChartRow {
+  x: string;
+  tooltip: string;
+  cumulative: number;
+}
+
+// Traduz os pontos acumulados (chave temporal crua) para rótulos pt-BR.
+//
+// Função exportada e pura de propósito: sob o jsdom o ResponsiveContainer tem
+// tamanho zero e o Recharts não desenha eixo nem tooltip, então esta escolha
+// de formatador é o único trecho do gráfico que nenhum teste de componente
+// consegue observar — inverter os dois pares deixaria todo tick lendo
+// "01T20/07" com a suíte inteira verde. Testada direto em
+// __tests__/cumulative-chart.test.tsx, e é ESTA função que o componente usa,
+// para o teste cobrir o caminho real e não uma cópia.
+//
+// A chave crua nunca vira Date: ela já é hora de parede em Brasília.
+export function buildChartRows(
+  data: CumulativePoint[],
+  granularity: UltimatesGranularity
+): CumulativeChartRow[] {
+  const porHora = granularity === "hora";
+  return data.map((d) => ({
+    x: porHora ? fmtHourShort(d.key) : fmtDateShort(d.key),
+    tooltip: porHora ? fmtHourLong(d.key) : fmtDateShort(d.key),
+    cumulative: d.cumulative,
+  }));
+}
 
 // Tudo que muda entre as duas séries vive aqui — o desenho abaixo é um só.
 // A cor de "novos" é a mesma do KPI "Novos Compradores" (--orange, ver
@@ -88,19 +121,30 @@ interface ChipAccent {
 // granularidade) são o mesmo controle com conteúdo e acento diferentes.
 function ChipSwitch<T extends string>({
   testId,
+  label,
   options,
   active,
   onChange,
   accentFor,
 }: {
   testId: string;
+  // Nome da DIMENSÃO controlada, não do valor. Visualmente os dois grupos se
+  // distinguem por posição e acento; para quem navega por leitor de tela, sem
+  // ele são só quatro botões aria-pressed em fila ("Renovações, Novos
+  // compradores, Dia, Hora"), sem indicação de quais dois andam juntos.
+  label: string;
   options: { value: T; label: string }[];
   active: T;
   onChange: (value: T) => void;
   accentFor: (value: T) => ChipAccent;
 }) {
   return (
-    <div data-testid={testId} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+    <div
+      data-testid={testId}
+      role="group"
+      aria-label={label}
+      style={{ display: "flex", alignItems: "center", gap: 6 }}
+    >
       {options.map(({ value, label }) => {
         const isActive = value === active;
         const accent = accentFor(value);
@@ -158,14 +202,12 @@ export function CumulativeChart({
 }: CumulativeChartProps) {
   const config = SERIES_CONFIG[series];
   const porHora = granularity === "hora";
-  // `x` é o rótulo do eixo, `tooltip` o do balão — separados porque o eixo
-  // precisa ser curto e o balão pode ser lido por extenso. A chave crua nunca
-  // vira Date: ela já é hora de parede em Brasília.
-  const chartData = data.map((d) => ({
-    x: porHora ? fmtHourShort(d.key) : fmtDateShort(d.key),
-    tooltip: porHora ? fmtHourLong(d.key) : fmtDateShort(d.key),
-    cumulative: d.cumulative,
-  }));
+  // Memo pelo mesmo motivo do `chartPoints` no dashboard: são até 8760 pontos,
+  // cada um com dois formatos baseados em split. Todos os modais do dashboard
+  // (upload, ofertas excluídas, vincular, desvincular) moram no pai deste
+  // componente, então abrir qualquer um deles re-renderiza o card — sem o memo,
+  // refazendo a tradução inteira para nada.
+  const chartData = useMemo(() => buildChartRows(data, granularity), [data, granularity]);
   // O eixo temporal é compartilhado pelas duas séries (a RPC agrega as duas
   // juntas), então "sem dados" aqui não é lista vazia: é a série ativa somar
   // zero. Sem isso, um ciclo só com novos compradores mostraria a curva de
@@ -216,6 +258,7 @@ export function CumulativeChart({
           {countsNewBuyers && (
             <ChipSwitch
               testId="ultimates-cumulative-series-switch"
+              label="Métrica"
               options={SERIES_ORDER.map((value) => ({ value, label: SERIES_CONFIG[value].button }))}
               active={series}
               onChange={onSeriesChange}
@@ -225,6 +268,7 @@ export function CumulativeChart({
           {granularityAvailable && (
             <ChipSwitch
               testId="ultimates-cumulative-granularity-switch"
+              label="Granularidade"
               options={GRANULARITY_ORDER.map((value) => ({ value, label: GRANULARITY_LABELS[value] }))}
               active={granularity}
               onChange={onGranularityChange}

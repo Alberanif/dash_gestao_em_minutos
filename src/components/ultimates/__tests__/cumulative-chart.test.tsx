@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import { CumulativeChart } from "../cumulative-chart";
+import { CumulativeChart, buildChartRows } from "../cumulative-chart";
 import {
   buildCumulativeSeries,
   buildHourlyCumulativeSeries,
@@ -55,6 +55,49 @@ function Harness({
     />
   );
 }
+
+// O Recharts não renderiza nada mensurável sob o ResponsiveContainer de
+// tamanho zero do jsdom, então nenhum teste de componente chega perto dos
+// rótulos do eixo e do tooltip. Sem estes testes diretos, trocar fmtHourShort
+// por fmtDateShort deixaria todo tick lendo "01T20/07" com a suíte verde.
+describe("buildChartRows — rótulos por granularidade", () => {
+  const PONTOS = [
+    { key: "2026-07-01", cumulative: 2 },
+    { key: "2026-08-03", cumulative: 5 },
+  ];
+  const PONTOS_HORA = [
+    { key: "2026-07-01T00", cumulative: 2 },
+    { key: "2026-07-01T20", cumulative: 5 },
+  ];
+
+  it("na visão dia usa dd/mm no eixo e no tooltip", () => {
+    expect(buildChartRows(PONTOS, "dia")).toEqual([
+      { x: "01/07", tooltip: "01/07", cumulative: 2 },
+      { x: "03/08", tooltip: "03/08", cumulative: 5 },
+    ]);
+  });
+
+  it("na visão hora usa dd/mm HHh no eixo e a forma por extenso no tooltip", () => {
+    expect(buildChartRows(PONTOS_HORA, "hora")).toEqual([
+      { x: "01/07 00h", tooltip: "01/07 às 00h", cumulative: 2 },
+      { x: "01/07 20h", tooltip: "01/07 às 20h", cumulative: 5 },
+    ]);
+  });
+
+  // Guarda contra a troca silenciosa dos dois pares de formatadores: a chave
+  // horária passada pelo formatador de dia produz lixo plausível ("01T20/07"),
+  // que ninguém nota em um eixo denso.
+  it("não confunde os dois formatadores entre si", () => {
+    expect(buildChartRows(PONTOS_HORA, "dia")[1].x).not.toBe(
+      buildChartRows(PONTOS_HORA, "hora")[1].x
+    );
+  });
+
+  it("preserva o acumulado e a ordem dos pontos", () => {
+    expect(buildChartRows(PONTOS, "dia").map((r) => r.cumulative)).toEqual([2, 5]);
+    expect(buildChartRows([], "hora")).toEqual([]);
+  });
+});
 
 describe("CumulativeChart — switch entre renovações e novos compradores", () => {
   it("abre em renovações, com o botão da série ativa marcado", () => {
@@ -212,6 +255,16 @@ describe("CumulativeChart — switch de granularidade", () => {
   it("mantém o grupo de granularidade quando a série horária chegou vazia", () => {
     render(<Harness hours={[]} />);
     expect(screen.getByTestId("ultimates-cumulative-granularity-switch")).toBeInTheDocument();
+  });
+
+  // Quatro botões aria-pressed em sequência ("Renovações, Novos compradores,
+  // Dia, Hora") não dizem, para quem navega por leitor de tela, quais dois
+  // andam juntos nem que dimensão cada par controla.
+  it("nomeia os dois grupos de chips para leitor de tela", () => {
+    render(<Harness />);
+
+    expect(screen.getByRole("group", { name: "Métrica" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Granularidade" })).toBeInTheDocument();
   });
 
   it("mostra o vazio da série na visão hora quando a métrica ativa soma zero", () => {
