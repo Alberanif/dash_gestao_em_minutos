@@ -60,3 +60,15 @@ describe("categoryLabel", () => {
     expect(categoryLabel("novo_reembolsado")).toBe("Novo — reembolsado");
   });
 });
+
+describe("categoryLabel — categorias de renovação sem vínculo", () => {
+  it("rotula renovacao_sem_vinculo", () => {
+    expect(categoryLabel("renovacao_sem_vinculo")).toBe("Renovação sem vínculo");
+  });
+
+  it("rotula renovacao_sem_vinculo_reembolsada com o travessão do idioma existente", () => {
+    expect(categoryLabel("renovacao_sem_vinculo_reembolsada")).toBe(
+      "Renovação sem vínculo — reembolsada"
+    );
+  });
+});

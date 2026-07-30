@@ -10,6 +10,10 @@ export interface UltimatesCycleRecord {
   product_id: string;
   goal_percent: number | null;
   status: UltimatesCycleStatus;
+  // Quando false, vendas de emails fora da base deixam de ser "novo comprador"
+  // e passam a renovação sem vínculo (migration 053). A reclassificação roda no
+  // cliente — ver src/lib/ultimates/new-purchases-mode.ts.
+  counts_new_buyers: boolean;
   refresh_started_at: string | null;
   last_refresh_at: string | null;
   created_by: string | null;
@@ -50,12 +54,19 @@ export interface UltimatesExcludedOfferRecord {
 
 // Categorias de classificação do cruzamento base-de-compradores x vendas
 // Hotmart, usadas pelo restante da feature (RPCs, API, UI).
+//
+// As RPCs só emitem as cinco primeiras. As duas últimas são produzidas no
+// cliente por applyNewPurchasesModeToRoster quando o ciclo tem
+// counts_new_buyers = false. Os dois pares de linhas com buyer_id = null
+// (novo_* e renovacao_sem_vinculo*) NUNCA coexistem: são dois por modo.
 export type UltimatesCategory =
   | "renovado"
   | "nao_renovado"
   | "renovacao_reembolsada"
   | "novo_comprador"
-  | "novo_reembolsado";
+  | "novo_reembolsado"
+  | "renovacao_sem_vinculo"
+  | "renovacao_sem_vinculo_reembolsada";
 
 // Retornos das RPCs de leitura (migration 050). Consumidos pelas próximas
 // tasks (APIs) — os nomes espelham as colunas de RETURNS TABLE das funções.
