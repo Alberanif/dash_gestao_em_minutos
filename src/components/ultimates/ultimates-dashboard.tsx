@@ -2,10 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { UserRole } from "@/types/auth";
-import type { UltimatesDailyRow, UltimatesRosterRow } from "@/types/ultimates";
+import type { UltimatesDailyRow, UltimatesHourlyRow, UltimatesRosterRow } from "@/types/ultimates";
 import type { CycleWithProduct } from "./types";
 import { aggregateRosterKpis } from "@/lib/ultimates/kpi-aggregation";
-import { buildCumulativeSeries, type UltimatesSeries } from "@/lib/ultimates/cumulative-chart";
+import {
+  buildCumulativeSeries,
+  buildHourlyCumulativeSeries,
+  type UltimatesGranularity,
+  type UltimatesSeries,
+} from "@/lib/ultimates/cumulative-chart";
 import {
   applyNewPurchasesModeToRoster,
   applyNewPurchasesModeToCounts,
@@ -23,11 +28,13 @@ import { ExcludedOffersModal } from "./excluded-offers-modal";
 import { NewPurchasesToggle } from "./new-purchases-toggle";
 
 // Dashboard do ciclo selecionado (PRD issue #114, seções 3.2–3.4/3.6, task
-// #123). UMA chamada ao roster + UMA ao daily alimentam KPIs (agregados no
-// cliente, src/lib/ultimates/kpi-aggregation.ts), meta, gráfico acumulado e
-// tabela — nunca fontes separadas, para que os números batam entre si
-// (critério 9). Contrato de props preservado da task #122: não renomeie
-// sem avisar quem pegar a #124 (slot "Vincular à base" em RosterTable).
+// #123). UMA chamada ao roster + UMA ao daily + UMA ao hourly (task de
+// evolução por hora) alimentam KPIs (agregados no cliente,
+// src/lib/ultimates/kpi-aggregation.ts), meta, gráfico acumulado (nas duas
+// granularidades) e tabela — nunca fontes separadas, para que os números
+// batam entre si (critério 9). Contrato de props preservado da task #122:
+// não renomeie sem avisar quem pegar a #124 (slot "Vincular à base" em
+// RosterTable).
 export interface UltimatesDashboardProps {
   cycle: CycleWithProduct;
   role: UserRole;
@@ -54,6 +61,7 @@ function SkeletonBlock({ height, radius = 11 }: { height: number; radius?: numbe
 export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: UltimatesDashboardProps) {
   const [roster, setRoster] = useState<UltimatesRosterRow[] | null>(null);
   const [daily, setDaily] = useState<UltimatesDailyRow[] | null>(null);
+  const [hourly, setHourly] = useState<UltimatesHourlyRow[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   // Incrementado ao clicar "Tentar novamente" ou após um refresh bem
   // sucedido — reexecuta o efeito de carga abaixo (mesmo padrão de
@@ -74,6 +82,9 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
   // componente sem key, então quem compara a mesma métrica entre ciclos não
   // precisa reclicar o switch a cada troca.
   const [series, setSeries] = useState<UltimatesSeries>("renovacoes");
+  // Mesma razão do `series` acima: granularidade é preferência de quem olha e
+  // deve sobreviver à troca de ciclo.
+  const [granularity, setGranularity] = useState<UltimatesGranularity>("dia");
 
   useEffect(() => {
     let cancelled = false;
@@ -85,21 +96,25 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
       // ultimates-screen.tsx).
       setRoster(null);
       setDaily(null);
+      setHourly(null);
       setLoadError(false);
       try {
-        const [rosterRes, dailyRes] = await Promise.all([
+        const [rosterRes, dailyRes, hourlyRes] = await Promise.all([
           fetch(`/api/ultimates/cycles/${cycle.id}/roster`),
           fetch(`/api/ultimates/cycles/${cycle.id}/daily`),
+          fetch(`/api/ultimates/cycles/${cycle.id}/hourly`),
         ]);
-        if (!rosterRes.ok || !dailyRes.ok) {
+        if (!rosterRes.ok || !dailyRes.ok || !hourlyRes.ok) {
           if (!cancelled) setLoadError(true);
           return;
         }
         const rosterData = await rosterRes.json();
         const dailyData = await dailyRes.json();
+        const hourlyData = await hourlyRes.json();
         if (cancelled) return;
         setRoster(Array.isArray(rosterData?.rows) ? rosterData.rows : []);
         setDaily(Array.isArray(dailyData?.days) ? dailyData.days : []);
+        setHourly(Array.isArray(hourlyData?.hours) ? hourlyData.hours : []);
       } catch {
         if (!cancelled) setLoadError(true);
       }
@@ -139,7 +154,7 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
     setReloadToken((t) => t + 1);
   }
 
-  const loading = roster === null || daily === null;
+  const loading = roster === null || daily === null || hourly === null;
   const countsNewBuyers = cycle.counts_new_buyers;
   // Reetiquetagem ANTES de tudo: KPIs, gráfico, tabela e CSV consomem estas
   // listas, então nenhum deles precisa conhecer a política do ciclo.
@@ -159,10 +174,23 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
     () => applyNewPurchasesModeToCounts(daily ?? [], countsNewBuyers),
     [daily, countsNewBuyers]
   );
+  const viewHourly = useMemo(
+    () => applyNewPurchasesModeToCounts(hourly ?? [], countsNewBuyers),
+    [hourly, countsNewBuyers]
+  );
   const kpis = roster ? aggregateRosterKpis(viewRoster) : null;
   // Série derivada no render, nunca por efeito: assim o `series` escolhido pelo
   // usuário sobrevive intacto e volta sozinho se o ciclo religar novas compras.
   const activeSeries = countsNewBuyers ? series : "renovacoes";
+  // useMemo obrigatório, não otimização: o preenchimento das horas vazias
+  // percorre todo o intervalo do ciclo e não pode rodar a cada render.
+  const chartPoints = useMemo(
+    () =>
+      granularity === "hora"
+        ? buildHourlyCumulativeSeries(viewHourly, activeSeries)
+        : buildCumulativeSeries(viewDaily, activeSeries),
+    [granularity, viewHourly, viewDaily, activeSeries]
+  );
   // Escrita só para gestor e ciclo ativo (critério 11: ciclo encerrado tem
   // dashboard acessível, mas upload/vínculo/atualização bloqueados).
   const canWrite = role === "gestor" && cycle.status !== "encerrado";
@@ -303,17 +331,17 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
             <SectionHeader
               index="02"
               title="Evolução"
-              desc={
-                countsNewBuyers
-                  ? "Renovações e novos compradores, dia a dia"
-                  : "Renovações acumuladas, dia a dia"
-              }
+              desc={`${
+                countsNewBuyers ? "Renovações e novos compradores" : "Renovações acumuladas"
+              }, ${granularity === "hora" ? "hora a hora" : "dia a dia"}`}
             />
             <CumulativeChart
-              data={buildCumulativeSeries(viewDaily, activeSeries)}
+              data={chartPoints}
               series={activeSeries}
               onSeriesChange={setSeries}
               countsNewBuyers={countsNewBuyers}
+              granularity={granularity}
+              onGranularityChange={setGranularity}
             />
           </section>
 
