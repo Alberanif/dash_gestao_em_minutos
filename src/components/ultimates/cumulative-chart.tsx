@@ -27,6 +27,11 @@ interface CumulativeChartProps {
   countsNewBuyers: boolean;
   granularity: UltimatesGranularity;
   onGranularityChange: (granularity: UltimatesGranularity) => void;
+  // Se a série horária chegou. Prop explícita, e não inferida de `data` vazio:
+  // lista vazia também é "ciclo sem venda ainda", um estado legítimo que não
+  // deve esconder o switch. Com ela false o grupo de granularidade some — o
+  // chip "Hora" existir levando a um gráfico vazio é pior do que não existir.
+  granularityAvailable: boolean;
 }
 
 const TICK = { fontSize: 10, fill: "var(--text-3)" };
@@ -149,6 +154,7 @@ export function CumulativeChart({
   countsNewBuyers,
   granularity,
   onGranularityChange,
+  granularityAvailable,
 }: CumulativeChartProps) {
   const config = SERIES_CONFIG[series];
   const porHora = granularity === "hora";
@@ -216,13 +222,15 @@ export function CumulativeChart({
               accentFor={(value) => SERIES_CONFIG[value]}
             />
           )}
-          <ChipSwitch
-            testId="ultimates-cumulative-granularity-switch"
-            options={GRANULARITY_ORDER.map((value) => ({ value, label: GRANULARITY_LABELS[value] }))}
-            active={granularity}
-            onChange={onGranularityChange}
-            accentFor={() => NEUTRAL_ACCENT}
-          />
+          {granularityAvailable && (
+            <ChipSwitch
+              testId="ultimates-cumulative-granularity-switch"
+              options={GRANULARITY_ORDER.map((value) => ({ value, label: GRANULARITY_LABELS[value] }))}
+              active={granularity}
+              onChange={onGranularityChange}
+              accentFor={() => NEUTRAL_ACCENT}
+            />
+          )}
         </div>
       </div>
 

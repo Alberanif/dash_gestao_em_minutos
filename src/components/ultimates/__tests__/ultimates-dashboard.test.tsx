@@ -518,8 +518,12 @@ describe("UltimatesDashboard — granularidade do card Evolução", () => {
     expect(await screen.findByTestId("ultimates-cumulative-chart")).toHaveAttribute("data-granularity", "hora");
   });
 
-  // Uma falha na terceira chamada não pode deixar o card meio pronto.
-  it("acende o erro do card quando a busca horária falha", async () => {
+  // A horária é a mais nova e a menos validada das três chamadas — a migration
+  // 054 pode nem ter subido ainda quando o deploy sair. Falhar nela não pode
+  // levar junto KPIs, meta, roster, CSV e a curva DIÁRIA, que funcionam hoje:
+  // o dashboard segue inteiro e só o chip "Hora" some, para ninguém clicar em
+  // um botão que leva a um gráfico vazio.
+  it("com a busca horária falhando, o dashboard renderiza e o chip Hora não é oferecido", async () => {
     global.fetch = jest.fn((url: string) => {
       if (url.includes("/hourly")) {
         return Promise.resolve({ ok: false, json: async () => ({}) });
@@ -528,6 +532,52 @@ describe("UltimatesDashboard — granularidade do card Evolução", () => {
         return Promise.resolve({ ok: true, json: async () => ({ rows: ROSTER }) });
       }
       return Promise.resolve({ ok: true, json: async () => ({ days: DAILY }) });
+    }) as unknown as typeof global.fetch;
+
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+
+    const card = await screen.findByTestId("ultimates-cumulative-chart");
+    expect(screen.queryByTestId("ultimates-dashboard-error")).toBeNull();
+    expect(screen.getByTestId("ultimates-kpi-row")).toBeInTheDocument();
+    expect(screen.getByText("Renovou 1")).toBeInTheDocument();
+    // A curva diária continua de pé, na granularidade padrão.
+    expect(card).toHaveAttribute("data-granularity", "dia");
+    expect(screen.queryByTestId("ultimates-cumulative-granularity-switch")).toBeNull();
+    expect(screen.queryByTestId("ultimates-cumulative-granularity-hora")).toBeNull();
+  });
+
+  // Mesma garantia quando a rota nem responde (rede caiu, 404 de rota
+  // inexistente antes do deploy): a rejeição do fetch horário não pode rejeitar
+  // o Promise.all e derrubar as outras duas cargas com ela.
+  it("com a busca horária rejeitando, o dashboard continua inteiro", async () => {
+    global.fetch = jest.fn((url: string) => {
+      if (url.includes("/hourly")) {
+        return Promise.reject(new Error("network"));
+      }
+      if (url.includes("/roster")) {
+        return Promise.resolve({ ok: true, json: async () => ({ rows: ROSTER }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ days: DAILY }) });
+    }) as unknown as typeof global.fetch;
+
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+
+    expect(await screen.findByTestId("ultimates-cumulative-chart")).toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-dashboard-error")).toBeNull();
+    expect(screen.queryByTestId("ultimates-cumulative-granularity-switch")).toBeNull();
+  });
+
+  // Roster e daily continuam governando o erro exatamente como antes da
+  // granularidade horária existir.
+  it("continua acendendo o erro do card quando a daily falha", async () => {
+    global.fetch = jest.fn((url: string) => {
+      if (url.includes("/daily")) {
+        return Promise.resolve({ ok: false, json: async () => ({}) });
+      }
+      if (url.includes("/hourly")) {
+        return Promise.resolve({ ok: true, json: async () => ({ hours: HOURLY }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ rows: ROSTER }) });
     }) as unknown as typeof global.fetch;
 
     render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);

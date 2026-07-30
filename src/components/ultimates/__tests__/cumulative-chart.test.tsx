@@ -29,10 +29,12 @@ function Harness({
   days = DAYS,
   hours = HOURS,
   countsNewBuyers = true,
+  granularityAvailable = true,
 }: {
   days?: UltimatesDailyRow[];
   hours?: UltimatesHourlyRow[];
   countsNewBuyers?: boolean;
+  granularityAvailable?: boolean;
 }) {
   const [series, setSeries] = useState<UltimatesSeries>("renovacoes");
   const [granularity, setGranularity] = useState<UltimatesGranularity>("dia");
@@ -49,6 +51,7 @@ function Harness({
       countsNewBuyers={countsNewBuyers}
       granularity={granularity}
       onGranularityChange={setGranularity}
+      granularityAvailable={granularityAvailable}
     />
   );
 }
@@ -189,6 +192,26 @@ describe("CumulativeChart — switch de granularidade", () => {
     expect(card).toHaveAttribute("data-series", "novos");
     expect(card).toHaveAttribute("data-granularity", "hora");
     expect(screen.getByText("Novos compradores acumulados — por hora")).toBeInTheDocument();
+  });
+
+  // Sem a série horária (rota fora do ar, migration 054 pendente) o card não
+  // oferece o chip: um "Hora" clicável levando a um gráfico vazio mentiria
+  // sobre não haver vendas naquelas horas.
+  it("não renderiza o grupo de granularidade quando a série horária não chegou", () => {
+    render(<Harness granularityAvailable={false} />);
+
+    expect(screen.queryByTestId("ultimates-cumulative-granularity-switch")).toBeNull();
+    expect(screen.queryByTestId("ultimates-cumulative-granularity-hora")).toBeNull();
+    // O resto do card segue inteiro, na visão dia.
+    expect(screen.getByTestId("ultimates-cumulative-chart")).toHaveAttribute("data-granularity", "dia");
+    expect(screen.getByText("Renovações acumuladas")).toBeInTheDocument();
+  });
+
+  // Lista vazia é "ciclo sem venda ainda", não "série indisponível" — o chip
+  // continua lá para quem quiser conferir a visão hora.
+  it("mantém o grupo de granularidade quando a série horária chegou vazia", () => {
+    render(<Harness hours={[]} />);
+    expect(screen.getByTestId("ultimates-cumulative-granularity-switch")).toBeInTheDocument();
   });
 
   it("mostra o vazio da série na visão hora quando a métrica ativa soma zero", () => {
