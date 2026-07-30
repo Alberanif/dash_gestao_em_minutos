@@ -264,7 +264,15 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
       {!loadError && !loading && kpis && (
         <div className="z-layout">
           <section>
-            <SectionHeader index="01" title="Visão do ciclo" desc="Base, renovações e novos compradores" />
+            <SectionHeader
+              index="01"
+              title="Visão do ciclo"
+              desc={
+                countsNewBuyers
+                  ? "Base, renovações e novos compradores"
+                  : "Base, renovações e renovações sem vínculo"
+              }
+            />
             {excludedCount > 0 && (
               <p
                 data-testid="ultimates-excluded-offers-note"
@@ -292,7 +300,15 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
           </section>
 
           <section>
-            <SectionHeader index="02" title="Evolução" desc="Renovações e novos compradores, dia a dia" />
+            <SectionHeader
+              index="02"
+              title="Evolução"
+              desc={
+                countsNewBuyers
+                  ? "Renovações e novos compradores, dia a dia"
+                  : "Renovações acumuladas, dia a dia"
+              }
+            />
             <CumulativeChart
               data={buildCumulativeSeries(viewDaily, activeSeries)}
               series={activeSeries}
