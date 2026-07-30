@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
   const { data: sale, error: saleError } = await supabase
     .from("dash_gestao_hotmart_sales")
-    .select("transaction_code, product_id")
+    .select("transaction_code, product_id, offer_code")
     .eq("transaction_code", transactionCode)
     .single();
 
@@ -69,6 +69,26 @@ export async function POST(request: NextRequest) {
       { error: "Transação não encontrada para o produto deste ciclo" },
       { status: 400 }
     );
+  }
+
+  // Oferta excluída vence o vínculo manual (PRD de 2026-07-30, decisão 4): as
+  // RPCs descartam a venda antes de olhar para manual_links, então o vínculo
+  // nasceria sem efeito algum. Recusar aqui evita um vínculo que o gestor
+  // acharia ter resolvido a classificação.
+  if (sale.offer_code) {
+    const { data: excludedOffer } = await supabase
+      .from("dash_gestao_ultimates_excluded_offers")
+      .select("id")
+      .eq("cycle_id", cycleId)
+      .eq("offer_code", sale.offer_code)
+      .maybeSingle();
+
+    if (excludedOffer) {
+      return NextResponse.json(
+        { error: "Transação pertence a uma oferta excluída deste ciclo" },
+        { status: 400 }
+      );
+    }
   }
 
   const { data: existingLink } = await supabase

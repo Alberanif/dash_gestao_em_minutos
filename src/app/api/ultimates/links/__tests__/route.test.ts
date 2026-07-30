@@ -6,6 +6,7 @@ jest.mock("@/lib/utils/api-auth", () => ({
 }));
 
 const mockSingle = jest.fn();
+const mockMaybeSingle = jest.fn();
 const mockEq = jest.fn();
 const mockSelect = jest.fn();
 const mockInsertSingle = jest.fn();
@@ -32,7 +33,10 @@ beforeEach(() => {
 
   mockRequireRole.mockResolvedValue({ error: null, userId: "user-1", role: "gestor" });
 
-  mockEq.mockReturnValue({ single: mockSingle, eq: mockEq });
+  // Nenhuma oferta excluída por padrão — os casos abaixo que se importam com
+  // isso sobrescrevem.
+  mockMaybeSingle.mockResolvedValue({ data: null, error: null });
+  mockEq.mockReturnValue({ single: mockSingle, eq: mockEq, maybeSingle: mockMaybeSingle });
   mockSelect.mockReturnValue({ eq: mockEq });
   mockInsertSelect.mockReturnValue({ single: mockInsertSingle });
   mockInsert.mockReturnValue({ select: mockInsertSelect });
@@ -147,6 +151,27 @@ describe("POST /api/ultimates/links", () => {
 
     expect(res.status).toBe(400);
     expect(body.error).toBe("Transação não encontrada para o produto deste ciclo");
+  });
+
+  it("returns 400 when the transaction belongs to an excluded offer", async () => {
+    // A exclusão de oferta vence o vínculo manual (PRD 2026-07-30, decisão 4):
+    // vincular aqui criaria um vínculo que nasce sem efeito nenhum.
+    mockSingle
+      .mockResolvedValueOnce({ data: { id: "c1", product_id: "PROD1", status: "ativo" }, error: null })
+      .mockResolvedValueOnce({ data: { id: "b1", cycle_id: "c1" }, error: null })
+      .mockResolvedValueOnce({
+        data: { transaction_code: "T1", product_id: "PROD1", offer_code: "OFERTA_TESTE" },
+        error: null,
+      });
+    mockMaybeSingle.mockResolvedValueOnce({ data: { id: "eo-1" }, error: null });
+
+    const { POST } = await import("../route");
+    const res = await POST(makeRequest("POST", { cycleId: "c1", buyerId: "b1", transactionCode: "T1" }));
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toBe("Transação pertence a uma oferta excluída deste ciclo");
+    expect(mockInsert).not.toHaveBeenCalled();
   });
 
   it("returns 409 when the transaction is already linked", async () => {

@@ -187,3 +187,94 @@ describe("UltimatesDashboard — fluxos de escrita (critérios 6 e 11)", () => {
     expect(screen.queryByTestId("ultimates-link-buyer-novo@example.com")).not.toBeInTheDocument();
   });
 });
+
+// ── Ofertas excluídas (PRD 2026-07-30) ──────────────────────────────────────
+
+function mockFetchWithExcluded(excludedCount: number) {
+  const offers = Array.from({ length: excludedCount }, (_, i) => ({
+    id: `eo-${i}`,
+    offer_code: `OFERTA_${i}`,
+    offer_name: `Oferta ${i}`,
+    note: null,
+    excluded_by: "user-1",
+    excluded_by_email: "gestor@ex.com",
+    created_at: "2026-07-30T12:00:00Z",
+  }));
+
+  global.fetch = jest.fn((url: string) => {
+    if (url.includes("/roster")) {
+      return Promise.resolve({ ok: true, json: async () => ({ rows: ROSTER }) });
+    }
+    if (url.includes("/daily")) {
+      return Promise.resolve({ ok: true, json: async () => ({ days: DAILY }) });
+    }
+    if (url.includes("/excluded-offers")) {
+      return Promise.resolve({ ok: true, json: async () => ({ offers }) });
+    }
+    if (url.includes("/offer-options")) {
+      return Promise.resolve({ ok: true, json: async () => ({ offers: [] }) });
+    }
+    return Promise.resolve({ ok: false, json: async () => ({}) });
+  }) as unknown as typeof global.fetch;
+}
+
+describe("UltimatesDashboard — sinalização de ofertas excluídas", () => {
+  it("mostra o contador no botão e a nota no card quando há ofertas excluídas", async () => {
+    mockFetchWithExcluded(2);
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" />);
+
+    // O botão aparece antes da contagem chegar (não some enquanto carrega);
+    // o contador entra no rótulo assim que a lista responde.
+    expect(await screen.findByText("Ofertas excluídas (2)")).toBeInTheDocument();
+
+    const note = await screen.findByTestId("ultimates-excluded-offers-note");
+    expect(note).toHaveTextContent("2 ofertas excluídas da contabilidade");
+  });
+
+  it("usa o singular com uma única oferta excluída", async () => {
+    mockFetchWithExcluded(1);
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" />);
+
+    expect(await screen.findByTestId("ultimates-excluded-offers-note")).toHaveTextContent(
+      "1 oferta excluída da contabilidade"
+    );
+  });
+
+  it("sem ofertas excluídas, não mostra contador nem nota", async () => {
+    mockFetchWithExcluded(0);
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" />);
+
+    await screen.findByTestId("ultimates-kpi-row");
+    expect(screen.getByTestId("ultimates-excluded-offers-btn")).toHaveTextContent(
+      "Ofertas excluídas"
+    );
+    expect(screen.getByTestId("ultimates-excluded-offers-btn")).not.toHaveTextContent("(");
+    expect(screen.queryByTestId("ultimates-excluded-offers-note")).not.toBeInTheDocument();
+  });
+
+  it("abre o modal ao clicar no botão", async () => {
+    mockFetchWithExcluded(1);
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" />);
+
+    fireEvent.click(await screen.findByTestId("ultimates-excluded-offers-btn"));
+
+    expect(await screen.findByTestId("ultimates-excluded-offers-modal")).toBeInTheDocument();
+  });
+
+  it("mantém o botão disponível em ciclo encerrado (a lista continua editável)", async () => {
+    mockFetchWithExcluded(0);
+    render(<UltimatesDashboard cycle={makeCycle({ status: "encerrado" })} role="gestor" />);
+
+    await screen.findByTestId("ultimates-kpi-row");
+    // "Carregar base" some em ciclo encerrado; esta lista não.
+    expect(screen.queryByTestId("ultimates-upload-btn")).not.toBeInTheDocument();
+    expect(screen.getByTestId("ultimates-excluded-offers-btn")).toBeInTheDocument();
+  });
+
+  it("mostra o botão para analista (leitura da lista)", async () => {
+    mockFetchWithExcluded(1);
+    render(<UltimatesDashboard cycle={makeCycle()} role="analista" />);
+
+    expect(await screen.findByTestId("ultimates-excluded-offers-btn")).toBeInTheDocument();
+  });
+});

@@ -15,6 +15,7 @@ import { SectionHeader } from "./section-header";
 import { UploadBuyersModal } from "./upload-buyers-modal";
 import { LinkBuyerModal } from "./link-buyer-modal";
 import { UnlinkBuyerModal } from "./unlink-buyer-modal";
+import { ExcludedOffersModal } from "./excluded-offers-modal";
 
 // Dashboard do ciclo selecionado (PRD issue #114, seções 3.2–3.4/3.6, task
 // #123). UMA chamada ao roster + UMA ao daily alimentam KPIs (agregados no
@@ -54,6 +55,12 @@ export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [linkTarget, setLinkTarget] = useState<UltimatesRosterRow | null>(null);
   const [unlinkTarget, setUnlinkTarget] = useState<UltimatesRosterRow | null>(null);
+  // Ofertas excluídas da contabilidade (PRD 2026-07-30). Só o CONTADOR mora
+  // aqui — a lista completa é do modal. Serve para sinalizar que os números
+  // exibidos passaram por um filtro; sem isso o dashboard mentiria por omissão
+  // para quem não configurou a exclusão.
+  const [excludedOpen, setExcludedOpen] = useState(false);
+  const [excludedCount, setExcludedCount] = useState(0);
   // Série exibida no card "Evolução". Mora aqui (e não dentro do gráfico)
   // para sobreviver à troca de ciclo — ultimates-screen.tsx renderiza este
   // componente sem key, então quem compara a mesma métrica entre ciclos não
@@ -91,6 +98,30 @@ export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
     }
 
     load();
+    return () => {
+      cancelled = true;
+    };
+  }, [cycle.id, reloadToken]);
+
+  // Carga do contador em efeito PRÓPRIO e tolerante a falha: é informação
+  // acessória, não pode derrubar o dashboard para o estado de erro nem
+  // atrasar KPIs/gráfico/tabela se a rota estiver lenta.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadExcludedCount() {
+      try {
+        const res = await fetch(`/api/ultimates/cycles/${cycle.id}/excluded-offers`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        setExcludedCount(Array.isArray(data?.offers) ? data.offers.length : 0);
+      } catch {
+        // Silencioso de propósito — ver comentário acima.
+      }
+    }
+
+    loadExcludedCount();
     return () => {
       cancelled = true;
     };
@@ -139,6 +170,14 @@ export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
               Carregar base
             </button>
           )}
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setExcludedOpen(true)}
+            data-testid="ultimates-excluded-offers-btn"
+          >
+            {excludedCount > 0 ? `Ofertas excluídas (${excludedCount})` : "Ofertas excluídas"}
+          </button>
           <RefreshControls
             cycleId={cycle.id}
             cycleStatus={cycle.status}
@@ -186,6 +225,16 @@ export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
         <div className="z-layout">
           <section>
             <SectionHeader index="01" title="Visão do ciclo" desc="Base, renovações e novos compradores" />
+            {excludedCount > 0 && (
+              <p
+                data-testid="ultimates-excluded-offers-note"
+                style={{ fontSize: 12, color: "var(--text-3)", margin: "0 0 12px" }}
+              >
+                {excludedCount === 1
+                  ? "1 oferta excluída da contabilidade"
+                  : `${excludedCount} ofertas excluídas da contabilidade`}
+              </p>
+            )}
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <KpiRow kpis={kpis} />
               {cycle.goal_percent != null && (
@@ -213,6 +262,18 @@ export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
             />
           </section>
         </div>
+      )}
+
+      {/* Diferente dos demais modais, este NÃO é gateado por ciclo ativo:
+          a lista de ofertas excluídas continua editável em ciclo encerrado
+          (decisão 8 do PRD de 2026-07-30). Só o papel decide quem escreve. */}
+      {excludedOpen && (
+        <ExcludedOffersModal
+          cycleId={cycle.id}
+          canWrite={role === "gestor"}
+          onChanged={handleRefreshed}
+          onClose={() => setExcludedOpen(false)}
+        />
       )}
 
       {uploadOpen && canWrite && (
