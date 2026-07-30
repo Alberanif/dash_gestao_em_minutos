@@ -21,10 +21,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: "body vazio" }, { status: 400 });
   }
 
-  const { name, goalPercent, status } = body as {
+  const { name, goalPercent, status, countsNewBuyers } = body as {
     name?: unknown;
     goalPercent?: unknown;
     status?: unknown;
+    countsNewBuyers?: unknown;
   };
 
   const update: Record<string, unknown> = {};
@@ -61,6 +62,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       );
     }
     update.status = status;
+  }
+
+  // Declara que o ciclo não admite novas compras (migration 053). A
+  // reclassificação em si é derivada no cliente; aqui só persistimos a política.
+  if (countsNewBuyers !== undefined) {
+    if (typeof countsNewBuyers !== "boolean") {
+      return NextResponse.json({ error: "countsNewBuyers deve ser booleano" }, { status: 400 });
+    }
+    update.counts_new_buyers = countsNewBuyers;
   }
 
   if (Object.keys(update).length === 0) {

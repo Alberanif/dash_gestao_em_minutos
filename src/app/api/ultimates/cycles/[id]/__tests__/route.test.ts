@@ -166,4 +166,65 @@ describe("PATCH /api/ultimates/cycles/[id]", () => {
     expect(res.status).toBe(200);
     expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: "ativo" }));
   });
+
+  it("grava counts_new_buyers quando countsNewBuyers é booleano", async () => {
+    mockSingle.mockResolvedValue({
+      data: { id: "cycle-uuid", counts_new_buyers: false },
+      error: null,
+    });
+
+    const { PATCH } = await import("../route");
+    const req = makeRequest("PATCH", "http://localhost/api/ultimates/cycles/cycle-uuid", {
+      countsNewBuyers: false,
+    });
+    const res = await PATCH(req, { params: Promise.resolve(params) });
+
+    expect(res.status).toBe(200);
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ counts_new_buyers: false })
+    );
+  });
+
+  it("aceita countsNewBuyers true", async () => {
+    mockSingle.mockResolvedValue({
+      data: { id: "cycle-uuid", counts_new_buyers: true },
+      error: null,
+    });
+
+    const { PATCH } = await import("../route");
+    const req = makeRequest("PATCH", "http://localhost/api/ultimates/cycles/cycle-uuid", {
+      countsNewBuyers: true,
+    });
+    const res = await PATCH(req, { params: Promise.resolve(params) });
+
+    expect(res.status).toBe(200);
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ counts_new_buyers: true })
+    );
+  });
+
+  it("rejeita countsNewBuyers não booleano com 400", async () => {
+    const { PATCH } = await import("../route");
+    const req = makeRequest("PATCH", "http://localhost/api/ultimates/cycles/cycle-uuid", {
+      countsNewBuyers: "sim",
+    });
+    const res = await PATCH(req, { params: Promise.resolve(params) });
+
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("não grava counts_new_buyers quando o campo não vem no body", async () => {
+    mockSingle.mockResolvedValue({ data: { id: "cycle-uuid" }, error: null });
+
+    const { PATCH } = await import("../route");
+    const req = makeRequest("PATCH", "http://localhost/api/ultimates/cycles/cycle-uuid", {
+      name: "Só o nome",
+    });
+    await PATCH(req, { params: Promise.resolve(params) });
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.not.objectContaining({ counts_new_buyers: expect.anything() })
+    );
+  });
 });
