@@ -75,4 +75,31 @@ describe("NewPurchasesToggle", () => {
     fireEvent.click(button);
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it("ignora o segundo clique enquanto o primeiro ainda está em andamento", async () => {
+    // Promise controlada manualmente: só resolve quando chamarmos resolveOnChange.
+    let resolveOnChange: (value: boolean) => void = () => {};
+    const onChange = jest.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveOnChange = resolve;
+        })
+    );
+    render(<NewPurchasesToggle checked disabled={false} onChange={onChange} />);
+    const button = screen.getByTestId("ultimates-new-purchases-toggle");
+
+    // Dois cliques rápidos, antes de o primeiro onChange resolver.
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    // `checked` continua prop (não muda), então sem a trava `pending` os dois
+    // cliques disparariam onChange(false) duas vezes.
+    expect(onChange).toHaveBeenCalledTimes(1);
+
+    resolveOnChange(true);
+    await waitFor(() => expect(button).not.toBeDisabled());
+
+    // Ainda uma única chamada depois de o primeiro clique terminar.
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
 });

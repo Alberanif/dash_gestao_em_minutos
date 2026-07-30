@@ -20,11 +20,21 @@ interface NewPurchasesToggleProps {
 // dashboard inteiro, não só o card ao lado.
 export function NewPurchasesToggle({ checked, disabled, onChange }: NewPurchasesToggleProps) {
   const [failed, setFailed] = useState(false);
+  // `checked` só muda quando o pai re-renderiza, depois do onChange resolver.
+  // Sem essa trava, dois cliques rápidos disparam onChange(!checked) duas
+  // vezes com o mesmo valor — duas persistências concorrentes para o mesmo
+  // campo. Mesmo padrão do `refreshing` em refresh-controls.tsx.
+  const [pending, setPending] = useState(false);
 
   async function handleClick() {
     setFailed(false);
-    const ok = await onChange(!checked);
-    if (!ok) setFailed(true);
+    setPending(true);
+    try {
+      const ok = await onChange(!checked);
+      if (!ok) setFailed(true);
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
@@ -33,7 +43,7 @@ export function NewPurchasesToggle({ checked, disabled, onChange }: NewPurchases
         type="button"
         role="switch"
         aria-checked={checked}
-        disabled={disabled}
+        disabled={disabled || pending}
         title={disabled ? "Indisponível" : undefined}
         onClick={handleClick}
         className="btn-secondary"
