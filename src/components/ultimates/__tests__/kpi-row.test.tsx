@@ -48,9 +48,13 @@ describe("KpiRow — ciclo sem novas compras", () => {
     renovados: 141,
     renovadosPercent: 86.5,
     renovacaoReembolsada: 4,
+    naoRenovados: 2,
     renovacoesSemVinculo: 4,
     renovacoesSemVinculoReembolsadas: 1,
-    possivelmenteRenovados: 4,
+    // min(4, 2) = 2 — distinto de renovacoesSemVinculo (4), então uma troca
+    // entre as duas variáveis no componente fica detectável pelos testes
+    // abaixo (antes coincidiam em 4 e mascaravam essa troca).
+    possivelmenteRenovados: 2,
   });
 
   it("substitui o 5º tile por Renovações sem vínculo, com o total das duas categorias", () => {
@@ -79,8 +83,8 @@ describe("KpiRow — ciclo sem novas compras", () => {
   it("mostra a dica em Não renovados sem alterar o valor", () => {
     render(<KpiRow kpis={semVinculo} countsNewBuyers={false} />);
     const tile = screen.getByTestId("ultimates-kpi-nao-renovados");
-    expect(tile).toHaveTextContent("19");
-    expect(tile).toHaveTextContent("até 4 renovaram com outro email");
+    expect(tile).toHaveTextContent("2");
+    expect(tile).toHaveTextContent("até 2 renovaram com outro email");
   });
 
   it("omite sufixos e dica quando não há nenhuma renovação sem vínculo", () => {
