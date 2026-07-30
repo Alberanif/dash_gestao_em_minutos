@@ -98,18 +98,13 @@ describe("CumulativeChart — ciclo sem novas compras", () => {
     expect(screen.queryByTestId("ultimates-cumulative-series-switch")).toBeNull();
   });
 
-  it("mantém o título de renovações acumuladas", () => {
+  // Smoke test: o Harness já fixa series="renovacoes" quando countsNewBuyers
+  // é false, então isto não verifica a lógica de esconder o switch — só
+  // garante que esconder o switch não quebra a renderização do cabeçalho.
+  it("esconder o switch não quebra o cabeçalho do card", () => {
     render(<Harness countsNewBuyers={false} />);
     expect(screen.getByTestId("ultimates-cumulative-chart")).toHaveTextContent(
       "Renovações acumuladas"
-    );
-  });
-
-  it("continua marcando a série renovacoes no atributo do container", () => {
-    render(<Harness countsNewBuyers={false} />);
-    expect(screen.getByTestId("ultimates-cumulative-chart")).toHaveAttribute(
-      "data-series",
-      "renovacoes"
     );
   });
 
