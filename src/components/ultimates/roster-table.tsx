@@ -12,6 +12,10 @@ import { fmtBRL, fmtDateFull, categoryLabel } from "@/lib/ultimates/format";
 interface RosterTableProps {
   rows: UltimatesRosterRow[];
   role: UserRole;
+  // Política do ciclo (migration 053) — decide QUAIS chips de filtro existem.
+  // As linhas já vieram reetiquetadas por applyNewPurchasesModeToRoster; sem
+  // esta prop a lista mostraria chips de categorias impossíveis no modo atual.
+  countsNewBuyers: boolean;
   // Task #124 conecta o modal de vínculo manual; enquanto não conectado, o
   // botão "Vincular à base" fica desabilitado (slot deixado de propósito —
   // ver PRD issue #114, seção 3.4, critério 7).
@@ -22,14 +26,27 @@ interface RosterTableProps {
   onUnlinkClick?: (row: UltimatesRosterRow) => void;
 }
 
-const CATEGORY_OPTIONS: CategoryFilter[] = [
-  "todas",
-  "renovado",
-  "nao_renovado",
-  "renovacao_reembolsada",
-  "novo_comprador",
-  "novo_reembolsado",
-];
+// Par de listas de chips por modo do ciclo (migration 053): os dois pares de
+// categorias com buyer_id = null (novo_* e renovacao_sem_vinculo*) nunca
+// coexistem nas linhas, então também não coexistem nos filtros.
+const CATEGORY_OPTIONS_BY_MODE: Record<"admite" | "nao_admite", CategoryFilter[]> = {
+  admite: [
+    "todas",
+    "renovado",
+    "nao_renovado",
+    "renovacao_reembolsada",
+    "novo_comprador",
+    "novo_reembolsado",
+  ],
+  nao_admite: [
+    "todas",
+    "renovado",
+    "nao_renovado",
+    "renovacao_reembolsada",
+    "renovacao_sem_vinculo",
+    "renovacao_sem_vinculo_reembolsada",
+  ],
+};
 
 // Acento por categoria (mesma paleta do dash-theme) — usado no badge dos
 // cards mobile.
@@ -39,6 +56,9 @@ const CATEGORY_COLOR: Record<UltimatesCategory, string> = {
   renovacao_reembolsada: "var(--amber)",
   novo_comprador: "var(--orange)",
   novo_reembolsado: "var(--amber)",
+  // Espelha o par novo_*: laranja para a aprovada, âmbar para a reembolsada.
+  renovacao_sem_vinculo: "var(--orange)",
+  renovacao_sem_vinculo_reembolsada: "var(--amber)",
 };
 
 const PAGE_SIZE = 10;
@@ -302,10 +322,11 @@ function RosterCards({
 // exportação CSV usa exatamente a visão filtrada atual. No mobile (< 640px)
 // a lista vira cards (RosterCards) — mesma lista, mesmos fluxos; o DataTable
 // compartilhado continua sendo a visão desktop.
-export function RosterTable({ rows, role, onLinkClick, onUnlinkClick }: RosterTableProps) {
+export function RosterTable({ rows, role, countsNewBuyers, onLinkClick, onUnlinkClick }: RosterTableProps) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<CategoryFilter>("todas");
   const isMobile = useMediaQuery("(max-width: 640px)");
+  const categoryOptions = CATEGORY_OPTIONS_BY_MODE[countsNewBuyers ? "admite" : "nao_admite"];
 
   // Memoizado para o reset de página do DataTable (que observa a referência
   // de `data`) disparar só quando linhas/busca/categoria mudam de verdade, e
@@ -392,7 +413,7 @@ export function RosterTable({ rows, role, onLinkClick, onUnlinkClick }: RosterTa
           className="field-control ult-roster-category"
           data-testid="ultimates-table-category"
         >
-          {CATEGORY_OPTIONS.map((opt) => (
+          {categoryOptions.map((opt) => (
             <option key={opt} value={opt}>
               {opt === "todas" ? "Todas as categorias" : categoryLabel(opt)}
             </option>

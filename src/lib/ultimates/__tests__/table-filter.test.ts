@@ -72,3 +72,26 @@ describe("filterRosterRows", () => {
     expect(result).toHaveLength(1);
   });
 });
+
+describe("filterRosterRows — categorias de renovação sem vínculo", () => {
+  it("filtra por renovacao_sem_vinculo", () => {
+    const rows = [
+      row({ category: "renovado" }),
+      row({ category: "renovacao_sem_vinculo", email: "sem@example.com" }),
+    ];
+    const out = filterRosterRows(rows, { search: "", category: "renovacao_sem_vinculo" });
+    expect(out.map((r) => r.email)).toEqual(["sem@example.com"]);
+  });
+
+  it("filtra por renovacao_sem_vinculo_reembolsada", () => {
+    const rows = [
+      row({ category: "renovacao_sem_vinculo" }),
+      row({ category: "renovacao_sem_vinculo_reembolsada", email: "rb@example.com" }),
+    ];
+    const out = filterRosterRows(rows, {
+      search: "",
+      category: "renovacao_sem_vinculo_reembolsada",
+    });
+    expect(out.map((r) => r.email)).toEqual(["rb@example.com"]);
+  });
+});
