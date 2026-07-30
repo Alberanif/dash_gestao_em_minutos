@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { UserRole } from "@/types/auth";
 import type { UltimatesDailyRow, UltimatesRosterRow } from "@/types/ultimates";
 import type { CycleWithProduct } from "./types";
@@ -143,8 +143,22 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
   const countsNewBuyers = cycle.counts_new_buyers;
   // Reetiquetagem ANTES de tudo: KPIs, gráfico, tabela e CSV consomem estas
   // listas, então nenhum deles precisa conhecer a política do ciclo.
-  const viewRoster = applyNewPurchasesModeToRoster(roster ?? [], countsNewBuyers);
-  const viewDaily = applyNewPurchasesModeToDaily(daily ?? [], countsNewBuyers);
+  // useMemo é OBRIGATÓRIO aqui, não otimização: com countsNewBuyers = false o
+  // mapeador devolve array NOVO a cada render (ver comentário em
+  // new-purchases-mode.ts). Sem memo, essa nova referência se propaga para o
+  // `filtered` do RosterTable (useMemo com `rows` na dependência) e dispara o
+  // reset de página do DataTable/RosterCards (que comparam identidade de
+  // array) em QUALQUER re-render do dashboard — inclusive abrir um modal
+  // ("Vincular à base", "Ofertas excluídas", "Carregar base") jogava o
+  // usuário de volta para a página 1 atrás do próprio modal.
+  const viewRoster = useMemo(
+    () => applyNewPurchasesModeToRoster(roster ?? [], countsNewBuyers),
+    [roster, countsNewBuyers]
+  );
+  const viewDaily = useMemo(
+    () => applyNewPurchasesModeToDaily(daily ?? [], countsNewBuyers),
+    [daily, countsNewBuyers]
+  );
   const kpis = roster ? aggregateRosterKpis(viewRoster) : null;
   // Série derivada no render, nunca por efeito: assim o `series` escolhido pelo
   // usuário sobrevive intacto e volta sozinho se o ciclo religar novas compras.
@@ -194,7 +208,12 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
           >
             {excludedCount > 0 ? `Ofertas excluídas (${excludedCount})` : "Ofertas excluídas"}
           </button>
+          {/* key={cycle.id} remonta só o toggle na troca de ciclo — o `failed`
+              interno dele (PATCH que falhou) não deve sobreviver para o ciclo
+              seguinte. O dashboard continua sem key (comentário no estado
+              `series` acima), então isso não afeta a série do gráfico. */}
           <NewPurchasesToggle
+            key={cycle.id}
             checked={countsNewBuyers}
             disabled={!canWrite}
             onChange={(value) => onCountsNewBuyersChange(cycle.id, value)}

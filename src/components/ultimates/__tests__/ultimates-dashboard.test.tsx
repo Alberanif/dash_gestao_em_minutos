@@ -375,3 +375,67 @@ describe("UltimatesDashboard — modo sem novas compras", () => {
     expect(await screen.findByTestId("ultimates-new-purchases-toggle")).toBeDisabled();
   });
 });
+
+// ── Regressão: paginação do roster não pode resetar sozinha (achado de review
+// do commit 8c52c36) ────────────────────────────────────────────────────────
+
+describe("UltimatesDashboard — paginação do roster no modo desligado", () => {
+  // 25 linhas ⇒ 3 páginas de 10 (PAGE_SIZE do RosterTable). Todas com
+  // category "renovado" e buyer_id preenchido: o mapeador de modo desligado
+  // não precisa reclassificar nada aqui, só devolver um array NOVO a cada
+  // chamada — é essa nova referência (não o conteúdo) que quebra a
+  // memoização de `filtered` em roster-table.tsx quando não há useMemo em
+  // volta de applyNewPurchasesModeToRoster.
+  const MANY_ROSTER: UltimatesRosterRow[] = Array.from({ length: 25 }, (_, i) =>
+    row({
+      buyer_id: `pb${i + 1}`,
+      name: `Participante ${String(i + 1).padStart(2, "0")}`,
+      email: `p${String(i + 1).padStart(2, "0")}@example.com`,
+      category: "renovado",
+    })
+  );
+
+  function mockManyRosterFetch() {
+    global.fetch = jest.fn((url: string) => {
+      if (url.includes("/roster")) {
+        return Promise.resolve({ ok: true, json: async () => ({ rows: MANY_ROSTER }) });
+      }
+      if (url.includes("/daily")) {
+        return Promise.resolve({ ok: true, json: async () => ({ days: [] }) });
+      }
+      if (url.includes("/excluded-offers")) {
+        return Promise.resolve({ ok: true, json: async () => ({ offers: [] }) });
+      }
+      if (url.includes("/offer-options")) {
+        return Promise.resolve({ ok: true, json: async () => ({ offers: [] }) });
+      }
+      return Promise.resolve({ ok: false, json: async () => ({}) });
+    }) as unknown as typeof global.fetch;
+  }
+
+  it("mantém a página 2 da tabela quando o dashboard re-renderiza (abrir um modal) com counts_new_buyers = false", async () => {
+    mockManyRosterFetch();
+    render(
+      <UltimatesDashboard
+        cycle={makeCycle({ counts_new_buyers: false })}
+        role="gestor"
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+      />
+    );
+
+    await screen.findByTestId("ultimates-kpi-row");
+    expect(screen.getByTestId("data-table-page-info")).toHaveTextContent("Página 1 de 3");
+
+    fireEvent.click(screen.getByTestId("data-table-next"));
+    expect(screen.getByTestId("data-table-page-info")).toHaveTextContent("Página 2 de 3");
+
+    // Provoca um re-render do dashboard sem tocar em roster/daily — abrir o
+    // modal de ofertas excluídas passa por setExcludedOpen, que não altera
+    // `roster` nem `countsNewBuyers`. Sem o useMemo do achado 1, isso ainda
+    // assim gera um array novo em viewRoster e reseta a paginação.
+    fireEvent.click(screen.getByTestId("ultimates-excluded-offers-btn"));
+    await screen.findByTestId("ultimates-excluded-offers-modal");
+
+    expect(screen.getByTestId("data-table-page-info")).toHaveTextContent("Página 2 de 3");
+  });
+});

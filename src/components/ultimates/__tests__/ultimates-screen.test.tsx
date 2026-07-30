@@ -118,7 +118,7 @@ describe("UltimatesScreen — seletor de ciclo", () => {
 });
 
 describe("UltimatesScreen — persistência do switch Novas Compras", () => {
-  function mockCyclesAndPatch(patchOk: boolean) {
+  function mockCyclesAndPatch(patchOk: boolean, initialCountsNewBuyers = true) {
     const fetchMock = jest.fn((url: string, init?: RequestInit) => {
       if (init?.method === "PATCH") {
         return Promise.resolve({ ok: patchOk, json: async () => ({}) });
@@ -129,7 +129,7 @@ describe("UltimatesScreen — persistência do switch Novas Compras", () => {
       }
       return Promise.resolve({
         ok: true,
-        json: async () => ({ cycles: [makeCycle({ counts_new_buyers: true })] }),
+        json: async () => ({ cycles: [makeCycle({ counts_new_buyers: initialCountsNewBuyers })] }),
       });
     });
     global.fetch = fetchMock as unknown as typeof global.fetch;
@@ -183,6 +183,30 @@ describe("UltimatesScreen — persistência do switch Novas Compras", () => {
     expect(screen.getByTestId("ultimates-new-purchases-toggle")).toHaveAttribute(
       "aria-checked",
       "true"
+    );
+  });
+
+  it("reverte o switch para 'false' quando o PATCH falha partindo de counts_new_buyers = false", async () => {
+    // Simétrico ao teste acima, mas partindo do estado oposto: a fixture do
+    // describe é counts_new_buyers = true, então o teste anterior só percorre
+    // true → false → true. Uma implementação que troque `previous` por um
+    // literal `true` hardcoded passaria idêntico nele. Partindo de false, o
+    // rollback correto é false → true → false; um literal `true` faria o
+    // switch terminar em "true" e este teste capturaria o erro.
+    mockCyclesAndPatch(false, false);
+    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
+
+    const toggle = await screen.findByTestId("ultimates-new-purchases-toggle");
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+
+    fireEvent.click(toggle);
+
+    expect(await screen.findByTestId("ultimates-new-purchases-feedback")).toHaveTextContent(
+      "Não foi possível salvar a configuração."
+    );
+    expect(screen.getByTestId("ultimates-new-purchases-toggle")).toHaveAttribute(
+      "aria-checked",
+      "false"
     );
   });
 
