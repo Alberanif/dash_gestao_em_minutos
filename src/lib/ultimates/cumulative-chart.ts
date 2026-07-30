@@ -65,12 +65,13 @@ function msParaHora(ms: number): string {
 // Teto de horas que o preenchimento tem permissão de materializar. O ciclo
 // (dash_gestao_ultimates_cycles) não tem colunas de início/fim, e a RPC
 // (migration 054) filtra só por produto + status — ela devolve toda hora com
-// venda no histórico INTEIRO do produto, não só do ciclo corrente. Um produto
-// com dois anos de vendas já gera ~17.500h de vão; uma única approved_date
-// corrompida (ano 2999, por exemplo) gera um vão de milhões de horas e trava
-// a aba preenchendo o array. 2000h (~83 dias) cobre qualquer ciclo real com
-// folga generosa sem abrir essa porta.
-const TETO_HORAS_PREENCHIDAS = 2000;
+// venda no histórico INTEIRO do produto, não só do ciclo corrente. O spec
+// prevê ciclo de 6 meses (~4300 pontos horários) como caso suportado, então o
+// teto precisa folgar acima disso: 8760h (1 ano) cobre os 6 meses com folga e
+// ainda rejeita os casos realmente patológicos — produto com dois anos de
+// vendas (~17.500h de vão) e approved_date corrompida (ano 2999, por
+// exemplo, gerando um vão de milhões de horas que travaria a aba).
+const TETO_HORAS_PREENCHIDAS = 8760;
 
 // Acumula os pontos recebidos, sem preencher as horas entre eles — o mesmo
 // contrato da curva diária. É o fallback usado quando preencher não é seguro
@@ -128,7 +129,13 @@ export function buildHourlyCumulativeSeries(
   const vaoHoras = Math.round((fim - inicio) / HORA_MS) + 1;
   const vaoValido = Number.isFinite(inicio) && Number.isFinite(fim);
 
-  if (!vaoValido || vaoHoras > TETO_HORAS_PREENCHIDAS) {
+  // `vaoHoras < 1`: `sorted` está em ordem lexicográfica, não cronológica —
+  // uma chave `hour` patológica (ano com 5 dígitos, por exemplo) pode fazer
+  // "o maior" ordenar antes de "o menor" quando convertido para ms. Nesse
+  // caso `fim < inicio`, `vaoHoras` fica negativo (não é `> TETO`) e a
+  // primeira comparação do loop (`ms <= fim`) já começaria falsa — mesmo
+  // sintoma do finding do `hour` malformado, então cai no mesmo fallback.
+  if (!vaoValido || vaoHoras < 1 || vaoHoras > TETO_HORAS_PREENCHIDAS) {
     return semPreencher(contagens);
   }
 

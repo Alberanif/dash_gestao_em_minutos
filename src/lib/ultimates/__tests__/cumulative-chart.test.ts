@@ -176,46 +176,43 @@ describe("buildHourlyCumulativeSeries", () => {
     expect(buildHourlyCumulativeSeries(hours)).toEqual([{ key: "2026-07-01T10", cumulative: 5 }]);
   });
 
-  // Converte epoch ms -> "YYYY-MM-DDTHH" com getters UTC, espelhando
-  // msParaHora do próprio módulo, só para montar fixtures de vão largo sem
-  // contar datas de calendário na mão.
-  function horaDeMs(ms: number): string {
-    const d = new Date(ms);
-    const y = d.getUTCFullYear();
-    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(d.getUTCDate()).padStart(2, "0");
-    const h = String(d.getUTCHours()).padStart(2, "0");
-    return `${y}-${m}-${day}T${h}`;
-  }
+  // `inicioMs` só serve para deixar a aritmética do índice->vão explícita nos
+  // comentários abaixo; as chaves de fixture e de expectativa são strings
+  // literais, não geradas por uma função de formatação — se fossem geradas
+  // pela mesma fórmula de `msParaHora` (produção), uma regressão nela (ex.:
+  // `getUTCHours` virar `getHours`) moveria fixture e expectativa juntas, e
+  // o teste continuaria passando sem detectar nada.
   const HORA_MS = 3_600_000;
-  const inicioMs = Date.UTC(2026, 6, 1, 0);
+  const inicioMs = Date.UTC(2026, 6, 1, 0); // 2026-07-01T00
 
-  // Teto defensivo: um vão maior que TETO_HORAS_PREENCHIDAS (2000h) degrada
-  // para o comportamento da curva diária — só os pontos recebidos,
-  // acumulados, sem preencher o intervalo. Vão de 2001 horas (índice 0..2000)
-  // ultrapassa o teto de 2000.
+  // Teto defensivo: um vão maior que TETO_HORAS_PREENCHIDAS (8760h = 1 ano)
+  // degrada para o comportamento da curva diária — só os pontos recebidos,
+  // acumulados, sem preencher o intervalo. Vão de 8761 horas (índice
+  // 0..8760, ou seja de 2026-07-01T00 a 2027-07-01T00) ultrapassa o teto.
   it("acima do teto de horas, devolve só os pontos recebidos acumulados, sem preencher", () => {
-    const fimMs = inicioMs + 2000 * HORA_MS; // índice 0..2000 => vão de 2001 horas
-    const hours = [hour(horaDeMs(inicioMs), 4), hour(horaDeMs(fimMs), 1)];
+    expect(inicioMs + 8760 * HORA_MS).toBe(Date.UTC(2027, 6, 1, 0));
+    const hours = [hour("2026-07-01T00", 4), hour("2027-07-01T00", 1)];
 
     expect(buildHourlyCumulativeSeries(hours)).toEqual([
-      { key: horaDeMs(inicioMs), cumulative: 4 },
-      { key: horaDeMs(fimMs), cumulative: 5 },
+      { key: "2026-07-01T00", cumulative: 4 },
+      { key: "2027-07-01T00", cumulative: 5 },
     ]);
   });
 
-  // Mesmo teto, do outro lado: vão de exatamente 2000 horas (índice 0..1999)
-  // ainda preenche normalmente — o teto não pode disparar cedo demais.
-  it("no teto exato de 2000 horas, ainda preenche normalmente", () => {
-    const fimMs = inicioMs + 1999 * HORA_MS; // índice 0..1999 => vão de exatamente 2000 horas
-    const hours = [hour(horaDeMs(inicioMs), 4), hour(horaDeMs(fimMs), 1)];
+  // Mesmo teto, do outro lado: vão de exatamente 8760 horas (índice
+  // 0..8759, de 2026-07-01T00 a 2027-06-30T23) ainda preenche normalmente —
+  // o teto não pode disparar cedo demais, e precisa cobrir com folga o caso
+  // de ciclo de 6 meses (~4300 pontos horários) previsto no spec.
+  it("no teto exato de 8760 horas, ainda preenche normalmente", () => {
+    expect(inicioMs + 8759 * HORA_MS).toBe(Date.UTC(2027, 5, 30, 23));
+    const hours = [hour("2026-07-01T00", 4), hour("2027-06-30T23", 1)];
 
     const pontos = buildHourlyCumulativeSeries(hours);
-    expect(pontos).toHaveLength(2000);
-    expect(pontos[0]).toEqual({ key: horaDeMs(inicioMs), cumulative: 4 });
-    expect(pontos[pontos.length - 1]).toEqual({ key: horaDeMs(fimMs), cumulative: 5 });
+    expect(pontos).toHaveLength(8760);
+    expect(pontos[0]).toEqual({ key: "2026-07-01T00", cumulative: 4 });
+    expect(pontos[pontos.length - 1]).toEqual({ key: "2027-06-30T23", cumulative: 5 });
     // patamar plano no meio do intervalo, prova de que o preenchimento rodou
-    expect(pontos[1]).toEqual({ key: horaDeMs(inicioMs + HORA_MS), cumulative: 4 });
+    expect(pontos[1]).toEqual({ key: "2026-07-01T01", cumulative: 4 });
   });
 
   // Guarda de runtime: Number(...) na rota vira NaN para valor não-numérico,
@@ -234,6 +231,22 @@ describe("buildHourlyCumulativeSeries", () => {
     expect(buildHourlyCumulativeSeries(hours, "novos")).toEqual([
       { key: "2026-07-01T10", cumulative: 1 },
       { key: "2026-07-01T11", cumulative: 1 },
+    ]);
+  });
+
+  // Vão invertido: uma hora não replicada com zero à esquerda ("T9" em vez de
+  // "T09") ordena DEPOIS de "T10" na comparação lexicográfica (sorted[]),
+  // mas é cronologicamente ANTES. Isso faz `fim` (calculado da última
+  // posição do array ordenado) ficar menor que `inicio` — `vaoHoras` sai
+  // negativo, não é `> TETO`, e sem a guarda `vaoHoras < 1` a primeira
+  // comparação do loop de preenchimento já começaria falsa, devolvendo []
+  // mesmo com dados válidos (o mesmo sintoma do finding do `hour` malformado).
+  it("vão invertido (lexicográfico diverge de cronológico) devolve os pontos recebidos, não []", () => {
+    const hours = [hour("2026-07-01T10", 2), hour("2026-07-01T9", 1)];
+
+    expect(buildHourlyCumulativeSeries(hours)).toEqual([
+      { key: "2026-07-01T10", cumulative: 2 },
+      { key: "2026-07-01T9", cumulative: 3 },
     ]);
   });
 
