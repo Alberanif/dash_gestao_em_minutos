@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import React from "react";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { UltimatesScreen } from "../ultimates-screen";
 import type { CycleWithProduct, HotmartProductOption } from "../types";
@@ -21,6 +21,7 @@ function makeCycle(overrides: Partial<CycleWithProduct> = {}): CycleWithProduct 
     created_by: "user-1",
     created_at: "2026-07-19T00:00:00Z",
     updated_at: "2026-07-19T00:00:00Z",
+    counts_new_buyers: true,
     ...overrides,
   };
 }
@@ -113,5 +114,106 @@ describe("UltimatesScreen — seletor de ciclo", () => {
     const encerradoOption = within(selector).getByTestId("ultimates-cycle-option-c2");
     expect(within(encerradoOption).getByText("Encerrado")).toBeInTheDocument();
     expect(within(selector).getByTestId("ultimates-cycle-option-c1")).toBeInTheDocument();
+  });
+});
+
+describe("UltimatesScreen — persistência do switch Novas Compras", () => {
+  function mockCyclesAndPatch(patchOk: boolean, initialCountsNewBuyers = true) {
+    const fetchMock = jest.fn((url: string, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        return Promise.resolve({ ok: patchOk, json: async () => ({}) });
+      }
+      // Rotas do dashboard (roster / daily / excluded-offers) — vazias bastam.
+      if (url.includes("/api/ultimates/cycles/")) {
+        return Promise.resolve({ ok: true, json: async () => ({ rows: [], days: [], offers: [] }) });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ cycles: [makeCycle({ counts_new_buyers: initialCountsNewBuyers })] }),
+      });
+    });
+    global.fetch = fetchMock as unknown as typeof global.fetch;
+    return fetchMock;
+  }
+
+  it("faz PATCH com countsNewBuyers ao alternar", async () => {
+    const fetchMock = mockCyclesAndPatch(true);
+    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
+
+    fireEvent.click(await screen.findByTestId("ultimates-new-purchases-toggle"));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/ultimates/cycles/c1",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({ countsNewBuyers: false }),
+        })
+      )
+    );
+  });
+
+  it("aplica de forma otimista antes da resposta", async () => {
+    mockCyclesAndPatch(true);
+    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
+
+    const toggle = await screen.findByTestId("ultimates-new-purchases-toggle");
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+
+    fireEvent.click(toggle);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("ultimates-new-purchases-toggle")).toHaveAttribute(
+        "aria-checked",
+        "false"
+      )
+    );
+  });
+
+  it("reverte o switch e mostra o erro quando o PATCH falha", async () => {
+    mockCyclesAndPatch(false);
+    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
+
+    const toggle = await screen.findByTestId("ultimates-new-purchases-toggle");
+    fireEvent.click(toggle);
+
+    expect(await screen.findByTestId("ultimates-new-purchases-feedback")).toHaveTextContent(
+      "Não foi possível salvar a configuração."
+    );
+    expect(screen.getByTestId("ultimates-new-purchases-toggle")).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
+  });
+
+  it("reverte o switch para 'false' quando o PATCH falha partindo de counts_new_buyers = false", async () => {
+    // Simétrico ao teste acima, mas partindo do estado oposto: a fixture do
+    // describe é counts_new_buyers = true, então o teste anterior só percorre
+    // true → false → true. Uma implementação que troque `previous` por um
+    // literal `true` hardcoded passaria idêntico nele. Partindo de false, o
+    // rollback correto é false → true → false; um literal `true` faria o
+    // switch terminar em "true" e este teste capturaria o erro.
+    mockCyclesAndPatch(false, false);
+    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
+
+    const toggle = await screen.findByTestId("ultimates-new-purchases-toggle");
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+
+    fireEvent.click(toggle);
+
+    expect(await screen.findByTestId("ultimates-new-purchases-feedback")).toHaveTextContent(
+      "Não foi possível salvar a configuração."
+    );
+    expect(screen.getByTestId("ultimates-new-purchases-toggle")).toHaveAttribute(
+      "aria-checked",
+      "false"
+    );
+  });
+
+  it("o switch fica travado para analista", async () => {
+    mockCyclesAndPatch(true);
+    render(<UltimatesScreen role="analista" products={PRODUCTS} />);
+
+    expect(await screen.findByTestId("ultimates-new-purchases-toggle")).toBeDisabled();
   });
 });

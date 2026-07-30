@@ -8,6 +8,10 @@ interface UnlinkBuyerModalProps {
   // Linha de comprador da base renovada — pode ou não ter vindo de um vínculo
   // manual (o roster não distingue). O DELETE trata 404 quando não era vínculo.
   targetRow: UltimatesRosterRow;
+  // Decide como nomear o destino da compra desvinculada — com o ciclo sem
+  // novas compras, ela volta para "Renovação sem vínculo", não para "Novos
+  // Compradores".
+  countsNewBuyers: boolean;
   onUnlinked: () => void;
   onCancel: () => void;
 }
@@ -17,7 +21,7 @@ interface UnlinkBuyerModalProps {
 // vínculo manual, então oferecemos a ação em qualquer renovação e tratamos o
 // 404 do DELETE (transação sem vínculo) com mensagem amigável — solução
 // mínima documentada no brief (não há endpoint para listar vínculos do ciclo).
-export function UnlinkBuyerModal({ cycleId, targetRow, onUnlinked, onCancel }: UnlinkBuyerModalProps) {
+export function UnlinkBuyerModal({ cycleId, targetRow, countsNewBuyers, onUnlinked, onCancel }: UnlinkBuyerModalProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -79,8 +83,9 @@ export function UnlinkBuyerModal({ cycleId, targetRow, onUnlinked, onCancel }: U
         </h3>
         <p style={{ fontSize: 13, color: "var(--color-text)", margin: 0, lineHeight: 1.6 }}>
           Desfazer o vínculo manual da renovação de <strong>{targetRow.name ?? targetRow.email}</strong>{" "}
-          ({targetRow.email})? A compra volta para <em>Novos Compradores</em> caso tenha vindo de um
-          email fora da base.
+          ({targetRow.email})? A compra volta para{" "}
+          <em>{countsNewBuyers ? "Novos Compradores" : "Renovação sem vínculo"}</em> caso tenha
+          vindo de um email fora da base.
         </p>
 
         {error && (

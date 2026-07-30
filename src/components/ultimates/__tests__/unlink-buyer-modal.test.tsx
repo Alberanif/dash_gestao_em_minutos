@@ -29,7 +29,13 @@ describe("UnlinkBuyerModal — desfazer vínculo", () => {
     global.fetch = fetchMock as unknown as typeof global.fetch;
 
     render(
-      <UnlinkBuyerModal cycleId="c1" targetRow={row({})} onUnlinked={onUnlinked} onCancel={jest.fn()} />
+      <UnlinkBuyerModal
+        cycleId="c1"
+        targetRow={row({})}
+        countsNewBuyers
+        onUnlinked={onUnlinked}
+        onCancel={jest.fn()}
+      />
     );
     fireEvent.click(screen.getByTestId("ultimates-unlink-confirm-btn"));
 
@@ -49,12 +55,48 @@ describe("UnlinkBuyerModal — desfazer vínculo", () => {
     }) as unknown as typeof global.fetch;
 
     render(
-      <UnlinkBuyerModal cycleId="c1" targetRow={row({})} onUnlinked={onUnlinked} onCancel={jest.fn()} />
+      <UnlinkBuyerModal
+        cycleId="c1"
+        targetRow={row({})}
+        countsNewBuyers
+        onUnlinked={onUnlinked}
+        onCancel={jest.fn()}
+      />
     );
     fireEvent.click(screen.getByTestId("ultimates-unlink-confirm-btn"));
 
     await screen.findByTestId("ultimates-unlink-error");
     expect(screen.getByTestId("ultimates-unlink-error")).toHaveTextContent(/vínculo manual/i);
     expect(onUnlinked).not.toHaveBeenCalled();
+  });
+});
+
+describe("UnlinkBuyerModal — destino conforme o modo do ciclo", () => {
+  it("diz Novos Compradores quando o ciclo admite novas compras", () => {
+    render(
+      <UnlinkBuyerModal
+        cycleId="c1"
+        targetRow={row({})}
+        countsNewBuyers
+        onUnlinked={jest.fn()}
+        onCancel={jest.fn()}
+      />
+    );
+    expect(screen.getByRole("dialog")).toHaveTextContent("Novos Compradores");
+  });
+
+  it("diz Renovação sem vínculo quando o ciclo não admite", () => {
+    render(
+      <UnlinkBuyerModal
+        cycleId="c1"
+        targetRow={row({})}
+        countsNewBuyers={false}
+        onUnlinked={jest.fn()}
+        onCancel={jest.fn()}
+      />
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("Renovação sem vínculo");
+    expect(dialog).not.toHaveTextContent("Novos Compradores");
   });
 });

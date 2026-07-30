@@ -4,6 +4,7 @@ import { render, screen, fireEvent, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { RosterTable } from "../roster-table";
 import type { UltimatesRosterRow } from "@/types/ultimates";
+import { applyNewPurchasesModeToRoster } from "@/lib/ultimates/new-purchases-mode";
 
 function row(overrides: Partial<UltimatesRosterRow>): UltimatesRosterRow {
   return {
@@ -28,28 +29,28 @@ const ROWS: UltimatesRosterRow[] = [
 
 describe("RosterTable — busca e filtro (client-side, mesma fonte dos KPIs)", () => {
   it("mostra todas as linhas inicialmente", () => {
-    render(<RosterTable rows={ROWS} role="gestor" />);
+    render(<RosterTable rows={ROWS} role="gestor" countsNewBuyers />);
     expect(screen.getByText("Maria Silva")).toBeInTheDocument();
     expect(screen.getByText("João Souza")).toBeInTheDocument();
     expect(screen.getByText("Ana Nova")).toBeInTheDocument();
   });
 
   it("filtra por busca de nome/email digitada", () => {
-    render(<RosterTable rows={ROWS} role="gestor" />);
+    render(<RosterTable rows={ROWS} role="gestor" countsNewBuyers />);
     fireEvent.change(screen.getByTestId("ultimates-table-search"), { target: { value: "maria" } });
     expect(screen.getByText("Maria Silva")).toBeInTheDocument();
     expect(screen.queryByText("João Souza")).not.toBeInTheDocument();
   });
 
   it("filtra por categoria selecionada no dropdown", () => {
-    render(<RosterTable rows={ROWS} role="gestor" />);
+    render(<RosterTable rows={ROWS} role="gestor" countsNewBuyers />);
     fireEvent.change(screen.getByTestId("ultimates-table-category"), { target: { value: "nao_renovado" } });
     expect(screen.getByText("João Souza")).toBeInTheDocument();
     expect(screen.queryByText("Maria Silva")).not.toBeInTheDocument();
   });
 
   it("mostra rótulo de categoria em pt-BR na linha", () => {
-    render(<RosterTable rows={ROWS} role="gestor" />);
+    render(<RosterTable rows={ROWS} role="gestor" countsNewBuyers />);
     const table = screen.getByRole("table");
     expect(within(table).getByText("Não renovado")).toBeInTheDocument();
   });
@@ -57,7 +58,7 @@ describe("RosterTable — busca e filtro (client-side, mesma fonte dos KPIs)", (
 
 describe("RosterTable — slot 'Vincular à base' (task #124)", () => {
   it("gestor vê o botão só nas linhas de novo comprador (buyer_id null), desabilitado sem onLinkClick", () => {
-    render(<RosterTable rows={ROWS} role="gestor" />);
+    render(<RosterTable rows={ROWS} role="gestor" countsNewBuyers />);
     const btn = screen.getByTestId("ultimates-link-buyer-ana@example.com");
     expect(btn).toBeDisabled();
     expect(btn).toHaveAttribute("title", "Indisponível");
@@ -66,7 +67,7 @@ describe("RosterTable — slot 'Vincular à base' (task #124)", () => {
 
   it("aciona onLinkClick quando fornecido pelo pai (contrato que a #124 conecta)", () => {
     const onLinkClick = jest.fn();
-    render(<RosterTable rows={ROWS} role="gestor" onLinkClick={onLinkClick} />);
+    render(<RosterTable rows={ROWS} role="gestor" countsNewBuyers onLinkClick={onLinkClick} />);
     const btn = screen.getByTestId("ultimates-link-buyer-ana@example.com");
     expect(btn).not.toBeDisabled();
     fireEvent.click(btn);
@@ -74,7 +75,7 @@ describe("RosterTable — slot 'Vincular à base' (task #124)", () => {
   });
 
   it("analista não vê nenhum botão de vínculo (ação é só gestor)", () => {
-    render(<RosterTable rows={ROWS} role="analista" />);
+    render(<RosterTable rows={ROWS} role="analista" countsNewBuyers />);
     expect(screen.queryByTestId("ultimates-link-buyer-ana@example.com")).not.toBeInTheDocument();
   });
 });
@@ -87,7 +88,7 @@ describe("RosterTable — exportação CSV usa a visão filtrada atual", () => {
     URL.revokeObjectURL = jest.fn();
     const clickSpy = jest.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
 
-    render(<RosterTable rows={ROWS} role="gestor" />);
+    render(<RosterTable rows={ROWS} role="gestor" countsNewBuyers />);
     fireEvent.change(screen.getByTestId("ultimates-table-category"), { target: { value: "nao_renovado" } });
     fireEvent.click(screen.getByText("Exportar CSV"));
 
@@ -112,7 +113,7 @@ describe("RosterTable — paginação (10 por página)", () => {
   );
 
   it("mostra só 10 linhas na primeira página e o rodapé de paginação", () => {
-    render(<RosterTable rows={MANY} role="gestor" />);
+    render(<RosterTable rows={MANY} role="gestor" countsNewBuyers />);
     expect(screen.getByText("Participante 01")).toBeInTheDocument();
     expect(screen.getByText("Participante 10")).toBeInTheDocument();
     expect(screen.queryByText("Participante 11")).not.toBeInTheDocument();
@@ -120,7 +121,7 @@ describe("RosterTable — paginação (10 por página)", () => {
   });
 
   it("buscar reseta para a página 1", () => {
-    render(<RosterTable rows={MANY} role="gestor" />);
+    render(<RosterTable rows={MANY} role="gestor" countsNewBuyers />);
     fireEvent.click(screen.getByTestId("data-table-next"));
     expect(screen.getByText("Participante 11")).toBeInTheDocument();
     fireEvent.change(screen.getByTestId("ultimates-table-search"), {
@@ -128,5 +129,100 @@ describe("RosterTable — paginação (10 por página)", () => {
     });
     expect(screen.getByTestId("data-table-page-info")).toHaveTextContent("Página 1 de 2");
     expect(screen.getByText("Participante 01")).toBeInTheDocument();
+  });
+});
+
+describe("RosterTable — categorias de renovação sem vínculo", () => {
+  const rows: UltimatesRosterRow[] = [
+    row({ buyer_id: "b1", category: "renovado", email: "base@example.com" }),
+    row({ buyer_id: null, category: "renovacao_sem_vinculo", email: "outro@example.com" }),
+  ];
+
+  it("mostra o chip de renovação sem vínculo e esconde os de novo comprador", () => {
+    render(<RosterTable rows={rows} role="gestor" countsNewBuyers={false} />);
+    expect(screen.getByRole("option", { name: "Renovação sem vínculo" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Novo Comprador" })).toBeNull();
+  });
+
+  it("esconde os chips de sem vínculo quando o ciclo admite novas compras", () => {
+    render(<RosterTable rows={rows} role="gestor" countsNewBuyers />);
+    expect(screen.getByRole("option", { name: "Novo Comprador" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Renovação sem vínculo" })).toBeNull();
+  });
+
+  it("renderiza o badge com o rótulo da categoria nova", () => {
+    render(<RosterTable rows={rows} role="gestor" countsNewBuyers={false} />);
+    expect(screen.getAllByText("Renovação sem vínculo").length).toBeGreaterThan(0);
+  });
+
+  it("mantém o botão Vincular à base na linha sem vínculo", () => {
+    render(
+      <RosterTable rows={rows} role="gestor" countsNewBuyers={false} onLinkClick={jest.fn()} />
+    );
+    expect(screen.getByTestId("ultimates-link-buyer-outro@example.com")).toBeEnabled();
+  });
+});
+
+describe("RosterTable — troca de modo (countsNewBuyers) com filtro de categoria ativo", () => {
+  // Linhas cruas como a RPC devolve (só as 5 categorias de fato) — o
+  // dashboard reetiqueta com applyNewPurchasesModeToRoster ANTES de passar
+  // para RosterTable; aqui simulamos exatamente esse fluxo via rerender,
+  // como ultimates-dashboard.tsx faz na troca de switch/ciclo.
+  const rawRows: UltimatesRosterRow[] = [
+    row({ buyer_id: "b1", name: "Maria Silva", email: "maria@example.com", category: "renovado" }),
+    row({ buyer_id: null, name: "Ana Nova", email: "ana@example.com", category: "novo_comprador" }),
+  ];
+
+  it("filtro 'Novo Comprador' não fica preso ao desligar o switch (rerender)", () => {
+    const { rerender } = render(
+      <RosterTable rows={rawRows} role="gestor" countsNewBuyers />
+    );
+
+    fireEvent.change(screen.getByTestId("ultimates-table-category"), {
+      target: { value: "novo_comprador" },
+    });
+    expect(screen.getByText("Ana Nova")).toBeInTheDocument();
+    expect(screen.queryByText("Maria Silva")).not.toBeInTheDocument();
+
+    // Ciclo desliga "conta novo comprador" — o pai reetiqueta as linhas
+    // (novo_comprador -> renovacao_sem_vinculo) e passa countsNewBuyers=false.
+    rerender(
+      <RosterTable
+        rows={applyNewPurchasesModeToRoster(rawRows, false)}
+        role="gestor"
+        countsNewBuyers={false}
+      />
+    );
+
+    expect(screen.getByTestId("ultimates-table-category")).toHaveValue("todas");
+    // Com o filtro de volta a "todas", as duas linhas voltam a aparecer —
+    // Ana Nova já reetiquetada como "Renovação sem vínculo".
+    expect(screen.getByText("Maria Silva")).toBeInTheDocument();
+    expect(screen.getByText("Ana Nova")).toBeInTheDocument();
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("Renovação sem vínculo")).toBeInTheDocument();
+  });
+
+  it("filtro 'Renovação sem vínculo' não fica preso ao religar o switch (rerender)", () => {
+    const offRows = applyNewPurchasesModeToRoster(rawRows, false);
+    const { rerender } = render(
+      <RosterTable rows={offRows} role="gestor" countsNewBuyers={false} />
+    );
+
+    fireEvent.change(screen.getByTestId("ultimates-table-category"), {
+      target: { value: "renovacao_sem_vinculo" },
+    });
+    expect(screen.getByText("Ana Nova")).toBeInTheDocument();
+    expect(screen.queryByText("Maria Silva")).not.toBeInTheDocument();
+
+    // Ciclo religa "conta novo comprador" — o pai volta a passar as linhas
+    // cruas (referência estável quando countsNewBuyers=true) e countsNewBuyers=true.
+    rerender(<RosterTable rows={rawRows} role="gestor" countsNewBuyers />);
+
+    expect(screen.getByTestId("ultimates-table-category")).toHaveValue("todas");
+    expect(screen.getByText("Maria Silva")).toBeInTheDocument();
+    expect(screen.getByText("Ana Nova")).toBeInTheDocument();
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("Novo Comprador")).toBeInTheDocument();
   });
 });

@@ -111,3 +111,15 @@ describe("buildRosterCsv", () => {
     expect(csv).not.toContain("r@example.com");
   });
 });
+
+describe("buildRosterCsv — categorias de renovação sem vínculo", () => {
+  it("exporta o rótulo pt-BR da renovação sem vínculo", () => {
+    const csv = buildRosterCsv([row({ category: "renovacao_sem_vinculo" })]);
+    expect(csv).toContain("Renovação sem vínculo");
+  });
+
+  it("exporta o rótulo da reembolsada sem virar duas colunas", () => {
+    const csv = buildRosterCsv([row({ category: "renovacao_sem_vinculo_reembolsada" })]);
+    expect(csv).toContain("Renovação sem vínculo — reembolsada");
+  });
+});

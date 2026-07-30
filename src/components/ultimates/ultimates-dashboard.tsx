@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { UserRole } from "@/types/auth";
 import type { UltimatesDailyRow, UltimatesRosterRow } from "@/types/ultimates";
 import type { CycleWithProduct } from "./types";
 import { aggregateRosterKpis } from "@/lib/ultimates/kpi-aggregation";
 import { buildCumulativeSeries, type UltimatesSeries } from "@/lib/ultimates/cumulative-chart";
+import {
+  applyNewPurchasesModeToRoster,
+  applyNewPurchasesModeToDaily,
+} from "@/lib/ultimates/new-purchases-mode";
 import { KpiRow } from "./kpi-row";
 import { GoalProgressBar } from "./goal-progress-bar";
 import { CumulativeChart } from "./cumulative-chart";
@@ -16,6 +20,7 @@ import { UploadBuyersModal } from "./upload-buyers-modal";
 import { LinkBuyerModal } from "./link-buyer-modal";
 import { UnlinkBuyerModal } from "./unlink-buyer-modal";
 import { ExcludedOffersModal } from "./excluded-offers-modal";
+import { NewPurchasesToggle } from "./new-purchases-toggle";
 
 // Dashboard do ciclo selecionado (PRD issue #114, seções 3.2–3.4/3.6, task
 // #123). UMA chamada ao roster + UMA ao daily alimentam KPIs (agregados no
@@ -26,6 +31,9 @@ import { ExcludedOffersModal } from "./excluded-offers-modal";
 export interface UltimatesDashboardProps {
   cycle: CycleWithProduct;
   role: UserRole;
+  // Persiste a política do ciclo e devolve se deu certo. Mora no pai porque a
+  // fonte de verdade é a lista de ciclos — ver comentário em ultimates-screen.
+  onCountsNewBuyersChange: (cycleId: string, value: boolean) => Promise<boolean>;
 }
 
 // Bloco de pulso do skeleton no tema escuro (o skeleton compartilhado de
@@ -43,7 +51,7 @@ function SkeletonBlock({ height, radius = 11 }: { height: number; radius?: numbe
   );
 }
 
-export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
+export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: UltimatesDashboardProps) {
   const [roster, setRoster] = useState<UltimatesRosterRow[] | null>(null);
   const [daily, setDaily] = useState<UltimatesDailyRow[] | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -132,11 +140,33 @@ export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
   }
 
   const loading = roster === null || daily === null;
-  const kpis = roster ? aggregateRosterKpis(roster) : null;
+  const countsNewBuyers = cycle.counts_new_buyers;
+  // Reetiquetagem ANTES de tudo: KPIs, gráfico, tabela e CSV consomem estas
+  // listas, então nenhum deles precisa conhecer a política do ciclo.
+  // useMemo é OBRIGATÓRIO aqui, não otimização: com countsNewBuyers = false o
+  // mapeador devolve array NOVO a cada render (ver comentário em
+  // new-purchases-mode.ts). Sem memo, essa nova referência se propaga para o
+  // `filtered` do RosterTable (useMemo com `rows` na dependência) e dispara o
+  // reset de página do DataTable/RosterCards (que comparam identidade de
+  // array) em QUALQUER re-render do dashboard — inclusive abrir um modal
+  // ("Vincular à base", "Ofertas excluídas", "Carregar base") jogava o
+  // usuário de volta para a página 1 atrás do próprio modal.
+  const viewRoster = useMemo(
+    () => applyNewPurchasesModeToRoster(roster ?? [], countsNewBuyers),
+    [roster, countsNewBuyers]
+  );
+  const viewDaily = useMemo(
+    () => applyNewPurchasesModeToDaily(daily ?? [], countsNewBuyers),
+    [daily, countsNewBuyers]
+  );
+  const kpis = roster ? aggregateRosterKpis(viewRoster) : null;
+  // Série derivada no render, nunca por efeito: assim o `series` escolhido pelo
+  // usuário sobrevive intacto e volta sozinho se o ciclo religar novas compras.
+  const activeSeries = countsNewBuyers ? series : "renovacoes";
   // Escrita só para gestor e ciclo ativo (critério 11: ciclo encerrado tem
   // dashboard acessível, mas upload/vínculo/atualização bloqueados).
   const canWrite = role === "gestor" && cycle.status !== "encerrado";
-  const baseRows = roster ? roster.filter((r) => r.buyer_id !== null) : [];
+  const baseRows = viewRoster.filter((r) => r.buyer_id !== null);
 
   function handleWriteDone() {
     setUploadOpen(false);
@@ -178,6 +208,16 @@ export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
           >
             {excludedCount > 0 ? `Ofertas excluídas (${excludedCount})` : "Ofertas excluídas"}
           </button>
+          {/* key={cycle.id} remonta só o toggle na troca de ciclo — o `failed`
+              interno dele (PATCH que falhou) não deve sobreviver para o ciclo
+              seguinte. O dashboard continua sem key (comentário no estado
+              `series` acima), então isso não afeta a série do gráfico. */}
+          <NewPurchasesToggle
+            key={cycle.id}
+            checked={countsNewBuyers}
+            disabled={!canWrite}
+            onChange={(value) => onCountsNewBuyersChange(cycle.id, value)}
+          />
           <RefreshControls
             cycleId={cycle.id}
             cycleStatus={cycle.status}
@@ -224,7 +264,15 @@ export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
       {!loadError && !loading && kpis && (
         <div className="z-layout">
           <section>
-            <SectionHeader index="01" title="Visão do ciclo" desc="Base, renovações e novos compradores" />
+            <SectionHeader
+              index="01"
+              title="Visão do ciclo"
+              desc={
+                countsNewBuyers
+                  ? "Base, renovações e novos compradores"
+                  : "Base, renovações e renovações sem vínculo"
+              }
+            />
             {excludedCount > 0 && (
               <p
                 data-testid="ultimates-excluded-offers-note"
@@ -235,8 +283,16 @@ export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
                   : `${excludedCount} ofertas excluídas da contabilidade`}
               </p>
             )}
+            {!countsNewBuyers && (
+              <p
+                data-testid="ultimates-new-purchases-note"
+                style={{ fontSize: 12, color: "var(--text-3)", margin: "0 0 12px" }}
+              >
+                Compras de emails fora da base contam como renovação
+              </p>
+            )}
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <KpiRow kpis={kpis} />
+              <KpiRow kpis={kpis} countsNewBuyers={countsNewBuyers} />
               {cycle.goal_percent != null && (
                 <GoalProgressBar goalPercent={cycle.goal_percent} currentPercent={kpis.renovadosPercent} />
               )}
@@ -244,19 +300,29 @@ export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
           </section>
 
           <section>
-            <SectionHeader index="02" title="Evolução" desc="Renovações e novos compradores, dia a dia" />
+            <SectionHeader
+              index="02"
+              title="Evolução"
+              desc={
+                countsNewBuyers
+                  ? "Renovações e novos compradores, dia a dia"
+                  : "Renovações acumuladas, dia a dia"
+              }
+            />
             <CumulativeChart
-              data={buildCumulativeSeries(daily ?? [], series)}
-              series={series}
+              data={buildCumulativeSeries(viewDaily, activeSeries)}
+              series={activeSeries}
               onSeriesChange={setSeries}
+              countsNewBuyers={countsNewBuyers}
             />
           </section>
 
           <section>
             <SectionHeader index="03" title="Roster" desc="Compradores do ciclo, busca e exportação" />
             <RosterTable
-              rows={roster ?? []}
+              rows={viewRoster}
               role={role}
+              countsNewBuyers={countsNewBuyers}
               onLinkClick={canWrite ? setLinkTarget : undefined}
               onUnlinkClick={canWrite ? setUnlinkTarget : undefined}
             />
@@ -298,6 +364,7 @@ export function UltimatesDashboard({ cycle, role }: UltimatesDashboardProps) {
         <UnlinkBuyerModal
           cycleId={cycle.id}
           targetRow={unlinkTarget}
+          countsNewBuyers={countsNewBuyers}
           onUnlinked={handleWriteDone}
           onCancel={() => setUnlinkTarget(null)}
         />

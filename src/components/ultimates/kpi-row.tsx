@@ -3,6 +3,11 @@ import { fmtPercent1 } from "@/lib/ultimates/format";
 
 interface KpiRowProps {
   kpis: RosterKpis;
+  // Política do ciclo (migration 053). A derivação já veio pronta em `kpis`;
+  // esta prop só decide qual dos dois 5º tiles renderizar — os dados sozinhos
+  // não distinguem "ciclo sem novas compras" de "ciclo que teve zero novas
+  // compras".
+  countsNewBuyers: boolean;
 }
 
 // Tile no estilo dos KPIs do Indicadores (hero-kpi-card): rótulo uppercase
@@ -69,10 +74,16 @@ function KpiTile({
 // 9). Todos os números vêm de aggregateRosterKpis sobre a MESMA chamada ao
 // roster usada pela tabela — nunca uma fonte separada, para que os números
 // batam entre si.
-export function KpiRow({ kpis }: KpiRowProps) {
+export function KpiRow({ kpis, countsNewBuyers }: KpiRowProps) {
+  const semVinculoTotal = kpis.renovacoesSemVinculo + kpis.renovacoesSemVinculoReembolsadas;
+
   return (
     <div data-testid="ultimates-kpi-row" className="ult-kpi-grid">
       <KpiTile testId="ultimates-kpi-base" label="Base" value={String(kpis.base)} dotColor="var(--violet)" />
+      {/* Total puro, sem decompor as renovações sem vínculo: o número JÁ as
+          inclui (aggregateRosterKpis soma renovado + renovacao_sem_vinculo), e
+          o tile "Renovações sem vínculo" à direita é quem dá essa contagem
+          quando ela existe. Por isso este tile é idêntico nos dois modos. */}
       <KpiTile
         testId="ultimates-kpi-renovados"
         label="Renovados"
@@ -83,25 +94,51 @@ export function KpiRow({ kpis }: KpiRowProps) {
       <KpiTile
         testId="ultimates-kpi-renovacao-reembolsada"
         label="Renovação reembolsada"
-        value={String(kpis.renovacaoReembolsada)}
+        value={
+          kpis.renovacoesSemVinculoReembolsadas > 0
+            ? `${kpis.renovacaoReembolsada} (+${kpis.renovacoesSemVinculoReembolsadas} sem vínculo)`
+            : String(kpis.renovacaoReembolsada)
+        }
         dotColor="var(--amber)"
       />
       <KpiTile
         testId="ultimates-kpi-nao-renovados"
         label="Não renovados"
         value={String(kpis.naoRenovados)}
+        // Dica, NUNCA abatimento: o valor precisa continuar batendo com o que o
+        // filtro "Não renovado" devolve na tabela (critério 9 do PRD #114).
+        sub={
+          kpis.possivelmenteRenovados > 0
+            ? `até ${kpis.possivelmenteRenovados} renovaram com outro email`
+            : undefined
+        }
         dotColor="var(--red)"
       />
-      <KpiTile
-        testId="ultimates-kpi-novos-compradores"
-        label="Novos Compradores"
-        value={
-          kpis.novosReembolsados > 0
-            ? `${kpis.novosCompradores} (+${kpis.novosReembolsados} ⟲)`
-            : String(kpis.novosCompradores)
-        }
-        dotColor="var(--orange)"
-      />
+      {countsNewBuyers ? (
+        <KpiTile
+          testId="ultimates-kpi-novos-compradores"
+          label="Novos Compradores"
+          value={
+            kpis.novosReembolsados > 0
+              ? `${kpis.novosCompradores} (+${kpis.novosReembolsados} ⟲)`
+              : String(kpis.novosCompradores)
+          }
+          dotColor="var(--orange)"
+        />
+      ) : (
+        // Mesma cor de acento do tile que substitui — o número é a fila de
+        // trabalho do "Vincular à base".
+        <KpiTile
+          testId="ultimates-kpi-renovacoes-sem-vinculo"
+          label="Renovações sem vínculo"
+          value={
+            kpis.renovacoesSemVinculoReembolsadas > 0
+              ? `${semVinculoTotal} (+${kpis.renovacoesSemVinculoReembolsadas} ⟲)`
+              : String(semVinculoTotal)
+          }
+          dotColor="var(--orange)"
+        />
+      )}
     </div>
   );
 }

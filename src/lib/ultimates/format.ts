@@ -43,6 +43,8 @@ const CATEGORY_LABELS: Record<UltimatesCategory, string> = {
   renovacao_reembolsada: "Renovação reembolsada",
   novo_comprador: "Novo Comprador",
   novo_reembolsado: "Novo — reembolsado",
+  renovacao_sem_vinculo: "Renovação sem vínculo",
+  renovacao_sem_vinculo_reembolsada: "Renovação sem vínculo — reembolsada",
 };
 
 export function categoryLabel(category: UltimatesCategory): string {

@@ -68,6 +68,37 @@ export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
     setEditTarget(null);
   }
 
+  // Aplicação OTIMISTA: a reclassificação é client-side e leva microssegundos,
+  // então esperar a rede seria inventar latência. Devolve se deu certo — o
+  // toggle usa isso para decidir se mostra o feedback de erro.
+  //
+  // O valor de verdade mora aqui, na lista de ciclos, e chega ao dashboard por
+  // prop. NÃO replique em useState lá dentro: UltimatesDashboard é renderizado
+  // sem key (de propósito, para o switch de séries sobreviver à troca de
+  // ciclo), então uma cópia local carregaria a configuração do ciclo anterior.
+  async function handleCountsNewBuyersChange(cycleId: string, value: boolean): Promise<boolean> {
+    const previous = (cycles ?? []).find((c) => c.id === cycleId)?.counts_new_buyers ?? true;
+
+    setCycles((prev) =>
+      (prev ?? []).map((c) => (c.id === cycleId ? { ...c, counts_new_buyers: value } : c))
+    );
+
+    try {
+      const res = await fetch(`/api/ultimates/cycles/${cycleId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ countsNewBuyers: value }),
+      });
+      if (!res.ok) throw new Error("patch falhou");
+      return true;
+    } catch {
+      setCycles((prev) =>
+        (prev ?? []).map((c) => (c.id === cycleId ? { ...c, counts_new_buyers: previous } : c))
+      );
+      return false;
+    }
+  }
+
   const selectedCycle =
     cycles && cycles.length > 0
       ? cycles.find((c) => c.id === selectedId) ?? cycles[0]
@@ -248,7 +279,11 @@ export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
             )}
           </div>
 
-          <UltimatesDashboard cycle={selectedCycle} role={role} />
+          <UltimatesDashboard
+            cycle={selectedCycle}
+            role={role}
+            onCountsNewBuyersChange={handleCountsNewBuyersChange}
+          />
         </>
       )}
     </div>

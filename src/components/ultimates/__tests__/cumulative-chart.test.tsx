@@ -14,13 +14,14 @@ const DAYS: UltimatesDailyRow[] = [
 
 // Wrapper controlado: o estado da série vive no dashboard em produção, então
 // o teste do switch precisa reproduzir esse ciclo (clique -> nova prop).
-function Harness({ days = DAYS }: { days?: UltimatesDailyRow[] }) {
+function Harness({ days = DAYS, countsNewBuyers = true }: { days?: UltimatesDailyRow[]; countsNewBuyers?: boolean }) {
   const [series, setSeries] = useState<UltimatesSeries>("renovacoes");
   return (
     <CumulativeChart
-      data={buildCumulativeSeries(days, series)}
-      series={series}
+      data={buildCumulativeSeries(days, countsNewBuyers ? series : "renovacoes")}
+      series={countsNewBuyers ? series : "renovacoes"}
       onSeriesChange={setSeries}
+      countsNewBuyers={countsNewBuyers}
     />
   );
 }
@@ -88,5 +89,27 @@ describe("CumulativeChart — switch entre renovações e novos compradores", ()
   it("mostra vazio quando o ciclo não tem nenhum dia com venda", () => {
     render(<Harness days={[]} />);
     expect(screen.getByTestId("ultimates-cumulative-chart-empty")).toBeInTheDocument();
+  });
+});
+
+describe("CumulativeChart — ciclo sem novas compras", () => {
+  it("não renderiza o switch de séries", () => {
+    render(<Harness countsNewBuyers={false} />);
+    expect(screen.queryByTestId("ultimates-cumulative-series-switch")).toBeNull();
+  });
+
+  // Smoke test: o Harness já fixa series="renovacoes" quando countsNewBuyers
+  // é false, então isto não verifica a lógica de esconder o switch — só
+  // garante que esconder o switch não quebra a renderização do cabeçalho.
+  it("esconder o switch não quebra o cabeçalho do card", () => {
+    render(<Harness countsNewBuyers={false} />);
+    expect(screen.getByTestId("ultimates-cumulative-chart")).toHaveTextContent(
+      "Renovações acumuladas"
+    );
+  });
+
+  it("o switch continua presente quando o ciclo admite novas compras", () => {
+    render(<Harness countsNewBuyers />);
+    expect(screen.getByTestId("ultimates-cumulative-series-switch")).toBeInTheDocument();
   });
 });
