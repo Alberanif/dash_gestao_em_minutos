@@ -9,11 +9,11 @@ import {
   CartesianGrid,
   ResponsiveContainer,
 } from "recharts";
-import type { CumulativeRenewalPoint, UltimatesSeries } from "@/lib/ultimates/cumulative-chart";
+import type { CumulativePoint, UltimatesSeries } from "@/lib/ultimates/cumulative-chart";
 import { fmtDateShort } from "@/lib/ultimates/format";
 
 interface CumulativeChartProps {
-  data: CumulativeRenewalPoint[];
+  data: CumulativePoint[];
   series: UltimatesSeries;
   onSeriesChange: (series: UltimatesSeries) => void;
   // Política do ciclo (migration 053). Com ela false só existe uma métrica —
@@ -105,7 +105,7 @@ function SeriesSwitch({
 // o mobile reduzir via media query.
 export function CumulativeChart({ data, series, onSeriesChange, countsNewBuyers }: CumulativeChartProps) {
   const config = SERIES_CONFIG[series];
-  const chartData = data.map((d) => ({ date: fmtDateShort(d.day), cumulative: d.cumulative }));
+  const chartData = data.map((d) => ({ date: fmtDateShort(d.key), cumulative: d.cumulative }));
   // O eixo de dias é compartilhado pelas duas séries (a RPC agrega as duas
   // juntas), então "sem dados" aqui não é lista vazia: é a série ativa somar
   // zero. Sem isso, um ciclo só com novos compradores mostraria a curva de
