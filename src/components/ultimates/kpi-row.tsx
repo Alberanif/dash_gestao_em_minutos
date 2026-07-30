@@ -80,14 +80,14 @@ export function KpiRow({ kpis, countsNewBuyers }: KpiRowProps) {
   return (
     <div data-testid="ultimates-kpi-row" className="ult-kpi-grid">
       <KpiTile testId="ultimates-kpi-base" label="Base" value={String(kpis.base)} dotColor="var(--violet)" />
+      {/* Total puro, sem decompor as renovações sem vínculo: o número JÁ as
+          inclui (aggregateRosterKpis soma renovado + renovacao_sem_vinculo), e
+          o tile "Renovações sem vínculo" à direita é quem dá essa contagem
+          quando ela existe. Por isso este tile é idêntico nos dois modos. */}
       <KpiTile
         testId="ultimates-kpi-renovados"
         label="Renovados"
-        value={
-          kpis.renovacoesSemVinculo > 0
-            ? `${kpis.renovados} (+${kpis.renovacoesSemVinculo} sem vínculo)`
-            : String(kpis.renovados)
-        }
+        value={String(kpis.renovados)}
         sub={`${fmtPercent1(kpis.renovadosPercent)} da base`}
         dotColor="var(--green)"
       />

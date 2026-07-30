@@ -328,10 +328,11 @@ describe("UltimatesDashboard — modo sem novas compras", () => {
       />
     );
 
-    // base = 1 (só b1); renovados = 1 identificado + 1 sem vínculo = 2
-    expect(await screen.findByTestId("ultimates-kpi-renovados")).toHaveTextContent(
-      "2 (+1 sem vínculo)"
-    );
+    // base = 1 (só b1); renovados = 1 identificado + 1 sem vínculo = 2.
+    // O tile mostra só o total — a decomposição fica no 5º tile.
+    const tile = await screen.findByTestId("ultimates-kpi-renovados");
+    expect(tile).toHaveTextContent("2");
+    expect(tile).not.toHaveTextContent("sem vínculo");
   });
 
   it("esconde o switch de séries do gráfico", async () => {

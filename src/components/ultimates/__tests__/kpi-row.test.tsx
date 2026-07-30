@@ -66,11 +66,14 @@ describe("KpiRow — ciclo sem novas compras", () => {
     expect(screen.queryByTestId("ultimates-kpi-novos-compradores")).toBeNull();
   });
 
-  it("soma no tile Renovados com o sufixo só das aprovadas", () => {
+  // O tile mostra o TOTAL puro. As 4 sem vínculo já estão dentro dos 141 (a
+  // soma é feita em aggregateRosterKpis), mas não são decompostas aqui — quem
+  // dá essa contagem é o 5º tile.
+  it("mostra o total de renovados sem decompor as sem vínculo", () => {
     render(<KpiRow kpis={semVinculo} countsNewBuyers={false} />);
-    expect(screen.getByTestId("ultimates-kpi-renovados")).toHaveTextContent(
-      "141 (+4 sem vínculo)"
-    );
+    const tile = screen.getByTestId("ultimates-kpi-renovados");
+    expect(tile).toHaveTextContent("141");
+    expect(tile).not.toHaveTextContent("sem vínculo");
   });
 
   it("soma no tile de reembolsadas com o sufixo das reembolsadas sem vínculo", () => {
