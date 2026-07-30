@@ -495,6 +495,30 @@ describe("UltimatesDashboard — granularidade do card Evolução", () => {
     expect(screen.getByText("Renovações e novos compradores, hora a hora")).toBeInTheDocument();
   });
 
+  // A descrição é o produto de duas dimensões (política do ciclo ×
+  // granularidade) e só metade da matriz tinha teste. Este fecha a outra
+  // metade: com o ciclo sem novas compras, a primeira parte não pode variar
+  // com o chip e a segunda tem que continuar variando.
+  it("a descrição da seção 02 combina as duas granularidades com o modo sem novas compras", async () => {
+    mockRosterAndDailyFetch();
+    render(
+      <UltimatesDashboard
+        cycle={makeCycle({ counts_new_buyers: false })}
+        role="gestor"
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+      />
+    );
+
+    await screen.findByTestId("ultimates-cumulative-chart");
+    expect(screen.getByText("Renovações acumuladas, dia a dia")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("ultimates-cumulative-granularity-hora"));
+    expect(screen.getByText("Renovações acumuladas, hora a hora")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("ultimates-cumulative-granularity-dia"));
+    expect(screen.getByText("Renovações acumuladas, dia a dia")).toBeInTheDocument();
+  });
+
   // Mesma garantia que o `series` já tem: o dashboard é renderizado sem
   // `key`, então a preferência de quem olha atravessa a troca de ciclo.
   it("a granularidade escolhida sobrevive à troca de ciclo", async () => {
