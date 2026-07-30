@@ -30,9 +30,15 @@ export function buildCumulativeSeries(
   // ordem cronológica) antes de acumular, caso a RPC não garanta ordem.
   const sorted = [...days].sort((a, b) => a.day.localeCompare(b.day));
 
+  // `Number.isFinite`, não `?? 0` — mesma guarda da série horária, palavra por
+  // palavra, porque é o mesmo modo de falha: daily/route.ts passa a contagem
+  // por Number(...), então um valor não-numérico chega aqui como NaN, não como
+  // null/undefined, e `??` não intercepta NaN. Um único NaN acumulado apaga o
+  // eixo Y inteiro no Recharts — e as duas curvas dividem o mesmo card.
   let running = 0;
   return sorted.map((d) => {
-    running += (series === "novos" ? d.new_buyers : d.renewals) ?? 0;
+    const bruto = series === "novos" ? d.new_buyers : d.renewals;
+    running += Number.isFinite(bruto) ? bruto : 0;
     return { key: d.day, cumulative: running };
   });
 }
@@ -44,9 +50,11 @@ const HORA_MS = 3_600_000;
 // Ela NÃO é UTC — é hora de parede em America/Sao_Paulo, já convertida pela
 // RPC (migration 054). Fingir que é UTC é justamente o que torna a aritmética
 // correta: some uma hora e a próxima chave sai certa, sem que o fuso da
-// máquina que renderiza, ou um horário de verão de qualquer lugar do mundo,
-// tenha voz no resultado. A ida e a volta usam sempre os getters UTC, então a
-// mentira se cancela.
+// máquina que renderiza — nem um horário de verão VIGENTE NESSE fuso — tenha
+// voz no resultado. A ida e a volta usam sempre os getters UTC, então a
+// mentira se cancela. (Isso não diz nada sobre o horário de verão do fuso do
+// DADO: se o Brasil voltar a ter DST, quem resolve isso é o `at time zone` da
+// RPC, não esta aritmética.)
 function horaParaMs(key: string): number {
   const [datePart, hourPart] = key.split("T");
   const [y, m, d] = datePart.split("-").map(Number);
@@ -66,8 +74,9 @@ function msParaHora(ms: number): string {
 // (dash_gestao_ultimates_cycles) não tem colunas de início/fim, e a RPC
 // (migration 054) filtra só por produto + status — ela devolve toda hora com
 // venda no histórico INTEIRO do produto, não só do ciclo corrente. O spec
-// prevê ciclo de 6 meses (~4300 pontos horários) como caso suportado, então o
-// teto precisa folgar acima disso: 8760h (1 ano) cobre os 6 meses com folga e
+// (Risco #1) estima um ciclo de 6 meses em ~4300 pontos horários e já diz que
+// "fica pesado" — pesado, não impossível, e o teto não é o lugar de recusá-lo,
+// então ele precisa folgar acima disso: 8760h (1 ano) cobre os 6 meses e
 // ainda rejeita os casos realmente patológicos — produto com dois anos de
 // vendas (~17.500h de vão) e approved_date corrompida (ano 2999, por
 // exemplo, gerando um vão de milhões de horas que travaria a aba).
@@ -75,9 +84,15 @@ const TETO_HORAS_PREENCHIDAS = 8760;
 
 // Acumula os pontos recebidos, sem preencher as horas entre eles — o mesmo
 // contrato da curva diária. É o fallback usado quando preencher não é seguro
-// (vão maior que o teto, ou uma chave `hour` malformada): devolver os dados
-// crus e honestos é sempre melhor do que travar a aba ou devolver [] e
-// esconder uma série que era válida.
+// (vão maior que o teto, chave `hour` malformada, ou formato que não sobrevive
+// ao round-trip): devolver os dados crus e honestos é sempre melhor do que
+// travar a aba ou devolver [] e esconder uma série que era válida.
+//
+// A saída sai na ordem de INSERÇÃO do Map, que é a ordem lexicográfica do
+// `sorted` de quem chama — e não a cronológica quando a entrada é justamente a
+// patológica do vão invertido ("T9" depois de "T10"). É aceito de propósito:
+// reordenar exigiria confiar na mesma conversão que já se provou não confiável
+// no caso que trouxe a série até aqui.
 function semPreencher(contagens: Map<string, number>): CumulativePoint[] {
   const pontos: CumulativePoint[] = [];
   let running = 0;
@@ -130,14 +145,28 @@ export function buildHourlyCumulativeSeries(
   const vaoValido = Number.isFinite(inicio) && Number.isFinite(fim);
 
   // `vaoHoras < 1`: `sorted` está em ordem lexicográfica, não cronológica —
-  // uma chave `hour` patológica (ano com 5 dígitos, por exemplo) pode fazer
-  // "o maior" ordenar antes de "o menor" quando convertido para ms. Nesse
+  // uma chave `hour` fora do formato pode fazer "o maior" ordenar antes de "o
+  // menor" quando convertido para ms. O gatilho plausível é uma hora sem zero
+  // à esquerda vinda de uma deriva do to_char ("T9" ordena depois de "T10",
+  // mas é cronologicamente antes); um ano com 5 dígitos faria o mesmo. Nesse
   // caso `fim < inicio`, `vaoHoras` fica negativo (não é `> TETO`) e a
   // primeira comparação do loop (`ms <= fim`) já começaria falsa — mesmo
   // sintoma do finding do `hour` malformado, então cai no mesmo fallback.
   if (!vaoValido || vaoHoras < 1 || vaoHoras > TETO_HORAS_PREENCHIDAS) {
     return semPreencher(contagens);
   }
+
+  // O preenchimento indexa por chave CRUA (`h.hour`, acima) e relê por chave
+  // REGERADA (`msParaHora`, abaixo). As duas só coincidem enquanto o to_char da
+  // migration 054 emitir exatamente "YYYY-MM-DDTHH". Se ele derivar, todo
+  // lookup erra, o acumulado nunca sai de zero e a guarda de vazio do
+  // CumulativeChart (último cumulative === 0) anuncia "Sem renovações
+  // registradas no ciclo ainda." — uma falha de encanamento vestida de
+  // resposta de negócio, o pior desfecho possível para um dashboard. Então a
+  // premissa se verifica sozinha: se a volta não reproduz uma chave que
+  // chegou de verdade, o preenchimento é abortado e os dados recebidos saem
+  // inteiros pelo fallback.
+  if (!contagens.has(msParaHora(inicio))) return semPreencher(contagens);
 
   const pontos: CumulativePoint[] = [];
   let running = 0;

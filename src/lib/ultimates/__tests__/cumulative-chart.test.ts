@@ -81,6 +81,25 @@ describe("buildCumulativeSeries", () => {
       { key: "2026-07-02", cumulative: 0 },
     ]);
   });
+
+  // Gêmeo do teste homônimo da série horária: as duas curvas dividem o mesmo
+  // card e o mesmo modo de falhar. Number(...) em daily/route.ts vira NaN para
+  // valor não-numérico, e `?? 0` deixa passar porque NaN não é null/undefined.
+  it("trata NaN na contagem como zero, sem propagar para cumulative", () => {
+    const days = [
+      { day: "2026-07-01", renewals: NaN, new_buyers: 1 },
+      { day: "2026-07-02", renewals: 2, new_buyers: NaN },
+    ] as unknown as UltimatesDailyRow[];
+
+    expect(buildCumulativeSeries(days, "renovacoes")).toEqual([
+      { key: "2026-07-01", cumulative: 0 },
+      { key: "2026-07-02", cumulative: 2 },
+    ]);
+    expect(buildCumulativeSeries(days, "novos")).toEqual([
+      { key: "2026-07-01", cumulative: 1 },
+      { key: "2026-07-02", cumulative: 1 },
+    ]);
+  });
 });
 
 function hour(hour: string, renewals: number, new_buyers = 0): UltimatesHourlyRow {
@@ -201,8 +220,9 @@ describe("buildHourlyCumulativeSeries", () => {
 
   // Mesmo teto, do outro lado: vão de exatamente 8760 horas (índice
   // 0..8759, de 2026-07-01T00 a 2027-06-30T23) ainda preenche normalmente —
-  // o teto não pode disparar cedo demais, e precisa cobrir com folga o caso
-  // de ciclo de 6 meses (~4300 pontos horários) previsto no spec.
+  // o teto não pode disparar cedo demais, e precisa cobrir com folga o ciclo
+  // de 6 meses (~4300 pontos horários) que o spec (Risco #1) já dá como
+  // pesado, mas não recusa.
   it("no teto exato de 8760 horas, ainda preenche normalmente", () => {
     expect(inicioMs + 8759 * HORA_MS).toBe(Date.UTC(2027, 5, 30, 23));
     const hours = [hour("2026-07-01T00", 4), hour("2027-06-30T23", 1)];
@@ -247,6 +267,37 @@ describe("buildHourlyCumulativeSeries", () => {
     expect(buildHourlyCumulativeSeries(hours)).toEqual([
       { key: "2026-07-01T10", cumulative: 2 },
       { key: "2026-07-01T9", cumulative: 3 },
+    ]);
+  });
+
+  // O modo de falha mais perigoso do módulo: as contagens são indexadas pela
+  // string CRUA da RPC e relidas por uma chave REGERADA por msParaHora(). Se o
+  // to_char da migration 054 derivar do formato combinado — aqui, hora sem
+  // zero à esquerda —, as duas pontas ainda parseiam, o vão sai válido, e todo
+  // lookup do preenchimento erra em silêncio: a curva inteira vira zero e o
+  // card anuncia "Sem renovações registradas no ciclo ainda.". Uma falha de
+  // encanamento vestida de resposta de negócio. A guarda de round-trip
+  // (`contagens.has(msParaHora(inicio))`) derruba o preenchimento para o
+  // fallback honesto, que preserva as contagens recebidas.
+  it("formato de hora divergente (sem zero à esquerda) preserva as contagens em vez de zerar a curva", () => {
+    const hours = [hour("2026-07-01T8", 1), hour("2026-07-01T9", 2)];
+
+    expect(buildHourlyCumulativeSeries(hours)).toEqual([
+      { key: "2026-07-01T8", cumulative: 1 },
+      { key: "2026-07-01T9", cumulative: 3 },
+    ]);
+  });
+
+  // Mesma classe de deriva, outra forma: hora completa (HH:MM:SS) no lugar de
+  // HH. Esta já não parseia, então cai no fallback pela guarda de NaN — o
+  // teste existe para fixar que as duas derivas terminam no MESMO lugar, e
+  // nenhuma delas em uma série zerada.
+  it("formato de hora divergente (HH:MM:SS) também preserva as contagens", () => {
+    const hours = [hour("2026-07-01T08:00:00", 1), hour("2026-07-01T09:00:00", 2)];
+
+    expect(buildHourlyCumulativeSeries(hours)).toEqual([
+      { key: "2026-07-01T08:00:00", cumulative: 1 },
+      { key: "2026-07-01T09:00:00", cumulative: 3 },
     ]);
   });
 
