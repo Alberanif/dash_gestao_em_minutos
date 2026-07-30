@@ -3,8 +3,13 @@ import React, { useState } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { CumulativeChart } from "../cumulative-chart";
-import { buildCumulativeSeries, type UltimatesSeries } from "@/lib/ultimates/cumulative-chart";
-import type { UltimatesDailyRow } from "@/types/ultimates";
+import {
+  buildCumulativeSeries,
+  buildHourlyCumulativeSeries,
+  type UltimatesGranularity,
+  type UltimatesSeries,
+} from "@/lib/ultimates/cumulative-chart";
+import type { UltimatesDailyRow, UltimatesHourlyRow } from "@/types/ultimates";
 
 const DAYS: UltimatesDailyRow[] = [
   { day: "2026-07-01", renewals: 2, new_buyers: 0 },
@@ -12,16 +17,38 @@ const DAYS: UltimatesDailyRow[] = [
   { day: "2026-07-03", renewals: 1, new_buyers: 1 },
 ];
 
-// Wrapper controlado: o estado da série vive no dashboard em produção, então
-// o teste do switch precisa reproduzir esse ciclo (clique -> nova prop).
-function Harness({ days = DAYS, countsNewBuyers = true }: { days?: UltimatesDailyRow[]; countsNewBuyers?: boolean }) {
+const HOURS: UltimatesHourlyRow[] = [
+  { hour: "2026-07-01T20", renewals: 2, new_buyers: 0 },
+  { hour: "2026-07-01T22", renewals: 1, new_buyers: 3 },
+];
+
+// Wrapper controlado: série e granularidade vivem no dashboard em produção,
+// então o teste dos switches precisa reproduzir esse ciclo (clique -> nova
+// prop).
+function Harness({
+  days = DAYS,
+  hours = HOURS,
+  countsNewBuyers = true,
+}: {
+  days?: UltimatesDailyRow[];
+  hours?: UltimatesHourlyRow[];
+  countsNewBuyers?: boolean;
+}) {
   const [series, setSeries] = useState<UltimatesSeries>("renovacoes");
+  const [granularity, setGranularity] = useState<UltimatesGranularity>("dia");
+  const activeSeries = countsNewBuyers ? series : "renovacoes";
   return (
     <CumulativeChart
-      data={buildCumulativeSeries(days, countsNewBuyers ? series : "renovacoes")}
-      series={countsNewBuyers ? series : "renovacoes"}
+      data={
+        granularity === "hora"
+          ? buildHourlyCumulativeSeries(hours, activeSeries)
+          : buildCumulativeSeries(days, activeSeries)
+      }
+      series={activeSeries}
       onSeriesChange={setSeries}
       countsNewBuyers={countsNewBuyers}
+      granularity={granularity}
+      onGranularityChange={setGranularity}
     />
   );
 }
@@ -111,5 +138,69 @@ describe("CumulativeChart — ciclo sem novas compras", () => {
   it("o switch continua presente quando o ciclo admite novas compras", () => {
     render(<Harness countsNewBuyers />);
     expect(screen.getByTestId("ultimates-cumulative-series-switch")).toBeInTheDocument();
+  });
+});
+
+describe("CumulativeChart — switch de granularidade", () => {
+  it("abre em dia, com o chip de dia marcado", () => {
+    render(<Harness />);
+
+    expect(screen.getByTestId("ultimates-cumulative-chart")).toHaveAttribute("data-granularity", "dia");
+    expect(screen.getByTestId("ultimates-cumulative-granularity-dia")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("ultimates-cumulative-granularity-hora")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("Renovações acumuladas")).toBeInTheDocument();
+  });
+
+  it("alterna para hora e ajusta o título do card", () => {
+    render(<Harness />);
+
+    fireEvent.click(screen.getByTestId("ultimates-cumulative-granularity-hora"));
+
+    expect(screen.getByTestId("ultimates-cumulative-chart")).toHaveAttribute("data-granularity", "hora");
+    expect(screen.getByText("Renovações acumuladas — por hora")).toBeInTheDocument();
+  });
+
+  it("volta para dia ao clicar no outro chip", () => {
+    render(<Harness />);
+
+    fireEvent.click(screen.getByTestId("ultimates-cumulative-granularity-hora"));
+    fireEvent.click(screen.getByTestId("ultimates-cumulative-granularity-dia"));
+
+    expect(screen.getByTestId("ultimates-cumulative-chart")).toHaveAttribute("data-granularity", "dia");
+    expect(screen.getByText("Renovações acumuladas")).toBeInTheDocument();
+  });
+
+  // O switch de granularidade não depende da política do ciclo: mesmo sem
+  // novas compras existe uma curva para olhar por hora.
+  it("continua visível quando o switch de séries está escondido", () => {
+    render(<Harness countsNewBuyers={false} />);
+
+    expect(screen.queryByTestId("ultimates-cumulative-series-switch")).toBeNull();
+    expect(screen.getByTestId("ultimates-cumulative-granularity-switch")).toBeInTheDocument();
+  });
+
+  it("as duas dimensões são independentes: série e granularidade combinam livremente", () => {
+    render(<Harness />);
+
+    fireEvent.click(screen.getByTestId("ultimates-cumulative-series-novos"));
+    fireEvent.click(screen.getByTestId("ultimates-cumulative-granularity-hora"));
+
+    const card = screen.getByTestId("ultimates-cumulative-chart");
+    expect(card).toHaveAttribute("data-series", "novos");
+    expect(card).toHaveAttribute("data-granularity", "hora");
+    expect(screen.getByText("Novos compradores acumulados — por hora")).toBeInTheDocument();
+  });
+
+  it("mostra o vazio da série na visão hora quando a métrica ativa soma zero", () => {
+    const semRenovacoes: UltimatesHourlyRow[] = [{ hour: "2026-07-01T20", renewals: 0, new_buyers: 2 }];
+    render(<Harness hours={semRenovacoes} />);
+
+    fireEvent.click(screen.getByTestId("ultimates-cumulative-granularity-hora"));
+
+    expect(screen.getByTestId("ultimates-cumulative-chart-empty")).toHaveTextContent(
+      "Sem renovações registradas no ciclo ainda."
+    );
+    // E o switch de granularidade continua acessível para voltar.
+    expect(screen.getByTestId("ultimates-cumulative-granularity-switch")).toBeInTheDocument();
   });
 });

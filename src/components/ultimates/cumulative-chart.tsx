@@ -9,8 +9,12 @@ import {
   CartesianGrid,
   ResponsiveContainer,
 } from "recharts";
-import type { CumulativePoint, UltimatesSeries } from "@/lib/ultimates/cumulative-chart";
-import { fmtDateShort } from "@/lib/ultimates/format";
+import type {
+  CumulativePoint,
+  UltimatesGranularity,
+  UltimatesSeries,
+} from "@/lib/ultimates/cumulative-chart";
+import { fmtDateShort, fmtHourLong, fmtHourShort } from "@/lib/ultimates/format";
 
 interface CumulativeChartProps {
   data: CumulativePoint[];
@@ -21,6 +25,8 @@ interface CumulativeChartProps {
   // applyNewPurchasesModeToCounts —, então o switch de séries não tem o que
   // alternar e é escondido em vez de mostrar uma curva zerada.
   countsNewBuyers: boolean;
+  granularity: UltimatesGranularity;
+  onGranularityChange: (granularity: UltimatesGranularity) => void;
 }
 
 const TICK = { fontSize: 10, fill: "var(--text-3)" };
@@ -54,43 +60,66 @@ const SERIES_CONFIG: Record<
 };
 
 const SERIES_ORDER: UltimatesSeries[] = ["renovacoes", "novos"];
+const GRANULARITY_ORDER: UltimatesGranularity[] = ["dia", "hora"];
+const GRANULARITY_LABELS: Record<UltimatesGranularity, string> = { dia: "Dia", hora: "Hora" };
 
-function SeriesSwitch({
-  series,
-  onSeriesChange,
+// Acento do grupo de granularidade. Deliberadamente neutro: violeta e laranja
+// significam MÉTRICA neste card (o laranja amarra a curva ao KPI "Novos
+// Compradores"), então pintar o controle de granularidade com eles quebraria
+// esse vínculo visual.
+const NEUTRAL_ACCENT = {
+  chip: "var(--surface-2)",
+  chipBorder: "var(--border-strong)",
+  chipText: "var(--text)",
+};
+
+interface ChipAccent {
+  chip: string;
+  chipBorder: string;
+  chipText: string;
+}
+
+// Um grupo de chips mutuamente exclusivos. Os dois switches do card (métrica e
+// granularidade) são o mesmo controle com conteúdo e acento diferentes.
+function ChipSwitch<T extends string>({
+  testId,
+  options,
+  active,
+  onChange,
+  accentFor,
 }: {
-  series: UltimatesSeries;
-  onSeriesChange: (series: UltimatesSeries) => void;
+  testId: string;
+  options: { value: T; label: string }[];
+  active: T;
+  onChange: (value: T) => void;
+  accentFor: (value: T) => ChipAccent;
 }) {
   return (
-    <div
-      data-testid="ultimates-cumulative-series-switch"
-      style={{ display: "flex", alignItems: "center", gap: 6 }}
-    >
-      {SERIES_ORDER.map((option) => {
-        const config = SERIES_CONFIG[option];
-        const active = option === series;
+    <div data-testid={testId} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      {options.map(({ value, label }) => {
+        const isActive = value === active;
+        const accent = accentFor(value);
         return (
           <button
-            key={option}
+            key={value}
             type="button"
-            aria-pressed={active}
-            onClick={() => onSeriesChange(option)}
-            data-testid={`ultimates-cumulative-series-${option}`}
+            aria-pressed={isActive}
+            onClick={() => onChange(value)}
+            data-testid={`${testId.replace("-switch", "")}-${value}`}
             style={{
               padding: "5px 11px",
               fontSize: 11,
               fontWeight: 600,
               fontFamily: "inherit",
               borderRadius: 20,
-              border: active ? `1px solid ${config.chipBorder}` : "1px solid var(--border-vis)",
-              background: active ? config.chip : "var(--surface)",
-              color: active ? config.chipText : "var(--text-muted)",
+              border: isActive ? `1px solid ${accent.chipBorder}` : "1px solid var(--border-vis)",
+              background: isActive ? accent.chip : "var(--surface)",
+              color: isActive ? accent.chipText : "var(--text-muted)",
               cursor: "pointer",
               transition: "background 150ms ease, color 150ms ease, border-color 150ms ease",
             }}
           >
-            {config.button}
+            {label}
           </button>
         );
       })}
@@ -98,25 +127,52 @@ function SeriesSwitch({
   );
 }
 
+// Acima deste número de pontos a animação de entrada do Recharts é
+// desligada. `dot={false}` já evita nós de DOM por ponto, mas a animação
+// padrão interpola o path inteiro (todas as coordenadas) a cada render — algo
+// barato para os ~30-180 pontos de um ciclo diário, mas caro para a curva
+// horária, que pode chegar a 8760 pontos (1 ano, ver TETO_HORAS_PREENCHIDAS
+// em cumulative-chart.ts). 300 fica folgado acima do maior ciclo diário
+// plausível e bem abaixo do menor cenário horário problemático.
+const LIMIAR_PONTOS_SEM_ANIMACAO = 300;
+
 // Gráfico acumulado do card "Evolução" (PRD issue #114, seção 3.3, critério
-// 9), alternável entre renovações e novos compradores. Os dados já vêm
-// acumulados de buildCumulativeSeries — aqui só formatamos eixos (pt-BR,
-// dd/mm) e desenhamos. A altura vive em .ult-chart-body (ultimates.css) para
-// o mobile reduzir via media query.
-export function CumulativeChart({ data, series, onSeriesChange, countsNewBuyers }: CumulativeChartProps) {
+// 9), alternável entre renovações e novos compradores, e entre as
+// granularidades dia/hora. Os dados já vêm acumulados de
+// buildCumulativeSeries/buildHourlyCumulativeSeries — aqui só formatamos
+// eixos (pt-BR) e desenhamos. A altura vive em .ult-chart-body
+// (ultimates.css) para o mobile reduzir via media query.
+export function CumulativeChart({
+  data,
+  series,
+  onSeriesChange,
+  countsNewBuyers,
+  granularity,
+  onGranularityChange,
+}: CumulativeChartProps) {
   const config = SERIES_CONFIG[series];
-  const chartData = data.map((d) => ({ date: fmtDateShort(d.key), cumulative: d.cumulative }));
-  // O eixo de dias é compartilhado pelas duas séries (a RPC agrega as duas
+  const porHora = granularity === "hora";
+  // `x` é o rótulo do eixo, `tooltip` o do balão — separados porque o eixo
+  // precisa ser curto e o balão pode ser lido por extenso. A chave crua nunca
+  // vira Date: ela já é hora de parede em Brasília.
+  const chartData = data.map((d) => ({
+    x: porHora ? fmtHourShort(d.key) : fmtDateShort(d.key),
+    tooltip: porHora ? fmtHourLong(d.key) : fmtDateShort(d.key),
+    cumulative: d.cumulative,
+  }));
+  // O eixo temporal é compartilhado pelas duas séries (a RPC agrega as duas
   // juntas), então "sem dados" aqui não é lista vazia: é a série ativa somar
   // zero. Sem isso, um ciclo só com novos compradores mostraria a curva de
   // renovações como uma linha reta colada no eixo, parecendo bug.
   const isEmpty = data.length === 0 || data[data.length - 1].cumulative === 0;
   const gradientId = `ultimatesCumulativeGradient-${series}`;
+  const title = porHora ? `${config.title} — por hora` : config.title;
 
   return (
     <div
       data-testid="ultimates-cumulative-chart"
       data-series={series}
+      data-granularity={granularity}
       style={{
         background: "var(--surface)",
         border: "1px solid var(--border-vis)",
@@ -148,9 +204,26 @@ export function CumulativeChart({ data, series, onSeriesChange, countsNewBuyers 
           }}
         >
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: config.color, flexShrink: 0 }} />
-          {config.title}
+          {title}
         </p>
-        {countsNewBuyers && <SeriesSwitch series={series} onSeriesChange={onSeriesChange} />}
+        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+          {countsNewBuyers && (
+            <ChipSwitch
+              testId="ultimates-cumulative-series-switch"
+              options={SERIES_ORDER.map((value) => ({ value, label: SERIES_CONFIG[value].button }))}
+              active={series}
+              onChange={onSeriesChange}
+              accentFor={(value) => SERIES_CONFIG[value]}
+            />
+          )}
+          <ChipSwitch
+            testId="ultimates-cumulative-granularity-switch"
+            options={GRANULARITY_ORDER.map((value) => ({ value, label: GRANULARITY_LABELS[value] }))}
+            active={granularity}
+            onChange={onGranularityChange}
+            accentFor={() => NEUTRAL_ACCENT}
+          />
+        </div>
       </div>
 
       {isEmpty ? (
@@ -176,7 +249,16 @@ export function CumulativeChart({ data, series, onSeriesChange, countsNewBuyers 
                 </linearGradient>
               </defs>
               <CartesianGrid stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="date" tick={TICK} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={24} />
+              {/* minTickGap maior por hora: são centenas de pontos, e o
+                  rótulo horário é mais largo que o de dia. */}
+              <XAxis
+                dataKey="x"
+                tick={TICK}
+                axisLine={false}
+                tickLine={false}
+                interval="preserveStartEnd"
+                minTickGap={porHora ? 48 : 24}
+              />
               <YAxis tick={TICK} axisLine={false} tickLine={false} allowDecimals={false} width={32} />
               <Tooltip
                 contentStyle={{
@@ -188,6 +270,9 @@ export function CumulativeChart({ data, series, onSeriesChange, countsNewBuyers 
                 }}
                 labelStyle={{ color: "var(--text-muted)" }}
                 itemStyle={{ color: "var(--text)" }}
+                labelFormatter={(_label: unknown, payload?: readonly { payload?: { tooltip?: string } }[]) =>
+                  payload?.[0]?.payload?.tooltip ?? ""
+                }
                 formatter={(value) => [value, config.title]}
               />
               <Area
@@ -198,6 +283,7 @@ export function CumulativeChart({ data, series, onSeriesChange, countsNewBuyers 
                 fill={`url(#${gradientId})`}
                 dot={false}
                 activeDot={{ r: 4 }}
+                isAnimationActive={chartData.length < LIMIAR_PONTOS_SEM_ANIMACAO}
               />
             </AreaChart>
           </ResponsiveContainer>
