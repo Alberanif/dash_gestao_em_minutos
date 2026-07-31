@@ -1,19 +1,22 @@
 // Tipos locais da UI de Dash Ultimates. Não editamos src/types/ultimates.ts
 // (restrição da task #122) — este arquivo só estende o que já existe lá para
 // o formato específico que a UI consome.
-import type { UltimatesCycleRecord } from "@/types/ultimates";
+import type { UltimatesCycleRecord, UltimatesCycleProductRef } from "@/types/ultimates";
 
-// Espelha UltimatesCycleWithProductName de
-// src/app/api/ultimates/cycles/route.ts (GET anexa product_name via join em
-// memória). Definido aqui em vez de importado da rota para não puxar código
-// server-only (next/server) para o bundle de cliente.
-export interface CycleWithProduct extends UltimatesCycleRecord {
-  product_name: string | null;
+// Espelha UltimatesCycleWithProducts de src/app/api/ultimates/cycles/route.ts
+// (GET anexa os produtos com dois joins em memória). Definido aqui em vez de
+// importado da rota para não puxar código server-only (next/server) para o
+// bundle de cliente.
+export interface CycleWithProducts extends UltimatesCycleRecord {
+  products: UltimatesCycleProductRef[];
 }
 
 export interface HotmartProductOption {
   product_id: string;
   product_name: string;
+  // Usado pelo modal de criação para travar a seleção numa única conta
+  // Hotmart — o refresh busca credenciais uma vez só, pelo account_id do ciclo.
+  account_id: string;
 }
 
 // Linha da lista devolvida por GET /api/ultimates/cycles/[id]/excluded-offers.

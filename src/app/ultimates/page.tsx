@@ -27,14 +27,14 @@ export default async function UltimatesPage() {
   // authenticated — ver 037_hotmart_products_offers.sql).
   const { data: products } = await supabase
     .from("dash_gestao_hotmart_products")
-    .select("product_id, product_name")
+    .select("product_id, product_name, account_id")
     .eq("is_active", true);
 
   return (
     <UltimatesScreen
       role={role}
       products={sortProductsByName(
-        (products ?? []) as { product_id: string; product_name: string }[]
+        (products ?? []) as { product_id: string; product_name: string; account_id: string }[]
       )}
     />
   );

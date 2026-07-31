@@ -3,11 +3,19 @@
 
 export type UltimatesCycleStatus = "ativo" | "encerrado";
 
+// Produto acompanhado por um ciclo. Um ciclo tem 1..N — o conjunto vive em
+// dash_gestao_ultimates_cycle_products (migration 056), que substituiu a
+// coluna escalar cycles.product_id. product_name é null quando o produto
+// ainda não foi sincronizado por /api/hotmart/sync-products.
+export interface UltimatesCycleProductRef {
+  product_id: string;
+  product_name: string | null;
+}
+
 export interface UltimatesCycleRecord {
   id: string;
   name: string;
   account_id: string;
-  product_id: string;
   goal_percent: number | null;
   status: UltimatesCycleStatus;
   // Quando false, vendas de emails fora da base deixam de ser "novo comprador"
@@ -119,6 +127,11 @@ export interface UltimatesHourlyRow {
 export interface UltimatesOfferOption {
   offer_code: string;
   offer_name: string;
+  // Produto dono da oferta. Com um ciclo multi-produto a lista mistura ofertas
+  // de produtos diferentes, e duas ofertas homônimas ficariam indistinguíveis
+  // no seletor sem isto.
+  product_id: string;
+  product_name: string;
   sales_count: number;
   is_excluded: boolean;
 }
