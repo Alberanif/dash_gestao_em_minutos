@@ -99,3 +99,31 @@ describe("KpiRow — ciclo sem novas compras", () => {
     expect(screen.getByTestId("ultimates-kpi-renovacoes-sem-vinculo")).toHaveTextContent("0");
   });
 });
+
+describe("KpiRow — sinalização de leads excluídos (PRD editar_roster)", () => {
+  it("mostra quantos leads estão excluídos no tile Base", () => {
+    render(<KpiRow kpis={kpis({ base: 120 })} countsNewBuyers excludedBuyersCount={3} />);
+
+    const tile = screen.getByTestId("ultimates-kpi-base");
+    expect(tile).toHaveTextContent("120");
+    expect(tile).toHaveTextContent("3 excluídos");
+  });
+
+  it("usa o singular com um único excluído", () => {
+    render(<KpiRow kpis={kpis({ base: 120 })} countsNewBuyers excludedBuyersCount={1} />);
+
+    expect(screen.getByTestId("ultimates-kpi-base")).toHaveTextContent("1 excluído");
+  });
+
+  it("não diz nada quando ninguém está excluído", () => {
+    render(<KpiRow kpis={kpis({ base: 120 })} countsNewBuyers excludedBuyersCount={0} />);
+
+    expect(screen.getByTestId("ultimates-kpi-base")).not.toHaveTextContent("excluído");
+  });
+
+  it("não diz nada quando o contador nem foi informado", () => {
+    render(<KpiRow kpis={kpis({ base: 120 })} countsNewBuyers />);
+
+    expect(screen.getByTestId("ultimates-kpi-base")).not.toHaveTextContent("excluído");
+  });
+});
