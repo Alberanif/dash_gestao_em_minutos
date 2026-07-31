@@ -5,6 +5,7 @@ import type { UserRole } from "@/types/auth";
 import type { UltimatesDailyRow, UltimatesHourlyRow, UltimatesRosterRow } from "@/types/ultimates";
 import type { CycleWithProduct } from "./types";
 import { aggregateRosterKpis } from "@/lib/ultimates/kpi-aggregation";
+import { derivePurchaseKpis } from "@/lib/ultimates/purchases-mode";
 import {
   buildCumulativeSeries,
   buildHourlyCumulativeSeries,
@@ -311,6 +312,10 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
   // requisito do skeleton sair.
   const loading = roster === null || daily === null;
   const countsNewBuyers = cycle.counts_new_buyers;
+  // Modo Apenas Compras (migration 059): a UI ramifica nele. Quando ligado,
+  // counts_new_buyers é irrelevante (seu interruptor some) e a tela fala a
+  // língua de compras.
+  const purchasesOnly = cycle.purchases_only;
   // Reetiquetagem ANTES de tudo: KPIs, gráfico, tabela e CSV consomem estas
   // listas, então nenhum deles precisa conhecer a política do ciclo.
   // useMemo é OBRIGATÓRIO aqui, não otimização: com countsNewBuyers = false o
@@ -348,6 +353,13 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
   // janela (com os nao_renovado dentro): o KpiRow só lê dela os números de
   // movimento, e base/naoRenovados dela nunca chegam à tela.
   const periodKpis = viewRosterRange ? aggregateRosterKpis(viewRosterRange) : undefined;
+  // KPIs de compra (modo Apenas Compras). Derivados sobre o roster EFETIVO —
+  // recortado pelo filtro De/Até quando ativo, senão o ciclo inteiro — para
+  // baterem com a curva e a tabela. `null` fora do modo (no-op).
+  const purchaseKpis = derivePurchaseKpis(
+    recorteAtivo ? (viewRosterRange as UltimatesRosterRow[]) : viewRoster,
+    purchasesOnly
+  );
   // A tabela é a única consumidora que descarta `nao_renovado`: no recorte,
   // essa categoria significa "não teve venda na janela", e listar a base
   // inteira como não renovada esconderia justamente quem movimentou.
@@ -414,7 +426,9 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
           </p>
         </div>
         <div className="ult-cycle-actions">
-          {canWrite && (
+          {/* Sem base de renovação no modo Apenas Compras: não há lista para
+              carregar (as compras entram sozinhas via materialização). */}
+          {canWrite && !purchasesOnly && (
             <button
               type="button"
               className="btn-secondary"
@@ -446,12 +460,16 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
               interno dele (PATCH que falhou) não deve sobreviver para o ciclo
               seguinte. O dashboard continua sem key (comentário no estado
               `series` acima), então isso não afeta a série do gráfico. */}
-          <NewPurchasesToggle
-            key={cycle.id}
-            checked={countsNewBuyers}
-            disabled={!canWrite}
-            onChange={(value) => onCountsNewBuyersChange(cycle.id, value)}
-          />
+          {/* O interruptor classifica vendas contra uma base que não existe no
+              modo Apenas Compras — escondido lá. */}
+          {!purchasesOnly && (
+            <NewPurchasesToggle
+              key={cycle.id}
+              checked={countsNewBuyers}
+              disabled={!canWrite}
+              onChange={(value) => onCountsNewBuyersChange(cycle.id, value)}
+            />
+          )}
           <RefreshControls
             cycleId={cycle.id}
             cycleStatus={cycle.status}
@@ -508,9 +526,11 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
               index="01"
               title="Visão do ciclo"
               desc={
-                countsNewBuyers
-                  ? "Base, renovações e novos compradores"
-                  : "Base, renovações e renovações sem vínculo"
+                purchasesOnly
+                  ? "Compras do ciclo"
+                  : countsNewBuyers
+                    ? "Base, renovações e novos compradores"
+                    : "Base, renovações e renovações sem vínculo"
               }
             />
             {/* Mesmo princípio das duas notas abaixo: quando um número
@@ -536,7 +556,7 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
                   : `${excludedCount} ofertas excluídas da contabilidade`}
               </p>
             )}
-            {!countsNewBuyers && (
+            {!countsNewBuyers && !purchasesOnly && (
               <p
                 data-testid="ultimates-new-purchases-note"
                 style={{ fontSize: 12, color: "var(--text-3)", margin: "0 0 12px" }}
@@ -550,8 +570,11 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
                 periodKpis={recorteAtivo ? periodKpis : undefined}
                 countsNewBuyers={countsNewBuyers}
                 excludedBuyersCount={excludedBuyersCount}
+                purchaseKpis={purchaseKpis}
               />
-              {cycle.goal_percent != null && (
+              {/* Meta é removida no modo Apenas Compras (não substituída): um
+                  percentual de uma base inexistente não tem sentido. */}
+              {!purchasesOnly && cycle.goal_percent != null && (
                 <GoalProgressBar goalPercent={cycle.goal_percent} currentPercent={kpis.renovadosPercent} />
               )}
             </div>

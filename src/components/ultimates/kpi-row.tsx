@@ -1,5 +1,6 @@
 import type { RosterKpis } from "@/lib/ultimates/kpi-aggregation";
-import { fmtPercent1 } from "@/lib/ultimates/format";
+import type { PurchaseKpis } from "@/lib/ultimates/purchases-mode";
+import { fmtBRL, fmtPercent1 } from "@/lib/ultimates/format";
 
 interface KpiRowProps {
   kpis: RosterKpis;
@@ -24,6 +25,12 @@ interface KpiRowProps {
   // recortar a base junto colaria o % da meta em ~100% em qualquer intervalo,
   // porque o denominador acompanharia o numerador. `undefined` = sem filtro.
   periodKpis?: RosterKpis;
+  // Modo Apenas Compras (migration 059). Quando presente, a linha inteira troca
+  // para os três tiles de compra (Compras · Compras reembolsadas · Valor total)
+  // e nenhum tile de renovação — nem a meta — é renderizado. Derivado por
+  // derivePurchaseKpis sobre o roster (já recortado pelo filtro De/Até, se
+  // houver), então aqui só projetamos.
+  purchaseKpis?: PurchaseKpis | null;
 }
 
 // Tile no estilo dos KPIs do Indicadores (hero-kpi-card): rótulo uppercase
@@ -95,7 +102,35 @@ export function KpiRow({
   countsNewBuyers,
   excludedBuyersCount = 0,
   periodKpis,
+  purchaseKpis,
 }: KpiRowProps) {
+  // Modo Apenas Compras: a linha é outra. Três tiles de compra, nada de
+  // renovação/base/meta.
+  if (purchaseKpis) {
+    return (
+      <div data-testid="ultimates-kpi-row" className="ult-kpi-grid">
+        <KpiTile
+          testId="ultimates-kpi-compras"
+          label="Compras"
+          value={String(purchaseKpis.compras)}
+          dotColor="var(--green)"
+        />
+        <KpiTile
+          testId="ultimates-kpi-compras-reembolsadas"
+          label="Compras reembolsadas"
+          value={String(purchaseKpis.comprasReembolsadas)}
+          dotColor="var(--amber)"
+        />
+        <KpiTile
+          testId="ultimates-kpi-valor-total"
+          label="Valor total"
+          value={fmtBRL(purchaseKpis.valorTotal)}
+          dotColor="var(--violet)"
+        />
+      </div>
+    );
+  }
+
   // Uma variável por NATUREZA do número, para que cada tile abaixo declare de
   // qual das duas ele lê: `mov` para movimento, `kpis` para estoque. Sem
   // filtro as duas são a mesma coisa.

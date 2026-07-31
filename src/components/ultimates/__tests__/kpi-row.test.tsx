@@ -128,6 +128,50 @@ describe("KpiRow — sinalização de leads excluídos (PRD editar_roster)", () 
   });
 });
 
+describe("KpiRow — modo Apenas Compras", () => {
+  it("com purchaseKpis, mostra Compras, Compras reembolsadas e Valor total", () => {
+    render(
+      <KpiRow
+        kpis={kpis()}
+        countsNewBuyers
+        purchaseKpis={{ compras: 42, comprasReembolsadas: 3, valorTotal: 4970 }}
+      />
+    );
+
+    expect(screen.getByTestId("ultimates-kpi-compras")).toHaveTextContent("Compras");
+    expect(screen.getByTestId("ultimates-kpi-compras")).toHaveTextContent("42");
+    expect(screen.getByTestId("ultimates-kpi-compras-reembolsadas")).toHaveTextContent(
+      "Compras reembolsadas"
+    );
+    expect(screen.getByTestId("ultimates-kpi-compras-reembolsadas")).toHaveTextContent("3");
+    const valor = screen.getByTestId("ultimates-kpi-valor-total");
+    expect(valor).toHaveTextContent("Valor total");
+    expect(valor).toHaveTextContent("4.970");
+  });
+
+  it("com purchaseKpis, some com os tiles de renovação", () => {
+    render(
+      <KpiRow
+        kpis={kpis()}
+        countsNewBuyers
+        purchaseKpis={{ compras: 1, comprasReembolsadas: 0, valorTotal: 100 }}
+      />
+    );
+
+    expect(screen.queryByTestId("ultimates-kpi-base")).toBeNull();
+    expect(screen.queryByTestId("ultimates-kpi-renovados")).toBeNull();
+    expect(screen.queryByTestId("ultimates-kpi-nao-renovados")).toBeNull();
+    expect(screen.queryByTestId("ultimates-kpi-novos-compradores")).toBeNull();
+    expect(screen.queryByTestId("ultimates-kpi-renovacoes-sem-vinculo")).toBeNull();
+  });
+
+  it("sem purchaseKpis, mantém os tiles de renovação intactos", () => {
+    render(<KpiRow kpis={kpis()} countsNewBuyers />);
+    expect(screen.getByTestId("ultimates-kpi-base")).toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-kpi-compras")).toBeNull();
+  });
+});
+
 describe("KpiRow — recorte por período (spec filtro de datas)", () => {
   const ciclo = kpis({
     base: 500,
