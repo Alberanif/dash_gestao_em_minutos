@@ -8,9 +8,10 @@
 // de linha, aspas internas dobradas); BOM UTF-8 no início para o Excel
 // pt-BR abrir acentos corretamente.
 import type { UltimatesRosterRow } from "@/types/ultimates";
-import { fmtBRL, fmtDateFull, categoryLabel } from "./format";
+import { fmtBRL, fmtDateFull } from "./format";
+import { purchaseCategoryLabel } from "./purchases-mode";
 
-const FIXED_HEADERS = ["Nome", "Email", "Telefone", "Categoria", "Data da renovação", "Valor"];
+const DATE_HEADER = { renovacao: "Data da renovação", compra: "Data da compra" };
 
 function needsQuoting(value: string): boolean {
   return /[;,"\n\r]/.test(value);
@@ -35,7 +36,18 @@ function extraValueToString(value: unknown): string {
   return String(value);
 }
 
-export function buildRosterCsv(rows: UltimatesRosterRow[]): string {
+// `purchasesOnly` reetiqueta a coluna de categoria e o cabeçalho de data para
+// o vocabulário de compras (migration 059), para o CSV bater com a visão da
+// tela — mesma fonte, mesma língua.
+export function buildRosterCsv(rows: UltimatesRosterRow[], purchasesOnly = false): string {
+  const fixedHeaders = [
+    "Nome",
+    "Email",
+    "Telefone",
+    "Categoria",
+    purchasesOnly ? DATE_HEADER.compra : DATE_HEADER.renovacao,
+    "Valor",
+  ];
   // União das chaves de `extra` entre todas as linhas exportadas — cada
   // upload pode ter colunas extras diferentes.
   const extraKeys: string[] = [];
@@ -49,14 +61,14 @@ export function buildRosterCsv(rows: UltimatesRosterRow[]): string {
     }
   }
 
-  const headerLine = [...FIXED_HEADERS, ...extraKeys].map(escapeCsvField).join(";");
+  const headerLine = [...fixedHeaders, ...extraKeys].map(escapeCsvField).join(";");
 
   const dataLines = rows.map((row) => {
     const fixed = [
       row.name ?? "",
       row.email,
       row.phone ?? "",
-      categoryLabel(row.category),
+      purchaseCategoryLabel(row.category, purchasesOnly),
       fmtDateFull(row.renewed_at),
       row.total_value === null ? "—" : fmtBRL(row.total_value),
     ];

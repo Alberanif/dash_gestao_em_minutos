@@ -5,8 +5,9 @@ jest.mock("@/lib/utils/api-auth", () => ({
 }));
 
 const mockFrom = jest.fn();
+const mockRpc = jest.fn();
 jest.mock("@/lib/supabase/server", () => ({
-  createSupabaseServiceClient: jest.fn(() => ({ from: mockFrom })),
+  createSupabaseServiceClient: jest.fn(() => ({ from: mockFrom, rpc: mockRpc })),
 }));
 
 // ── Mutable test state (reset per test) ───────────────────────────────────────
@@ -17,6 +18,9 @@ let lockError: { message: string } | null;
 let releaseError: { message: string } | null;
 let accountRow: Record<string, unknown> | null;
 let upsertError: { message: string } | null;
+// Captura as chamadas de RPC (a sincronização de buyers do modo Apenas Compras).
+let rpcCalls: Array<{ fn: string; args: unknown }>;
+let syncError: { message: string } | null;
 
 // Captura os payloads passados para cycles.update (lock e finally).
 let cycleUpdatePayloads: Array<Record<string, unknown>>;
@@ -74,6 +78,18 @@ beforeEach(() => {
   cycleUpdateOptions = [];
   releaseFilter = null;
   upsertOrder = [];
+  rpcCalls = [];
+  syncError = null;
+
+  mockRpc.mockImplementation((fn: string, args: unknown) => {
+    rpcCalls.push({ fn, args });
+    const builder = {
+      abortSignal: () => builder,
+      then: (resolve: (v: { data: unknown; error: { message: string } | null }) => void) =>
+        resolve({ data: 0, error: syncError }),
+    };
+    return builder;
+  });
 
   (global.fetch as jest.Mock) = jest.fn();
 
@@ -138,6 +154,7 @@ function activeCycle(overrides: Record<string, unknown> = {}) {
     status: "ativo",
     created_at: "2026-01-01T00:00:00.000Z",
     last_refresh_at: null,
+    purchases_only: false,
     ...overrides,
   };
 }
@@ -381,6 +398,44 @@ describe("POST /api/ultimates/cycles/[id]/refresh", () => {
     expect(res.status).toBe(502);
     const body = await res.json();
     expect(body.error).toContain("demorou demais");
+
+    const clearing = cycleUpdatePayloads.find((p) => p.refresh_started_at === null);
+    expect(clearing).toBeDefined();
+  });
+
+  // ── Apenas Compras: materialização de buyers a partir das vendas ────────────
+  it("materializa buyers via RPC insert-only quando o ciclo é purchases_only", async () => {
+    cycleRow = activeCycle({ purchases_only: true });
+    lockCount = 1;
+    mockTokenAndSales([saleItem()]);
+
+    const res = await callRoute();
+    expect(res.status).toBe(200);
+
+    // A sincronização roda com o id do ciclo, DEPOIS do upsert de vendas.
+    expect(rpcCalls).toEqual([
+      { fn: "dash_gestao_ultimates_sync_buyers_from_sales", args: { p_cycle_id: "cycle-1" } },
+    ]);
+  });
+
+  it("NÃO chama a sincronização em ciclo de renovação (purchases_only false)", async () => {
+    cycleRow = activeCycle({ purchases_only: false });
+    lockCount = 1;
+    mockTokenAndSales([saleItem()]);
+
+    const res = await callRoute();
+    expect(res.status).toBe(200);
+    expect(rpcCalls).toEqual([]);
+  });
+
+  it("retorna 502 e libera o lock quando a sincronização de buyers falha", async () => {
+    cycleRow = activeCycle({ purchases_only: true });
+    lockCount = 1;
+    mockTokenAndSales([saleItem()]);
+    syncError = { message: "boom sync" };
+
+    const res = await callRoute();
+    expect(res.status).toBe(502);
 
     const clearing = cycleUpdatePayloads.find((p) => p.refresh_started_at === null);
     expect(clearing).toBeDefined();

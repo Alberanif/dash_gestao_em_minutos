@@ -37,6 +37,21 @@ describe("buildRosterCsv", () => {
     expect(lines[1]).toBe("Maria;maria@example.com;11999990000;Não renovado;—;—");
   });
 
+  it("no modo Apenas Compras, cabeçalho e categoria usam o vocabulário de compras", () => {
+    const csv = buildRosterCsv(
+      [
+        row({ name: "Compra", email: "c@example.com", category: "renovado", total_value: 100 }),
+        row({ name: "Estorno", email: "e@example.com", category: "renovacao_reembolsada" }),
+      ],
+      true
+    );
+    const lines = csv.slice(1).split("\r\n");
+    expect(lines[0]).toBe("Nome;Email;Telefone;Categoria;Data da compra;Valor");
+    expect(lines[1]).toContain("Compra;c@example.com");
+    expect(lines[1]).toContain(";Compra;"); // categoria reetiquetada
+    expect(lines[2]).toContain(";Compra reembolsada;");
+  });
+
   it("formata data (dd/mm/aaaa) e valor (BRL) quando presentes", () => {
     const csv = buildRosterCsv([
       row({

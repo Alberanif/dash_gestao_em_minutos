@@ -21,6 +21,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: "body vazio" }, { status: 400 });
   }
 
+  // purchases_only NÃO é lido aqui de propósito: é definido só na criação e
+  // imutável depois (PRD "Apenas Compras"). Trocar o modo no meio do ciclo
+  // corromperia a contabilidade — um purchasesOnly no body é simplesmente
+  // ignorado, nunca aplicado.
   const { name, goalPercent, status, countsNewBuyers } = body as {
     name?: unknown;
     goalPercent?: unknown;

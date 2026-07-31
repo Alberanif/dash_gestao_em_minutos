@@ -227,6 +227,43 @@ describe("RosterTable — troca de modo (countsNewBuyers) com filtro de categori
   });
 });
 
+describe("RosterTable — modo Apenas Compras (#155)", () => {
+  const PURCHASES: UltimatesRosterRow[] = [
+    row({ buyer_id: "b1", name: "Compra Ativa", email: "c1@example.com", category: "renovado", total_value: 100 }),
+    row({
+      buyer_id: "b2",
+      name: "Compra Estorno",
+      email: "c2@example.com",
+      category: "renovacao_reembolsada",
+      total_value: 0,
+    }),
+  ];
+
+  it("reetiqueta badge/coluna de categoria para o vocabulário de compras", () => {
+    render(<RosterTable rows={PURCHASES} role="gestor" countsNewBuyers purchasesOnly />);
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("Compra")).toBeInTheDocument();
+    expect(within(table).getByText("Compra reembolsada")).toBeInTheDocument();
+    expect(within(table).queryByText("Renovado")).toBeNull();
+    expect(within(table).queryByText("Renovação reembolsada")).toBeNull();
+  });
+
+  it("troca a coluna 'Data da renovação' por 'Data da compra'", () => {
+    render(<RosterTable rows={PURCHASES} role="gestor" countsNewBuyers purchasesOnly />);
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("Data da compra")).toBeInTheDocument();
+    expect(within(table).queryByText("Data da renovação")).toBeNull();
+  });
+
+  it("filtro de categoria oferece as opções de compra, não as de renovação", () => {
+    render(<RosterTable rows={PURCHASES} role="gestor" countsNewBuyers purchasesOnly />);
+    expect(screen.getByRole("option", { name: "Compra" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Compra reembolsada" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Renovado" })).toBeNull();
+    expect(screen.queryByRole("option", { name: "Novo Comprador" })).toBeNull();
+  });
+});
+
 describe("RosterTable — ações de edição do roster (PRD editar_roster)", () => {
   const HANDLERS = {
     onMarkRenewedClick: jest.fn(),

@@ -227,4 +227,32 @@ describe("PATCH /api/ultimates/cycles/[id]", () => {
       expect.not.objectContaining({ counts_new_buyers: expect.anything() })
     );
   });
+
+  // purchases_only é imutável (definido só na criação). O PATCH nunca o aplica.
+  it("ignora purchasesOnly: não grava purchases_only mesmo se vier no body", async () => {
+    mockSingle.mockResolvedValue({ data: { id: "cycle-uuid", name: "Novo nome" }, error: null });
+
+    const { PATCH } = await import("../route");
+    const req = makeRequest("PATCH", "http://localhost/api/ultimates/cycles/cycle-uuid", {
+      name: "Novo nome",
+      purchasesOnly: true,
+    });
+    const res = await PATCH(req, { params: Promise.resolve(params) });
+
+    expect(res.status).toBe(200);
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.not.objectContaining({ purchases_only: expect.anything() })
+    );
+  });
+
+  it("retorna 400 quando purchasesOnly é o único campo (nada aplicável)", async () => {
+    const { PATCH } = await import("../route");
+    const req = makeRequest("PATCH", "http://localhost/api/ultimates/cycles/cycle-uuid", {
+      purchasesOnly: true,
+    });
+    const res = await PATCH(req, { params: Promise.resolve(params) });
+
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
 });

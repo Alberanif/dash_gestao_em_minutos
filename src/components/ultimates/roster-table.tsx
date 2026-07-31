@@ -7,7 +7,8 @@ import type { UserRole } from "@/types/auth";
 import type { UltimatesCategory, UltimatesRosterRow } from "@/types/ultimates";
 import { filterRosterRows, type CategoryFilter } from "@/lib/ultimates/table-filter";
 import { buildRosterCsv } from "@/lib/ultimates/csv-export";
-import { fmtBRL, fmtDateFull, categoryLabel } from "@/lib/ultimates/format";
+import { fmtBRL, fmtDateFull } from "@/lib/ultimates/format";
+import { purchaseCategoryLabel } from "@/lib/ultimates/purchases-mode";
 
 interface RosterTableProps {
   rows: UltimatesRosterRow[];
@@ -16,6 +17,11 @@ interface RosterTableProps {
   // As linhas já vieram reetiquetadas por applyNewPurchasesModeToRoster; sem
   // esta prop a lista mostraria chips de categorias impossíveis no modo atual.
   countsNewBuyers: boolean;
+  // Modo Apenas Compras (migration 059): reetiqueta categoria/coluna/card para
+  // o vocabulário de compras e restringe os chips de filtro às categorias que
+  // existem no modo. As linhas já vêm materializadas (buyer_id preenchido); as
+  // ações de vínculo/marcar renovado simplesmente não são passadas pelo pai.
+  purchasesOnly?: boolean;
   // Task #124 conecta o modal de vínculo manual; enquanto não conectado, o
   // botão "Vincular à base" fica desabilitado (slot deixado de propósito —
   // ver PRD issue #114, seção 3.4, critério 7).
@@ -60,6 +66,14 @@ const CATEGORY_OPTIONS_BY_MODE: Record<"admite" | "nao_admite", CategoryFilter[]
     "renovacao_sem_vinculo_reembolsada",
   ],
 };
+
+// Modo Apenas Compras: só as duas categorias que as linhas materializadas
+// podem ter (renovado = Compra, renovacao_reembolsada = Compra reembolsada).
+const CATEGORY_OPTIONS_PURCHASES: CategoryFilter[] = [
+  "todas",
+  "renovado",
+  "renovacao_reembolsada",
+];
 
 // Acento por categoria (mesma paleta do dash-theme) — usado no badge dos
 // cards mobile.
@@ -116,7 +130,13 @@ function downloadCsv(csv: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function CategoryBadge({ category }: { category: UltimatesCategory }) {
+function CategoryBadge({
+  category,
+  purchasesOnly,
+}: {
+  category: UltimatesCategory;
+  purchasesOnly: boolean;
+}) {
   const color = CATEGORY_COLOR[category] ?? "var(--text-muted)";
   return (
     <span
@@ -131,7 +151,7 @@ function CategoryBadge({ category }: { category: UltimatesCategory }) {
         border: `1px solid color-mix(in srgb, ${color} 32%, transparent)`,
       }}
     >
-      {categoryLabel(category)}
+      {purchaseCategoryLabel(category, purchasesOnly)}
     </span>
   );
 }
@@ -265,11 +285,13 @@ function RosterCards({
   isGestor,
   handlers,
   onExportCsv,
+  purchasesOnly,
 }: {
   rows: UltimatesRosterRow[];
   isGestor: boolean;
   handlers: RowHandlers;
   onExportCsv: () => void;
+  purchasesOnly: boolean;
 }) {
   const [page, setPage] = useState(1);
 
@@ -346,7 +368,7 @@ function RosterCards({
                 <p style={{ fontSize: 12, color: "var(--text-3)", margin: "2px 0 0" }}>{row.phone}</p>
               )}
             </div>
-            <CategoryBadge category={row.category} />
+            <CategoryBadge category={row.category} purchasesOnly={purchasesOnly} />
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -360,7 +382,7 @@ function RosterCards({
             </div>
             <div>
               <p style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-4)", margin: 0 }}>
-                Renovação
+                {purchasesOnly ? "Compra" : "Renovação"}
               </p>
               <p style={{ fontSize: 13, color: "var(--text-2)", margin: "2px 0 0" }}>
                 {fmtDateFull(row.renewed_at)}
@@ -416,6 +438,7 @@ export function RosterTable({
   rows,
   role,
   countsNewBuyers,
+  purchasesOnly = false,
   onLinkClick,
   onUnlinkClick,
   onMarkRenewedClick,
@@ -432,7 +455,9 @@ export function RosterTable({
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<CategoryFilter>("todas");
   const isMobile = useMediaQuery("(max-width: 640px)");
-  const categoryOptions = CATEGORY_OPTIONS_BY_MODE[countsNewBuyers ? "admite" : "nao_admite"];
+  const categoryOptions = purchasesOnly
+    ? CATEGORY_OPTIONS_PURCHASES
+    : CATEGORY_OPTIONS_BY_MODE[countsNewBuyers ? "admite" : "nao_admite"];
 
   // RosterTable não é remontada quando `countsNewBuyers` muda (nem o
   // dashboard nem esta tabela têm `key`) — troca de switch ou de ciclo entre
@@ -459,7 +484,7 @@ export function RosterTable({
   const isGestor = role === "gestor";
 
   function handleExportCsv() {
-    const csv = buildRosterCsv(filtered);
+    const csv = buildRosterCsv(filtered, purchasesOnly);
     const today = new Date().toISOString().slice(0, 10);
     downloadCsv(csv, `dash-ultimates-roster-${today}.csv`);
   }
@@ -487,11 +512,11 @@ export function RosterTable({
     {
       key: "category",
       label: "Categoria",
-      render: (value) => categoryLabel(value as UltimatesCategory),
+      render: (value) => purchaseCategoryLabel(value as UltimatesCategory, purchasesOnly),
     },
     {
       key: "renewed_at",
-      label: "Data da renovação",
+      label: purchasesOnly ? "Data da compra" : "Data da renovação",
       render: (value) => fmtDateFull(value as UltimatesRosterRow["renewed_at"]),
     },
     {
@@ -534,7 +559,9 @@ export function RosterTable({
         >
           {categoryOptions.map((opt) => (
             <option key={opt} value={opt}>
-              {opt === "todas" ? "Todas as categorias" : categoryLabel(opt)}
+              {opt === "todas"
+                ? "Todas as categorias"
+                : purchaseCategoryLabel(opt as UltimatesCategory, purchasesOnly)}
             </option>
           ))}
         </select>
@@ -546,6 +573,7 @@ export function RosterTable({
           isGestor={isGestor}
           handlers={handlers}
           onExportCsv={handleExportCsv}
+          purchasesOnly={purchasesOnly}
         />
       ) : (
         <DataTable<TableRow>

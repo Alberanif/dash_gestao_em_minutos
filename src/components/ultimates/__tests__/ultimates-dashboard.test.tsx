@@ -21,6 +21,7 @@ function makeCycle(overrides: Partial<CycleWithProduct> = {}): CycleWithProduct 
     created_at: "2026-07-01T00:00:00Z",
     updated_at: "2026-07-01T00:00:00Z",
     counts_new_buyers: true,
+    purchases_only: false,
     ...overrides,
   };
 }
@@ -889,5 +890,74 @@ describe("UltimatesDashboard — filtro de datas", () => {
     expect(screen.getByTestId("ultimates-kpi-renovados")).toHaveTextContent("2");
     expect(screen.queryByTestId("ultimates-date-note")).not.toBeInTheDocument();
     expect(screen.queryByTestId("ultimates-dashboard-error")).not.toBeInTheDocument();
+  });
+});
+
+describe("UltimatesDashboard — modo Apenas Compras (#154)", () => {
+  function renderPurchases(overrides: Partial<CycleWithProduct> = {}) {
+    mockRosterAndDailyFetch();
+    return render(
+      <UltimatesDashboard
+        cycle={makeCycle({ purchases_only: true, ...overrides })}
+        role="gestor"
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+      />
+    );
+  }
+
+  it("esconde 'Carregar base' e o interruptor Novas Compras", async () => {
+    renderPurchases();
+    await screen.findByTestId("ultimates-kpi-row");
+    expect(screen.queryByTestId("ultimates-upload-btn")).toBeNull();
+    expect(screen.queryByTestId("ultimates-new-purchases-toggle")).toBeNull();
+  });
+
+  it("mantém Ofertas excluídas, Leads excluídos e Atualizar agora", async () => {
+    renderPurchases();
+    await screen.findByTestId("ultimates-kpi-row");
+    expect(screen.getByTestId("ultimates-excluded-offers-btn")).toBeInTheDocument();
+    expect(screen.getByTestId("ultimates-excluded-buyers-btn")).toBeInTheDocument();
+    expect(screen.getByTestId("ultimates-refresh-controls")).toBeInTheDocument();
+  });
+
+  it("mostra os tiles de compra e nenhum tile de renovação", async () => {
+    renderPurchases();
+    await screen.findByTestId("ultimates-kpi-row");
+    // ROSTER tem 2 renovado -> 2 compras.
+    expect(screen.getByTestId("ultimates-kpi-compras")).toHaveTextContent("2");
+    expect(screen.getByTestId("ultimates-kpi-valor-total")).toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-kpi-base")).toBeNull();
+    expect(screen.queryByTestId("ultimates-kpi-renovados")).toBeNull();
+  });
+
+  it("não mostra a barra de meta mesmo com goal_percent cadastrado", async () => {
+    renderPurchases({ goal_percent: 60 });
+    await screen.findByTestId("ultimates-kpi-row");
+    expect(screen.queryByTestId("ultimates-goal-bar")).toBeNull();
+  });
+
+  it("descreve a Seção 01 como 'Compras do ciclo'", async () => {
+    renderPurchases();
+    await screen.findByTestId("ultimates-kpi-row");
+    expect(screen.getByText("Compras do ciclo")).toBeInTheDocument();
+  });
+
+  it("gráfico é série única de compras, sem seletor de séries", async () => {
+    renderPurchases();
+    await screen.findByTestId("ultimates-cumulative-chart");
+    expect(screen.queryByTestId("ultimates-cumulative-series-switch")).toBeNull();
+    expect(screen.getByText("Compras acumuladas")).toBeInTheDocument();
+  });
+
+  it("roster oferece só Editar e Excluir por linha (sem vincular/marcar/desfazer)", async () => {
+    renderPurchases();
+    await screen.findByTestId("ultimates-kpi-row");
+    // ROSTER tem b1/b2 renovado (materializados) e b3 nao_renovado — mas em
+    // compras não há vínculo nem marcar renovado.
+    expect(screen.getByTestId("ultimates-edit-buyer-r1@example.com")).toBeInTheDocument();
+    expect(screen.getByTestId("ultimates-exclude-buyer-r1@example.com")).toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-mark-renewed-n1@example.com")).toBeNull();
+    expect(screen.queryByTestId("ultimates-link-buyer-r1@example.com")).toBeNull();
+    expect(screen.queryByTestId("ultimates-unlink-buyer-r1@example.com")).toBeNull();
   });
 });

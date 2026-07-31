@@ -324,4 +324,51 @@ describe("POST /api/ultimates/cycles", () => {
       expect.objectContaining({ goal_percent: null })
     );
   });
+
+  it("creates cycle with purchases_only true when purchasesOnly is true", async () => {
+    mockProductsSingle.mockResolvedValueOnce({ data: { account_id: "acc-1" }, error: null });
+    mockCyclesInsertSingle.mockResolvedValueOnce({ data: { id: "new-cycle" }, error: null });
+
+    const { POST } = await import("../route");
+    const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
+      name: "Ciclo Compras",
+      productId: "p1",
+      purchasesOnly: true,
+    });
+    await POST(req);
+
+    expect(mockCyclesInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ purchases_only: true })
+    );
+  });
+
+  it("defaults purchases_only to false when purchasesOnly is omitted", async () => {
+    mockProductsSingle.mockResolvedValueOnce({ data: { account_id: "acc-1" }, error: null });
+    mockCyclesInsertSingle.mockResolvedValueOnce({ data: { id: "new-cycle" }, error: null });
+
+    const { POST } = await import("../route");
+    const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
+      name: "Ciclo Renovação",
+      productId: "p1",
+    });
+    await POST(req);
+
+    expect(mockCyclesInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ purchases_only: false })
+    );
+  });
+
+  it("returns 400 when purchasesOnly is not boolean", async () => {
+    mockProductsSingle.mockResolvedValueOnce({ data: { account_id: "acc-1" }, error: null });
+
+    const { POST } = await import("../route");
+    const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
+      name: "Ciclo X",
+      productId: "p1",
+      purchasesOnly: "sim",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(mockCyclesInsert).not.toHaveBeenCalled();
+  });
 });

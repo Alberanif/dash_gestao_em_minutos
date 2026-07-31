@@ -5,6 +5,7 @@ import type { UserRole } from "@/types/auth";
 import type { UltimatesDailyRow, UltimatesHourlyRow, UltimatesRosterRow } from "@/types/ultimates";
 import type { CycleWithProduct } from "./types";
 import { aggregateRosterKpis } from "@/lib/ultimates/kpi-aggregation";
+import { derivePurchaseKpis } from "@/lib/ultimates/purchases-mode";
 import {
   buildCumulativeSeries,
   buildHourlyCumulativeSeries,
@@ -311,6 +312,10 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
   // requisito do skeleton sair.
   const loading = roster === null || daily === null;
   const countsNewBuyers = cycle.counts_new_buyers;
+  // Modo Apenas Compras (migration 059): a UI ramifica nele. Quando ligado,
+  // counts_new_buyers é irrelevante (seu interruptor some) e a tela fala a
+  // língua de compras.
+  const purchasesOnly = cycle.purchases_only;
   // Reetiquetagem ANTES de tudo: KPIs, gráfico, tabela e CSV consomem estas
   // listas, então nenhum deles precisa conhecer a política do ciclo.
   // useMemo é OBRIGATÓRIO aqui, não otimização: com countsNewBuyers = false o
@@ -325,13 +330,17 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
     () => applyNewPurchasesModeToRoster(roster ?? [], countsNewBuyers),
     [roster, countsNewBuyers]
   );
+  // Uma métrica só na curva quando o ciclo não admite novas compras OU é Apenas
+  // Compras: em compras não há série "novos" — toda venda materializada é base,
+  // e qualquer new_buyer residual entra na curva de compras em vez de sumir.
+  const seriesCountsNewBuyers = countsNewBuyers && !purchasesOnly;
   const viewDaily = useMemo(
-    () => applyNewPurchasesModeToCounts(daily ?? [], countsNewBuyers),
-    [daily, countsNewBuyers]
+    () => applyNewPurchasesModeToCounts(daily ?? [], seriesCountsNewBuyers),
+    [daily, seriesCountsNewBuyers]
   );
   const viewHourly = useMemo(
-    () => applyNewPurchasesModeToCounts(hourly ?? [], countsNewBuyers),
-    [hourly, countsNewBuyers]
+    () => applyNewPurchasesModeToCounts(hourly ?? [], seriesCountsNewBuyers),
+    [hourly, seriesCountsNewBuyers]
   );
   // Mesma reetiquetagem do roster do ciclo, pelo mesmo motivo e com o mesmo
   // useMemo obrigatório (ver o comentário de `viewRoster` acima).
@@ -348,6 +357,13 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
   // janela (com os nao_renovado dentro): o KpiRow só lê dela os números de
   // movimento, e base/naoRenovados dela nunca chegam à tela.
   const periodKpis = viewRosterRange ? aggregateRosterKpis(viewRosterRange) : undefined;
+  // KPIs de compra (modo Apenas Compras). Derivados sobre o roster EFETIVO —
+  // recortado pelo filtro De/Até quando ativo, senão o ciclo inteiro — para
+  // baterem com a curva e a tabela. `null` fora do modo (no-op).
+  const purchaseKpis = derivePurchaseKpis(
+    recorteAtivo ? (viewRosterRange as UltimatesRosterRow[]) : viewRoster,
+    purchasesOnly
+  );
   // A tabela é a única consumidora que descarta `nao_renovado`: no recorte,
   // essa categoria significa "não teve venda na janela", e listar a base
   // inteira como não renovada esconderia justamente quem movimentou.
@@ -356,7 +372,7 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
     : viewRoster;
   // Série derivada no render, nunca por efeito: assim o `series` escolhido pelo
   // usuário sobrevive intacto e volta sozinho se o ciclo religar novas compras.
-  const activeSeries = countsNewBuyers ? series : "renovacoes";
+  const activeSeries = seriesCountsNewBuyers ? series : "renovacoes";
   // Mesma técnica para a granularidade, pelo mesmo motivo: sem a série horária
   // o card volta para "dia" sem apagar a preferência de quem escolheu "hora" —
   // ela volta sozinha no ciclo (ou no reload) em que a rota responder.
@@ -414,7 +430,9 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
           </p>
         </div>
         <div className="ult-cycle-actions">
-          {canWrite && (
+          {/* Sem base de renovação no modo Apenas Compras: não há lista para
+              carregar (as compras entram sozinhas via materialização). */}
+          {canWrite && !purchasesOnly && (
             <button
               type="button"
               className="btn-secondary"
@@ -446,12 +464,16 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
               interno dele (PATCH que falhou) não deve sobreviver para o ciclo
               seguinte. O dashboard continua sem key (comentário no estado
               `series` acima), então isso não afeta a série do gráfico. */}
-          <NewPurchasesToggle
-            key={cycle.id}
-            checked={countsNewBuyers}
-            disabled={!canWrite}
-            onChange={(value) => onCountsNewBuyersChange(cycle.id, value)}
-          />
+          {/* O interruptor classifica vendas contra uma base que não existe no
+              modo Apenas Compras — escondido lá. */}
+          {!purchasesOnly && (
+            <NewPurchasesToggle
+              key={cycle.id}
+              checked={countsNewBuyers}
+              disabled={!canWrite}
+              onChange={(value) => onCountsNewBuyersChange(cycle.id, value)}
+            />
+          )}
           <RefreshControls
             cycleId={cycle.id}
             cycleStatus={cycle.status}
@@ -508,9 +530,11 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
               index="01"
               title="Visão do ciclo"
               desc={
-                countsNewBuyers
-                  ? "Base, renovações e novos compradores"
-                  : "Base, renovações e renovações sem vínculo"
+                purchasesOnly
+                  ? "Compras do ciclo"
+                  : countsNewBuyers
+                    ? "Base, renovações e novos compradores"
+                    : "Base, renovações e renovações sem vínculo"
               }
             />
             {/* Mesmo princípio das duas notas abaixo: quando um número
@@ -523,7 +547,9 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
                 data-testid="ultimates-date-note"
                 style={{ fontSize: 12, color: "var(--text-3)", margin: "0 0 12px" }}
               >
-                {`Renovações e novos compradores restritos a ${fmtDateShort(range.start)} – ${fmtDateShort(range.end)} · Base e meta seguem o ciclo inteiro`}
+                {purchasesOnly
+                  ? `Compras restritas a ${fmtDateShort(range.start)} – ${fmtDateShort(range.end)}`
+                  : `Renovações e novos compradores restritos a ${fmtDateShort(range.start)} – ${fmtDateShort(range.end)} · Base e meta seguem o ciclo inteiro`}
               </p>
             )}
             {excludedCount > 0 && (
@@ -536,7 +562,7 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
                   : `${excludedCount} ofertas excluídas da contabilidade`}
               </p>
             )}
-            {!countsNewBuyers && (
+            {!countsNewBuyers && !purchasesOnly && (
               <p
                 data-testid="ultimates-new-purchases-note"
                 style={{ fontSize: 12, color: "var(--text-3)", margin: "0 0 12px" }}
@@ -550,8 +576,11 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
                 periodKpis={recorteAtivo ? periodKpis : undefined}
                 countsNewBuyers={countsNewBuyers}
                 excludedBuyersCount={excludedBuyersCount}
+                purchaseKpis={purchaseKpis}
               />
-              {cycle.goal_percent != null && (
+              {/* Meta é removida no modo Apenas Compras (não substituída): um
+                  percentual de uma base inexistente não tem sentido. */}
+              {!purchasesOnly && cycle.goal_percent != null && (
                 <GoalProgressBar goalPercent={cycle.goal_percent} currentPercent={kpis.renovadosPercent} />
               )}
             </div>
@@ -562,14 +591,19 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
               index="02"
               title="Evolução"
               desc={`${
-                countsNewBuyers ? "Renovações e novos compradores" : "Renovações acumuladas"
+                purchasesOnly
+                  ? "Compras acumuladas"
+                  : countsNewBuyers
+                    ? "Renovações e novos compradores"
+                    : "Renovações acumuladas"
               }, ${activeGranularity === "hora" ? "hora a hora" : "dia a dia"}`}
             />
             <CumulativeChart
               data={chartPoints}
               series={activeSeries}
               onSeriesChange={setSeries}
-              countsNewBuyers={countsNewBuyers}
+              countsNewBuyers={seriesCountsNewBuyers}
+              purchasesOnly={purchasesOnly}
               granularity={activeGranularity}
               onGranularityChange={setGranularity}
               granularityAvailable={hourlyDisponivel}
@@ -583,9 +617,13 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
               rows={tableRows}
               role={role}
               countsNewBuyers={countsNewBuyers}
-              onLinkClick={canWrite ? setLinkTarget : undefined}
-              onUnlinkClick={canWrite ? setUnlinkTarget : undefined}
-              onMarkRenewedClick={canWrite ? setMarkRenewedTarget : undefined}
+              purchasesOnly={purchasesOnly}
+              // Sem base: no modo Apenas Compras não há vínculo nem "marcar
+              // renovado" — só Editar e Excluir. As demais ações não são
+              // passadas, então não aparecem.
+              onLinkClick={canWrite && !purchasesOnly ? setLinkTarget : undefined}
+              onUnlinkClick={canWrite && !purchasesOnly ? setUnlinkTarget : undefined}
+              onMarkRenewedClick={canWrite && !purchasesOnly ? setMarkRenewedTarget : undefined}
               onEditClick={canWrite ? setEditTarget : undefined}
               onExcludeClick={canExcludeBuyers ? setExcludeTarget : undefined}
             />

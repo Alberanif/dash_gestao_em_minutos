@@ -63,7 +63,7 @@ export async function POST(
   // 1. Ciclo existe?
   const { data: cycle, error: cycleErr } = await supabase
     .from("dash_gestao_ultimates_cycles")
-    .select("id, account_id, product_id, status, created_at, last_refresh_at")
+    .select("id, account_id, product_id, status, created_at, last_refresh_at, purchases_only")
     .eq("id", id)
     .single();
 
@@ -199,6 +199,20 @@ export async function POST(
 
       if (upsertErr) throw new Error(`Hotmart upsert error: ${upsertErr.message}`);
       upserted = rows.length;
+    }
+
+    // Modo Apenas Compras (migration 059): materializa cada email de venda
+    // aprovada/estornada do produto como buyer do ciclo, para o roster/KPIs/ações
+    // existentes passarem a mostrar as compras. RPC ADITIVA (INSERT ... ON
+    // CONFLICT DO NOTHING) — nunca sobrescreve nome/telefone editado pelo gestor,
+    // então a correção manual sobrevive a todo refresh. Ciclo de renovação não
+    // dispara. Roda depois do upsert de vendas (lê o que acabou de entrar) e
+    // dentro do deadline, para o finally liberar o lock mesmo se o banco travar.
+    if (cycle.purchases_only) {
+      const { error: syncErr } = await supabase
+        .rpc("dash_gestao_ultimates_sync_buyers_from_sales", { p_cycle_id: id })
+        .abortSignal(deadline);
+      if (syncErr) throw new Error(`Sync buyers error: ${syncErr.message}`);
     }
 
     const lastRefreshAt = new Date().toISOString();

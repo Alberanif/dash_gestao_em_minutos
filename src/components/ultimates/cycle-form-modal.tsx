@@ -26,6 +26,10 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel }: Cycle
     editTarget?.goal_percent != null ? String(editTarget.goal_percent) : ""
   );
   const [status, setStatus] = useState<UltimatesCycleStatus>(editTarget?.status ?? "ativo");
+  // "Apenas Compras" só é escolhido na criação e é imutável depois (PRD). Na
+  // edição o valor vem fixo do ciclo; no create é o estado deste interruptor.
+  const [purchasesOnly, setPurchasesOnly] = useState(false);
+  const isPurchasesOnly = isEdit ? !!editTarget?.purchases_only : purchasesOnly;
   const [confirmEncerrar, setConfirmEncerrar] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -89,7 +93,7 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel }: Cycle
       const method = isEdit ? "PATCH" : "POST";
       const body = isEdit
         ? { name: name.trim(), goalPercent, status }
-        : { name: name.trim(), productId, goalPercent };
+        : { name: name.trim(), productId, goalPercent, purchasesOnly };
 
       const res = await fetch(url, {
         method,
@@ -130,6 +134,34 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel }: Cycle
         <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-strong)", margin: 0 }}>
           {isEdit ? "Editar ciclo" : "Novo ciclo"}
         </h3>
+
+        {!isEdit && (
+          <div>
+            <button
+              type="button"
+              aria-pressed={purchasesOnly}
+              onClick={() => setPurchasesOnly((v) => !v)}
+              data-testid="cycle-form-purchases-only"
+              className={purchasesOnly ? "btn-primary" : "btn-secondary"}
+              style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}
+            >
+              <span>Apenas Compras</span>
+              <span style={{ opacity: 0.7, fontSize: 12 }}>{purchasesOnly ? "Ligado" : "Desligado"}</span>
+            </button>
+            <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "4px 0 0", lineHeight: 1.4 }}>
+              Sem base de renovação: toda compra aprovada do produto entra no Roster automaticamente. Definido só na criação — não muda depois.
+            </p>
+          </div>
+        )}
+
+        {isEdit && editTarget?.purchases_only && (
+          <p
+            data-testid="cycle-form-purchases-only-readonly"
+            style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0 }}
+          >
+            Modo: <strong>Apenas Compras</strong> (definido na criação, imutável)
+          </p>
+        )}
 
         <div>
           <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
@@ -224,19 +256,21 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel }: Cycle
           </div>
         )}
 
-        <div>
-          <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
-            Meta de renovação (%) — opcional
-          </label>
-          <input
-            value={goalPercentInput}
-            onChange={(e) => setGoalPercentInput(e.target.value)}
-            placeholder="Ex: 60"
-            inputMode="decimal"
-            className="field-control"
-            data-testid="cycle-form-goal"
-          />
-        </div>
+        {!isPurchasesOnly && (
+          <div>
+            <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
+              Meta de renovação (%) — opcional
+            </label>
+            <input
+              value={goalPercentInput}
+              onChange={(e) => setGoalPercentInput(e.target.value)}
+              placeholder="Ex: 60"
+              inputMode="decimal"
+              className="field-control"
+              data-testid="cycle-form-goal"
+            />
+          </div>
+        )}
 
         {isEdit && (
           <div>
