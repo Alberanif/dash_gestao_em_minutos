@@ -90,6 +90,17 @@ export type UltimatesCategory =
 // (buyer_id null), vinda de dash_gestao_ultimates_roster.
 export interface UltimatesRosterRow {
   buyer_id: string | null;
+  // PROCEDÊNCIA DIFERENTE POR TIPO DE LINHA (migration 056, PRD #146):
+  // - linha da base (buyer_id preenchido): vem do CSV importado, editável pelo
+  //   gestor e sobrescrita pelo próximo upload;
+  // - novo comprador (buyer_id null): vem da Hotmart, agregado do primeiro
+  //   valor não-nulo entre as vendas daquele email.
+  // Não há coalesce entre os dois — de propósito, para a coluna não ter duas
+  // origens silenciosas na mesma célula.
+  //
+  // `phone` do novo comprador só existe para compras recebidas via webhook: a
+  // API sales/history não devolve telefone, então esse campo é parcial por
+  // natureza e não tem backfill.
   name: string | null;
   email: string;
   phone: string | null;
