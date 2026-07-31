@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { parseDateRange, type DateRange } from "@/lib/ultimates/date-range";
 
 export interface DateRangeFilterProps {
@@ -26,16 +26,24 @@ export function DateRangeFilter({ value, onChange, unavailable = false }: DateRa
   const [start, setStart] = useState(value?.start ?? "");
   const [end, setEnd] = useState(value?.end ?? "");
   const [erro, setErro] = useState("");
+  const [aplicado, setAplicado] = useState(value);
 
-  // Sincroniza o rascunho quando o intervalo aplicado muda por fora — é o que
+  // Sincroniza o rascunho quando o intervalo aplicado muda POR FORA — é o que
   // faz o intervalo restaurado do localStorage aparecer nos campos, já que o
   // dashboard só o lê depois do primeiro render (localStorage não existe no
   // servidor).
-  useEffect(() => {
+  //
+  // Ajuste durante o render, e não em useEffect: é o padrão que o React
+  // recomenda para estado derivado de prop. O efeito faria o componente
+  // renderizar uma vez com os campos velhos antes de corrigi-los, e cairia na
+  // regra react-hooks/set-state-in-effect. Aqui o React descarta o render em
+  // curso e refaz com os valores novos, sem pintar o intermediário.
+  if (value !== aplicado) {
+    setAplicado(value);
     setStart(value?.start ?? "");
     setEnd(value?.end ?? "");
     setErro("");
-  }, [value]);
+  }
 
   function handleApply() {
     if (!start || !end) {
