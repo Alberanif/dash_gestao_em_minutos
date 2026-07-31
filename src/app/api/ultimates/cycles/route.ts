@@ -59,10 +59,14 @@ export async function POST(request: NextRequest) {
   if (error) return error;
 
   const body = await request.json().catch(() => null);
-  const { name, productId, goalPercent } = body ?? {};
+  const { name, productId, goalPercent, purchasesOnly } = body ?? {};
 
   if (typeof name !== "string" || name.trim().length === 0) {
     return NextResponse.json({ error: "name é obrigatório" }, { status: 400 });
+  }
+
+  if (purchasesOnly !== undefined && typeof purchasesOnly !== "boolean") {
+    return NextResponse.json({ error: "purchasesOnly deve ser booleano" }, { status: 400 });
   }
 
   if (goalPercent !== undefined && goalPercent !== null) {
@@ -103,6 +107,7 @@ export async function POST(request: NextRequest) {
       product_id: productId,
       account_id: (product as { account_id: string }).account_id,
       goal_percent: goalPercent ?? null,
+      purchases_only: purchasesOnly ?? false,
       status: "ativo",
       created_by: userId,
     })

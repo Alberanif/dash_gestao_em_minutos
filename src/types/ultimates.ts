@@ -14,6 +14,13 @@ export interface UltimatesCycleRecord {
   // e passam a renovação sem vínculo (migration 053). A reclassificação roda no
   // cliente — ver src/lib/ultimates/new-purchases-mode.ts.
   counts_new_buyers: boolean;
+  // Quando true, o ciclo não tem base de renovação: toda venda aprovada do
+  // produto é materializada como buyer e o dashboard fala "Compras" em vez de
+  // "Renovações" (migration 059, PRD "Apenas Compras"). Definida na criação e
+  // IMUTÁVEL depois — trocar o modelo no meio corromperia a contabilidade do
+  // ciclo. A ramificação de nomenclatura/KPIs roda no cliente
+  // (src/lib/ultimates/purchases-mode.ts).
+  purchases_only: boolean;
   refresh_started_at: string | null;
   last_refresh_at: string | null;
   created_by: string | null;

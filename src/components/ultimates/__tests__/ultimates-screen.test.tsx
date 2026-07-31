@@ -22,6 +22,7 @@ function makeCycle(overrides: Partial<CycleWithProduct> = {}): CycleWithProduct 
     created_at: "2026-07-19T00:00:00Z",
     updated_at: "2026-07-19T00:00:00Z",
     counts_new_buyers: true,
+    purchases_only: false,
     ...overrides,
   };
 }
