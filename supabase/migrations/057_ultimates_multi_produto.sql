@@ -16,9 +16,11 @@
 -- ORDEM ENTRE MIGRATIONS TAMBÉM IMPORTA: os corpos de roster/daily/hourly aqui
 -- são os das 055 (leads excluídos, vínculos excluídos, from_manual_link) e 056
 -- (buyer_name/buyer_phone do novo comprador) com a adaptação multi-produto
--- aplicada por cima — nada além dela. Aplicar esta migration antes daquelas
--- REVERTERIA as duas features, e em silêncio: as funções continuariam existindo
--- e respondendo. Fila deste ambiente: 052 → 055 → 056 → 057.
+-- aplicada por cima — nada além dela. Aplicar esta migration ANTES daquelas
+-- falha alto, não em silêncio: o roster bate em 42P13 (não dá para trocar o tipo
+-- de retorno de uma função existente) e daily/hourly nem chegam a ser criadas,
+-- porque o corpo referencia dash_gestao_ultimates_excluded_buyers, que a 055
+-- ainda não teria criado. Fila: 052 → 053 → 054 → 055 → 056 → 057.
 --
 -- ARMADILHA CENTRAL: as versões anteriores usavam `cross join cyc`, seguro
 -- porque cyc tinha exatamente uma linha. Com N produtos um cross join

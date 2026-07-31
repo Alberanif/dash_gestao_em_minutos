@@ -30,12 +30,16 @@ export default async function UltimatesPage() {
     .select("product_id, product_name, account_id")
     .eq("is_active", true);
 
+  // Sem cast na linha abaixo, de propósito: o supabase-js infere os NOMES dos
+  // campos a partir da string literal do .select() (os valores viram any, os
+  // nomes não). Deixando o tipo fluir, o tsc acusa se alguém tirar account_id do
+  // select acima — que é justamente o que alimenta a trava de conta do modal de
+  // ciclo. Um `as { ... }[]` aqui afirmaria a forma e engoliria essa deriva em
+  // silêncio.
   return (
     <UltimatesScreen
       role={role}
-      products={sortProductsByName(
-        (products ?? []) as { product_id: string; product_name: string; account_id: string }[]
-      )}
+      products={sortProductsByName(products ?? [])}
     />
   );
 }
