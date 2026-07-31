@@ -2,7 +2,7 @@
 
 **Data:** 2026-07-31
 **Branch:** `feat/ultimates-filtro-datas`
-**Spec:** `docs/superpowers/specs/2026-07-31-ultimates-filtro-datas-design.md`
+**Spec:** `docs/SPEC_2026-07-31_ultimates_filtro_datas.md`
 
 ## O que subiu
 

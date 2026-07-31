@@ -1,5 +1,5 @@
 -- Dash Ultimates: recorte do roster por intervalo de datas.
--- (Spec docs/superpowers/specs/2026-07-31-ultimates-filtro-datas-design.md.)
+-- (Spec docs/SPEC_2026-07-31_ultimates_filtro_datas.md.)
 --
 -- PROBLEMA: o dashboard ganhou um filtro De/Até, e o roster é a única das três
 -- fontes que NÃO pode ser recortada no cliente. Ele expõe `renewed_at`, mas
