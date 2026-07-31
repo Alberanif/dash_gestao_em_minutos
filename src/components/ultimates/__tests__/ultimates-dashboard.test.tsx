@@ -746,3 +746,148 @@ describe("UltimatesDashboard — sinalização de leads excluídos", () => {
     expect(await screen.findByTestId("ultimates-excluded-buyers-modal")).toBeInTheDocument();
   });
 });
+
+describe("UltimatesDashboard — filtro de datas", () => {
+  // Roster da JANELA: quem movimentou no período, mais uma linha nao_renovado
+  // (a RPC recortada continua devolvendo a base inteira — o descarte é da
+  // exibição, não da rota).
+  const ROSTER_JANELA: UltimatesRosterRow[] = [
+    row({ buyer_id: "b1", name: "Renovou 1", email: "r1@example.com", category: "renovado" }),
+    row({ buyer_id: "b3", name: "Não Renovou", email: "n1@example.com", category: "nao_renovado" }),
+    row({ buyer_id: null, name: "Novo", email: "novo@example.com", category: "novo_comprador" }),
+  ];
+
+  function mockComJanela(janelaOk = true) {
+    global.fetch = jest.fn((url: string) => {
+      if (url.includes("/roster") && url.includes("start=")) {
+        return janelaOk
+          ? Promise.resolve({ ok: true, status: 200, json: async () => ({ rows: ROSTER_JANELA }) })
+          : Promise.resolve({
+              ok: false,
+              status: 501,
+              json: async () => ({ error: "Recorte por data indisponível" }),
+            });
+      }
+      if (url.includes("/roster")) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ rows: ROSTER }) });
+      }
+      if (url.includes("/hourly")) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ hours: HOURLY }) });
+      }
+      if (url.includes("/daily")) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ days: DAILY }) });
+      }
+      return Promise.resolve({ ok: false, status: 404, json: async () => ({}) });
+    }) as unknown as typeof global.fetch;
+  }
+
+  async function aplicarIntervalo() {
+    fireEvent.change(await screen.findByTestId("ultimates-date-start"), {
+      target: { value: "2026-07-01" },
+    });
+    fireEvent.change(screen.getByTestId("ultimates-date-end"), {
+      target: { value: "2026-07-02" },
+    });
+    fireEvent.click(screen.getByTestId("ultimates-date-apply"));
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("sem intervalo, não busca o roster recortado", async () => {
+    mockComJanela();
+    render(
+      <UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn()} />
+    );
+
+    await screen.findByTestId("ultimates-kpi-row");
+    const urls = (global.fetch as jest.Mock).mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.includes("start="))).toBe(false);
+    expect(screen.queryByTestId("ultimates-date-note")).not.toBeInTheDocument();
+  });
+
+  it("aplicado, mistura estoque do ciclo com movimento da janela e avisa", async () => {
+    mockComJanela();
+    render(
+      <UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn()} />
+    );
+    await screen.findByTestId("ultimates-kpi-row");
+    await aplicarIntervalo();
+
+    // Base = 3 (roster do ciclo, inalterado). Renovados = 1 e novos = 1 (janela).
+    expect(await screen.findByTestId("ultimates-date-note")).toBeInTheDocument();
+    expect(screen.getByTestId("ultimates-kpi-base")).toHaveTextContent("3");
+    expect(screen.getByTestId("ultimates-kpi-renovados")).toHaveTextContent("1");
+    expect(screen.getByTestId("ultimates-kpi-novos-compradores")).toHaveTextContent("1");
+  });
+
+  it("aplicado, a tabela mostra só quem movimentou — sem os não renovados", async () => {
+    mockComJanela();
+    render(
+      <UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn()} />
+    );
+    await screen.findByTestId("ultimates-kpi-row");
+    await aplicarIntervalo();
+
+    expect(await screen.findByText("Novo")).toBeInTheDocument();
+    expect(screen.getByText("Renovou 1")).toBeInTheDocument();
+    expect(screen.queryByText("Não Renovou")).not.toBeInTheDocument();
+  });
+
+  it("grava o intervalo no localStorage e o restaura na montagem", async () => {
+    mockComJanela();
+    const { unmount } = render(
+      <UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn()} />
+    );
+    await screen.findByTestId("ultimates-kpi-row");
+    await aplicarIntervalo();
+    await screen.findByTestId("ultimates-date-note");
+
+    expect(JSON.parse(localStorage.getItem("ultimates-date-range") as string)).toEqual({
+      start: "2026-07-01",
+      end: "2026-07-02",
+    });
+
+    unmount();
+    render(
+      <UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn()} />
+    );
+
+    expect(await screen.findByTestId("ultimates-date-note")).toBeInTheDocument();
+    expect((screen.getByTestId("ultimates-date-start") as HTMLInputElement).value).toBe(
+      "2026-07-01"
+    );
+  });
+
+  it("limpar volta ao ciclo inteiro e apaga a chave", async () => {
+    mockComJanela();
+    render(
+      <UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn()} />
+    );
+    await screen.findByTestId("ultimates-kpi-row");
+    await aplicarIntervalo();
+    await screen.findByTestId("ultimates-date-note");
+
+    fireEvent.click(screen.getByTestId("ultimates-date-clear"));
+
+    expect(await screen.findByText("Não Renovou")).toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-date-note")).not.toBeInTheDocument();
+    expect(localStorage.getItem("ultimates-date-range")).toBeNull();
+  });
+
+  it("501 no recorte degrada sozinho: dash inteiro do ciclo + aviso", async () => {
+    mockComJanela(false);
+    render(
+      <UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn()} />
+    );
+    await screen.findByTestId("ultimates-kpi-row");
+    await aplicarIntervalo();
+
+    expect(await screen.findByTestId("ultimates-date-unavailable")).toBeInTheDocument();
+    // Nada zerado nem em branco: todos os tiles caem de volta para o ciclo.
+    expect(screen.getByTestId("ultimates-kpi-renovados")).toHaveTextContent("2");
+    expect(screen.queryByTestId("ultimates-date-note")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-dashboard-error")).not.toBeInTheDocument();
+  });
+});

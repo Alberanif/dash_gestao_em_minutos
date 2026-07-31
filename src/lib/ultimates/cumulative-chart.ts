@@ -2,6 +2,7 @@
 // GET /api/ultimates/cycles/[id]/{daily,hourly} devolvem valores por bucket,
 // não acumulados; o gráfico precisa da soma corrente.
 import type { UltimatesDailyRow, UltimatesHourlyRow } from "@/types/ultimates";
+import { keyInRange, type DateRange } from "./date-range";
 
 // Séries alternáveis pelo switch do card "Evolução".
 export type UltimatesSeries = "renovacoes" | "novos";
@@ -24,11 +25,16 @@ export interface CumulativePoint {
 // gráficos serem comparáveis ponto a ponto ao alternar o switch.
 export function buildCumulativeSeries(
   days: UltimatesDailyRow[],
-  series: UltimatesSeries = "renovacoes"
+  series: UltimatesSeries = "renovacoes",
+  // Recorte do filtro De/Até, aplicado ANTES do acúmulo: a curva começa do zero
+  // no primeiro bucket do intervalo e responde "quanto entrou no período" em
+  // vez de exibir uma fatia deslocada da curva do ciclo. `null` = ciclo inteiro.
+  range: DateRange | null = null
 ): CumulativePoint[] {
+  const recortados = days.filter((d) => keyInRange(d.day, range));
   // Defensivo: ordena por dia (string ISO YYYY-MM-DD, ordem lexicográfica ==
   // ordem cronológica) antes de acumular, caso a RPC não garanta ordem.
-  const sorted = [...days].sort((a, b) => a.day.localeCompare(b.day));
+  const sorted = [...recortados].sort((a, b) => a.day.localeCompare(b.day));
 
   // `Number.isFinite`, não `?? 0` — mesma guarda da série horária, palavra por
   // palavra, porque é o mesmo modo de falha: daily/route.ts passa a contagem
@@ -111,11 +117,17 @@ function semPreencher(contagens: Map<string, number>): CumulativePoint[] {
 // justamente porque a expansão é barata aqui e cara no payload.
 export function buildHourlyCumulativeSeries(
   hours: UltimatesHourlyRow[],
-  series: UltimatesSeries = "renovacoes"
+  series: UltimatesSeries = "renovacoes",
+  range: DateRange | null = null
 ): CumulativePoint[] {
-  if (hours.length === 0) return [];
+  // O recorte vem ANTES do guarda de vazio para que um intervalo sem nenhuma
+  // hora saia por [] pelo mesmo caminho de "ciclo sem venda". O intervalo é
+  // comparado só pela parte de data da chave (keyInRange), então a hora do
+  // bucket não participa — as pontas são dias inteiros.
+  const recortados = hours.filter((h) => keyInRange(h.hour, range));
+  if (recortados.length === 0) return [];
 
-  const sorted = [...hours].sort((a, b) => a.hour.localeCompare(b.hour));
+  const sorted = [...recortados].sort((a, b) => a.hour.localeCompare(b.hour));
 
   // Soma em vez de sobrescrever: a RPC agrupa por hora, então duplicata não
   // deveria existir — mas somar é a única resposta que não perde uma venda.

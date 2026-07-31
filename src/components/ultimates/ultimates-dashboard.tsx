@@ -15,6 +15,14 @@ import {
   applyNewPurchasesModeToRoster,
   applyNewPurchasesModeToCounts,
 } from "@/lib/ultimates/new-purchases-mode";
+import {
+  readStoredRange,
+  writeStoredRange,
+  clearStoredRange,
+  type DateRange,
+} from "@/lib/ultimates/date-range";
+import { fmtDateShort } from "@/lib/ultimates/format";
+import { DateRangeFilter } from "./date-range-filter";
 import { KpiRow } from "./kpi-row";
 import { GoalProgressBar } from "./goal-progress-bar";
 import { CumulativeChart } from "./cumulative-chart";
@@ -122,6 +130,18 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
   // Mesma razão do `series` acima: granularidade é preferência de quem olha e
   // deve sobreviver à troca de ciclo.
   const [granularity, setGranularity] = useState<UltimatesGranularity>("dia");
+  // Intervalo aplicado pelo filtro De/Até. Mora aqui pela MESMA razão de
+  // `series` e `granularity` — é preferência de quem olha, então sobrevive à
+  // troca de ciclo (o dashboard é renderizado sem key). `null` = ciclo inteiro.
+  const [range, setRange] = useState<DateRange | null>(null);
+  // Roster recortado pela janela. Como o `hourly` lá em cima, `null` aqui é
+  // INDISPONÍVEL, não "carregando": ele só existe quando há intervalo E a
+  // migration 058 já subiu. Sem ele o dashboard inteiro mostra o ciclo.
+  const [rosterRange, setRosterRange] = useState<UltimatesRosterRow[] | null>(null);
+  // A rota respondeu 501 — recorte pedido, migration pendente. Estado separado
+  // porque `rosterRange = null` sozinho não distingue "não pedi" de "pedi e não
+  // deu", e só o segundo caso merece aviso na barra.
+  const [rangeUnavailable, setRangeUnavailable] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -215,8 +235,75 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
     };
   }, [cycle.id, reloadToken]);
 
+  // Restauração do intervalo salvo, em efeito e não no useState inicial: este
+  // componente é renderizado no servidor, onde localStorage não existe, e ler
+  // durante o render daria divergência de hidratação. Roda uma vez — a chave é
+  // única (não é por ciclo), então trocar de ciclo não a relê.
+  useEffect(() => {
+    // Leitura numa função, não direto no corpo do efeito —
+    // react-hooks/set-state-in-effect rejeita setState síncrono ali (mesmo
+    // contorno das cargas abaixo e de ultimates-screen.tsx).
+    function restaurar() {
+      const salvo = readStoredRange();
+      if (salvo) setRange(salvo);
+    }
+    restaurar();
+  }, []);
+
+  // Carga do roster recortado, em efeito PRÓPRIO e tolerante a falha — mesma
+  // razão dos contadores de excluídos: o recorte não pode derrubar o dashboard
+  // para o estado de erro nem atrasar KPIs, gráfico e tabela do ciclo, que já
+  // funcionam sem ele.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRange(r: DateRange | null) {
+      // Reset dentro da função async, e não no corpo síncrono do efeito —
+      // react-hooks/set-state-in-effect rejeita setState direto ali (mesmo
+      // contorno da carga de roster/daily acima).
+      if (r === null) {
+        setRosterRange(null);
+        setRangeUnavailable(false);
+        return;
+      }
+      try {
+        const res = await fetch(
+          `/api/ultimates/cycles/${cycle.id}/roster?start=${r.start}&end=${r.end}`
+        );
+        if (cancelled) return;
+        if (!res.ok) {
+          setRosterRange(null);
+          // 501 = migration 058 pendente (ver a rota). Qualquer outro código é
+          // falha real e também cai para o ciclo, mas sem prometer na tela que
+          // o recorte volta sozinho depois de um deploy de banco.
+          setRangeUnavailable(res.status === 501);
+          return;
+        }
+        const data = await res.json();
+        if (cancelled) return;
+        setRosterRange(Array.isArray(data?.rows) ? data.rows : []);
+        setRangeUnavailable(false);
+      } catch {
+        if (cancelled) return;
+        setRosterRange(null);
+        setRangeUnavailable(false);
+      }
+    }
+
+    loadRange(range);
+    return () => {
+      cancelled = true;
+    };
+  }, [cycle.id, range, reloadToken]);
+
   function handleRefreshed() {
     setReloadToken((t) => t + 1);
+  }
+
+  function handleRangeChange(next: DateRange | null) {
+    setRange(next);
+    if (next) writeStoredRange(next);
+    else clearStoredRange();
   }
 
   // `hourly` fora do guarda de propósito: ela é opcional (ver o estado acima),
@@ -246,7 +333,27 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
     () => applyNewPurchasesModeToCounts(hourly ?? [], countsNewBuyers),
     [hourly, countsNewBuyers]
   );
+  // Mesma reetiquetagem do roster do ciclo, pelo mesmo motivo e com o mesmo
+  // useMemo obrigatório (ver o comentário de `viewRoster` acima).
+  const viewRosterRange = useMemo(
+    () => (rosterRange ? applyNewPurchasesModeToRoster(rosterRange, countsNewBuyers) : null),
+    [rosterRange, countsNewBuyers]
+  );
+  // Recorte EFETIVO: só existe quando o intervalo foi pedido E a janela chegou.
+  // Todo o resto do componente lê esta variável, nunca `range` sozinho — assim
+  // a degradação do 501 cai de volta para o ciclo em UM lugar só.
+  const recorteAtivo = range !== null && viewRosterRange !== null;
   const kpis = roster ? aggregateRosterKpis(viewRoster) : null;
+  // KPIs da janela. `aggregateRosterKpis` roda sobre a lista COMPLETA da
+  // janela (com os nao_renovado dentro): o KpiRow só lê dela os números de
+  // movimento, e base/naoRenovados dela nunca chegam à tela.
+  const periodKpis = viewRosterRange ? aggregateRosterKpis(viewRosterRange) : undefined;
+  // A tabela é a única consumidora que descarta `nao_renovado`: no recorte,
+  // essa categoria significa "não teve venda na janela", e listar a base
+  // inteira como não renovada esconderia justamente quem movimentou.
+  const tableRows = recorteAtivo
+    ? (viewRosterRange as UltimatesRosterRow[]).filter((r) => r.category !== "nao_renovado")
+    : viewRoster;
   // Série derivada no render, nunca por efeito: assim o `series` escolhido pelo
   // usuário sobrevive intacto e volta sozinho se o ciclo religar novas compras.
   const activeSeries = countsNewBuyers ? series : "renovacoes";
@@ -257,12 +364,16 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
   const activeGranularity = hourlyDisponivel ? granularity : "dia";
   // useMemo obrigatório, não otimização: o preenchimento das horas vazias
   // percorre todo o intervalo do ciclo e não pode rodar a cada render.
+  // O recorte do gráfico passa por `recorteAtivo`, e não por `range` direto,
+  // para que a curva e os tiles nunca discordem: se a janela do roster não
+  // veio, os dois mostram o ciclo.
+  const chartRange = recorteAtivo ? range : null;
   const chartPoints = useMemo(
     () =>
       activeGranularity === "hora"
-        ? buildHourlyCumulativeSeries(viewHourly, activeSeries)
-        : buildCumulativeSeries(viewDaily, activeSeries),
-    [activeGranularity, viewHourly, viewDaily, activeSeries]
+        ? buildHourlyCumulativeSeries(viewHourly, activeSeries, chartRange)
+        : buildCumulativeSeries(viewDaily, activeSeries, chartRange),
+    [activeGranularity, viewHourly, viewDaily, activeSeries, chartRange]
   );
   // Escrita só para gestor e ciclo ativo (critério 11: ciclo encerrado tem
   // dashboard acessível, mas upload/vínculo/atualização bloqueados).
@@ -350,6 +461,12 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
         </div>
       </div>
 
+      {/* Acima dos blocos de erro/loading de propósito: a barra é o controle
+          que produziu o estado atual, e escondê-la enquanto o dashboard
+          recarrega deixaria quem acabou de aplicar um intervalo sem como
+          desfazê-lo. */}
+      <DateRangeFilter value={range} onChange={handleRangeChange} unavailable={rangeUnavailable} />
+
       {loadError && (
         <div
           data-testid="ultimates-dashboard-error"
@@ -396,6 +513,19 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
                   : "Base, renovações e renovações sem vínculo"
               }
             />
+            {/* Mesmo princípio das duas notas abaixo: quando um número
+                exibido passou por um filtro, o card diz — senão o dashboard
+                mente por omissão para quem só bate o olho nos tiles. Aqui o
+                aviso é obrigatório porque o recorte é MISTO: movimento da
+                janela ao lado de estoque do ciclo. */}
+            {recorteAtivo && range && (
+              <p
+                data-testid="ultimates-date-note"
+                style={{ fontSize: 12, color: "var(--text-3)", margin: "0 0 12px" }}
+              >
+                {`Renovações e novos compradores restritos a ${fmtDateShort(range.start)} – ${fmtDateShort(range.end)} · Base e meta seguem o ciclo inteiro`}
+              </p>
+            )}
             {excludedCount > 0 && (
               <p
                 data-testid="ultimates-excluded-offers-note"
@@ -417,6 +547,7 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <KpiRow
                 kpis={kpis}
+                periodKpis={recorteAtivo ? periodKpis : undefined}
                 countsNewBuyers={countsNewBuyers}
                 excludedBuyersCount={excludedBuyersCount}
               />
@@ -442,13 +573,14 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
               granularity={activeGranularity}
               onGranularityChange={setGranularity}
               granularityAvailable={hourlyDisponivel}
+              rangeActive={recorteAtivo}
             />
           </section>
 
           <section>
             <SectionHeader index="03" title="Roster" desc="Compradores do ciclo, busca e exportação" />
             <RosterTable
-              rows={viewRoster}
+              rows={tableRows}
               role={role}
               countsNewBuyers={countsNewBuyers}
               onLinkClick={canWrite ? setLinkTarget : undefined}

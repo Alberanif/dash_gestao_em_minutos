@@ -14,6 +14,16 @@ interface KpiRowProps {
   // sozinho deixaria este tile mentindo por omissão para quem só bate o olho
   // nos KPIs.
   excludedBuyersCount?: number;
+  // KPIs da janela recortada pelo filtro De/Até (spec 2026-07-31). Quando
+  // presente, os tiles de MOVIMENTO (Renovados, Renovação reembolsada, Novos
+  // Compradores / Renovações sem vínculo) saem daqui e os de ESTOQUE (Base,
+  // Não renovados) continuam saindo de `kpis`.
+  //
+  // A separação não é estética: `nao_renovado` é AUSÊNCIA de venda e não tem
+  // data, então "não renovados no período" não é pergunta bem formada — e
+  // recortar a base junto colaria o % da meta em ~100% em qualquer intervalo,
+  // porque o denominador acompanharia o numerador. `undefined` = sem filtro.
+  periodKpis?: RosterKpis;
 }
 
 // Tile no estilo dos KPIs do Indicadores (hero-kpi-card): rótulo uppercase
@@ -80,11 +90,23 @@ function KpiTile({
 // 9). Todos os números vêm de aggregateRosterKpis sobre a MESMA chamada ao
 // roster usada pela tabela — nunca uma fonte separada, para que os números
 // batam entre si.
-export function KpiRow({ kpis, countsNewBuyers, excludedBuyersCount = 0 }: KpiRowProps) {
-  const semVinculoTotal = kpis.renovacoesSemVinculo + kpis.renovacoesSemVinculoReembolsadas;
+export function KpiRow({
+  kpis,
+  countsNewBuyers,
+  excludedBuyersCount = 0,
+  periodKpis,
+}: KpiRowProps) {
+  // Uma variável por NATUREZA do número, para que cada tile abaixo declare de
+  // qual das duas ele lê: `mov` para movimento, `kpis` para estoque. Sem
+  // filtro as duas são a mesma coisa.
+  const mov = periodKpis ?? kpis;
+  const filtrado = periodKpis !== undefined;
+  const semVinculoTotal = mov.renovacoesSemVinculo + mov.renovacoesSemVinculoReembolsadas;
 
   return (
     <div data-testid="ultimates-kpi-row" className="ult-kpi-grid">
+      {/* ESTOQUE: lê `kpis`, nunca `mov`. A base é o denominador do ciclo e
+          não segue o filtro — ver o comentário de `periodKpis`. */}
       <KpiTile
         testId="ultimates-kpi-base"
         label="Base"
@@ -103,17 +125,21 @@ export function KpiRow({ kpis, countsNewBuyers, excludedBuyersCount = 0 }: KpiRo
       <KpiTile
         testId="ultimates-kpi-renovados"
         label="Renovados"
-        value={String(kpis.renovados)}
-        sub={`${fmtPercent1(kpis.renovadosPercent)} da base`}
+        value={String(mov.renovados)}
+        // Sob filtro o percentual SAI em vez de ser recalculado: com o valor
+        // vindo da janela e a base do ciclo, "N% da base" misturaria numerador
+        // e denominador de recortes diferentes na mesma frase. O percentual do
+        // ciclo continua existindo, na barra de meta logo abaixo.
+        sub={filtrado ? "no período" : `${fmtPercent1(kpis.renovadosPercent)} da base`}
         dotColor="var(--green)"
       />
       <KpiTile
         testId="ultimates-kpi-renovacao-reembolsada"
         label="Renovação reembolsada"
         value={
-          kpis.renovacoesSemVinculoReembolsadas > 0
-            ? `${kpis.renovacaoReembolsada} (+${kpis.renovacoesSemVinculoReembolsadas} sem vínculo)`
-            : String(kpis.renovacaoReembolsada)
+          mov.renovacoesSemVinculoReembolsadas > 0
+            ? `${mov.renovacaoReembolsada} (+${mov.renovacoesSemVinculoReembolsadas} sem vínculo)`
+            : String(mov.renovacaoReembolsada)
         }
         dotColor="var(--amber)"
       />
@@ -135,9 +161,9 @@ export function KpiRow({ kpis, countsNewBuyers, excludedBuyersCount = 0 }: KpiRo
           testId="ultimates-kpi-novos-compradores"
           label="Novos Compradores"
           value={
-            kpis.novosReembolsados > 0
-              ? `${kpis.novosCompradores} (+${kpis.novosReembolsados} ⟲)`
-              : String(kpis.novosCompradores)
+            mov.novosReembolsados > 0
+              ? `${mov.novosCompradores} (+${mov.novosReembolsados} ⟲)`
+              : String(mov.novosCompradores)
           }
           dotColor="var(--orange)"
         />
@@ -148,8 +174,8 @@ export function KpiRow({ kpis, countsNewBuyers, excludedBuyersCount = 0 }: KpiRo
           testId="ultimates-kpi-renovacoes-sem-vinculo"
           label="Renovações sem vínculo"
           value={
-            kpis.renovacoesSemVinculoReembolsadas > 0
-              ? `${semVinculoTotal} (+${kpis.renovacoesSemVinculoReembolsadas} ⟲)`
+            mov.renovacoesSemVinculoReembolsadas > 0
+              ? `${semVinculoTotal} (+${mov.renovacoesSemVinculoReembolsadas} ⟲)`
               : String(semVinculoTotal)
           }
           dotColor="var(--orange)"

@@ -127,3 +127,87 @@ describe("KpiRow — sinalização de leads excluídos (PRD editar_roster)", () 
     expect(screen.getByTestId("ultimates-kpi-base")).not.toHaveTextContent("excluído");
   });
 });
+
+describe("KpiRow — recorte por período (spec filtro de datas)", () => {
+  const ciclo = kpis({
+    base: 500,
+    renovados: 250,
+    renovadosPercent: 50,
+    renovacaoReembolsada: 8,
+    naoRenovados: 242,
+    novosCompradores: 90,
+  });
+
+  it("sem periodKpis, todos os tiles saem de kpis", () => {
+    render(<KpiRow kpis={ciclo} countsNewBuyers />);
+
+    expect(screen.getByTestId("ultimates-kpi-base")).toHaveTextContent("500");
+    expect(screen.getByTestId("ultimates-kpi-renovados")).toHaveTextContent("250");
+    expect(screen.getByTestId("ultimates-kpi-renovados")).toHaveTextContent("da base");
+    expect(screen.getByTestId("ultimates-kpi-novos-compradores")).toHaveTextContent("90");
+  });
+
+  it("com periodKpis, movimento vem da janela e estoque continua do ciclo", () => {
+    render(
+      <KpiRow
+        kpis={ciclo}
+        periodKpis={kpis({
+          base: 130,
+          renovados: 120,
+          renovacaoReembolsada: 5,
+          naoRenovados: 0,
+          novosCompradores: 40,
+        })}
+        countsNewBuyers
+      />
+    );
+
+    // Estoque: ciclo. Repare que periodKpis traz base 130 e naoRenovados 0 —
+    // são justamente os números que NÃO podem vazar para a tela.
+    expect(screen.getByTestId("ultimates-kpi-base")).toHaveTextContent("500");
+    expect(screen.getByTestId("ultimates-kpi-nao-renovados")).toHaveTextContent("242");
+    // Movimento: janela.
+    expect(screen.getByTestId("ultimates-kpi-renovados")).toHaveTextContent("120");
+    expect(screen.getByTestId("ultimates-kpi-renovacao-reembolsada")).toHaveTextContent("5");
+    expect(screen.getByTestId("ultimates-kpi-novos-compradores")).toHaveTextContent("40");
+  });
+
+  it("com periodKpis, o subtítulo de Renovados vira 'no período'", () => {
+    render(<KpiRow kpis={ciclo} periodKpis={kpis({ renovados: 120 })} countsNewBuyers />);
+
+    const tile = screen.getByTestId("ultimates-kpi-renovados");
+    expect(tile).toHaveTextContent("no período");
+    // Misturar numerador da janela com denominador do ciclo na mesma frase
+    // daria um percentual que não significa nem uma coisa nem outra.
+    expect(tile).not.toHaveTextContent("da base");
+  });
+
+  it("com periodKpis, a dica de Não renovados segue vindo do ciclo", () => {
+    render(
+      <KpiRow
+        kpis={kpis({ naoRenovados: 19, renovacoesSemVinculo: 4, possivelmenteRenovados: 2 })}
+        periodKpis={kpis({ naoRenovados: 0, possivelmenteRenovados: 0 })}
+        countsNewBuyers={false}
+      />
+    );
+
+    const tile = screen.getByTestId("ultimates-kpi-nao-renovados");
+    expect(tile).toHaveTextContent("19");
+    expect(tile).toHaveTextContent("até 2 renovaram com outro email");
+  });
+
+  it("com periodKpis e ciclo sem novas compras, o 5º tile lê da janela", () => {
+    render(
+      <KpiRow
+        kpis={kpis({ renovacoesSemVinculo: 30, renovacoesSemVinculoReembolsadas: 2 })}
+        periodKpis={kpis({ renovacoesSemVinculo: 7, renovacoesSemVinculoReembolsadas: 1 })}
+        countsNewBuyers={false}
+      />
+    );
+
+    // 7 aprovadas + 1 reembolsada = 8, tudo da janela.
+    expect(screen.getByTestId("ultimates-kpi-renovacoes-sem-vinculo")).toHaveTextContent(
+      "8 (+1 ⟲)"
+    );
+  });
+});

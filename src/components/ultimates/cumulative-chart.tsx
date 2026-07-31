@@ -33,6 +33,10 @@ interface CumulativeChartProps {
   // deve esconder o switch. Com ela false o grupo de granularidade some — o
   // chip "Hora" existir levando a um gráfico vazio é pior do que não existir.
   granularityAvailable: boolean;
+  // Há recorte por período ativo? Só troca a frase do estado vazio — a curva
+  // já chega recortada em `data`, porque o recorte roda antes do acúmulo (ver
+  // buildCumulativeSeries).
+  rangeActive?: boolean;
 }
 
 const TICK = { fontSize: 10, fill: "var(--text-3)" };
@@ -75,7 +79,19 @@ export function buildChartRows(
 // mantém o violeta que já estava em produção.
 const SERIES_CONFIG: Record<
   UltimatesSeries,
-  { button: string; title: string; color: string; chip: string; chipBorder: string; chipText: string; empty: string }
+  {
+    button: string;
+    title: string;
+    color: string;
+    chip: string;
+    chipBorder: string;
+    chipText: string;
+    empty: string;
+    // Variante do vazio quando há recorte por período: "no ciclo ainda" seria
+    // falso quando o vazio é do intervalo escolhido, e mandaria quem lê
+    // procurar um problema de dado que não existe.
+    emptyRange: string;
+  }
 > = {
   renovacoes: {
     button: "Renovações",
@@ -85,6 +101,7 @@ const SERIES_CONFIG: Record<
     chipBorder: "rgba(124, 111, 240, 0.55)",
     chipText: "#b3a9ff",
     empty: "Sem renovações registradas no ciclo ainda.",
+    emptyRange: "Sem renovações no período selecionado.",
   },
   novos: {
     button: "Novos compradores",
@@ -94,6 +111,7 @@ const SERIES_CONFIG: Record<
     chipBorder: "rgba(232, 133, 63, 0.55)",
     chipText: "#f0b183",
     empty: "Sem novos compradores registrados no ciclo ainda.",
+    emptyRange: "Sem novos compradores no período selecionado.",
   },
 };
 
@@ -199,6 +217,7 @@ export function CumulativeChart({
   granularity,
   onGranularityChange,
   granularityAvailable,
+  rangeActive = false,
 }: CumulativeChartProps) {
   const config = SERIES_CONFIG[series];
   const porHora = granularity === "hora";
@@ -288,7 +307,7 @@ export function CumulativeChart({
             color: "var(--text-muted)",
           }}
         >
-          {config.empty}
+          {rangeActive ? config.emptyRange : config.empty}
         </div>
       ) : (
         <div className="ult-chart-body">

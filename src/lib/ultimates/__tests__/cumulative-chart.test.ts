@@ -314,3 +314,72 @@ describe("buildHourlyCumulativeSeries", () => {
     ]);
   });
 });
+
+describe("recorte por intervalo de datas", () => {
+  const DIAS: UltimatesDailyRow[] = [
+    day("2026-07-08", 5, 1),
+    day("2026-07-10", 2, 3),
+    day("2026-07-15", 4, 0),
+    day("2026-07-25", 9, 9),
+  ];
+
+  it("range null mantém o comportamento de hoje", () => {
+    expect(buildCumulativeSeries(DIAS, "renovacoes", null)).toEqual(
+      buildCumulativeSeries(DIAS, "renovacoes")
+    );
+  });
+
+  it("acumula do zero dentro do intervalo, ignorando o que veio antes", () => {
+    const pontos = buildCumulativeSeries(DIAS, "renovacoes", {
+      start: "2026-07-10",
+      end: "2026-07-20",
+    });
+    // 08/07 (5) fica de fora e NÃO entra como saldo inicial: a curva responde
+    // "quanto entrou no período".
+    expect(pontos).toEqual([
+      { key: "2026-07-10", cumulative: 2 },
+      { key: "2026-07-15", cumulative: 6 },
+    ]);
+  });
+
+  it("inclui as duas pontas do intervalo", () => {
+    const pontos = buildCumulativeSeries(DIAS, "novos", {
+      start: "2026-07-08",
+      end: "2026-07-10",
+    });
+    expect(pontos.map((p) => p.key)).toEqual(["2026-07-08", "2026-07-10"]);
+    expect(pontos[1].cumulative).toBe(4);
+  });
+
+  it("intervalo sem nenhum dia devolve lista vazia", () => {
+    expect(
+      buildCumulativeSeries(DIAS, "renovacoes", { start: "2026-06-01", end: "2026-06-30" })
+    ).toEqual([]);
+  });
+
+  it("recorta a série horária pela parte de data da chave", () => {
+    const horas: UltimatesHourlyRow[] = [
+      { hour: "2026-07-09T23", renewals: 7, new_buyers: 0 },
+      { hour: "2026-07-10T00", renewals: 1, new_buyers: 0 },
+      { hour: "2026-07-10T02", renewals: 2, new_buyers: 0 },
+    ];
+    const pontos = buildHourlyCumulativeSeries(horas, "renovacoes", {
+      start: "2026-07-10",
+      end: "2026-07-10",
+    });
+    // 23h do dia 09 fica fora; as horas vazias entre 00h e 02h continuam sendo
+    // preenchidas como patamar.
+    expect(pontos).toEqual([
+      { key: "2026-07-10T00", cumulative: 1 },
+      { key: "2026-07-10T01", cumulative: 1 },
+      { key: "2026-07-10T02", cumulative: 3 },
+    ]);
+  });
+
+  it("intervalo sem nenhuma hora devolve lista vazia", () => {
+    const horas: UltimatesHourlyRow[] = [{ hour: "2026-07-09T23", renewals: 7, new_buyers: 0 }];
+    expect(
+      buildHourlyCumulativeSeries(horas, "renovacoes", { start: "2026-07-10", end: "2026-07-10" })
+    ).toEqual([]);
+  });
+});
