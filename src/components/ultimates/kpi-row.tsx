@@ -8,6 +8,12 @@ interface KpiRowProps {
   // não distinguem "ciclo sem novas compras" de "ciclo que teve zero novas
   // compras".
   countsNewBuyers: boolean;
+  // Quantos leads da base estão excluídos da contabilidade (migration 055).
+  // Anunciado no tile "Base" porque é ali que o número foi alterado: a exclusão
+  // derruba o denominador do % da meta, e o contador no botão do cabeçalho
+  // sozinho deixaria este tile mentindo por omissão para quem só bate o olho
+  // nos KPIs.
+  excludedBuyersCount?: number;
 }
 
 // Tile no estilo dos KPIs do Indicadores (hero-kpi-card): rótulo uppercase
@@ -74,12 +80,22 @@ function KpiTile({
 // 9). Todos os números vêm de aggregateRosterKpis sobre a MESMA chamada ao
 // roster usada pela tabela — nunca uma fonte separada, para que os números
 // batam entre si.
-export function KpiRow({ kpis, countsNewBuyers }: KpiRowProps) {
+export function KpiRow({ kpis, countsNewBuyers, excludedBuyersCount = 0 }: KpiRowProps) {
   const semVinculoTotal = kpis.renovacoesSemVinculo + kpis.renovacoesSemVinculoReembolsadas;
 
   return (
     <div data-testid="ultimates-kpi-row" className="ult-kpi-grid">
-      <KpiTile testId="ultimates-kpi-base" label="Base" value={String(kpis.base)} dotColor="var(--violet)" />
+      <KpiTile
+        testId="ultimates-kpi-base"
+        label="Base"
+        value={String(kpis.base)}
+        sub={
+          excludedBuyersCount > 0
+            ? `${excludedBuyersCount} ${excludedBuyersCount === 1 ? "excluído" : "excluídos"}`
+            : undefined
+        }
+        dotColor="var(--violet)"
+      />
       {/* Total puro, sem decompor as renovações sem vínculo: o número JÁ as
           inclui (aggregateRosterKpis soma renovado + renovacao_sem_vinculo), e
           o tile "Renovações sem vínculo" à direita é quem dá essa contagem

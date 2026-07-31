@@ -610,3 +610,139 @@ describe("UltimatesDashboard — granularidade do card Evolução", () => {
     expect(screen.queryByTestId("ultimates-cumulative-chart")).toBeNull();
   });
 });
+
+const EDIT_ROSTER: UltimatesRosterRow[] = [
+  row({ buyer_id: "b1", name: "Renovou", email: "r1@example.com", category: "renovado", transaction_code: "HP-TX-1", from_manual_link: true }),
+  row({ buyer_id: "b2", name: "Não Renovou", email: "n1@example.com", category: "nao_renovado" }),
+  row({ buyer_id: null, name: null, email: "novo@example.com", category: "novo_comprador", transaction_code: "HP-TX-9" }),
+];
+
+const EXCLUIDOS = [
+  {
+    id: "eb-1",
+    email: "teste@empresa.com",
+    name: "Teste Interno",
+    note: null,
+    excluded_by: "user-9",
+    excluded_by_email: "gestor@empresa.com",
+    created_at: "2026-07-30T12:00:00Z",
+  },
+];
+
+function mockEditRosterFetch(excluidos: unknown[] = []) {
+  const fetchMock = jest.fn((url: string, init?: RequestInit) => {
+    if (url.includes("/excluded-buyers")) {
+      if (init?.method === "POST" || init?.method === "DELETE") {
+        return Promise.resolve({ ok: true, status: 201, json: async () => ({}) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ buyers: excluidos }) });
+    }
+    if (url.includes("/roster")) return Promise.resolve({ ok: true, json: async () => ({ rows: EDIT_ROSTER }) });
+    if (url.includes("/hourly")) return Promise.resolve({ ok: true, json: async () => ({ hours: [] }) });
+    if (url.includes("/daily")) return Promise.resolve({ ok: true, json: async () => ({ days: [] }) });
+    return Promise.resolve({ ok: false, json: async () => ({}) });
+  });
+  global.fetch = fetchMock as unknown as typeof global.fetch;
+  return fetchMock;
+}
+
+describe("UltimatesDashboard — edição do roster (PRD editar_roster)", () => {
+  it("gestor em ciclo ativo vê as três ações na linha da base", async () => {
+    mockEditRosterFetch();
+    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+
+    await screen.findByTestId("ultimates-kpi-row");
+
+    expect(screen.getByTestId("ultimates-mark-renewed-n1@example.com")).toBeInTheDocument();
+    expect(screen.getByTestId("ultimates-edit-buyer-n1@example.com")).toBeInTheDocument();
+    expect(screen.getByTestId("ultimates-exclude-buyer-n1@example.com")).toBeInTheDocument();
+    expect(screen.getByTestId("ultimates-unlink-buyer-r1@example.com")).toBeInTheDocument();
+  });
+
+  it("ciclo encerrado mantém só 'Excluir' na linha da base", async () => {
+    mockEditRosterFetch();
+    render(<UltimatesDashboard cycle={makeCycle({ status: "encerrado" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+
+    await screen.findByTestId("ultimates-kpi-row");
+
+    expect(screen.getByTestId("ultimates-exclude-buyer-n1@example.com")).toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-edit-buyer-n1@example.com")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-mark-renewed-n1@example.com")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-unlink-buyer-r1@example.com")).not.toBeInTheDocument();
+  });
+
+  it("analista não vê nenhuma ação de edição", async () => {
+    mockEditRosterFetch();
+    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="analista" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+
+    await screen.findByTestId("ultimates-kpi-row");
+
+    expect(screen.queryByTestId("ultimates-exclude-buyer-n1@example.com")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-edit-buyer-n1@example.com")).not.toBeInTheDocument();
+  });
+
+  it("abre o modal de exclusão a partir da linha", async () => {
+    mockEditRosterFetch();
+    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+
+    await screen.findByTestId("ultimates-kpi-row");
+    fireEvent.click(screen.getByTestId("ultimates-exclude-buyer-n1@example.com"));
+
+    expect(screen.getByTestId("ultimates-exclude-confirm-btn")).toBeInTheDocument();
+  });
+
+  it("abre o vínculo invertido com as compras não atribuídas do ciclo", async () => {
+    mockEditRosterFetch();
+    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+
+    await screen.findByTestId("ultimates-kpi-row");
+    fireEvent.click(screen.getByTestId("ultimates-mark-renewed-n1@example.com"));
+
+    // A compra de novo@example.com é a candidata — veio do mesmo roster.
+    expect(screen.getByTestId("ultimates-mark-renewed-select-HP-TX-9")).toBeInTheDocument();
+  });
+
+  it("abre o modal de edição de cadastro a partir da linha", async () => {
+    mockEditRosterFetch();
+    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+
+    await screen.findByTestId("ultimates-kpi-row");
+    fireEvent.click(screen.getByTestId("ultimates-edit-buyer-n1@example.com"));
+
+    expect(screen.getByTestId("ultimates-edit-confirm-btn")).toBeInTheDocument();
+  });
+});
+
+describe("UltimatesDashboard — sinalização de leads excluídos", () => {
+  it("exibe o contador no botão e no tile Base", async () => {
+    mockEditRosterFetch(EXCLUIDOS);
+    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+
+    await screen.findByTestId("ultimates-kpi-row");
+
+    expect(await screen.findByTestId("ultimates-excluded-buyers-btn")).toHaveTextContent(
+      "Leads excluídos (1)"
+    );
+    expect(screen.getByTestId("ultimates-kpi-base")).toHaveTextContent("1 excluído");
+  });
+
+  it("sem exclusões, o botão aparece sem contador", async () => {
+    mockEditRosterFetch();
+    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+
+    await screen.findByTestId("ultimates-kpi-row");
+
+    expect(screen.getByTestId("ultimates-excluded-buyers-btn")).toHaveTextContent("Leads excluídos");
+    expect(screen.getByTestId("ultimates-excluded-buyers-btn")).not.toHaveTextContent("(");
+  });
+
+  it("o botão abre o modal de gestão mesmo em ciclo encerrado", async () => {
+    mockEditRosterFetch(EXCLUIDOS);
+    render(<UltimatesDashboard cycle={makeCycle({ status: "encerrado" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+
+    await screen.findByTestId("ultimates-kpi-row");
+    fireEvent.click(screen.getByTestId("ultimates-excluded-buyers-btn"));
+
+    expect(await screen.findByTestId("ultimates-excluded-buyers-modal")).toBeInTheDocument();
+  });
+});

@@ -25,6 +25,10 @@ import { UploadBuyersModal } from "./upload-buyers-modal";
 import { LinkBuyerModal } from "./link-buyer-modal";
 import { UnlinkBuyerModal } from "./unlink-buyer-modal";
 import { ExcludedOffersModal } from "./excluded-offers-modal";
+import { ExcludedBuyersModal } from "./excluded-buyers-modal";
+import { ExcludeBuyerModal } from "./exclude-buyer-modal";
+import { EditBuyerModal } from "./edit-buyer-modal";
+import { MarkRenewedModal } from "./mark-renewed-modal";
 import { NewPurchasesToggle } from "./new-purchases-toggle";
 
 // Dashboard do ciclo selecionado (PRD issue #114, seções 3.2–3.4/3.6, task
@@ -99,6 +103,17 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
   // para quem não configurou a exclusão.
   const [excludedOpen, setExcludedOpen] = useState(false);
   const [excludedCount, setExcludedCount] = useState(0);
+  // Leads excluídos da contabilidade (PRD editar_roster). Mesmo desenho do
+  // par acima: só o CONTADOR mora aqui, porque ele alimenta duas sinalizações
+  // (o rótulo do botão e o subtítulo do tile "Base") — a lista completa é do
+  // modal. A exclusão derruba o denominador do % da meta, então o dashboard
+  // não pode exibir o número novo sem dizer que ele foi filtrado.
+  const [excludedBuyersOpen, setExcludedBuyersOpen] = useState(false);
+  const [excludedBuyersCount, setExcludedBuyersCount] = useState(0);
+  // Alvos das três ações da linha do roster.
+  const [excludeTarget, setExcludeTarget] = useState<UltimatesRosterRow | null>(null);
+  const [editTarget, setEditTarget] = useState<UltimatesRosterRow | null>(null);
+  const [markRenewedTarget, setMarkRenewedTarget] = useState<UltimatesRosterRow | null>(null);
   // Série exibida no card "Evolução". Mora aqui (e não dentro do gráfico)
   // para sobreviver à troca de ciclo — ultimates-screen.tsx renderiza este
   // componente sem key, então quem compara a mesma métrica entre ciclos não
@@ -176,6 +191,30 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
     };
   }, [cycle.id, reloadToken]);
 
+  // Contador de leads excluídos, em efeito próprio pelo mesmo motivo do de
+  // ofertas: informação acessória não derruba o dashboard nem atrasa
+  // KPIs/gráfico/tabela.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadExcludedBuyersCount() {
+      try {
+        const res = await fetch(`/api/ultimates/cycles/${cycle.id}/excluded-buyers`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        setExcludedBuyersCount(Array.isArray(data?.buyers) ? data.buyers.length : 0);
+      } catch {
+        // Silencioso de propósito — ver comentário acima.
+      }
+    }
+
+    loadExcludedBuyersCount();
+    return () => {
+      cancelled = true;
+    };
+  }, [cycle.id, reloadToken]);
+
   function handleRefreshed() {
     setReloadToken((t) => t + 1);
   }
@@ -228,12 +267,24 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
   // Escrita só para gestor e ciclo ativo (critério 11: ciclo encerrado tem
   // dashboard acessível, mas upload/vínculo/atualização bloqueados).
   const canWrite = role === "gestor" && cycle.status !== "encerrado";
+  // Excluir/restaurar lead é a ÚNICA escrita do roster que atravessa o
+  // encerramento (decisão 13 do PRD editar_roster, mesmo racional das ofertas
+  // excluídas): um email de teste descoberto depois do encerramento também
+  // suja o histórico. As demais ações seguem `canWrite`.
+  const canExcludeBuyers = role === "gestor";
   const baseRows = viewRoster.filter((r) => r.buyer_id !== null);
+  // Compras não atribuídas — alimentam o vínculo invertido sem nenhuma chamada
+  // nova: são as mesmas linhas que a tabela já mostra como "Novos Compradores"
+  // (ou "Renovação sem vínculo", conforme o modo do ciclo).
+  const unattributedRows = viewRoster.filter((r) => r.buyer_id === null);
 
   function handleWriteDone() {
     setUploadOpen(false);
     setLinkTarget(null);
     setUnlinkTarget(null);
+    setExcludeTarget(null);
+    setEditTarget(null);
+    setMarkRenewedTarget(null);
     setReloadToken((t) => t + 1);
   }
 
@@ -269,6 +320,16 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
             data-testid="ultimates-excluded-offers-btn"
           >
             {excludedCount > 0 ? `Ofertas excluídas (${excludedCount})` : "Ofertas excluídas"}
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setExcludedBuyersOpen(true)}
+            data-testid="ultimates-excluded-buyers-btn"
+          >
+            {excludedBuyersCount > 0
+              ? `Leads excluídos (${excludedBuyersCount})`
+              : "Leads excluídos"}
           </button>
           {/* key={cycle.id} remonta só o toggle na troca de ciclo — o `failed`
               interno dele (PATCH que falhou) não deve sobreviver para o ciclo
@@ -354,7 +415,11 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
               </p>
             )}
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <KpiRow kpis={kpis} countsNewBuyers={countsNewBuyers} />
+              <KpiRow
+                kpis={kpis}
+                countsNewBuyers={countsNewBuyers}
+                excludedBuyersCount={excludedBuyersCount}
+              />
               {cycle.goal_percent != null && (
                 <GoalProgressBar goalPercent={cycle.goal_percent} currentPercent={kpis.renovadosPercent} />
               )}
@@ -388,6 +453,9 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
               countsNewBuyers={countsNewBuyers}
               onLinkClick={canWrite ? setLinkTarget : undefined}
               onUnlinkClick={canWrite ? setUnlinkTarget : undefined}
+              onMarkRenewedClick={canWrite ? setMarkRenewedTarget : undefined}
+              onEditClick={canWrite ? setEditTarget : undefined}
+              onExcludeClick={canExcludeBuyers ? setExcludeTarget : undefined}
             />
           </section>
         </div>
@@ -402,6 +470,47 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
           canWrite={role === "gestor"}
           onChanged={handleRefreshed}
           onClose={() => setExcludedOpen(false)}
+        />
+      )}
+
+      {/* Como o de ofertas, este NÃO é gateado por ciclo ativo — a lista de
+          leads excluídos continua editável em ciclo encerrado (decisão 13 do
+          PRD editar_roster). Só o papel decide quem escreve. */}
+      {excludedBuyersOpen && (
+        <ExcludedBuyersModal
+          cycleId={cycle.id}
+          canWrite={canExcludeBuyers}
+          onChanged={handleRefreshed}
+          onClose={() => setExcludedBuyersOpen(false)}
+        />
+      )}
+
+      {excludeTarget && canExcludeBuyers && (
+        <ExcludeBuyerModal
+          cycleId={cycle.id}
+          targetRow={excludeTarget}
+          onExcluded={handleWriteDone}
+          onCancel={() => setExcludeTarget(null)}
+        />
+      )}
+
+      {editTarget && canWrite && (
+        <EditBuyerModal
+          cycleId={cycle.id}
+          targetRow={editTarget}
+          onSaved={handleWriteDone}
+          onCancel={() => setEditTarget(null)}
+        />
+      )}
+
+      {markRenewedTarget && canWrite && (
+        <MarkRenewedModal
+          cycleId={cycle.id}
+          targetRow={markRenewedTarget}
+          unattributedRows={unattributedRows}
+          countsNewBuyers={countsNewBuyers}
+          onLinked={handleWriteDone}
+          onCancel={() => setMarkRenewedTarget(null)}
         />
       )}
 

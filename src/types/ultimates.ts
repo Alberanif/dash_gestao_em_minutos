@@ -52,6 +52,21 @@ export interface UltimatesExcludedOfferRecord {
   created_at: string;
 }
 
+// Lead da base cuja contabilidade foi excluída do ciclo (migration 055). A
+// chave é o EMAIL NORMALIZADO, não o buyer_id: é por email que o lado das
+// vendas é filtrado (dash_gestao_hotmart_sales só tem buyer_email) e é o que
+// faz a exclusão sobreviver ao delete+reinsert de
+// dash_gestao_ultimates_replace_buyers, que troca o id de quem sai e volta ao
+// CSV.
+export interface UltimatesExcludedBuyerRecord {
+  id: string;
+  cycle_id: string;
+  email: string;
+  note: string | null;
+  excluded_by: string;
+  created_at: string;
+}
+
 // Categorias de classificação do cruzamento base-de-compradores x vendas
 // Hotmart, usadas pelo restante da feature (RPCs, API, UI).
 //
@@ -87,6 +102,15 @@ export interface UltimatesRosterRow {
   total_value: number | null;
   // transaction_code da primeira venda aprovada; null se nenhuma.
   transaction_code: string | null;
+  // A renovação exposta em transaction_code veio de vínculo manual? Decide se
+  // "Desfazer vínculo" tem o que desfazer (migration 055).
+  //
+  // OPCIONAL de propósito: a RPC anterior à 055 não devolve o campo, e a fila
+  // de migrations deste ambiente anda dias atrás do código. `undefined` = "não
+  // sei", e quem consome deve cair no comportamento anterior (oferecer o
+  // desfazer em toda renovação, tratando o 404 do DELETE) em vez de esconder
+  // uma ação que funciona. Só `false` afirma que não há vínculo.
+  from_manual_link?: boolean;
 }
 
 // Vendas aprovadas do produto do ciclo por dia (não acumuladas — o acúmulo é
