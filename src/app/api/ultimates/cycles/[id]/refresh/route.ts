@@ -182,9 +182,11 @@ export async function POST(
     // Sequencial de propósito: buscar os produtos em paralelo multiplicaria a
     // taxa de chamadas à Hotmart pelo tamanho do conjunto.
     //
-    // ATENÇÃO: pageToken é declarado DENTRO do laço de produtos. Se vazasse
-    // para fora, o segundo produto começaria com o token do primeiro e a
-    // paginação devolveria as vendas erradas.
+    // pageToken é escopado ao laço de produtos por higiene defensiva. Hoje isso
+    // NÃO muda comportamento: o do...while só sai quando pageToken já é falsy,
+    // então cada produto começaria zerado de qualquer jeito. Passa a ser
+    // load-bearing no instante em que alguém acrescentar um break ou return
+    // antecipado dentro da paginação de um produto.
     for (const productId of productIds) {
       let pageToken: string | undefined;
 
