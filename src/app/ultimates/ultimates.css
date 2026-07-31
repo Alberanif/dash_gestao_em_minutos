@@ -148,3 +148,63 @@
     width: 100%;
   }
 }
+
+/* Barra De/Até do recorte por período. Estilo próprio, e não o
+   date-range-controls de components/layout: aquele usa tokens do tema claro
+   (--color-text-muted) e classes Tailwind que não existem no .dash-dark. */
+.ult-date-filter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border-vis);
+  border-radius: 11px;
+}
+
+.ult-date-field {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-label);
+}
+
+/* color-scheme: dark faz o ícone nativo do calendário do Chrome aparecer claro
+   sobre o fundo escuro — sem ele o botão fica preto no preto e some. */
+.ult-date-field input {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text-strong);
+  background: var(--surface-2);
+  border: 1px solid var(--border-vis);
+  border-radius: 8px;
+  padding: 7px 10px;
+  color-scheme: dark;
+}
+
+.ult-date-field input:disabled {
+  opacity: 0.5;
+}
+
+.ult-date-msg {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+@media (max-width: 640px) {
+  .ult-date-filter {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ult-date-field input {
+    flex: 1;
+  }
+}
