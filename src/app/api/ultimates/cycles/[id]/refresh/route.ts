@@ -13,8 +13,8 @@ import type { HotmartCredentials } from "@/types/accounts";
 /**
  * Dash Ultimates — "Atualizar agora" (PRD issue #114, seção 6.3, RF-7, critério 8).
  *
- * Busca sob demanda das vendas Hotmart do produto de UM ciclo, sem tocar nos
- * crons globais. Protegida por dois mecanismos:
+ * Busca sob demanda das vendas Hotmart de todos os produtos de UM ciclo, sem
+ * tocar nos crons globais. Protegida por dois mecanismos:
  *  - Throttle: bloqueia refreshes em rajada (< THROTTLE_MS desde last_refresh_at).
  *  - Lock atômico: um único UPDATE condicional em refresh_started_at resolve a
  *    corrida no Postgres. Perdedor sai imediatamente com 409, sem chamar a Hotmart.
@@ -29,6 +29,11 @@ import type { HotmartCredentials } from "@/types/accounts";
  * recompilação do `next dev`, kill de cold start — maxDuration não vale em dev),
  * o TTL do lock é a rede de segurança: outra invocação o rouba após LOCK_TTL_MS.
  * Escrita via service_role (a tabela só permite escrita fora da RLS).
+ *
+ * O orçamento REFRESH_BUDGET_MS é COMPARTILHADO entre todos os produtos do
+ * ciclo, não por produto: um conjunto grande com muito histórico pode estourar
+ * e virar 502. É limitação conhecida (ver spec de 2026-07-30) — aumentar o
+ * orçamento exige rever LOCK_TTL_MS e maxDuration junto.
  */
 
 // A busca escopada pagina a API da Hotmart; folga para não ser cortado pela
@@ -63,7 +68,7 @@ export async function POST(
   // 1. Ciclo existe?
   const { data: cycle, error: cycleErr } = await supabase
     .from("dash_gestao_ultimates_cycles")
-    .select("id, account_id, product_id, status, created_at, last_refresh_at")
+    .select("id, account_id, status, created_at, last_refresh_at")
     .eq("id", id)
     .single();
 
@@ -149,35 +154,62 @@ export async function POST(
     const { client_id, client_secret } = account.credentials as HotmartCredentials;
     const accessToken = await fetchHotmartToken(client_id, client_secret, deadline);
 
+    const { data: cycleProducts, error: cycleProductsErr } = await supabase
+      .from("dash_gestao_ultimates_cycle_products")
+      .select("product_id")
+      .eq("cycle_id", id)
+      .abortSignal(deadline);
+
+    if (cycleProductsErr) {
+      throw new Error(`Falha ao ler produtos do ciclo: ${cycleProductsErr.message}`);
+    }
+
+    const productIds = ((cycleProducts ?? []) as { product_id: string }[]).map(
+      (row) => row.product_id
+    );
+
+    if (productIds.length === 0) {
+      throw new Error("Ciclo sem produtos associados");
+    }
+
     // Período do ciclo: da criação até agora. Escopo por product_id (parâmetro
-    // nativo da API sales/history) — busca só as vendas do produto do ciclo.
+    // nativo da API sales/history) — uma paginação completa POR PRODUTO.
     const startMs = new Date(cycle.created_at).getTime();
     const endMs = now.getTime();
 
     const allItems: HotmartSaleItem[] = [];
-    let pageToken: string | undefined;
 
-    do {
-      const url = new URL(HOTMART_SALES_URL);
-      url.searchParams.set("start_date", String(startMs));
-      url.searchParams.set("end_date", String(endMs));
-      url.searchParams.set("product_id", cycle.product_id);
-      url.searchParams.set("max_results", "500");
-      if (pageToken) url.searchParams.set("page_token", pageToken);
+    // Sequencial de propósito: buscar os produtos em paralelo multiplicaria a
+    // taxa de chamadas à Hotmart pelo tamanho do conjunto.
+    //
+    // ATENÇÃO: pageToken é declarado DENTRO do laço de produtos. Se vazasse
+    // para fora, o segundo produto começaria com o token do primeiro e a
+    // paginação devolveria as vendas erradas.
+    for (const productId of productIds) {
+      let pageToken: string | undefined;
 
-      const res = await fetch(url.toString(), {
-        headers: { Authorization: `Bearer ${accessToken}` },
-        signal: deadline,
-      });
+      do {
+        const url = new URL(HOTMART_SALES_URL);
+        url.searchParams.set("start_date", String(startMs));
+        url.searchParams.set("end_date", String(endMs));
+        url.searchParams.set("product_id", productId);
+        url.searchParams.set("max_results", "500");
+        if (pageToken) url.searchParams.set("page_token", pageToken);
 
-      if (!res.ok) {
-        throw new Error(`Hotmart sales API error: ${res.status} ${await res.text()}`);
-      }
+        const res = await fetch(url.toString(), {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          signal: deadline,
+        });
 
-      const data = await res.json();
-      allItems.push(...(data.items ?? []));
-      pageToken = data.page_info?.next_page_token;
-    } while (pageToken);
+        if (!res.ok) {
+          throw new Error(`Hotmart sales API error: ${res.status} ${await res.text()}`);
+        }
+
+        const data = await res.json();
+        allItems.push(...(data.items ?? []));
+        pageToken = data.page_info?.next_page_token;
+      } while (pageToken);
+    }
 
     let upserted = 0;
     if (allItems.length > 0) {
