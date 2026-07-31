@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { UserRole } from "@/types/auth";
 import type { UltimatesDailyRow, UltimatesHourlyRow, UltimatesRosterRow } from "@/types/ultimates";
-import type { CycleWithProduct } from "./types";
+import type { CycleWithProducts } from "./types";
 import { aggregateRosterKpis } from "@/lib/ultimates/kpi-aggregation";
+import { formatCycleProducts } from "@/lib/ultimates/format";
 import {
   buildCumulativeSeries,
   buildHourlyCumulativeSeries,
@@ -37,7 +38,7 @@ import { NewPurchasesToggle } from "./new-purchases-toggle";
 // não renomeie sem avisar quem pegar a #124 (slot "Vincular à base" em
 // RosterTable).
 export interface UltimatesDashboardProps {
-  cycle: CycleWithProduct;
+  cycle: CycleWithProducts;
   role: UserRole;
   // Persiste a política do ciclo e devolve se deu certo. Mora no pai porque a
   // fonte de verdade é a lista de ciclos — ver comentário em ultimates-screen.
@@ -247,8 +248,12 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
           >
             {cycle.name}
           </h2>
-          <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "2px 0 0" }}>
-            {cycle.product_name ?? "Produto não identificado"}
+          <p
+            data-testid="ultimates-cycle-products"
+            title={cycle.products.map((p) => p.product_name ?? p.product_id).join(", ")}
+            style={{ fontSize: 12, color: "var(--text-muted)", margin: "2px 0 0" }}
+          >
+            {formatCycleProducts(cycle.products)}
           </p>
         </div>
         <div className="ult-cycle-actions">

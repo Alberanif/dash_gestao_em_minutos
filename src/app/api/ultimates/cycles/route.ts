@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import type { UltimatesCycleRecord } from "@/types/ultimates";
+import type { UltimatesCycleRecord, UltimatesCycleProductRef } from "@/types/ultimates";
 
-// Ciclo com o nome do produto anexado (join manual com
-// dash_gestao_hotmart_products, feito em memória porque as tabelas não têm
-// FK direto para join via PostgREST). Específico desta rota — ver
-// restrição de não editar src/types/ultimates.ts.
-export interface UltimatesCycleWithProductName extends UltimatesCycleRecord {
-  product_name: string | null;
+// Ciclo com o conjunto de produtos anexado. O join é manual (duas queries em
+// memória) porque as tabelas não têm FK direto para join via PostgREST —
+// mesma razão do join de produto que existia antes da migration 056.
+export interface UltimatesCycleWithProducts extends UltimatesCycleRecord {
+  products: UltimatesCycleProductRef[];
 }
 
 export async function GET() {
@@ -27,15 +26,36 @@ export async function GET() {
   }
 
   const rows = (cycles ?? []) as UltimatesCycleRecord[];
-  const productIds = Array.from(new Set(rows.map((cycle) => cycle.product_id)));
+  const cycleIds = rows.map((cycle) => cycle.id);
+
+  const productIdsByCycle = new Map<string, string[]>();
+  const allProductIds = new Set<string>();
+
+  if (cycleIds.length > 0) {
+    const { data: pairs, error: pairsError } = await supabase
+      .from("dash_gestao_ultimates_cycle_products")
+      .select("cycle_id, product_id")
+      .in("cycle_id", cycleIds);
+
+    if (pairsError) {
+      return NextResponse.json({ error: pairsError.message }, { status: 500 });
+    }
+
+    for (const pair of (pairs ?? []) as { cycle_id: string; product_id: string }[]) {
+      const list = productIdsByCycle.get(pair.cycle_id) ?? [];
+      list.push(pair.product_id);
+      productIdsByCycle.set(pair.cycle_id, list);
+      allProductIds.add(pair.product_id);
+    }
+  }
 
   const productNameById = new Map<string, string>();
 
-  if (productIds.length > 0) {
+  if (allProductIds.size > 0) {
     const { data: products, error: productsError } = await supabase
       .from("dash_gestao_hotmart_products")
       .select("product_id, product_name")
-      .in("product_id", productIds);
+      .in("product_id", Array.from(allProductIds));
 
     if (productsError) {
       return NextResponse.json({ error: productsError.message }, { status: 500 });
@@ -46,12 +66,21 @@ export async function GET() {
     }
   }
 
-  const withProductName: UltimatesCycleWithProductName[] = rows.map((cycle) => ({
+  const withProducts: UltimatesCycleWithProducts[] = rows.map((cycle) => ({
     ...cycle,
-    product_name: productNameById.get(cycle.product_id) ?? null,
+    // Ordem por nome para o header do dashboard ser estável entre requisições
+    // — o PostgREST não garante ordem numa tabela sem order by.
+    products: (productIdsByCycle.get(cycle.id) ?? [])
+      .map((productId) => ({
+        product_id: productId,
+        product_name: productNameById.get(productId) ?? null,
+      }))
+      .sort((a, b) =>
+        (a.product_name ?? a.product_id).localeCompare(b.product_name ?? b.product_id, "pt-BR")
+      ),
   }));
 
-  return NextResponse.json({ cycles: withProductName });
+  return NextResponse.json({ cycles: withProducts });
 }
 
 export async function POST(request: NextRequest) {

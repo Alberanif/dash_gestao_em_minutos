@@ -15,6 +15,9 @@ const mockProductsIn = jest.fn();
 const mockProductsEq = jest.fn();
 const mockProductsSingle = jest.fn();
 
+const mockCycleProductsSelect = jest.fn();
+const mockCycleProductsIn = jest.fn();
+
 const mockFrom = jest.fn();
 const mockRpc = jest.fn();
 
@@ -51,6 +54,9 @@ beforeEach(() => {
   mockProductsEq.mockReturnValue({ single: mockProductsSingle });
   mockProductsSingle.mockResolvedValue({ data: null, error: null });
 
+  mockCycleProductsSelect.mockReturnValue({ in: mockCycleProductsIn });
+  mockCycleProductsIn.mockResolvedValue({ data: [], error: null });
+
   mockRpc.mockResolvedValue({ data: null, error: null });
 
   mockFrom.mockImplementation((table: string) => {
@@ -59,6 +65,9 @@ beforeEach(() => {
     }
     if (table === "dash_gestao_hotmart_products") {
       return { select: mockProductsSelect };
+    }
+    if (table === "dash_gestao_ultimates_cycle_products") {
+      return { select: mockCycleProductsSelect };
     }
     throw new Error(`Unexpected table: ${table}`);
   });
@@ -93,15 +102,15 @@ describe("GET /api/ultimates/cycles", () => {
     expect(res.status).toBe(403);
   });
 
-  it("lists cycles ordered by created_at desc with product_name attached", async () => {
+  it("lista ciclos com o conjunto de produtos de cada um", async () => {
     const cycles = [
       {
         id: "c1",
         name: "Ciclo 1",
         account_id: "acc-1",
-        product_id: "p1",
         goal_percent: 50,
         status: "ativo",
+        counts_new_buyers: true,
         refresh_started_at: null,
         last_refresh_at: null,
         created_by: "user-1",
@@ -112,9 +121,9 @@ describe("GET /api/ultimates/cycles", () => {
         id: "c2",
         name: "Ciclo 2 encerrado",
         account_id: "acc-1",
-        product_id: "p2",
         goal_percent: null,
         status: "encerrado",
+        counts_new_buyers: true,
         refresh_started_at: null,
         last_refresh_at: null,
         created_by: "user-1",
@@ -123,6 +132,14 @@ describe("GET /api/ultimates/cycles", () => {
       },
     ];
     mockCyclesOrder.mockResolvedValueOnce({ data: cycles, error: null });
+    mockCycleProductsIn.mockResolvedValueOnce({
+      data: [
+        { cycle_id: "c1", product_id: "p2" },
+        { cycle_id: "c1", product_id: "p1" },
+        { cycle_id: "c2", product_id: "p2" },
+      ],
+      error: null,
+    });
     mockProductsIn.mockResolvedValueOnce({
       data: [
         { product_id: "p1", product_name: "Produto Um" },
@@ -137,9 +154,33 @@ describe("GET /api/ultimates/cycles", () => {
 
     expect(res.status).toBe(200);
     expect(mockCyclesOrder).toHaveBeenCalledWith("created_at", { ascending: false });
-    expect(body.cycles).toHaveLength(2);
-    expect(body.cycles[0]).toMatchObject({ id: "c1", product_name: "Produto Um" });
-    expect(body.cycles[1]).toMatchObject({ id: "c2", status: "encerrado", product_name: "Produto Dois" });
+    // Ordenados por nome dentro do ciclo, para o header ser determinístico.
+    expect(body.cycles[0].products).toEqual([
+      { product_id: "p2", product_name: "Produto Dois" },
+      { product_id: "p1", product_name: "Produto Um" },
+    ]);
+    expect(body.cycles[1].products).toEqual([
+      { product_id: "p2", product_name: "Produto Dois" },
+    ]);
+  });
+
+  it("produto não sincronizado entra com product_name null", async () => {
+    mockCyclesOrder.mockResolvedValueOnce({
+      data: [{ id: "c1", name: "Ciclo 1", account_id: "acc-1", status: "ativo", created_at: "2026-07-19T00:00:00Z" }],
+      error: null,
+    });
+    mockCycleProductsIn.mockResolvedValueOnce({
+      data: [{ cycle_id: "c1", product_id: "desconhecido" }],
+      error: null,
+    });
+    mockProductsIn.mockResolvedValueOnce({ data: [], error: null });
+
+    const { GET } = await import("../route");
+    const body = await (await GET()).json();
+
+    expect(body.cycles[0].products).toEqual([
+      { product_id: "desconhecido", product_name: null },
+    ]);
   });
 
   it("keeps encerrado cycles in the listing", async () => {
@@ -148,9 +189,9 @@ describe("GET /api/ultimates/cycles", () => {
         id: "c2",
         name: "Encerrado",
         account_id: "acc-1",
-        product_id: "p2",
         goal_percent: null,
         status: "encerrado",
+        counts_new_buyers: true,
         refresh_started_at: null,
         last_refresh_at: null,
         created_by: "user-1",
@@ -159,7 +200,11 @@ describe("GET /api/ultimates/cycles", () => {
       },
     ];
     mockCyclesOrder.mockResolvedValueOnce({ data: cycles, error: null });
-    mockProductsIn.mockResolvedValueOnce({ data: [{ product_id: "p2", product_name: "Produto Dois" }], error: null });
+    // Sem par nenhum na junção, allProductIds fica vazio e o GET pula a
+    // consulta de nomes — não empilhar mockProductsIn aqui: um once não
+    // consumido vaza para o describe de POST (jest.clearAllMocks() não drena
+    // a fila de mockResolvedValueOnce, só mockReset faria isso).
+    mockCycleProductsIn.mockResolvedValueOnce({ data: [], error: null });
 
     const { GET } = await import("../route");
     const res = await GET();

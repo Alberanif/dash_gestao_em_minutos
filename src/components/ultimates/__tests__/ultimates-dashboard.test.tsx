@@ -3,16 +3,15 @@ import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { UltimatesDashboard } from "../ultimates-dashboard";
-import type { CycleWithProduct } from "../types";
+import type { CycleWithProducts } from "../types";
 import type { UltimatesRosterRow, UltimatesDailyRow, UltimatesHourlyRow } from "@/types/ultimates";
 
-function makeCycle(overrides: Partial<CycleWithProduct> = {}): CycleWithProduct {
+function makeCycle(overrides: Partial<CycleWithProducts> = {}): CycleWithProducts {
   return {
     id: "c1",
     name: "Ciclo Julho",
     account_id: "acc-1",
-    product_id: "p1",
-    product_name: "Produto Um",
+    products: [{ product_id: "p1", product_name: "Produto Um" }],
     goal_percent: 60,
     status: "ativo",
     refresh_started_at: null,
@@ -132,6 +131,23 @@ describe("UltimatesDashboard — wiring de KPIs/meta/gráfico/tabela sobre a mes
     render(<UltimatesDashboard cycle={makeCycle({ name: "Ciclo XPTO" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
     expect(screen.getByTestId("ultimates-dashboard-slot")).toBeInTheDocument();
     expect(await screen.findByTestId("ultimates-selected-cycle")).toHaveTextContent("Ciclo XPTO");
+  });
+
+  it("mostra os produtos do ciclo no header", () => {
+    mockRosterAndDailyFetch();
+    render(
+      <UltimatesDashboard
+        cycle={makeCycle({
+          products: [
+            { product_id: "p1", product_name: "Anual" },
+            { product_id: "p2", product_name: "Mensal" },
+          ],
+        })}
+        role="gestor"
+        onCountsNewBuyersChange={jest.fn()}
+      />
+    );
+    expect(screen.getByTestId("ultimates-cycle-products")).toHaveTextContent("Anual · Mensal");
   });
 
   it("mostra erro com opção de tentar novamente quando roster ou daily falham", async () => {

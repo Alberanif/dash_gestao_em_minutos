@@ -6,7 +6,7 @@ import type { UserRole } from "@/types/auth";
 import { selectInitialCycleId } from "@/lib/ultimates/select-initial-cycle";
 import { UltimatesDashboard } from "./ultimates-dashboard";
 import { CycleFormModal } from "./cycle-form-modal";
-import type { CycleWithProduct, HotmartProductOption } from "./types";
+import type { CycleWithProducts, HotmartProductOption } from "./types";
 
 interface UltimatesScreenProps {
   role: UserRole;
@@ -22,11 +22,11 @@ interface UltimatesScreenProps {
 export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
   const isGestor = role === "gestor";
 
-  const [cycles, setCycles] = useState<CycleWithProduct[] | null>(null);
+  const [cycles, setCycles] = useState<CycleWithProducts[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<CycleWithProduct | null>(null);
+  const [editTarget, setEditTarget] = useState<CycleWithProducts | null>(null);
   // Incrementado pelo botão "Tentar novamente" para reexecutar o efeito de
   // carga abaixo — mesmo padrão de EventosPage (fetch inline no efeito, com
   // flag de cancelamento), evitado setState fora do corpo do efeito.
@@ -43,7 +43,7 @@ export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
           return;
         }
         const data = await res.json();
-        const list: CycleWithProduct[] = Array.isArray(data?.cycles) ? data.cycles : [];
+        const list: CycleWithProducts[] = Array.isArray(data?.cycles) ? data.cycles : [];
         if (cancelled) return;
         setCycles(list);
         setSelectedId((prev) => (prev && list.some((c) => c.id === prev) ? prev : selectInitialCycleId(list)));
@@ -57,13 +57,13 @@ export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
     };
   }, [reloadToken]);
 
-  function handleCreated(cycle: CycleWithProduct) {
+  function handleCreated(cycle: CycleWithProducts) {
     setCycles((prev) => [cycle, ...(prev ?? [])]);
     setSelectedId(cycle.id);
     setCreateOpen(false);
   }
 
-  function handleEdited(cycle: CycleWithProduct) {
+  function handleEdited(cycle: CycleWithProducts) {
     setCycles((prev) => (prev ?? []).map((c) => (c.id === cycle.id ? cycle : c)));
     setEditTarget(null);
   }
