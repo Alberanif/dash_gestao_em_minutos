@@ -32,3 +32,17 @@ export interface ExcludedOffer {
   excluded_by_email: string | null;
   created_at: string;
 }
+
+// Linha da lista devolvida por GET /api/ultimates/cycles/[id]/excluded-buyers.
+// `name` é resolvido pela rota na base do ciclo e vem null quando o email já
+// saiu do CSV — a exclusão sobrevive ao upload, a linha da base não. A
+// exibição sempre cai de volta no email, que é a chave da exclusão.
+export interface ExcludedBuyer {
+  id: string;
+  email: string;
+  name: string | null;
+  note: string | null;
+  excluded_by: string;
+  excluded_by_email: string | null;
+  created_at: string;
+}

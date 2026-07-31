@@ -246,4 +246,76 @@ describe("POST /api/hotmart/webhook — passo aditivo Dash Ultimates (isolação
       })
     );
   });
+
+  // ── Identidade do comprador (PRD #146) ──────────────────────────────────────
+
+  it("(e) payload com nome e telefone: upsert inclui buyer_name e buyer_phone", async () => {
+    mockCyclesLimit.mockResolvedValueOnce({ data: [{ account_id: "acc-42" }], error: null });
+
+    const { POST } = await import("../route");
+    const req = makeRequest(
+      {
+        ...monitoredPayload,
+        data: {
+          ...monitoredPayload.data,
+          buyer: {
+            email: "comprador@example.com",
+            name: "  Maria Souza  ",
+            checkout_phone: " 11988887777 ",
+          },
+        },
+      },
+      VALID_HEADERS
+    );
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    const [row] = mockUpsert.mock.calls[0];
+    expect(row).toEqual(
+      expect.objectContaining({
+        buyer_name: "Maria Souza",
+        buyer_phone: "11988887777",
+      })
+    );
+  });
+
+  // Regra 4.3 do PRD #146: campo ausente ⇒ chave OMITIDA, jamais enviada como
+  // null. O upsert do PostgREST só atualiza as colunas presentes no payload —
+  // enviar null aqui faria um evento de estorno (que não repete os dados do
+  // comprador) apagar o nome que o cron já havia gravado para a mesma
+  // transação.
+  it("(f) payload sem nome/telefone: as chaves são OMITIDAS do upsert, não enviadas como null", async () => {
+    mockCyclesLimit.mockResolvedValueOnce({ data: [{ account_id: "acc-42" }], error: null });
+
+    const { POST } = await import("../route");
+    const req = makeRequest(monitoredPayload, VALID_HEADERS);
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    const [row] = mockUpsert.mock.calls[0];
+    expect(Object.keys(row)).not.toContain("buyer_name");
+    expect(Object.keys(row)).not.toContain("buyer_phone");
+  });
+
+  it("(g) payload com nome em branco: chave omitida (string vazia não sobrescreve)", async () => {
+    mockCyclesLimit.mockResolvedValueOnce({ data: [{ account_id: "acc-42" }], error: null });
+
+    const { POST } = await import("../route");
+    const req = makeRequest(
+      {
+        ...monitoredPayload,
+        data: {
+          ...monitoredPayload.data,
+          buyer: { email: "comprador@example.com", name: "   ", checkout_phone: "" },
+        },
+      },
+      VALID_HEADERS
+    );
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    const [row] = mockUpsert.mock.calls[0];
+    expect(Object.keys(row)).not.toContain("buyer_name");
+    expect(Object.keys(row)).not.toContain("buyer_phone");
+  });
 });

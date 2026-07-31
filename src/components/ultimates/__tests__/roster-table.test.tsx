@@ -226,3 +226,177 @@ describe("RosterTable — troca de modo (countsNewBuyers) com filtro de categori
     expect(within(table).getByText("Novo Comprador")).toBeInTheDocument();
   });
 });
+
+describe("RosterTable — ações de edição do roster (PRD editar_roster)", () => {
+  const HANDLERS = {
+    onMarkRenewedClick: jest.fn(),
+    onEditClick: jest.fn(),
+    onExcludeClick: jest.fn(),
+  };
+
+  beforeEach(() => {
+    HANDLERS.onMarkRenewedClick.mockClear();
+    HANDLERS.onEditClick.mockClear();
+    HANDLERS.onExcludeClick.mockClear();
+  });
+
+  it("oferece 'Marcar renovado' só em linha da base não renovada", () => {
+    render(<RosterTable rows={ROWS} role="gestor" countsNewBuyers {...HANDLERS} />);
+
+    expect(screen.getByTestId("ultimates-mark-renewed-joao@example.com")).toBeInTheDocument();
+    // Renovado da base já tem renovação — nada a marcar.
+    expect(screen.queryByTestId("ultimates-mark-renewed-maria@example.com")).not.toBeInTheDocument();
+    // Novo comprador não é linha da base.
+    expect(screen.queryByTestId("ultimates-mark-renewed-ana@example.com")).not.toBeInTheDocument();
+  });
+
+  it("aciona onMarkRenewedClick com a linha do não renovado", () => {
+    render(<RosterTable rows={ROWS} role="gestor" countsNewBuyers {...HANDLERS} />);
+    fireEvent.click(screen.getByTestId("ultimates-mark-renewed-joao@example.com"));
+
+    expect(HANDLERS.onMarkRenewedClick).toHaveBeenCalledWith(
+      expect.objectContaining({ email: "joao@example.com" })
+    );
+  });
+
+  it("oferece Editar e Excluir em toda linha da base, e em nenhuma de novo comprador", () => {
+    render(<RosterTable rows={ROWS} role="gestor" countsNewBuyers {...HANDLERS} />);
+
+    expect(screen.getByTestId("ultimates-edit-buyer-maria@example.com")).toBeInTheDocument();
+    expect(screen.getByTestId("ultimates-exclude-buyer-maria@example.com")).toBeInTheDocument();
+    expect(screen.getByTestId("ultimates-edit-buyer-joao@example.com")).toBeInTheDocument();
+    expect(screen.getByTestId("ultimates-exclude-buyer-joao@example.com")).toBeInTheDocument();
+
+    expect(screen.queryByTestId("ultimates-edit-buyer-ana@example.com")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-exclude-buyer-ana@example.com")).not.toBeInTheDocument();
+  });
+
+  it("aciona onEditClick e onExcludeClick com a linha", () => {
+    render(<RosterTable rows={ROWS} role="gestor" countsNewBuyers {...HANDLERS} />);
+
+    fireEvent.click(screen.getByTestId("ultimates-edit-buyer-maria@example.com"));
+    expect(HANDLERS.onEditClick).toHaveBeenCalledWith(
+      expect.objectContaining({ email: "maria@example.com" })
+    );
+
+    fireEvent.click(screen.getByTestId("ultimates-exclude-buyer-joao@example.com"));
+    expect(HANDLERS.onExcludeClick).toHaveBeenCalledWith(
+      expect.objectContaining({ email: "joao@example.com" })
+    );
+  });
+
+  it("sem os handlers (ciclo encerrado), a ação correspondente não é oferecida", () => {
+    render(
+      <RosterTable rows={ROWS} role="gestor" countsNewBuyers onExcludeClick={HANDLERS.onExcludeClick} />
+    );
+
+    // Excluir atravessa o encerramento; editar e marcar renovado não.
+    expect(screen.getByTestId("ultimates-exclude-buyer-maria@example.com")).toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-edit-buyer-maria@example.com")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-mark-renewed-joao@example.com")).not.toBeInTheDocument();
+  });
+
+  it("analista não vê nenhuma das ações", () => {
+    render(<RosterTable rows={ROWS} role="analista" countsNewBuyers {...HANDLERS} />);
+
+    expect(screen.queryByTestId("ultimates-mark-renewed-joao@example.com")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-edit-buyer-maria@example.com")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-exclude-buyer-maria@example.com")).not.toBeInTheDocument();
+  });
+});
+
+describe("RosterTable — 'Desfazer vínculo' só quando há vínculo a desfazer", () => {
+  const LINKED = row({
+    buyer_id: "b1",
+    name: "Veio de vínculo",
+    email: "link@example.com",
+    category: "renovado",
+    transaction_code: "HP-TX-1",
+    from_manual_link: true,
+  });
+  const BY_EMAIL = row({
+    buyer_id: "b2",
+    name: "Casou por email",
+    email: "email@example.com",
+    category: "renovado",
+    transaction_code: "HP-TX-2",
+    from_manual_link: false,
+  });
+
+  it("oferece o botão na renovação vinda de vínculo manual", () => {
+    render(
+      <RosterTable rows={[LINKED]} role="gestor" countsNewBuyers onUnlinkClick={jest.fn()} />
+    );
+    expect(screen.getByTestId("ultimates-unlink-buyer-link@example.com")).toBeInTheDocument();
+  });
+
+  it("NÃO oferece o botão na renovação que casou por email", () => {
+    render(
+      <RosterTable rows={[BY_EMAIL]} role="gestor" countsNewBuyers onUnlinkClick={jest.fn()} />
+    );
+    expect(screen.queryByTestId("ultimates-unlink-buyer-email@example.com")).not.toBeInTheDocument();
+  });
+
+  it("com from_manual_link ausente (RPC antiga), mantém o comportamento anterior", () => {
+    const legacy = row({
+      buyer_id: "b3",
+      name: "RPC antiga",
+      email: "legado@example.com",
+      category: "renovado",
+      transaction_code: "HP-TX-3",
+    });
+    render(
+      <RosterTable rows={[legacy]} role="gestor" countsNewBuyers onUnlinkClick={jest.fn()} />
+    );
+    expect(screen.getByTestId("ultimates-unlink-buyer-legado@example.com")).toBeInTheDocument();
+  });
+});
+
+// ─── Identidade do novo comprador (PRD #146) ──────────────────────────────────
+// Testes de caracterização: a RPC passa a preencher name/phone nas linhas com
+// buyer_id null, e estes testes travam o fato de que a UI já os exibe sem
+// nenhuma mudança — e de que o switch não os descarta ao reetiquetar.
+describe("RosterTable — nome e telefone do novo comprador", () => {
+  const newBuyer = row({
+    buyer_id: null,
+    name: "Carla Nunes",
+    email: "carla@example.com",
+    phone: "11988887777",
+    category: "novo_comprador",
+  });
+
+  it("exibe nome e telefone na linha de novo comprador", () => {
+    render(<RosterTable rows={[newBuyer]} role="gestor" countsNewBuyers />);
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("Carla Nunes")).toBeInTheDocument();
+    expect(within(table).getByText("11988887777")).toBeInTheDocument();
+  });
+
+  it("encontra o novo comprador buscando pelo nome, não só pelo email", () => {
+    render(<RosterTable rows={[newBuyer, ROWS[0]]} role="gestor" countsNewBuyers />);
+    fireEvent.change(screen.getByTestId("ultimates-table-search"), { target: { value: "carla" } });
+    expect(screen.getByText("Carla Nunes")).toBeInTheDocument();
+    expect(screen.queryByText("Maria Silva")).not.toBeInTheDocument();
+  });
+
+  it("mantém nome e telefone com o switch de novas compras desligado", () => {
+    const remapped = applyNewPurchasesModeToRoster([newBuyer], false);
+    render(<RosterTable rows={remapped} role="gestor" countsNewBuyers={false} />);
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("Renovação sem vínculo")).toBeInTheDocument();
+    expect(within(table).getByText("Carla Nunes")).toBeInTheDocument();
+    expect(within(table).getByText("11988887777")).toBeInTheDocument();
+  });
+
+  it("linha sem nome continua exibindo o traço, sem quebrar", () => {
+    const anonymous = row({
+      buyer_id: null,
+      name: null,
+      email: "anonimo@example.com",
+      phone: null,
+      category: "novo_comprador",
+    });
+    render(<RosterTable rows={[anonymous]} role="gestor" countsNewBuyers />);
+    expect(screen.getByText("anonimo@example.com")).toBeInTheDocument();
+  });
+});
