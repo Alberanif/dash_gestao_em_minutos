@@ -48,7 +48,7 @@ beforeEach(() => {
   mockListAllUsers.mockResolvedValue({ users: [], error: null });
 
   cycleSingle.mockResolvedValue({
-    data: { id: "c1", product_id: "PROD1", status: "ativo" },
+    data: { id: "c1", status: "ativo" },
     error: null,
   });
   excludedOrder.mockResolvedValue({ data: [], error: null });
@@ -267,7 +267,7 @@ describe("POST /api/ultimates/cycles/[id]/excluded-buyers", () => {
 
   it("accepts the write on an encerrado cycle", async () => {
     cycleSingle.mockResolvedValueOnce({
-      data: { id: "c1", product_id: "PROD1", status: "encerrado" },
+      data: { id: "c1", status: "encerrado" },
       error: null,
     });
 
@@ -315,7 +315,7 @@ describe("DELETE /api/ultimates/cycles/[id]/excluded-buyers", () => {
 
   it("accepts the removal on an encerrado cycle", async () => {
     cycleSingle.mockResolvedValueOnce({
-      data: { id: "c1", product_id: "PROD1", status: "encerrado" },
+      data: { id: "c1", status: "encerrado" },
       error: null,
     });
 
