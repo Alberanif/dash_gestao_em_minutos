@@ -90,6 +90,19 @@ export function mapHotmartSaleItem(
       ? new Date(item.purchase.approved_date).toISOString()
       : null,
     buyer_email: item.buyer.email,
+    // Nome do comprador (PRD #146). Gravado cru, só com trim — a normalização
+    // desta tabela acontece na leitura, dentro das RPCs, como já é o caso de
+    // buyer_email. Vazio vira null para não poluir o roster com string vazia.
+    //
+    // ⚠️ buyer_phone NÃO ENTRA AQUI, e a ausência é a proteção — não um
+    // esquecimento. A API sales/history não devolve telefone; ele só chega pelo
+    // webhook (data.buyer.checkout_phone). Como o upsert do PostgREST só
+    // atualiza as colunas PRESENTES no payload, omitir a chave preserva o
+    // telefone já gravado. Incluí-la (mesmo como null, mesmo "por consistência"
+    // com o campo acima) faria o cron semanal de 60 dias apagar todos os
+    // telefones em silêncio. Há um teste que falha se a chave reaparecer:
+    // src/lib/services/__tests__/hotmart-map-sale.test.ts.
+    buyer_name: item.buyer.name?.trim() || null,
     tracking_source_sck: item.purchase.tracking?.source_sck ?? null,
     tracking_source: item.purchase.tracking?.source ?? null,
     tracking_external_code: item.purchase.tracking?.external_code ?? null,

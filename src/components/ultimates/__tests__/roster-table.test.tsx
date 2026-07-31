@@ -351,3 +351,52 @@ describe("RosterTable — 'Desfazer vínculo' só quando há vínculo a desfazer
     expect(screen.getByTestId("ultimates-unlink-buyer-legado@example.com")).toBeInTheDocument();
   });
 });
+
+// ─── Identidade do novo comprador (PRD #146) ──────────────────────────────────
+// Testes de caracterização: a RPC passa a preencher name/phone nas linhas com
+// buyer_id null, e estes testes travam o fato de que a UI já os exibe sem
+// nenhuma mudança — e de que o switch não os descarta ao reetiquetar.
+describe("RosterTable — nome e telefone do novo comprador", () => {
+  const newBuyer = row({
+    buyer_id: null,
+    name: "Carla Nunes",
+    email: "carla@example.com",
+    phone: "11988887777",
+    category: "novo_comprador",
+  });
+
+  it("exibe nome e telefone na linha de novo comprador", () => {
+    render(<RosterTable rows={[newBuyer]} role="gestor" countsNewBuyers />);
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("Carla Nunes")).toBeInTheDocument();
+    expect(within(table).getByText("11988887777")).toBeInTheDocument();
+  });
+
+  it("encontra o novo comprador buscando pelo nome, não só pelo email", () => {
+    render(<RosterTable rows={[newBuyer, ROWS[0]]} role="gestor" countsNewBuyers />);
+    fireEvent.change(screen.getByTestId("ultimates-table-search"), { target: { value: "carla" } });
+    expect(screen.getByText("Carla Nunes")).toBeInTheDocument();
+    expect(screen.queryByText("Maria Silva")).not.toBeInTheDocument();
+  });
+
+  it("mantém nome e telefone com o switch de novas compras desligado", () => {
+    const remapped = applyNewPurchasesModeToRoster([newBuyer], false);
+    render(<RosterTable rows={remapped} role="gestor" countsNewBuyers={false} />);
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("Renovação sem vínculo")).toBeInTheDocument();
+    expect(within(table).getByText("Carla Nunes")).toBeInTheDocument();
+    expect(within(table).getByText("11988887777")).toBeInTheDocument();
+  });
+
+  it("linha sem nome continua exibindo o traço, sem quebrar", () => {
+    const anonymous = row({
+      buyer_id: null,
+      name: null,
+      email: "anonimo@example.com",
+      phone: null,
+      category: "novo_comprador",
+    });
+    render(<RosterTable rows={[anonymous]} role="gestor" countsNewBuyers />);
+    expect(screen.getByText("anonimo@example.com")).toBeInTheDocument();
+  });
+});

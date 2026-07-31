@@ -61,7 +61,9 @@ export async function POST(request: NextRequest) {
       body as {
         data?: {
           product?: { id?: number | string; name?: string };
-          buyer?: { email?: string };
+          // name/checkout_phone: identidade do comprador (PRD #146). O webhook
+          // é a ÚNICA fonte de telefone — a API sales/history não o devolve.
+          buyer?: { email?: string; name?: string; checkout_phone?: string };
           purchase?: {
             price?: { value?: number };
             order_date?: number | string;
@@ -95,6 +97,14 @@ export async function POST(request: NextRequest) {
           return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
         };
 
+        // Identidade do comprador (PRD #146). CHAVE OMITIDA quando o campo não
+        // vem — nunca enviada como null. O upsert do PostgREST só atualiza as
+        // colunas PRESENTES no payload: enviar null aqui faria um evento de
+        // estorno (que não repete os dados do comprador) apagar o nome que o
+        // cron já gravou para a mesma transação.
+        const buyerName = ultimatesData?.buyer?.name?.trim() || null;
+        const buyerPhone = ultimatesData?.buyer?.checkout_phone?.trim() || null;
+
         const { error: upsertError } = await supabase
           .from("dash_gestao_hotmart_sales")
           .upsert(
@@ -112,6 +122,8 @@ export async function POST(request: NextRequest) {
               // idempotente via onConflict: transaction_code).
               price: ultimatesData?.purchase?.price?.value ?? null,
               buyer_email: ultimatesData?.buyer?.email ?? null,
+              ...(buyerName ? { buyer_name: buyerName } : {}),
+              ...(buyerPhone ? { buyer_phone: buyerPhone } : {}),
               purchase_date: toIsoDate(ultimatesData?.purchase?.order_date),
               approved_date: toIsoDate(ultimatesData?.purchase?.approved_date),
               collected_at: new Date().toISOString(),
