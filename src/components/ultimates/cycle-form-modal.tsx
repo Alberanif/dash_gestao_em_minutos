@@ -9,6 +9,7 @@ interface CycleFormModalProps {
   editTarget?: CycleWithProduct | null;
   onSave: (cycle: CycleWithProduct) => void;
   onCancel: () => void;
+  onDelete?: (cycleId: string) => void;
 }
 
 // Cria ou edita um ciclo (só gestor — validado nos endpoints, e a tela só
@@ -17,7 +18,7 @@ interface CycleFormModalProps {
 // etapas para a ação sensível (aqui, encerrar o ciclo).
 // A escolha de produto usa busca + lista (padrão de link-buyer-modal.tsx),
 // com seleção explícita — sem pré-seleção.
-export function CycleFormModal({ products, editTarget, onSave, onCancel }: CycleFormModalProps) {
+export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelete }: CycleFormModalProps) {
   const isEdit = !!editTarget;
   const [name, setName] = useState(editTarget?.name ?? "");
   const [productId, setProductId] = useState(editTarget?.product_id ?? "");
@@ -33,6 +34,18 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel }: Cycle
   const [confirmEncerrar, setConfirmEncerrar] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  // Zona de perigo: recolhida por padrão. Este modal é aberto por rotina (mudar
+  // nome, mudar meta), então o alvo de clique destrutivo não fica exposto nem
+  // na mesma faixa de Cancelar/Salvar.
+  const [dangerOpen, setDangerOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  // Confere contra o nome PERSISTIDO (editTarget.name), nunca contra o campo
+  // Nome do formulário — senão bastaria digitar qualquer coisa nos dois lugares
+  // para destravar a exclusão, e a confirmação viraria enfeite.
+  const deleteConfirmed = isEdit && deleteConfirmText.trim() === editTarget!.name;
 
   // Filtro local (nome ou ID, case-insensitive) — a lista completa de produtos
   // ativos já chega via props, então não há round-trip de API na busca.
@@ -120,6 +133,31 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel }: Cycle
       setError("Falha de rede ao salvar o ciclo.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!isEdit || !deleteConfirmed) return;
+
+    setDeleteError("");
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/ultimates/cycles/${editTarget!.id}`, { method: "DELETE" });
+
+      // 404 conta como sucesso: o objetivo era "este ciclo não existir mais".
+      // Se outra aba (ou outro gestor) já o excluiu, insistir em erro só deixaria
+      // a tela presa exibindo um fantasma.
+      if (res.ok || res.status === 404) {
+        onDelete?.(editTarget!.id);
+        return;
+      }
+
+      const data = await res.json().catch(() => null);
+      setDeleteError(data?.error ?? "Erro ao excluir ciclo.");
+    } catch {
+      setDeleteError("Falha de rede ao excluir o ciclo.");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -323,13 +361,116 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel }: Cycle
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || deleting}
             className="btn-primary"
             data-testid="cycle-form-save"
           >
             {saving ? "Salvando..." : "Salvar"}
           </button>
         </div>
+
+        {isEdit && onDelete && (
+          <div
+            style={{
+              marginTop: 4,
+              paddingTop: 12,
+              borderTop: "1px solid var(--color-border, var(--border-vis))",
+            }}
+          >
+            {!dangerOpen ? (
+              <button
+                type="button"
+                onClick={() => setDangerOpen(true)}
+                data-testid="cycle-form-delete-open"
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  fontSize: 12,
+                  fontFamily: "inherit",
+                  color: "var(--color-danger)",
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                }}
+              >
+                Excluir ciclo
+              </button>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <p
+                  data-testid="cycle-form-delete-warning"
+                  style={{
+                    fontSize: 12,
+                    color: "var(--color-danger)",
+                    margin: 0,
+                    padding: "8px 10px",
+                    borderRadius: "var(--radius-sm)",
+                    border: "1px solid color-mix(in srgb, var(--color-danger) 35%, transparent)",
+                    background: "color-mix(in srgb, var(--color-danger) 10%, transparent)",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Excluir apaga o ciclo <strong>para sempre</strong>, junto com a base de
+                  compradores, os vínculos manuais, as ofertas excluídas e os compradores
+                  excluídos. Não há como desfazer. Para só congelar a operação sem perder nada,
+                  use o status <strong>Encerrado</strong>.
+                </p>
+                <label className="block text-sm font-medium" style={{ color: "var(--color-text-muted)", fontSize: 12 }}>
+                  Digite <strong>{editTarget!.name}</strong> para confirmar
+                </label>
+                <input
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder={editTarget!.name}
+                  className="field-control"
+                  data-testid="cycle-form-delete-confirm-input"
+                />
+                {deleteError && (
+                  <p
+                    data-testid="cycle-form-delete-error"
+                    style={{ fontSize: 12, color: "var(--color-danger)", margin: 0 }}
+                  >
+                    {deleteError}
+                  </p>
+                )}
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDangerOpen(false);
+                      setDeleteConfirmText("");
+                      setDeleteError("");
+                    }}
+                    className="btn-secondary"
+                    data-testid="cycle-form-delete-cancel"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={!deleteConfirmed || deleting}
+                    data-testid="cycle-form-delete-confirm"
+                    style={{
+                      padding: "8px 14px",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      fontFamily: "inherit",
+                      borderRadius: "var(--radius-sm)",
+                      border: "1px solid var(--color-danger)",
+                      background: "var(--color-danger)",
+                      color: "#fff",
+                      cursor: !deleteConfirmed || deleting ? "not-allowed" : "pointer",
+                      opacity: !deleteConfirmed || deleting ? 0.5 : 1,
+                    }}
+                  >
+                    {deleting ? "Excluindo..." : "Excluir definitivamente"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
