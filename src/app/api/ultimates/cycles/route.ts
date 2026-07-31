@@ -5,7 +5,7 @@ import type { UltimatesCycleRecord, UltimatesCycleProductRef } from "@/types/ult
 
 // Ciclo com o conjunto de produtos anexado. O join é manual (duas queries em
 // memória) porque as tabelas não têm FK direto para join via PostgREST —
-// mesma razão do join de produto que existia antes da migration 056.
+// mesma razão do join de produto que existia antes da migration 057.
 export interface UltimatesCycleWithProducts extends UltimatesCycleRecord {
   products: UltimatesCycleProductRef[];
 }

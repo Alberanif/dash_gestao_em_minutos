@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
   }
 
   // O conjunto de produtos vive em dash_gestao_ultimates_cycle_products desde a
-  // migration 056 — a venda precisa ser de ALGUM deles.
+  // migration 057 — a venda precisa ser de ALGUM deles.
   const { data: cycleProducts, error: cycleProductsError } = await supabase
     .from("dash_gestao_ultimates_cycle_products")
     .select("product_id")

@@ -4,7 +4,7 @@
 export type UltimatesCycleStatus = "ativo" | "encerrado";
 
 // Produto acompanhado por um ciclo. Um ciclo tem 1..N — o conjunto vive em
-// dash_gestao_ultimates_cycle_products (migration 056), que substituiu a
+// dash_gestao_ultimates_cycle_products (migration 057), que substituiu a
 // coluna escalar cycles.product_id. product_name é null quando o produto
 // ainda não foi sincronizado por /api/hotmart/sync-products.
 export interface UltimatesCycleProductRef {
