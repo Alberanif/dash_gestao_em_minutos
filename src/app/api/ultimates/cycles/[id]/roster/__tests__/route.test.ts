@@ -151,3 +151,110 @@ describe("GET /api/ultimates/cycles/[id]/roster", () => {
     expect(res.status).toBe(500);
   });
 });
+
+describe("GET /api/ultimates/cycles/[id]/roster — recorte por intervalo", () => {
+  it("sem query string, chama a RPC só com o ciclo", async () => {
+    const { GET } = await import("../route");
+    await GET(
+      makeRequest("http://localhost/api/ultimates/cycles/cycle-1/roster"),
+      makeParams("cycle-1")
+    );
+
+    expect(mockRpc).toHaveBeenCalledWith("dash_gestao_ultimates_roster", {
+      p_cycle_id: "cycle-1",
+    });
+  });
+
+  it("repassa o intervalo à RPC quando start e end são válidos", async () => {
+    const { GET } = await import("../route");
+    const res = await GET(
+      makeRequest(
+        "http://localhost/api/ultimates/cycles/cycle-1/roster?start=2026-07-10&end=2026-07-20"
+      ),
+      makeParams("cycle-1")
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockRpc).toHaveBeenCalledWith("dash_gestao_ultimates_roster", {
+      p_cycle_id: "cycle-1",
+      p_start: "2026-07-10",
+      p_end: "2026-07-20",
+    });
+  });
+
+  it("devolve 400 quando só uma ponta vem, ou quando o fim é anterior ao início", async () => {
+    const { GET } = await import("../route");
+
+    const soUma = await GET(
+      makeRequest("http://localhost/api/ultimates/cycles/cycle-1/roster?start=2026-07-10"),
+      makeParams("cycle-1")
+    );
+    expect(soUma.status).toBe(400);
+    expect(await soUma.json()).toEqual({ error: "Intervalo inválido" });
+
+    const invertido = await GET(
+      makeRequest(
+        "http://localhost/api/ultimates/cycles/cycle-1/roster?start=2026-07-20&end=2026-07-10"
+      ),
+      makeParams("cycle-1")
+    );
+    expect(invertido.status).toBe(400);
+
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("devolve 501 quando a RPC não conhece os parâmetros (migration 058 pendente)", async () => {
+    mockRpc.mockResolvedValueOnce({
+      data: null,
+      error: {
+        code: "PGRST202",
+        message:
+          "Could not find the function public.dash_gestao_ultimates_roster(p_cycle_id, p_end, p_start) in the schema cache",
+      },
+    });
+
+    const { GET } = await import("../route");
+    const res = await GET(
+      makeRequest(
+        "http://localhost/api/ultimates/cycles/cycle-1/roster?start=2026-07-10&end=2026-07-20"
+      ),
+      makeParams("cycle-1")
+    );
+
+    expect(res.status).toBe(501);
+    expect(await res.json()).toEqual({ error: "Recorte por data indisponível" });
+  });
+
+  it("mantém 500 para falha real da RPC mesmo com intervalo", async () => {
+    mockRpc.mockResolvedValueOnce({
+      data: null,
+      error: { code: "57014", message: "statement timeout" },
+    });
+
+    const { GET } = await import("../route");
+    const res = await GET(
+      makeRequest(
+        "http://localhost/api/ultimates/cycles/cycle-1/roster?start=2026-07-10&end=2026-07-20"
+      ),
+      makeParams("cycle-1")
+    );
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "statement timeout" });
+  });
+
+  it("PGRST202 sem intervalo continua sendo 500 — ali não há recorte a degradar", async () => {
+    mockRpc.mockResolvedValueOnce({
+      data: null,
+      error: { code: "PGRST202", message: "function not found" },
+    });
+
+    const { GET } = await import("../route");
+    const res = await GET(
+      makeRequest("http://localhost/api/ultimates/cycles/cycle-1/roster"),
+      makeParams("cycle-1")
+    );
+
+    expect(res.status).toBe(500);
+  });
+});
