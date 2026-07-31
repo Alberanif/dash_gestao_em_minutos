@@ -37,6 +37,14 @@ beforeEach(() => {
   // Nenhuma oferta excluída por padrão — os casos abaixo que se importam com
   // isso sobrescrevem.
   mockMaybeSingle.mockResolvedValue({ data: null, error: null });
+  // Default de higiene: sem isso, um teste que não enfileira todos os
+  // .single() da rota (com mockResolvedValueOnce) deixa a chamada extra
+  // retornar undefined, e a rota quebra ao desestruturar `{ data }` de
+  // undefined — o teste morre por TypeError, não pela asserção que importa.
+  // Com o default, uma guarda afrouxada deixa a rota seguir até o fim (e
+  // devolver 201), e é a asserção de status que passa a matar o mutante.
+  mockSingle.mockResolvedValue({ data: null, error: null });
+  mockInsertSingle.mockResolvedValue({ data: { id: "link-default" }, error: null });
   mockEq.mockReturnValue({ single: mockSingle, eq: mockEq, maybeSingle: mockMaybeSingle });
   mockSelect.mockReturnValue({ eq: mockEq });
   mockInsertSelect.mockReturnValue({ single: mockInsertSingle });
