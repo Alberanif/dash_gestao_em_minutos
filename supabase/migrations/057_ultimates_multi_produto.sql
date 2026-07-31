@@ -13,6 +13,13 @@
 -- ORDEM DESTE ARQUIVO IMPORTA: as RPCs precisam parar de referenciar
 -- cycles.product_id ANTES do drop da coluna, senão o ALTER falha.
 --
+-- ORDEM ENTRE MIGRATIONS TAMBÉM IMPORTA: os corpos de roster/daily/hourly aqui
+-- são os das 055 (leads excluídos, vínculos excluídos, from_manual_link) e 056
+-- (buyer_name/buyer_phone do novo comprador) com a adaptação multi-produto
+-- aplicada por cima — nada além dela. Aplicar esta migration antes daquelas
+-- REVERTERIA as duas features, e em silêncio: as funções continuariam existindo
+-- e respondendo. Fila deste ambiente: 052 → 055 → 056 → 057.
+--
 -- ARMADILHA CENTRAL: as versões anteriores usavam `cross join cyc`, seguro
 -- porque cyc tinha exatamente uma linha. Com N produtos um cross join
 -- MULTIPLICARIA CADA VENDA POR N — sem erro, sem exceção, só KPI e curva
@@ -54,8 +61,10 @@ insert into dash_gestao_ultimates_cycle_products (cycle_id, product_id)
   select id, product_id from dash_gestao_ultimates_cycles;
 
 -- ── 3. Roster com universo multi-produto ────────────────────────────────────
--- Assinatura e RETURNS TABLE inalterados desde a 050, então CREATE OR REPLACE
--- basta e os grants sobrevivem.
+-- Corpo copiado da 056 (que já traz os filtros de lead excluído da 055 e a
+-- identidade do novo comprador), com a troca de cyc por prods como ÚNICA
+-- diferença. RETURNS TABLE idêntico ao vigente — inclusive from_manual_link —,
+-- então CREATE OR REPLACE basta e os grants sobrevivem. Não reaplique grants.
 create or replace function public.dash_gestao_ultimates_roster(p_cycle_id uuid)
 returns table (
   buyer_id         uuid,
@@ -66,13 +75,18 @@ returns table (
   category         text,
   renewed_at       timestamptz,
   total_value      numeric,
-  transaction_code text
+  transaction_code text,
+  from_manual_link boolean
 )
 language sql
 stable
 security definer
 set search_path = public
 as $$
+  -- Universo de produtos do ciclo. Entra como subconsulta no filtro, e não como
+  -- cross join, porque com N linhas o cross join multiplicaria cada venda por N
+  -- sem erro nenhum. Um comprador com venda em dois produtos gera duas linhas
+  -- em `attributed` e uma só em base_sales_agg — o group by deduplica.
   with prods as (
     select cp.product_id
     from public.dash_gestao_ultimates_cycle_products cp
@@ -82,6 +96,20 @@ as $$
     select eo.offer_code
     from public.dash_gestao_ultimates_excluded_offers eo
     where eo.cycle_id = p_cycle_id
+  ),
+  excluded_buyers as (
+    select eb.email
+    from public.dash_gestao_ultimates_excluded_buyers eb
+    where eb.cycle_id = p_cycle_id
+  ),
+  excluded_links as (
+    select ml.transaction_code
+    from public.dash_gestao_ultimates_manual_links ml
+    join public.dash_gestao_ultimates_buyers b on b.id = ml.buyer_id
+    where ml.cycle_id = p_cycle_id
+      and exists (
+        select 1 from excluded_buyers eb where eb.email = lower(btrim(b.email))
+      )
   ),
   buyers as (
     select
@@ -93,30 +121,43 @@ as $$
       b.extra
     from public.dash_gestao_ultimates_buyers b
     where b.cycle_id = p_cycle_id
+      and not exists (
+        select 1 from excluded_buyers eb where eb.email = lower(btrim(b.email))
+      )
   ),
   links as (
     select ml.transaction_code, ml.buyer_id
     from public.dash_gestao_ultimates_manual_links ml
     where ml.cycle_id = p_cycle_id
   ),
-  -- Vendas de QUALQUER produto do ciclo. O vínculo manual tem precedência
-  -- sobre o casamento por email; vendas de oferta excluída não chegam aqui.
-  -- Um comprador com venda em dois produtos gera duas linhas AQUI e uma só
-  -- em base_sales_agg — é o group by que faz a deduplicação.
   attributed as (
     select
       s.transaction_code,
       lower(btrim(s.buyer_email)) as norm_email,
+      -- (a) Identidade vinda da Hotmart. A gravação é crua (só trim no
+      -- coletor); a normalização acontece aqui, na leitura, no mesmo idioma de
+      -- buyer_email. O nullif protege contra linhas gravadas com string vazia
+      -- por versões anteriores do coletor ou por payload de webhook com campo
+      -- em branco.
+      nullif(btrim(s.buyer_name), '')  as buyer_name,
+      nullif(btrim(s.buyer_phone), '') as buyer_phone,
       s.status,
       s.approved_date,
       s.price,
-      coalesce(l.buyer_id, be.id) as matched_buyer_id
+      coalesce(l.buyer_id, be.id) as matched_buyer_id,
+      l.buyer_id is not null      as via_link
     from public.dash_gestao_hotmart_sales s
     left join links l on l.transaction_code = s.transaction_code
     left join buyers be on be.norm_email = lower(btrim(s.buyer_email))
     where s.product_id in (select prods.product_id from prods)
       and not exists (
         select 1 from excluded ex where ex.offer_code = s.offer_code
+      )
+      and not exists (
+        select 1 from excluded_buyers eb where eb.email = lower(btrim(s.buyer_email))
+      )
+      and not exists (
+        select 1 from excluded_links el where el.transaction_code = s.transaction_code
       )
   ),
   base_sales_agg as (
@@ -127,7 +168,9 @@ as $$
       min(a.approved_date) filter (where a.status in ('APPROVED', 'COMPLETE')) as renewed_at,
       sum(a.price)         filter (where a.status in ('APPROVED', 'COMPLETE')) as total_value,
       (array_agg(a.transaction_code order by a.approved_date asc nulls last)
-         filter (where a.status in ('APPROVED', 'COMPLETE')))[1]        as transaction_code
+         filter (where a.status in ('APPROVED', 'COMPLETE')))[1]        as transaction_code,
+      (array_agg(a.via_link order by a.approved_date asc nulls last)
+         filter (where a.status in ('APPROVED', 'COMPLETE')))[1]        as from_manual_link
     from attributed a
     where a.matched_buyer_id is not null
     group by a.matched_buyer_id
@@ -146,7 +189,8 @@ as $$
       end        as category,
       agg.renewed_at,
       agg.total_value,
-      agg.transaction_code
+      agg.transaction_code,
+      coalesce(agg.from_manual_link, false) as from_manual_link
     from buyers b
     left join base_sales_agg agg on agg.buyer_id = b.id
   ),
@@ -158,7 +202,22 @@ as $$
       min(a.approved_date) filter (where a.status in ('APPROVED', 'COMPLETE')) as renewed_at,
       sum(a.price)         filter (where a.status in ('APPROVED', 'COMPLETE')) as total_value,
       (array_agg(a.transaction_code order by a.approved_date asc nulls last)
-         filter (where a.status in ('APPROVED', 'COMPLETE')))[1]        as transaction_code
+         filter (where a.status in ('APPROVED', 'COMPLETE')))[1]        as transaction_code,
+      -- (b) Primeiro valor NÃO-NULO entre TODAS as vendas deste email.
+      --
+      -- SEM filter de status, de propósito, e esta é a diferença que importa:
+      -- todos os campos acima são filtrados por vendas aprovadas, mas a
+      -- categoria 'novo_reembolsado' NÃO TEM venda aprovada por definição.
+      -- Filtrar aqui deixaria justamente essas linhas anônimas para sempre.
+      --
+      -- MESMA ordenação do transaction_code (aprovada mais antiga primeiro),
+      -- desempatada por transaction_code para ser determinística quando
+      -- approved_date é null nas duas — sem o desempate, o nome exibido podia
+      -- mudar entre dois refreshes sem nada ter mudado na Hotmart.
+      (array_agg(a.buyer_name order by a.approved_date asc nulls last, a.transaction_code)
+         filter (where a.buyer_name is not null))[1]                    as name,
+      (array_agg(a.buyer_phone order by a.approved_date asc nulls last, a.transaction_code)
+         filter (where a.buyer_phone is not null))[1]                   as phone
     from attributed a
     where a.matched_buyer_id is null
       and a.norm_email is not null
@@ -168,9 +227,10 @@ as $$
   new_roster as (
     select
       null::uuid   as buyer_id,
-      null::text   as name,
+      -- (c) Antes: null::text as name / null::text as phone.
+      nsa.name     as name,
       nsa.email    as email,
-      null::text   as phone,
+      nsa.phone    as phone,
       '{}'::jsonb  as extra,
       case
         when nsa.has_approved then 'novo_comprador'
@@ -178,18 +238,23 @@ as $$
       end          as category,
       nsa.renewed_at,
       nsa.total_value,
-      nsa.transaction_code
+      nsa.transaction_code,
+      false        as from_manual_link
     from new_sales_agg nsa
     where nsa.has_approved or nsa.has_refund
   )
-  select buyer_id, name, email, phone, extra, category, renewed_at, total_value, transaction_code
+  select buyer_id, name, email, phone, extra, category, renewed_at, total_value,
+         transaction_code, from_manual_link
   from base_roster
   union all
-  select buyer_id, name, email, phone, extra, category, renewed_at, total_value, transaction_code
+  select buyer_id, name, email, phone, extra, category, renewed_at, total_value,
+         transaction_code, from_manual_link
   from new_roster;
 $$;
 
 -- ── 4. Daily com universo multi-produto ─────────────────────────────────────
+-- Corpo copiado da 055, com a troca de cyc por prods como única diferença.
+-- RETURNS TABLE idêntico ao vigente, então CREATE OR REPLACE basta.
 create or replace function public.dash_gestao_ultimates_daily(p_cycle_id uuid)
 returns table (
   day        date,
@@ -211,10 +276,27 @@ as $$
     from public.dash_gestao_ultimates_excluded_offers eo
     where eo.cycle_id = p_cycle_id
   ),
+  excluded_buyers as (
+    select eb.email
+    from public.dash_gestao_ultimates_excluded_buyers eb
+    where eb.cycle_id = p_cycle_id
+  ),
+  excluded_links as (
+    select ml.transaction_code
+    from public.dash_gestao_ultimates_manual_links ml
+    join public.dash_gestao_ultimates_buyers b on b.id = ml.buyer_id
+    where ml.cycle_id = p_cycle_id
+      and exists (
+        select 1 from excluded_buyers eb where eb.email = lower(btrim(b.email))
+      )
+  ),
   buyers as (
     select b.id, lower(btrim(b.email)) as norm_email
     from public.dash_gestao_ultimates_buyers b
     where b.cycle_id = p_cycle_id
+      and not exists (
+        select 1 from excluded_buyers eb where eb.email = lower(btrim(b.email))
+      )
   ),
   links as (
     select ml.transaction_code, ml.buyer_id
@@ -234,6 +316,13 @@ as $$
       and not exists (
         select 1 from excluded ex where ex.offer_code = s.offer_code
       )
+      and not exists (
+        select 1 from excluded_buyers eb where eb.email = lower(btrim(s.buyer_email))
+      )
+      and not exists (
+        select 1 from excluded_links el where el.transaction_code = s.transaction_code
+      )
+      -- Ou pertence à base, ou tem email para virar novo comprador.
       and (
         coalesce(l.buyer_id, be.id) is not null
         or nullif(btrim(lower(s.buyer_email)), '') is not null
@@ -251,6 +340,7 @@ $$;
 -- ── 5. Hourly com universo multi-produto ────────────────────────────────────
 -- Espelho exato da daily acima; só o bucket muda (hora em America/Sao_Paulo,
 -- ver migration 054). Toda mudança no filtro de vendas vale para as duas.
+-- Corpo copiado da 055, com a troca de cyc por prods como única diferença.
 create or replace function public.dash_gestao_ultimates_hourly(p_cycle_id uuid)
 returns table (
   hour       text,
@@ -272,10 +362,27 @@ as $$
     from public.dash_gestao_ultimates_excluded_offers eo
     where eo.cycle_id = p_cycle_id
   ),
+  excluded_buyers as (
+    select eb.email
+    from public.dash_gestao_ultimates_excluded_buyers eb
+    where eb.cycle_id = p_cycle_id
+  ),
+  excluded_links as (
+    select ml.transaction_code
+    from public.dash_gestao_ultimates_manual_links ml
+    join public.dash_gestao_ultimates_buyers b on b.id = ml.buyer_id
+    where ml.cycle_id = p_cycle_id
+      and exists (
+        select 1 from excluded_buyers eb where eb.email = lower(btrim(b.email))
+      )
+  ),
   buyers as (
     select b.id, lower(btrim(b.email)) as norm_email
     from public.dash_gestao_ultimates_buyers b
     where b.cycle_id = p_cycle_id
+      and not exists (
+        select 1 from excluded_buyers eb where eb.email = lower(btrim(b.email))
+      )
   ),
   links as (
     select ml.transaction_code, ml.buyer_id
@@ -297,6 +404,12 @@ as $$
       and s.approved_date is not null
       and not exists (
         select 1 from excluded ex where ex.offer_code = s.offer_code
+      )
+      and not exists (
+        select 1 from excluded_buyers eb where eb.email = lower(btrim(s.buyer_email))
+      )
+      and not exists (
+        select 1 from excluded_links el where el.transaction_code = s.transaction_code
       )
       and (
         coalesce(l.buyer_id, be.id) is not null
@@ -472,9 +585,12 @@ grant  execute on function public.dash_gestao_ultimates_create_cycle(text, text[
 -- 4. create index idx_ultimates_cycles_product_status
 --      on dash_gestao_ultimates_cycles (product_id, status);
 -- 5. drop function if exists public.dash_gestao_ultimates_create_cycle(text, text[], numeric, uuid);
--- 6. Reaplicar dash_gestao_ultimates_roster e _daily da migration 052 e _hourly
---    da 054 (as versões com cross join cyc). CREATE OR REPLACE basta nas três: a
---    assinatura não mudou e os grants sobrevivem.
+-- 6. Reaplicar dash_gestao_ultimates_roster da migration 056 e _daily e _hourly
+--    da 055 (as versões com cross join cyc) — NÃO as da 052/054, que não têm
+--    from_manual_link, nem os filtros de lead/vínculo excluído, nem a identidade
+--    do novo comprador; voltar para elas reverteria duas features em silêncio.
+--    CREATE OR REPLACE basta nas três: a assinatura não mudou e os grants
+--    sobrevivem.
 -- 7. _offer_options exige DROP + CREATE, NÃO replace: esta migration mudou o
 --    RETURNS TABLE dela (acrescentou product_id e product_name), e o Postgres não
 --    troca tipo de retorno por replace. Nesta ordem:
