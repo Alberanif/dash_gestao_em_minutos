@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
   if (error) return error;
 
   const body = await request.json().catch(() => null);
-  const { name, productId, goalPercent } = body ?? {};
+  const { name, productIds, goalPercent } = body ?? {};
 
   if (typeof name !== "string" || name.trim().length === 0) {
     return NextResponse.json({ error: "name é obrigatório" }, { status: 400 });
@@ -74,19 +74,40 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (typeof productId !== "string" || productId.trim().length === 0) {
-    return NextResponse.json({ error: "productId é obrigatório" }, { status: 400 });
+  // Deduplica antes de tudo: a PK composta de cycle_products rejeitaria a
+  // duplicata com um 23505 que não diz nada ao gestor.
+  const ids = Array.isArray(productIds)
+    ? Array.from(
+        new Set(
+          productIds
+            .filter((value): value is string => typeof value === "string")
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0)
+        )
+      )
+    : [];
+
+  if (ids.length === 0) {
+    return NextResponse.json({ error: "Selecione ao menos um produto" }, { status: 400 });
   }
 
   const supabase = createSupabaseServiceClient();
 
-  const { data: product, error: productError } = await supabase
+  // As duas checagens abaixo existem SÓ pela mensagem: quem garante a
+  // invariante é dash_gestao_ultimates_create_cycle, que repete as duas e
+  // levanta exceção. Não remova a validação da RPC confiando nesta.
+  const { data: products, error: productsError } = await supabase
     .from("dash_gestao_hotmart_products")
-    .select("account_id")
-    .eq("product_id", productId)
-    .single();
+    .select("product_id, account_id")
+    .in("product_id", ids);
 
-  if (productError || !product) {
+  if (productsError) {
+    return NextResponse.json({ error: productsError.message }, { status: 500 });
+  }
+
+  const found = (products ?? []) as { product_id: string; account_id: string }[];
+
+  if (found.length !== ids.length) {
     return NextResponse.json(
       {
         error:
@@ -96,21 +117,25 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data: cycle, error: insertError } = await supabase
-    .from("dash_gestao_ultimates_cycles")
-    .insert({
-      name: name.trim(),
-      product_id: productId,
-      account_id: (product as { account_id: string }).account_id,
-      goal_percent: goalPercent ?? null,
-      status: "ativo",
-      created_by: userId,
-    })
-    .select()
-    .single();
+  if (new Set(found.map((product) => product.account_id)).size > 1) {
+    return NextResponse.json(
+      { error: "Todos os produtos devem ser da mesma conta Hotmart" },
+      { status: 400 }
+    );
+  }
 
-  if (insertError) {
-    return NextResponse.json({ error: insertError.message }, { status: 500 });
+  const { data: cycle, error: rpcError } = await supabase.rpc(
+    "dash_gestao_ultimates_create_cycle",
+    {
+      p_name: name.trim(),
+      p_product_ids: ids,
+      p_goal_percent: goalPercent ?? null,
+      p_created_by: userId,
+    }
+  );
+
+  if (rpcError) {
+    return NextResponse.json({ error: rpcError.message }, { status: 500 });
   }
 
   return NextResponse.json({ cycle }, { status: 201 });

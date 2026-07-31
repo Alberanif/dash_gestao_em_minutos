@@ -16,9 +16,10 @@ const mockProductsEq = jest.fn();
 const mockProductsSingle = jest.fn();
 
 const mockFrom = jest.fn();
+const mockRpc = jest.fn();
 
 jest.mock("@/lib/supabase/server", () => ({
-  createSupabaseServiceClient: jest.fn(() => ({ from: mockFrom })),
+  createSupabaseServiceClient: jest.fn(() => ({ from: mockFrom, rpc: mockRpc })),
 }));
 
 function makeRequest(method: string, url: string, body?: object): NextRequest {
@@ -49,6 +50,8 @@ beforeEach(() => {
   mockProductsIn.mockResolvedValue({ data: [], error: null });
   mockProductsEq.mockReturnValue({ single: mockProductsSingle });
   mockProductsSingle.mockResolvedValue({ data: null, error: null });
+
+  mockRpc.mockResolvedValue({ data: null, error: null });
 
   mockFrom.mockImplementation((table: string) => {
     if (table === "dash_gestao_ultimates_cycles") {
@@ -182,7 +185,7 @@ describe("POST /api/ultimates/cycles", () => {
     const { POST } = await import("../route");
     const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
       name: "Ciclo X",
-      productId: "p1",
+      productIds: ["p1"],
     });
     const res = await POST(req);
     expect(res.status).toBe(403);
@@ -199,7 +202,7 @@ describe("POST /api/ultimates/cycles", () => {
     const { POST } = await import("../route");
     const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
       name: "Ciclo X",
-      productId: "p1",
+      productIds: ["p1"],
     });
     const res = await POST(req);
     expect(res.status).toBe(403);
@@ -216,7 +219,7 @@ describe("POST /api/ultimates/cycles", () => {
     const { POST } = await import("../route");
     const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
       name: "Ciclo X",
-      productId: "p1",
+      productIds: ["p1"],
     });
     const res = await POST(req);
     expect(res.status).toBe(401);
@@ -226,7 +229,7 @@ describe("POST /api/ultimates/cycles", () => {
     const { POST } = await import("../route");
     const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
       name: "   ",
-      productId: "p1",
+      productIds: ["p1"],
     });
     const res = await POST(req);
     expect(res.status).toBe(400);
@@ -236,7 +239,7 @@ describe("POST /api/ultimates/cycles", () => {
     const { POST } = await import("../route");
     const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
       name: "Ciclo X",
-      productId: "p1",
+      productIds: ["p1"],
       goalPercent: "abc",
     });
     const res = await POST(req);
@@ -247,81 +250,131 @@ describe("POST /api/ultimates/cycles", () => {
     const { POST } = await import("../route");
     const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
       name: "Ciclo X",
-      productId: "p1",
+      productIds: ["p1"],
       goalPercent: 150,
     });
     const res = await POST(req);
     expect(res.status).toBe(400);
   });
 
-  it("returns 400 with sync guidance when product does not exist", async () => {
-    mockProductsSingle.mockResolvedValueOnce({ data: null, error: { message: "No rows found" } });
-
+  it("returns 400 when productIds is missing or empty", async () => {
     const { POST } = await import("../route");
-    const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
-      name: "Ciclo X",
-      productId: "unknown-product",
-    });
-    const res = await POST(req);
-    const body = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(body.error).toMatch(/sync-products/);
+    for (const body of [
+      { name: "Ciclo X" },
+      { name: "Ciclo X", productIds: [] },
+      { name: "Ciclo X", productIds: "p1" },
+    ]) {
+      const res = await POST(makeRequest("POST", "http://localhost/api/ultimates/cycles", body));
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toMatch(/ao menos um produto/i);
+    }
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 
-  it("creates cycle with status ativo, account_id from product, and created_by from session", async () => {
-    mockProductsSingle.mockResolvedValueOnce({ data: { account_id: "acc-1" }, error: null });
+  it("returns 400 with sync guidance when some product does not exist", async () => {
+    // Pediu 2, o banco só conhece 1.
+    mockProductsIn.mockResolvedValueOnce({
+      data: [{ product_id: "p1", account_id: "acc-1" }],
+      error: null,
+    });
+
+    const { POST } = await import("../route");
+    const res = await POST(
+      makeRequest("POST", "http://localhost/api/ultimates/cycles", {
+        name: "Ciclo X",
+        productIds: ["p1", "fantasma"],
+      })
+    );
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/sync-products/);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when products span more than one Hotmart account", async () => {
+    mockProductsIn.mockResolvedValueOnce({
+      data: [
+        { product_id: "p1", account_id: "acc-1" },
+        { product_id: "p2", account_id: "acc-2" },
+      ],
+      error: null,
+    });
+
+    const { POST } = await import("../route");
+    const res = await POST(
+      makeRequest("POST", "http://localhost/api/ultimates/cycles", {
+        name: "Ciclo X",
+        productIds: ["p1", "p2"],
+      })
+    );
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/mesma conta Hotmart/i);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("creates the cycle through the atomic RPC with deduplicated productIds", async () => {
+    mockProductsIn.mockResolvedValueOnce({
+      data: [
+        { product_id: "p1", account_id: "acc-1" },
+        { product_id: "p2", account_id: "acc-1" },
+      ],
+      error: null,
+    });
     const created = {
       id: "new-cycle",
       name: "Ciclo X",
       account_id: "acc-1",
-      product_id: "p1",
       goal_percent: 30,
       status: "ativo",
+      counts_new_buyers: true,
       refresh_started_at: null,
       last_refresh_at: null,
       created_by: "user-1",
-      created_at: "2026-07-19T00:00:00Z",
-      updated_at: "2026-07-19T00:00:00Z",
+      created_at: "2026-07-30T00:00:00Z",
+      updated_at: "2026-07-30T00:00:00Z",
     };
-    mockCyclesInsertSingle.mockResolvedValueOnce({ data: created, error: null });
+    mockRpc.mockResolvedValueOnce({ data: created, error: null });
 
     const { POST } = await import("../route");
-    const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
-      name: "Ciclo X",
-      productId: "p1",
-      goalPercent: 30,
-    });
-    const res = await POST(req);
+    const res = await POST(
+      makeRequest("POST", "http://localhost/api/ultimates/cycles", {
+        name: "  Ciclo X  ",
+        productIds: ["p1", "p2", "p1"],
+        goalPercent: 30,
+      })
+    );
     const body = await res.json();
 
     expect(res.status).toBe(201);
     expect(body.cycle).toEqual(created);
-    expect(mockCyclesInsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: "Ciclo X",
-        product_id: "p1",
-        account_id: "acc-1",
-        goal_percent: 30,
-        status: "ativo",
-        created_by: "user-1",
-      })
-    );
+    expect(mockRpc).toHaveBeenCalledWith("dash_gestao_ultimates_create_cycle", {
+      p_name: "Ciclo X",
+      p_product_ids: ["p1", "p2"],
+      p_goal_percent: 30,
+      p_created_by: "user-1",
+    });
   });
 
-  it("creates cycle without goalPercent when omitted", async () => {
-    mockProductsSingle.mockResolvedValueOnce({ data: { account_id: "acc-1" }, error: null });
-    mockCyclesInsertSingle.mockResolvedValueOnce({ data: { id: "new-cycle" }, error: null });
+  it("sends goalPercent null when omitted", async () => {
+    mockProductsIn.mockResolvedValueOnce({
+      data: [{ product_id: "p1", account_id: "acc-1" }],
+      error: null,
+    });
+    mockRpc.mockResolvedValueOnce({ data: { id: "new-cycle" }, error: null });
 
     const { POST } = await import("../route");
-    const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
-      name: "Ciclo Sem Meta",
-      productId: "p1",
-    });
-    await POST(req);
+    await POST(
+      makeRequest("POST", "http://localhost/api/ultimates/cycles", {
+        name: "Ciclo Sem Meta",
+        productIds: ["p1"],
+      })
+    );
 
-    expect(mockCyclesInsert).toHaveBeenCalledWith(
-      expect.objectContaining({ goal_percent: null })
+    expect(mockRpc).toHaveBeenCalledWith(
+      "dash_gestao_ultimates_create_cycle",
+      expect.objectContaining({ p_goal_percent: null })
     );
   });
 });
