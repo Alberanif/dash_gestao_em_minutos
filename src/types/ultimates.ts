@@ -101,6 +101,17 @@ export interface UltimatesDailyRow {
   new_buyers: number;
 }
 
+// Mesma agregação de UltimatesDailyRow, com bucket de hora (migration 054).
+// `hour` é "YYYY-MM-DDTHH" em America/Sao_Paulo — texto, não data: a RPC já
+// converteu o fuso, e construir um Date a partir daqui reinterpretaria a
+// string no fuso de quem renderiza. Só horas COM venda vêm da RPC; o
+// preenchimento das vazias é de buildHourlyCumulativeSeries.
+export interface UltimatesHourlyRow {
+  hour: string;
+  renewals: number;
+  new_buyers: number;
+}
+
 // Uma linha por oferta do produto do ciclo, vinda de
 // dash_gestao_ultimates_offer_options (migration 052). Alimenta o seletor do
 // modal "Ofertas excluídas": sales_count conta vendas em qualquer status e

@@ -1,4 +1,4 @@
-import { fmtBRL, fmtPercent1, fmtDateFull, fmtDateShort, categoryLabel } from "../format";
+import { fmtBRL, fmtPercent1, fmtDateFull, fmtDateShort, fmtHourShort, fmtHourLong, categoryLabel } from "../format";
 
 // Intl.NumberFormat("pt-BR", { style: "currency" }) usa NBSP (U+00A0) entre
 // "R$" e o valor, nao espaco comum -- normaliza antes de comparar para nao
@@ -70,5 +70,29 @@ describe("categoryLabel — categorias de renovação sem vínculo", () => {
     expect(categoryLabel("renovacao_sem_vinculo_reembolsada")).toBe(
       "Renovação sem vínculo — reembolsada"
     );
+  });
+});
+
+describe("fmtHourShort", () => {
+  it("formata a chave horaria como dd/mm HHh", () => {
+    expect(fmtHourShort("2026-07-30T14")).toBe("30/07 14h");
+  });
+
+  it("preserva o zero a esquerda da meia-noite", () => {
+    expect(fmtHourShort("2026-07-30T00")).toBe("30/07 00h");
+  });
+
+  it("formata hora de mes com um digito", () => {
+    expect(fmtHourShort("2026-08-01T09")).toBe("01/08 09h");
+  });
+});
+
+describe("fmtHourLong", () => {
+  it("formata a chave horaria como dd/mm as HHh", () => {
+    expect(fmtHourLong("2026-07-30T14")).toBe("30/07 às 14h");
+  });
+
+  it("preserva o zero a esquerda da meia-noite", () => {
+    expect(fmtHourLong("2026-07-30T00")).toBe("30/07 às 00h");
   });
 });

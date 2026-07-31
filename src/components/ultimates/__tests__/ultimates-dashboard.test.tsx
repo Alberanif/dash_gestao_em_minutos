@@ -4,7 +4,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { UltimatesDashboard } from "../ultimates-dashboard";
 import type { CycleWithProduct } from "../types";
-import type { UltimatesRosterRow, UltimatesDailyRow } from "@/types/ultimates";
+import type { UltimatesRosterRow, UltimatesDailyRow, UltimatesHourlyRow } from "@/types/ultimates";
 
 function makeCycle(overrides: Partial<CycleWithProduct> = {}): CycleWithProduct {
   return {
@@ -51,10 +51,18 @@ const DAILY: UltimatesDailyRow[] = [
   { day: "2026-07-02", renewals: 1, new_buyers: 0 },
 ];
 
+const HOURLY: UltimatesHourlyRow[] = [
+  { hour: "2026-07-01T20", renewals: 1, new_buyers: 2 },
+  { hour: "2026-07-02T09", renewals: 1, new_buyers: 0 },
+];
+
 function mockRosterAndDailyFetch() {
   global.fetch = jest.fn((url: string) => {
     if (url.includes("/roster")) {
       return Promise.resolve({ ok: true, json: async () => ({ rows: ROSTER }) });
+    }
+    if (url.includes("/hourly")) {
+      return Promise.resolve({ ok: true, json: async () => ({ hours: HOURLY }) });
     }
     if (url.includes("/daily")) {
       return Promise.resolve({ ok: true, json: async () => ({ days: DAILY }) });
@@ -141,6 +149,7 @@ const WRITE_ROSTER: UltimatesRosterRow[] = [
 function mockWriteRosterFetch() {
   global.fetch = jest.fn((url: string) => {
     if (url.includes("/roster")) return Promise.resolve({ ok: true, json: async () => ({ rows: WRITE_ROSTER }) });
+    if (url.includes("/hourly")) return Promise.resolve({ ok: true, json: async () => ({ hours: [] }) });
     if (url.includes("/daily")) return Promise.resolve({ ok: true, json: async () => ({ days: [] }) });
     return Promise.resolve({ ok: false, json: async () => ({}) });
   }) as unknown as typeof global.fetch;
@@ -205,6 +214,9 @@ function mockFetchWithExcluded(excludedCount: number) {
   global.fetch = jest.fn((url: string) => {
     if (url.includes("/roster")) {
       return Promise.resolve({ ok: true, json: async () => ({ rows: ROSTER }) });
+    }
+    if (url.includes("/hourly")) {
+      return Promise.resolve({ ok: true, json: async () => ({ hours: HOURLY }) });
     }
     if (url.includes("/daily")) {
       return Promise.resolve({ ok: true, json: async () => ({ days: DAILY }) });
@@ -291,6 +303,9 @@ describe("UltimatesDashboard — modo sem novas compras", () => {
     global.fetch = jest.fn((url: string) => {
       if (url.includes("/roster")) {
         return Promise.resolve({ ok: true, json: async () => ({ rows: MIXED_ROSTER }) });
+      }
+      if (url.includes("/hourly")) {
+        return Promise.resolve({ ok: true, json: async () => ({ hours: [] }) });
       }
       if (url.includes("/daily")) {
         return Promise.resolve({ ok: true, json: async () => ({ days: MIXED_DAILY }) });
@@ -401,6 +416,9 @@ describe("UltimatesDashboard — paginação do roster no modo desligado", () =>
       if (url.includes("/roster")) {
         return Promise.resolve({ ok: true, json: async () => ({ rows: MANY_ROSTER }) });
       }
+      if (url.includes("/hourly")) {
+        return Promise.resolve({ ok: true, json: async () => ({ hours: [] }) });
+      }
       if (url.includes("/daily")) {
         return Promise.resolve({ ok: true, json: async () => ({ days: [] }) });
       }
@@ -438,5 +456,157 @@ describe("UltimatesDashboard — paginação do roster no modo desligado", () =>
     await screen.findByTestId("ultimates-excluded-offers-modal");
 
     expect(screen.getByTestId("data-table-page-info")).toHaveTextContent("Página 2 de 3");
+  });
+});
+
+describe("UltimatesDashboard — granularidade do card Evolução", () => {
+  it("busca a série horária junto com roster e daily", async () => {
+    mockRosterAndDailyFetch();
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+
+    await screen.findByTestId("ultimates-cumulative-chart");
+
+    const urls = (global.fetch as jest.Mock).mock.calls.map((c) => c[0] as string);
+    expect(urls.some((u) => u.includes("/api/ultimates/cycles/c1/hourly"))).toBe(true);
+  });
+
+  it("abre em dia e alterna o card para hora", async () => {
+    mockRosterAndDailyFetch();
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+
+    const card = await screen.findByTestId("ultimates-cumulative-chart");
+    expect(card).toHaveAttribute("data-granularity", "dia");
+
+    fireEvent.click(screen.getByTestId("ultimates-cumulative-granularity-hora"));
+
+    expect(screen.getByTestId("ultimates-cumulative-chart")).toHaveAttribute("data-granularity", "hora");
+    expect(screen.getByText("Renovações acumuladas — por hora")).toBeInTheDocument();
+  });
+
+  it("a descrição da seção 02 segue a granularidade", async () => {
+    mockRosterAndDailyFetch();
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+
+    await screen.findByTestId("ultimates-cumulative-chart");
+    expect(screen.getByText("Renovações e novos compradores, dia a dia")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("ultimates-cumulative-granularity-hora"));
+
+    expect(screen.getByText("Renovações e novos compradores, hora a hora")).toBeInTheDocument();
+  });
+
+  // A descrição é o produto de duas dimensões (política do ciclo ×
+  // granularidade) e só metade da matriz tinha teste. Este fecha a outra
+  // metade: com o ciclo sem novas compras, a primeira parte não pode variar
+  // com o chip e a segunda tem que continuar variando.
+  it("a descrição da seção 02 combina as duas granularidades com o modo sem novas compras", async () => {
+    mockRosterAndDailyFetch();
+    render(
+      <UltimatesDashboard
+        cycle={makeCycle({ counts_new_buyers: false })}
+        role="gestor"
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+      />
+    );
+
+    await screen.findByTestId("ultimates-cumulative-chart");
+    expect(screen.getByText("Renovações acumuladas, dia a dia")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("ultimates-cumulative-granularity-hora"));
+    expect(screen.getByText("Renovações acumuladas, hora a hora")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("ultimates-cumulative-granularity-dia"));
+    expect(screen.getByText("Renovações acumuladas, dia a dia")).toBeInTheDocument();
+  });
+
+  // Mesma garantia que o `series` já tem: o dashboard é renderizado sem
+  // `key`, então a preferência de quem olha atravessa a troca de ciclo.
+  it("a granularidade escolhida sobrevive à troca de ciclo", async () => {
+    mockRosterAndDailyFetch();
+    const { rerender } = render(
+      <UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />
+    );
+
+    await screen.findByTestId("ultimates-cumulative-chart");
+    fireEvent.click(screen.getByTestId("ultimates-cumulative-granularity-hora"));
+    expect(screen.getByTestId("ultimates-cumulative-chart")).toHaveAttribute("data-granularity", "hora");
+
+    rerender(
+      <UltimatesDashboard
+        cycle={makeCycle({ id: "c2", name: "Ciclo Agosto" })}
+        role="gestor"
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+      />
+    );
+
+    expect(await screen.findByTestId("ultimates-cumulative-chart")).toHaveAttribute("data-granularity", "hora");
+  });
+
+  // A horária é a mais nova e a menos validada das três chamadas — a migration
+  // 054 pode nem ter subido ainda quando o deploy sair. Falhar nela não pode
+  // levar junto KPIs, meta, roster, CSV e a curva DIÁRIA, que funcionam hoje:
+  // o dashboard segue inteiro e só o chip "Hora" some, para ninguém clicar em
+  // um botão que leva a um gráfico vazio.
+  it("com a busca horária falhando, o dashboard renderiza e o chip Hora não é oferecido", async () => {
+    global.fetch = jest.fn((url: string) => {
+      if (url.includes("/hourly")) {
+        return Promise.resolve({ ok: false, json: async () => ({}) });
+      }
+      if (url.includes("/roster")) {
+        return Promise.resolve({ ok: true, json: async () => ({ rows: ROSTER }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ days: DAILY }) });
+    }) as unknown as typeof global.fetch;
+
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+
+    const card = await screen.findByTestId("ultimates-cumulative-chart");
+    expect(screen.queryByTestId("ultimates-dashboard-error")).toBeNull();
+    expect(screen.getByTestId("ultimates-kpi-row")).toBeInTheDocument();
+    expect(screen.getByText("Renovou 1")).toBeInTheDocument();
+    // A curva diária continua de pé, na granularidade padrão.
+    expect(card).toHaveAttribute("data-granularity", "dia");
+    expect(screen.queryByTestId("ultimates-cumulative-granularity-switch")).toBeNull();
+    expect(screen.queryByTestId("ultimates-cumulative-granularity-hora")).toBeNull();
+  });
+
+  // Mesma garantia quando a rota nem responde (rede caiu, 404 de rota
+  // inexistente antes do deploy): a rejeição do fetch horário não pode rejeitar
+  // o Promise.all e derrubar as outras duas cargas com ela.
+  it("com a busca horária rejeitando, o dashboard continua inteiro", async () => {
+    global.fetch = jest.fn((url: string) => {
+      if (url.includes("/hourly")) {
+        return Promise.reject(new Error("network"));
+      }
+      if (url.includes("/roster")) {
+        return Promise.resolve({ ok: true, json: async () => ({ rows: ROSTER }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ days: DAILY }) });
+    }) as unknown as typeof global.fetch;
+
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+
+    expect(await screen.findByTestId("ultimates-cumulative-chart")).toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-dashboard-error")).toBeNull();
+    expect(screen.queryByTestId("ultimates-cumulative-granularity-switch")).toBeNull();
+  });
+
+  // Roster e daily continuam governando o erro exatamente como antes da
+  // granularidade horária existir.
+  it("continua acendendo o erro do card quando a daily falha", async () => {
+    global.fetch = jest.fn((url: string) => {
+      if (url.includes("/daily")) {
+        return Promise.resolve({ ok: false, json: async () => ({}) });
+      }
+      if (url.includes("/hourly")) {
+        return Promise.resolve({ ok: true, json: async () => ({ hours: HOURLY }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ rows: ROSTER }) });
+    }) as unknown as typeof global.fetch;
+
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+
+    expect(await screen.findByText("Tentar novamente")).toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-cumulative-chart")).toBeNull();
   });
 });

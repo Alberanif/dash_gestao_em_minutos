@@ -37,6 +37,28 @@ export function fmtDateShort(dateStr: string): string {
   return `${d}/${m}`;
 }
 
+// "2026-07-30T14" -> "30/07 14h" (eixo) e "30/07 às 14h" (tooltip).
+//
+// Split direto, sem Date, pelo mesmo motivo de fmtDateShort — e aqui o motivo
+// é mais forte: a chave já é hora de parede em America/Sao_Paulo (convertida
+// pela RPC da migration 054), então qualquer passagem por Date a
+// reinterpretaria no fuso de quem renderiza e deslocaria o gráfico inteiro.
+function partesDaHora(hourKey: string): { dia: string; mes: string; hora: string } {
+  const [datePart, hora] = hourKey.split("T");
+  const [, mes, dia] = datePart.split("-");
+  return { dia, mes, hora };
+}
+
+export function fmtHourShort(hourKey: string): string {
+  const { dia, mes, hora } = partesDaHora(hourKey);
+  return `${dia}/${mes} ${hora}h`;
+}
+
+export function fmtHourLong(hourKey: string): string {
+  const { dia, mes, hora } = partesDaHora(hourKey);
+  return `${dia}/${mes} às ${hora}h`;
+}
+
 const CATEGORY_LABELS: Record<UltimatesCategory, string> = {
   renovado: "Renovado",
   nao_renovado: "Não renovado",

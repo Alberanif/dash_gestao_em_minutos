@@ -1,8 +1,8 @@
 import {
   applyNewPurchasesModeToRoster,
-  applyNewPurchasesModeToDaily,
+  applyNewPurchasesModeToCounts,
 } from "../new-purchases-mode";
-import type { UltimatesDailyRow, UltimatesRosterRow } from "@/types/ultimates";
+import type { UltimatesDailyRow, UltimatesHourlyRow, UltimatesRosterRow } from "@/types/ultimates";
 
 function row(overrides: Partial<UltimatesRosterRow>): UltimatesRosterRow {
   return {
@@ -71,30 +71,41 @@ describe("applyNewPurchasesModeToRoster", () => {
   });
 });
 
-describe("applyNewPurchasesModeToDaily", () => {
-  it("é identidade quando o ciclo admite novas compras", () => {
-    expect(applyNewPurchasesModeToDaily(DAYS, true)).toBe(DAYS);
+describe("applyNewPurchasesModeToCounts", () => {
+  it("é identidade referencial quando o ciclo admite novas compras", () => {
+    // O useMemo do dashboard depende disso: uma cópia nova invalidaria a
+    // memoização a cada render.
+    expect(applyNewPurchasesModeToCounts(DAYS, true)).toBe(DAYS);
   });
 
-  it("soma new_buyers em renewals e zera new_buyers", () => {
-    expect(applyNewPurchasesModeToDaily(DAYS, false)).toEqual([
+  it("soma new_buyers em renewals e zera new_buyers quando o ciclo não admite novas compras", () => {
+    expect(applyNewPurchasesModeToCounts(DAYS, false)).toEqual([
       { day: "2026-07-01", renewals: 2, new_buyers: 0 },
       { day: "2026-07-02", renewals: 3, new_buyers: 0 },
     ]);
   });
 
-  it("preserva o eixo de dias — nenhum dia entra ou sai", () => {
-    const out = applyNewPurchasesModeToDaily(DAYS, false);
-    expect(out.map((d) => d.day)).toEqual(["2026-07-01", "2026-07-02"]);
-  });
-
   it("não muta o array de entrada", () => {
-    const days: UltimatesDailyRow[] = [{ day: "2026-07-02", renewals: 0, new_buyers: 3 }];
-    applyNewPurchasesModeToDaily(days, false);
-    expect(days[0]).toEqual({ day: "2026-07-02", renewals: 0, new_buyers: 3 });
+    const copy = DAYS.map((d) => ({ ...d }));
+    applyNewPurchasesModeToCounts(DAYS, false);
+    expect(DAYS).toEqual(copy);
   });
 
-  it("lida com lista vazia", () => {
-    expect(applyNewPurchasesModeToDaily([], false)).toEqual([]);
+  it("devolve vazio para entrada vazia", () => {
+    expect(applyNewPurchasesModeToCounts([] as UltimatesDailyRow[], false)).toEqual([]);
+  });
+
+  // A mesma função serve a série horária — a regra do modo não pode existir
+  // em dois lugares, senão as duas visões do card divergem.
+  it("aplica a mesma regra a linhas horárias, preservando a chave `hour`", () => {
+    const hours: UltimatesHourlyRow[] = [
+      { hour: "2026-07-01T20", renewals: 1, new_buyers: 4 },
+      { hour: "2026-07-01T21", renewals: 2, new_buyers: 0 },
+    ];
+
+    expect(applyNewPurchasesModeToCounts(hours, false)).toEqual([
+      { hour: "2026-07-01T20", renewals: 5, new_buyers: 0 },
+      { hour: "2026-07-01T21", renewals: 2, new_buyers: 0 },
+    ]);
   });
 });
