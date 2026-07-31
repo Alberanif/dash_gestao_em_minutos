@@ -21,9 +21,22 @@ interface RosterTableProps {
   // ver PRD issue #114, seção 3.4, critério 7).
   onLinkClick?: (row: UltimatesRosterRow) => void;
   // Desfazer vínculo manual de uma renovação de comprador da base (critério
-  // 6). Oferecido em qualquer renovação; o DELETE trata 404 quando a linha não
-  // veio de vínculo. Ausente ⇒ ação não disponível (ex.: ciclo encerrado).
+  // 6). Desde a migration 055 é oferecido apenas quando `from_manual_link` diz
+  // que há vínculo — ver isUnlinkableRow. Ausente ⇒ ação não disponível (ex.:
+  // ciclo encerrado).
   onUnlinkClick?: (row: UltimatesRosterRow) => void;
+  // ── Ações de edição do roster (PRD editar_roster) ────────────────────────
+  // Todas só aparecem para gestor e só em linhas da BASE. Cada handler ausente
+  // esconde a sua ação, que é como o pai expressa o gate de ciclo encerrado:
+  // lá só `onExcludeClick` é passado (decisão 13 do PRD).
+  //
+  // Vínculo invertido: a partir de um "não renovado", apontar qual compra não
+  // atribuída é a renovação dele.
+  onMarkRenewedClick?: (row: UltimatesRosterRow) => void;
+  // Corrigir nome/telefone do cadastro.
+  onEditClick?: (row: UltimatesRosterRow) => void;
+  // Excluir o lead da contabilidade do ciclo.
+  onExcludeClick?: (row: UltimatesRosterRow) => void;
 }
 
 // Par de listas de chips por modo do ciclo (migration 053): os dois pares de
@@ -67,13 +80,20 @@ function isNewBuyerRow(row: UltimatesRosterRow): boolean {
   return row.buyer_id === null;
 }
 
-// Renovação de comprador da base (pode ter vindo de venda por email OU de
-// vínculo manual — o roster não distingue; ver unlink-buyer-modal.tsx).
-function isRenewedBaseRow(row: UltimatesRosterRow): boolean {
+// Renovação de comprador da base cujo vínculo manual pode ser desfeito.
+//
+// `from_manual_link` só existe a partir da migration 055. Enquanto ela não
+// sobe, o campo vem `undefined` e mantemos o comportamento anterior — oferecer
+// o botão em toda renovação e deixar o DELETE responder 404 com mensagem
+// amigável. Esconder a ação nesse caso seria pior: ela funciona, só não
+// sabemos de antemão se tem efeito. Apenas `false` afirma "casou por email,
+// não há o que desfazer".
+function isUnlinkableRow(row: UltimatesRosterRow): boolean {
   return (
     row.buyer_id !== null &&
     row.transaction_code !== null &&
-    (row.category === "renovado" || row.category === "renovacao_reembolsada")
+    (row.category === "renovado" || row.category === "renovacao_reembolsada") &&
+    row.from_manual_link !== false
   );
 }
 
@@ -116,26 +136,33 @@ function CategoryBadge({ category }: { category: UltimatesCategory }) {
   );
 }
 
-// Botão de ação de uma linha/card (Vincular à base | Desfazer vínculo | nada).
-// Mesmos data-testids nas duas visões — só uma delas é renderizada por vez.
-function RowAction({
-  row,
-  onLinkClick,
-  onUnlinkClick,
-  fullWidth,
-}: {
-  row: UltimatesRosterRow;
-  onLinkClick?: (row: UltimatesRosterRow) => void;
-  onUnlinkClick?: (row: UltimatesRosterRow) => void;
-  fullWidth?: boolean;
-}) {
+type RowHandlers = Pick<
+  RosterTableProps,
+  "onLinkClick" | "onUnlinkClick" | "onMarkRenewedClick" | "onEditClick" | "onExcludeClick"
+>;
+
+// Botões de ação de uma linha/card. Devolve a LISTA para que quem chama decida
+// o vazio: a tabela mostra "—" numa célula vazia, o card mobile não mostra
+// nada. Mesmos data-testids nas duas visões — só uma delas é renderizada por
+// vez.
+//
+// Linha de novo comprador tem um caminho próprio e continua com um botão só:
+// as ações de edição são todas da BASE (decisão 4 do PRD).
+function buildRowActions(
+  row: UltimatesRosterRow,
+  handlers: RowHandlers,
+  fullWidth?: boolean
+): React.ReactNode[] {
   const style: React.CSSProperties = fullWidth
     ? { fontSize: 12, padding: "8px 10px", width: "100%" }
     : { fontSize: 12, padding: "5px 10px" };
 
+  const { onLinkClick, onUnlinkClick, onMarkRenewedClick, onEditClick, onExcludeClick } = handlers;
+
   if (isNewBuyerRow(row)) {
-    return (
+    return [
       <button
+        key="link"
         type="button"
         className="btn-secondary"
         data-testid={`ultimates-link-buyer-${row.email}`}
@@ -145,12 +172,31 @@ function RowAction({
         style={style}
       >
         Vincular à base
+      </button>,
+    ];
+  }
+
+  const actions: React.ReactNode[] = [];
+
+  if (onMarkRenewedClick && row.category === "nao_renovado") {
+    actions.push(
+      <button
+        key="mark-renewed"
+        type="button"
+        className="btn-secondary"
+        data-testid={`ultimates-mark-renewed-${row.email}`}
+        onClick={() => onMarkRenewedClick(row)}
+        style={style}
+      >
+        Marcar renovado
       </button>
     );
   }
-  if (isRenewedBaseRow(row) && onUnlinkClick) {
-    return (
+
+  if (onUnlinkClick && isUnlinkableRow(row)) {
+    actions.push(
       <button
+        key="unlink"
         type="button"
         className="btn-secondary"
         data-testid={`ultimates-unlink-buyer-${row.email}`}
@@ -161,7 +207,55 @@ function RowAction({
       </button>
     );
   }
-  return null;
+
+  if (onEditClick) {
+    actions.push(
+      <button
+        key="edit"
+        type="button"
+        className="btn-secondary"
+        data-testid={`ultimates-edit-buyer-${row.email}`}
+        onClick={() => onEditClick(row)}
+        style={style}
+      >
+        Editar
+      </button>
+    );
+  }
+
+  if (onExcludeClick) {
+    actions.push(
+      <button
+        key="exclude"
+        type="button"
+        className="btn-secondary"
+        data-testid={`ultimates-exclude-buyer-${row.email}`}
+        onClick={() => onExcludeClick(row)}
+        style={style}
+      >
+        Excluir
+      </button>
+    );
+  }
+
+  return actions;
+}
+
+// Envelope das ações. `fullWidth` empilha (card mobile); sem ele, elas ficam
+// lado a lado e quebram a linha se não couberem.
+function RowActions({ nodes, fullWidth }: { nodes: React.ReactNode[]; fullWidth?: boolean }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 6,
+        flexWrap: "wrap",
+        flexDirection: fullWidth ? "column" : "row",
+      }}
+    >
+      {nodes}
+    </div>
+  );
 }
 
 // Visão mobile do roster (< 640px): um card por participante, com a MESMA
@@ -169,14 +263,12 @@ function RowAction({
 function RosterCards({
   rows,
   isGestor,
-  onLinkClick,
-  onUnlinkClick,
+  handlers,
   onExportCsv,
 }: {
   rows: UltimatesRosterRow[];
   isGestor: boolean;
-  onLinkClick?: (row: UltimatesRosterRow) => void;
-  onUnlinkClick?: (row: UltimatesRosterRow) => void;
+  handlers: RowHandlers;
   onExportCsv: () => void;
 }) {
   const [page, setPage] = useState(1);
@@ -276,9 +368,7 @@ function RosterCards({
             </div>
           </div>
 
-          {isGestor && (
-            <RowAction row={row} onLinkClick={onLinkClick} onUnlinkClick={onUnlinkClick} fullWidth />
-          )}
+          {isGestor && <RowActions nodes={buildRowActions(row, handlers, true)} fullWidth />}
         </div>
       ))}
 
@@ -322,7 +412,23 @@ function RosterCards({
 // exportação CSV usa exatamente a visão filtrada atual. No mobile (< 640px)
 // a lista vira cards (RosterCards) — mesma lista, mesmos fluxos; o DataTable
 // compartilhado continua sendo a visão desktop.
-export function RosterTable({ rows, role, countsNewBuyers, onLinkClick, onUnlinkClick }: RosterTableProps) {
+export function RosterTable({
+  rows,
+  role,
+  countsNewBuyers,
+  onLinkClick,
+  onUnlinkClick,
+  onMarkRenewedClick,
+  onEditClick,
+  onExcludeClick,
+}: RosterTableProps) {
+  const handlers: RowHandlers = {
+    onLinkClick,
+    onUnlinkClick,
+    onMarkRenewedClick,
+    onEditClick,
+    onExcludeClick,
+  };
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<CategoryFilter>("todas");
   const isMobile = useMediaQuery("(max-width: 640px)");
@@ -400,12 +506,10 @@ export function RosterTable({ rows, role, countsNewBuyers, onLinkClick, onUnlink
       ? [
           {
             key: "buyer_id" as keyof TableRow,
-            label: "Ação",
+            label: "Ações",
             render: (_value: unknown, row: TableRow) => {
-              if (isNewBuyerRow(row) || (isRenewedBaseRow(row) && onUnlinkClick)) {
-                return <RowAction row={row} onLinkClick={onLinkClick} onUnlinkClick={onUnlinkClick} />;
-              }
-              return "—";
+              const nodes = buildRowActions(row, handlers);
+              return nodes.length > 0 ? <RowActions nodes={nodes} /> : "—";
             },
           },
         ]
@@ -440,8 +544,7 @@ export function RosterTable({ rows, role, countsNewBuyers, onLinkClick, onUnlink
         <RosterCards
           rows={filtered}
           isGestor={isGestor}
-          onLinkClick={onLinkClick}
-          onUnlinkClick={onUnlinkClick}
+          handlers={handlers}
           onExportCsv={handleExportCsv}
         />
       ) : (
