@@ -133,9 +133,12 @@ describe("GET /api/ultimates/cycles", () => {
     ];
     mockCyclesOrder.mockResolvedValueOnce({ data: cycles, error: null });
     mockCycleProductsIn.mockResolvedValueOnce({
+      // Ordem de chegada DELIBERADAMENTE oposta à alfabética: p1 ("Produto Um")
+      // antes de p2 ("Produto Dois"). Se o sort do GET sumir, a asserção abaixo
+      // falha. Com os dois na ordem alfabética o teste passaria verde sem sort.
       data: [
-        { cycle_id: "c1", product_id: "p2" },
         { cycle_id: "c1", product_id: "p1" },
+        { cycle_id: "c1", product_id: "p2" },
         { cycle_id: "c2", product_id: "p2" },
       ],
       error: null,

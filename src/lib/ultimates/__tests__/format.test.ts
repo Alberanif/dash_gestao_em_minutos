@@ -116,6 +116,18 @@ describe("formatCycleProducts", () => {
     ).toBe("Anual · Mensal");
   });
 
+  // Fronteira exata entre juntar nomes e resumir em contagem. Sem este caso,
+  // trocar `> 3` por `>= 3` no formatador passaria despercebido.
+  it("com exatamente 3 produtos ainda junta os nomes", () => {
+    expect(
+      formatCycleProducts([
+        { product_id: "1", product_name: "Anual" },
+        { product_id: "2", product_name: "Mensal" },
+        { product_id: "3", product_name: "Trimestral" },
+      ])
+    ).toBe("Anual · Mensal · Trimestral");
+  });
+
   it("resume a partir de 4 produtos", () => {
     expect(
       formatCycleProducts([
