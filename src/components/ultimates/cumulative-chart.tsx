@@ -33,6 +33,10 @@ interface CumulativeChartProps {
   // deve esconder o switch. Com ela false o grupo de granularidade some — o
   // chip "Hora" existir levando a um gráfico vazio é pior do que não existir.
   granularityAvailable: boolean;
+  // Modo Apenas Compras (migration 059): a curva é uma só ("Compras
+  // acumuladas"). O seletor de séries já some via countsNewBuyers=false; aqui
+  // só reetiquetamos o título/tooltip/vazio para o vocabulário de compras.
+  purchasesOnly?: boolean;
   // Há recorte por período ativo? Só troca a frase do estado vazio — a curva
   // já chega recortada em `data`, porque o recorte roda antes do acúmulo (ver
   // buildCumulativeSeries).
@@ -217,9 +221,17 @@ export function CumulativeChart({
   granularity,
   onGranularityChange,
   granularityAvailable,
+  purchasesOnly = false,
   rangeActive = false,
 }: CumulativeChartProps) {
-  const config = SERIES_CONFIG[series];
+  const config = purchasesOnly
+    ? {
+        ...SERIES_CONFIG[series],
+        title: "Compras acumuladas",
+        empty: "Sem compras registradas no ciclo ainda.",
+        emptyRange: "Sem compras no período selecionado.",
+      }
+    : SERIES_CONFIG[series];
   const porHora = granularity === "hora";
   // Memo pelo mesmo motivo do `chartPoints` no dashboard: são até 8760 pontos,
   // cada um com dois formatos baseados em split. Todos os modais do dashboard

@@ -330,13 +330,17 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
     () => applyNewPurchasesModeToRoster(roster ?? [], countsNewBuyers),
     [roster, countsNewBuyers]
   );
+  // Uma métrica só na curva quando o ciclo não admite novas compras OU é Apenas
+  // Compras: em compras não há série "novos" — toda venda materializada é base,
+  // e qualquer new_buyer residual entra na curva de compras em vez de sumir.
+  const seriesCountsNewBuyers = countsNewBuyers && !purchasesOnly;
   const viewDaily = useMemo(
-    () => applyNewPurchasesModeToCounts(daily ?? [], countsNewBuyers),
-    [daily, countsNewBuyers]
+    () => applyNewPurchasesModeToCounts(daily ?? [], seriesCountsNewBuyers),
+    [daily, seriesCountsNewBuyers]
   );
   const viewHourly = useMemo(
-    () => applyNewPurchasesModeToCounts(hourly ?? [], countsNewBuyers),
-    [hourly, countsNewBuyers]
+    () => applyNewPurchasesModeToCounts(hourly ?? [], seriesCountsNewBuyers),
+    [hourly, seriesCountsNewBuyers]
   );
   // Mesma reetiquetagem do roster do ciclo, pelo mesmo motivo e com o mesmo
   // useMemo obrigatório (ver o comentário de `viewRoster` acima).
@@ -368,7 +372,7 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
     : viewRoster;
   // Série derivada no render, nunca por efeito: assim o `series` escolhido pelo
   // usuário sobrevive intacto e volta sozinho se o ciclo religar novas compras.
-  const activeSeries = countsNewBuyers ? series : "renovacoes";
+  const activeSeries = seriesCountsNewBuyers ? series : "renovacoes";
   // Mesma técnica para a granularidade, pelo mesmo motivo: sem a série horária
   // o card volta para "dia" sem apagar a preferência de quem escolheu "hora" —
   // ela volta sozinha no ciclo (ou no reload) em que a rota responder.
@@ -543,7 +547,9 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
                 data-testid="ultimates-date-note"
                 style={{ fontSize: 12, color: "var(--text-3)", margin: "0 0 12px" }}
               >
-                {`Renovações e novos compradores restritos a ${fmtDateShort(range.start)} – ${fmtDateShort(range.end)} · Base e meta seguem o ciclo inteiro`}
+                {purchasesOnly
+                  ? `Compras restritas a ${fmtDateShort(range.start)} – ${fmtDateShort(range.end)}`
+                  : `Renovações e novos compradores restritos a ${fmtDateShort(range.start)} – ${fmtDateShort(range.end)} · Base e meta seguem o ciclo inteiro`}
               </p>
             )}
             {excludedCount > 0 && (
@@ -585,14 +591,19 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
               index="02"
               title="Evolução"
               desc={`${
-                countsNewBuyers ? "Renovações e novos compradores" : "Renovações acumuladas"
+                purchasesOnly
+                  ? "Compras acumuladas"
+                  : countsNewBuyers
+                    ? "Renovações e novos compradores"
+                    : "Renovações acumuladas"
               }, ${activeGranularity === "hora" ? "hora a hora" : "dia a dia"}`}
             />
             <CumulativeChart
               data={chartPoints}
               series={activeSeries}
               onSeriesChange={setSeries}
-              countsNewBuyers={countsNewBuyers}
+              countsNewBuyers={seriesCountsNewBuyers}
+              purchasesOnly={purchasesOnly}
               granularity={activeGranularity}
               onGranularityChange={setGranularity}
               granularityAvailable={hourlyDisponivel}
@@ -606,9 +617,13 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
               rows={tableRows}
               role={role}
               countsNewBuyers={countsNewBuyers}
-              onLinkClick={canWrite ? setLinkTarget : undefined}
-              onUnlinkClick={canWrite ? setUnlinkTarget : undefined}
-              onMarkRenewedClick={canWrite ? setMarkRenewedTarget : undefined}
+              purchasesOnly={purchasesOnly}
+              // Sem base: no modo Apenas Compras não há vínculo nem "marcar
+              // renovado" — só Editar e Excluir. As demais ações não são
+              // passadas, então não aparecem.
+              onLinkClick={canWrite && !purchasesOnly ? setLinkTarget : undefined}
+              onUnlinkClick={canWrite && !purchasesOnly ? setUnlinkTarget : undefined}
+              onMarkRenewedClick={canWrite && !purchasesOnly ? setMarkRenewedTarget : undefined}
               onEditClick={canWrite ? setEditTarget : undefined}
               onExcludeClick={canExcludeBuyers ? setExcludeTarget : undefined}
             />

@@ -941,4 +941,23 @@ describe("UltimatesDashboard — modo Apenas Compras (#154)", () => {
     await screen.findByTestId("ultimates-kpi-row");
     expect(screen.getByText("Compras do ciclo")).toBeInTheDocument();
   });
+
+  it("gráfico é série única de compras, sem seletor de séries", async () => {
+    renderPurchases();
+    await screen.findByTestId("ultimates-cumulative-chart");
+    expect(screen.queryByTestId("ultimates-cumulative-series-switch")).toBeNull();
+    expect(screen.getByText("Compras acumuladas")).toBeInTheDocument();
+  });
+
+  it("roster oferece só Editar e Excluir por linha (sem vincular/marcar/desfazer)", async () => {
+    renderPurchases();
+    await screen.findByTestId("ultimates-kpi-row");
+    // ROSTER tem b1/b2 renovado (materializados) e b3 nao_renovado — mas em
+    // compras não há vínculo nem marcar renovado.
+    expect(screen.getByTestId("ultimates-edit-buyer-r1@example.com")).toBeInTheDocument();
+    expect(screen.getByTestId("ultimates-exclude-buyer-r1@example.com")).toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-mark-renewed-n1@example.com")).toBeNull();
+    expect(screen.queryByTestId("ultimates-link-buyer-r1@example.com")).toBeNull();
+    expect(screen.queryByTestId("ultimates-unlink-buyer-r1@example.com")).toBeNull();
+  });
 });
