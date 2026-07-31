@@ -132,9 +132,11 @@ beforeEach(() => {
     }
     if (table === "dash_gestao_ultimates_cycle_products") {
       return {
+        // .select("product_id").eq("cycle_id", id).order("product_id").abortSignal(deadline)
         select: () => ({
           eq: () => {
             const afterEq = {
+              order: () => afterEq,
               abortSignal: () => afterEq,
               then: (resolve: (v: { data: unknown; error: unknown }) => void) =>
                 resolve({ data: cycleProductRows, error: cycleProductsError }),
@@ -435,6 +437,49 @@ describe("POST /api/ultimates/cycles/[id]/refresh", () => {
     expect(salesUrls.some((url) => url.includes("product_id=prod-a"))).toBe(true);
     expect(salesUrls.some((url) => url.includes("product_id=prod-b"))).toBe(true);
     expect(body.upserted).toBe(2);
+  });
+
+  it("falha parcial no 2º produto não descarta o upsert já feito do 1º (persistência por produto)", async () => {
+    cycleRow = activeCycle();
+    lockCount = 1;
+    cycleProductRows = [{ product_id: "prod-a" }, { product_id: "prod-b" }];
+
+    // token ok -> página de prod-a ok (1 item, sem next_page_token) -> página
+    // de prod-b falha (resposta não-2xx da Hotmart). Se o upsert só acontecesse
+    // depois do laço inteiro, a venda de prod-a nunca chegaria a ser gravada.
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ access_token: "tok-abc" }),
+        text: () => Promise.resolve(""),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ items: [saleItem()], page_info: {} }),
+        text: () => Promise.resolve(""),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve("boom"),
+      });
+
+    const res = await callRoute();
+    expect(res.status).toBe(502);
+
+    // A venda de prod-a foi upsertada ANTES da falha em prod-b — persistência
+    // por produto, não acumulada em memória até o fim do laço.
+    expect(salesUpsert).toHaveBeenCalledTimes(1);
+    expect(salesUpsert).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ transaction_code: "HP-TX-1" })]),
+      expect.objectContaining({ onConflict: "transaction_code" })
+    );
+
+    // finally libera o lock e grava last_refresh_at mesmo com a falha parcial —
+    // o throttle passa a valer a partir desta tentativa (comportamento inalterado).
+    const clearing = cycleUpdatePayloads.find((p) => p.refresh_started_at === null);
+    expect(clearing).toBeDefined();
   });
 
   it("falha com mensagem clara quando o ciclo não tem produtos", async () => {

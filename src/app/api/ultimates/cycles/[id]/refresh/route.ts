@@ -158,6 +158,11 @@ export async function POST(
       .from("dash_gestao_ultimates_cycle_products")
       .select("product_id")
       .eq("cycle_id", id)
+      // Ordem estável: numa falha parcial (orçamento estourado no meio do laço),
+      // quem fica sem venda gravada nesta tentativa precisa ser sempre o mesmo
+      // sufixo da lista — não um conjunto que varia a cada execução por causa da
+      // ordem de retorno do Postgres.
+      .order("product_id")
       .abortSignal(deadline);
 
     if (cycleProductsErr) {
@@ -177,7 +182,11 @@ export async function POST(
     const startMs = new Date(cycle.created_at).getTime();
     const endMs = now.getTime();
 
-    const allItems: HotmartSaleItem[] = [];
+    // Instante único da coleta: todas as linhas gravadas nesta execução — de
+    // qualquer produto — levam o mesmo collectedAt. Não recalcular dentro do
+    // laço; é o carimbo da EXECUÇÃO, não do produto.
+    const collectedAt = now.toISOString();
+    let upserted = 0;
 
     // Sequencial de propósito: buscar os produtos em paralelo multiplicaria a
     // taxa de chamadas à Hotmart pelo tamanho do conjunto.
@@ -187,7 +196,19 @@ export async function POST(
     // então cada produto começaria zerado de qualquer jeito. Passa a ser
     // load-bearing no instante em que alguém acrescentar um break ou return
     // antecipado dentro da paginação de um produto.
+    //
+    // O upsert acontece AQUI DENTRO, ao fim da paginação de cada produto — não
+    // depois do laço inteiro. REFRESH_BUDGET_MS é compartilhado por todos os
+    // produtos do ciclo: se o produto seguinte estourar o orçamento (ou a
+    // Hotmart falhar), o throw sobe e o catch responde 502 — mas o que já foi
+    // paginado dos produtos anteriores já está gravado, não é descartado. Sem
+    // essa granularidade, uma falha no meio do laço perderia dezenas de
+    // milhares de linhas em memória, e a retentativa seguinte (determinística:
+    // mesmo start_date, mesma lista de produtos) repetiria o mesmo trabalho até
+    // estourar de novo no mesmo lugar — os produtos do fim da lista nunca
+    // receberiam venda nenhuma.
     for (const productId of productIds) {
+      const items: HotmartSaleItem[] = [];
       let pageToken: string | undefined;
 
       do {
@@ -208,31 +229,32 @@ export async function POST(
         }
 
         const data = await res.json();
-        allItems.push(...(data.items ?? []));
+        items.push(...(data.items ?? []));
         pageToken = data.page_info?.next_page_token;
       } while (pageToken);
-    }
 
-    let upserted = 0;
-    if (allItems.length > 0) {
-      const collectedAt = now.toISOString();
-      const rows = allItems.map((item) =>
-        mapHotmartSaleItem(item, cycle.account_id, collectedAt)
-      );
+      if (items.length > 0) {
+        const rows = items.map((item) =>
+          mapHotmartSaleItem(item, cycle.account_id, collectedAt)
+        );
 
-      // Garante que os offer_codes das vendas existam em hotmart_offers antes do
-      // upsert (FK offer_code -> dash_gestao_hotmart_offers) — mesmo pré-upsert
-      // usado por collectHotmart. Necessário para ofertas novas ainda não
-      // sincronizadas por syncHotmartProducts.
-      await upsertPlaceholderOffers(supabase, rows, collectedAt, deadline);
+        // Garante que os offer_codes das vendas existam em hotmart_offers antes do
+        // upsert (FK offer_code -> dash_gestao_hotmart_offers) — mesmo pré-upsert
+        // usado por collectHotmart. Necessário para ofertas novas ainda não
+        // sincronizadas por syncHotmartProducts. Precisa continuar valendo POR
+        // LOTE (por produto): se o pré-upsert de offers do produto 3 nunca
+        // rodar, o upsert de sales do produto 3 nem chega a acontecer — mas os
+        // lotes 1 e 2, já com offers + sales gravados, não são afetados.
+        await upsertPlaceholderOffers(supabase, rows, collectedAt, deadline);
 
-      const { error: upsertErr } = await supabase
-        .from("dash_gestao_hotmart_sales")
-        .upsert(rows, { onConflict: "transaction_code" })
-        .abortSignal(deadline);
+        const { error: upsertErr } = await supabase
+          .from("dash_gestao_hotmart_sales")
+          .upsert(rows, { onConflict: "transaction_code" })
+          .abortSignal(deadline);
 
-      if (upsertErr) throw new Error(`Hotmart upsert error: ${upsertErr.message}`);
-      upserted = rows.length;
+        if (upsertErr) throw new Error(`Hotmart upsert error: ${upsertErr.message}`);
+        upserted += rows.length;
+      }
     }
 
     const lastRefreshAt = new Date().toISOString();
