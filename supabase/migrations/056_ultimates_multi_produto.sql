@@ -406,7 +406,10 @@ declare
 begin
   -- Deduplica e descarta vazios antes de qualquer checagem: a PK composta
   -- rejeitaria duplicata, mas com um erro 23505 ilegível para o gestor.
-  select array_agg(distinct x)
+  -- O btrim entra DENTRO do array_agg: sem ele um id com espaço de borda
+  -- passaria pelo filtro e morreria depois na comparação exata do lookup,
+  -- virando "Produto não encontrado" para um produto que existe.
+  select array_agg(distinct btrim(x))
     into v_ids
   from unnest(coalesce(p_product_ids, '{}'::text[])) as x
   where btrim(x) <> '';
@@ -469,6 +472,18 @@ grant  execute on function public.dash_gestao_ultimates_create_cycle(text, text[
 -- 4. create index idx_ultimates_cycles_product_status
 --      on dash_gestao_ultimates_cycles (product_id, status);
 -- 5. drop function if exists public.dash_gestao_ultimates_create_cycle(text, text[], numeric, uuid);
--- 6. Reaplicar dash_gestao_ultimates_roster e _daily da migration 052,
---    _hourly da 054 e _offer_options da 052 (as versões com cross join cyc).
--- 7. drop table if exists dash_gestao_ultimates_cycle_products;
+-- 6. Reaplicar dash_gestao_ultimates_roster e _daily da migration 052 e _hourly
+--    da 054 (as versões com cross join cyc). CREATE OR REPLACE basta nas três: a
+--    assinatura não mudou e os grants sobrevivem.
+-- 7. _offer_options exige DROP + CREATE, NÃO replace: esta migration mudou o
+--    RETURNS TABLE dela (acrescentou product_id e product_name), e o Postgres não
+--    troca tipo de retorno por replace. Nesta ordem:
+--      drop function if exists public.dash_gestao_ultimates_offer_options(uuid);
+--      <definição de _offer_options da migration 052>
+--      revoke execute on function public.dash_gestao_ultimates_offer_options(uuid)
+--        from public, anon, authenticated;
+--      grant  execute on function public.dash_gestao_ultimates_offer_options(uuid)
+--        to service_role;
+--    O DROP destrói os grants: sem reaplicá-los a função volta sem permissão para
+--    o service_role e toda leitura de oferta quebra com "permission denied".
+-- 8. drop table if exists dash_gestao_ultimates_cycle_products;
