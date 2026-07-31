@@ -252,7 +252,7 @@ export function ExcludedOffersModal({
               <option value="">Selecione a oferta...</option>
               {visible.map((option) => (
                 <option key={option.offer_code} value={option.offer_code}>
-                  {option.offer_name} · {option.offer_code} · {option.sales_count} venda(s)
+                  {option.product_name} · {option.offer_name} · {option.offer_code} · {option.sales_count} venda(s)
                 </option>
               ))}
             </select>
@@ -313,7 +313,8 @@ function matchesSearch(option: UltimatesOfferOption, term: string): boolean {
   if (needle === "") return true;
   return (
     option.offer_code.toLowerCase().includes(needle) ||
-    (option.offer_name ?? "").toLowerCase().includes(needle)
+    (option.offer_name ?? "").toLowerCase().includes(needle) ||
+    (option.product_name ?? "").toLowerCase().includes(needle)
   );
 }
 

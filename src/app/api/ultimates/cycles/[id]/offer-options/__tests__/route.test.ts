@@ -93,4 +93,32 @@ describe("GET /api/ultimates/cycles/[id]/offer-options", () => {
 
     expect(res.status).toBe(500);
   });
+
+  it("repassa produto da oferta e normaliza sales_count vindo como string", async () => {
+    mockRpc.mockResolvedValueOnce({
+      data: [
+        {
+          offer_code: "OF1",
+          offer_name: "Oferta padrão",
+          product_id: "p1",
+          product_name: "Anual",
+          sales_count: "12",
+          is_excluded: false,
+        },
+      ],
+      error: null,
+    });
+
+    const { GET } = await import("../route");
+    const body = await (await GET(makeRequest(), params)).json();
+
+    expect(body.offers[0]).toEqual({
+      offer_code: "OF1",
+      offer_name: "Oferta padrão",
+      product_id: "p1",
+      product_name: "Anual",
+      sales_count: 12,
+      is_excluded: false,
+    });
+  });
 });

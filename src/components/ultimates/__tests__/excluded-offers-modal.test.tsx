@@ -17,8 +17,22 @@ const EXCLUDED = [
 ];
 
 const OPTIONS = [
-  { offer_code: "PRINCIPAL", offer_name: "Oferta principal", sales_count: 412, is_excluded: false },
-  { offer_code: "OFERTA_TESTE", offer_name: "Oferta interna", sales_count: 3, is_excluded: true },
+  {
+    offer_code: "PRINCIPAL",
+    offer_name: "Oferta principal",
+    product_id: "p1",
+    product_name: "Anual",
+    sales_count: 412,
+    is_excluded: false,
+  },
+  {
+    offer_code: "OFERTA_TESTE",
+    offer_name: "Oferta interna",
+    product_id: "p1",
+    product_name: "Anual",
+    sales_count: 3,
+    is_excluded: true,
+  },
 ];
 
 // Roteia por URL/método em vez de por ordem de chamada — o componente dispara
@@ -94,9 +108,30 @@ describe("ExcludedOffersModal — leitura", () => {
 
 describe("ExcludedOffersModal — busca de oferta", () => {
   const SEARCHABLE = [
-    { offer_code: "PRINCIPAL", offer_name: "Oferta principal", sales_count: 412, is_excluded: false },
-    { offer_code: "XYZ123", offer_name: "Cortesia equipe", sales_count: 2, is_excluded: false },
-    { offer_code: "OFERTA_TESTE", offer_name: "Oferta interna", sales_count: 3, is_excluded: true },
+    {
+      offer_code: "PRINCIPAL",
+      offer_name: "Oferta principal",
+      product_id: "p1",
+      product_name: "Anual",
+      sales_count: 412,
+      is_excluded: false,
+    },
+    {
+      offer_code: "XYZ123",
+      offer_name: "Cortesia equipe",
+      product_id: "p1",
+      product_name: "Anual",
+      sales_count: 2,
+      is_excluded: false,
+    },
+    {
+      offer_code: "OFERTA_TESTE",
+      offer_name: "Oferta interna",
+      product_id: "p1",
+      product_name: "Anual",
+      sales_count: 3,
+      is_excluded: true,
+    },
   ];
 
   async function renderWithSearch() {

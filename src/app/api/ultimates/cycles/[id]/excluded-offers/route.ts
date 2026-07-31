@@ -58,7 +58,7 @@ export async function GET(
 
   const { data: cycle, error: cycleError } = await supabase
     .from("dash_gestao_ultimates_cycles")
-    .select("id, product_id, status")
+    .select("id, status")
     .eq("id", id)
     .single();
 
@@ -131,7 +131,7 @@ export async function POST(
 
   const { data: cycle, error: cycleError } = await supabase
     .from("dash_gestao_ultimates_cycles")
-    .select("id, product_id, status")
+    .select("id, status")
     .eq("id", id)
     .single();
 
@@ -139,18 +139,31 @@ export async function POST(
     return NextResponse.json({ error: "Ciclo não encontrado" }, { status: 404 });
   }
 
-  // A oferta precisa ser do produto do ciclo: excluir uma oferta de outro
-  // produto não teria efeito nenhum (o universo das RPCs já é filtrado por
-  // product_id) e daria ao gestor a impressão de ter resolvido algo.
+  const { data: cycleProducts, error: cycleProductsError } = await supabase
+    .from("dash_gestao_ultimates_cycle_products")
+    .select("product_id")
+    .eq("cycle_id", id);
+
+  if (cycleProductsError) {
+    return NextResponse.json({ error: cycleProductsError.message }, { status: 500 });
+  }
+
+  const cycleProductIds = new Set(
+    ((cycleProducts ?? []) as { product_id: string }[]).map((row) => row.product_id)
+  );
+
   const { data: offer, error: offerError } = await supabase
     .from("dash_gestao_hotmart_offers")
     .select("offer_code, offer_name, product_id")
     .eq("offer_code", offerCode)
     .single();
 
-  if (offerError || !offer || offer.product_id !== cycle.product_id) {
+  // A oferta precisa ser de algum produto do ciclo: excluir oferta de fora não
+  // teria efeito (o universo das RPCs já é filtrado por produto) e daria ao
+  // gestor a impressão de ter resolvido algo.
+  if (offerError || !offer || !cycleProductIds.has(offer.product_id)) {
     return NextResponse.json(
-      { error: "Oferta não encontrada para o produto deste ciclo" },
+      { error: "Oferta não encontrada para os produtos deste ciclo" },
       { status: 400 }
     );
   }
@@ -202,7 +215,7 @@ export async function DELETE(
 
   const { data: cycle, error: cycleError } = await supabase
     .from("dash_gestao_ultimates_cycles")
-    .select("id, product_id, status")
+    .select("id, status")
     .eq("id", id)
     .single();
 
