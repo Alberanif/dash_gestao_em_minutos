@@ -284,3 +284,63 @@ describe("ExcludedOffersModal — analista", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+// Cenário que motivou mostrar o produto na linha: com N produtos no ciclo, duas
+// ofertas homônimas de produtos diferentes ficariam indistinguíveis no seletor e
+// o gestor excluiria a errada.
+describe("ExcludedOffersModal — ofertas homônimas de produtos diferentes", () => {
+  // Códigos deliberadamente sem "anual"/"mensal" no texto: se o código
+  // vazasse o termo buscado, a mutação que remove product_name do filtro
+  // passaria escondida atrás do match por código.
+  const HOMONIMAS = [
+    {
+      offer_code: "OFR001",
+      offer_name: "Oferta principal",
+      product_id: "p1",
+      product_name: "Ultimates Anual",
+      sales_count: 412,
+      is_excluded: false,
+    },
+    {
+      offer_code: "OFR002",
+      offer_name: "Oferta principal",
+      product_id: "p2",
+      product_name: "Ultimates Mensal",
+      sales_count: 87,
+      is_excluded: false,
+    },
+  ];
+
+  async function renderHomonimas() {
+    installFetch({ options: HOMONIMAS });
+    render(
+      <ExcludedOffersModal cycleId="c1" canWrite onChanged={jest.fn()} onClose={jest.fn()} />
+    );
+    return (await screen.findByTestId("ultimates-excluded-offer-select")) as HTMLSelectElement;
+  }
+
+  it("mostra o nome do produto em cada linha, distinguindo as duas ofertas", async () => {
+    const select = await renderHomonimas();
+    const textos = Array.from(select.options)
+      .filter((o) => o.value !== "")
+      .map((o) => o.textContent ?? "");
+
+    expect(textos).toHaveLength(2);
+    // Sem o nome do produto na linha, as duas leriam exatamente igual.
+    expect(textos[0]).not.toBe(textos[1]);
+    expect(textos.some((t) => t.includes("Ultimates Anual"))).toBe(true);
+    expect(textos.some((t) => t.includes("Ultimates Mensal"))).toBe(true);
+  });
+
+  it("filtra pelo nome do produto, não só por código e nome da oferta", async () => {
+    const select = await renderHomonimas();
+    fireEvent.change(screen.getByTestId("ultimates-excluded-offer-search"), {
+      target: { value: "mensal" },
+    });
+
+    const codigos = Array.from(select.options)
+      .map((o) => o.value)
+      .filter((v) => v !== "");
+    expect(codigos).toEqual(["OFR002"]);
+  });
+});
