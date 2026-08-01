@@ -78,7 +78,7 @@ afterEach(() => {
 describe("UltimatesDashboard — wiring de KPIs/meta/gráfico/tabela sobre a mesma fonte (critério 9)", () => {
   it("busca roster + daily do ciclo selecionado e renderiza KPIs consistentes com o roster", async () => {
     mockRosterAndDailyFetch();
-    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     expect(await screen.findByTestId("ultimates-kpi-row")).toBeInTheDocument();
     // base = 3 (todas com buyer_id != null); renovados = 2.
@@ -92,20 +92,20 @@ describe("UltimatesDashboard — wiring de KPIs/meta/gráfico/tabela sobre a mes
 
   it("exibe a barra de meta quando goal_percent está cadastrada", async () => {
     mockRosterAndDailyFetch();
-    render(<UltimatesDashboard cycle={makeCycle({ goal_percent: 60 })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle({ goal_percent: 60 })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
     expect(await screen.findByTestId("ultimates-goal-bar")).toBeInTheDocument();
   });
 
   it("NÃO exibe a barra de meta quando goal_percent é null", async () => {
     mockRosterAndDailyFetch();
-    render(<UltimatesDashboard cycle={makeCycle({ goal_percent: null })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle({ goal_percent: null })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
     await screen.findByTestId("ultimates-kpi-row");
     expect(screen.queryByTestId("ultimates-goal-bar")).not.toBeInTheDocument();
   });
 
   it("renderiza o gráfico de renovações acumuladas a partir do daily", async () => {
     mockRosterAndDailyFetch();
-    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
     const chart = await screen.findByTestId("ultimates-cumulative-chart");
     expect(chart).toBeInTheDocument();
     expect(chart).toHaveAttribute("data-series", "renovacoes");
@@ -113,7 +113,7 @@ describe("UltimatesDashboard — wiring de KPIs/meta/gráfico/tabela sobre a mes
 
   it("o switch do card 02 troca a visualização para novos compradores, sem refetch", async () => {
     mockRosterAndDailyFetch();
-    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     await screen.findByTestId("ultimates-cumulative-chart");
     const fetchCallsBefore = (global.fetch as jest.Mock).mock.calls.length;
@@ -129,7 +129,7 @@ describe("UltimatesDashboard — wiring de KPIs/meta/gráfico/tabela sobre a mes
 
   it("mantém o testid de slot e o nome do ciclo selecionado (contrato da task #122)", async () => {
     mockRosterAndDailyFetch();
-    render(<UltimatesDashboard cycle={makeCycle({ name: "Ciclo XPTO" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle({ name: "Ciclo XPTO" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
     expect(screen.getByTestId("ultimates-dashboard-slot")).toBeInTheDocument();
     expect(await screen.findByTestId("ultimates-selected-cycle")).toHaveTextContent("Ciclo XPTO");
   });
@@ -145,7 +145,7 @@ describe("UltimatesDashboard — wiring de KPIs/meta/gráfico/tabela sobre a mes
           ],
         })}
         role="gestor"
-        onCountsNewBuyersChange={jest.fn()}
+        onCountsNewBuyersChange={jest.fn()} onViewRangeChange={jest.fn().mockResolvedValue(true)}
       />
     );
     expect(screen.getByTestId("ultimates-cycle-products")).toHaveTextContent("Anual · Mensal");
@@ -153,7 +153,7 @@ describe("UltimatesDashboard — wiring de KPIs/meta/gráfico/tabela sobre a mes
 
   it("mostra erro com opção de tentar novamente quando roster ou daily falham", async () => {
     global.fetch = jest.fn().mockResolvedValue({ ok: false, json: async () => ({}) }) as unknown as typeof global.fetch;
-    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
     expect(await screen.findByTestId("ultimates-dashboard-error")).toBeInTheDocument();
   });
 });
@@ -175,7 +175,7 @@ function mockWriteRosterFetch() {
 describe("UltimatesDashboard — fluxos de escrita (critérios 6 e 11)", () => {
   it("gestor em ciclo ativo vê 'Carregar base' e pode abrir vínculo/desfazer", async () => {
     mockWriteRosterFetch();
-    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     await screen.findByTestId("ultimates-kpi-row");
     expect(screen.getByTestId("ultimates-upload-btn")).toBeInTheDocument();
@@ -194,7 +194,7 @@ describe("UltimatesDashboard — fluxos de escrita (critérios 6 e 11)", () => {
 
   it("ciclo encerrado: dashboard acessível mas escrita bloqueada (sem Carregar base nem ações)", async () => {
     mockWriteRosterFetch();
-    render(<UltimatesDashboard cycle={makeCycle({ status: "encerrado" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle({ status: "encerrado" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     await screen.findByTestId("ultimates-kpi-row");
     // Dashboard segue acessível (tabela renderiza).
@@ -208,7 +208,7 @@ describe("UltimatesDashboard — fluxos de escrita (critérios 6 e 11)", () => {
 
   it("analista não vê ações de escrita mesmo em ciclo ativo", async () => {
     mockWriteRosterFetch();
-    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="analista" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="analista" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
     await screen.findByTestId("ultimates-kpi-row");
     expect(screen.queryByTestId("ultimates-upload-btn")).not.toBeInTheDocument();
     expect(screen.queryByTestId("ultimates-link-buyer-novo@example.com")).not.toBeInTheDocument();
@@ -251,7 +251,7 @@ function mockFetchWithExcluded(excludedCount: number) {
 describe("UltimatesDashboard — sinalização de ofertas excluídas", () => {
   it("mostra o contador no botão e a nota no card quando há ofertas excluídas", async () => {
     mockFetchWithExcluded(2);
-    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     // O botão aparece antes da contagem chegar (não some enquanto carrega);
     // o contador entra no rótulo assim que a lista responde.
@@ -263,7 +263,7 @@ describe("UltimatesDashboard — sinalização de ofertas excluídas", () => {
 
   it("usa o singular com uma única oferta excluída", async () => {
     mockFetchWithExcluded(1);
-    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     expect(await screen.findByTestId("ultimates-excluded-offers-note")).toHaveTextContent(
       "1 oferta excluída da contabilidade"
@@ -272,7 +272,7 @@ describe("UltimatesDashboard — sinalização de ofertas excluídas", () => {
 
   it("sem ofertas excluídas, não mostra contador nem nota", async () => {
     mockFetchWithExcluded(0);
-    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     await screen.findByTestId("ultimates-kpi-row");
     expect(screen.getByTestId("ultimates-excluded-offers-btn")).toHaveTextContent(
@@ -284,7 +284,7 @@ describe("UltimatesDashboard — sinalização de ofertas excluídas", () => {
 
   it("abre o modal ao clicar no botão", async () => {
     mockFetchWithExcluded(1);
-    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     fireEvent.click(await screen.findByTestId("ultimates-excluded-offers-btn"));
 
@@ -293,7 +293,7 @@ describe("UltimatesDashboard — sinalização de ofertas excluídas", () => {
 
   it("mantém o botão disponível em ciclo encerrado (a lista continua editável)", async () => {
     mockFetchWithExcluded(0);
-    render(<UltimatesDashboard cycle={makeCycle({ status: "encerrado" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle({ status: "encerrado" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     await screen.findByTestId("ultimates-kpi-row");
     // "Carregar base" some em ciclo encerrado; esta lista não.
@@ -303,7 +303,7 @@ describe("UltimatesDashboard — sinalização de ofertas excluídas", () => {
 
   it("mostra o botão para analista (leitura da lista)", async () => {
     mockFetchWithExcluded(1);
-    render(<UltimatesDashboard cycle={makeCycle()} role="analista" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle()} role="analista" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     expect(await screen.findByTestId("ultimates-excluded-offers-btn")).toBeInTheDocument();
   });
@@ -340,6 +340,7 @@ describe("UltimatesDashboard — modo sem novas compras", () => {
         cycle={makeCycle({ counts_new_buyers: false })}
         role="gestor"
         onCountsNewBuyersChange={onToggle}
+        onViewRangeChange={jest.fn().mockResolvedValue(true)}
       />
     );
 
@@ -357,6 +358,7 @@ describe("UltimatesDashboard — modo sem novas compras", () => {
         cycle={makeCycle({ counts_new_buyers: false })}
         role="gestor"
         onCountsNewBuyersChange={onToggle}
+        onViewRangeChange={jest.fn().mockResolvedValue(true)}
       />
     );
 
@@ -374,6 +376,7 @@ describe("UltimatesDashboard — modo sem novas compras", () => {
         cycle={makeCycle({ counts_new_buyers: false })}
         role="gestor"
         onCountsNewBuyersChange={onToggle}
+        onViewRangeChange={jest.fn().mockResolvedValue(true)}
       />
     );
 
@@ -388,6 +391,7 @@ describe("UltimatesDashboard — modo sem novas compras", () => {
         cycle={makeCycle({ counts_new_buyers: true })}
         role="gestor"
         onCountsNewBuyersChange={onToggle}
+        onViewRangeChange={jest.fn().mockResolvedValue(true)}
       />
     );
 
@@ -402,6 +406,7 @@ describe("UltimatesDashboard — modo sem novas compras", () => {
         cycle={makeCycle({ status: "encerrado" })}
         role="gestor"
         onCountsNewBuyersChange={onToggle}
+        onViewRangeChange={jest.fn().mockResolvedValue(true)}
       />
     );
 
@@ -455,7 +460,7 @@ describe("UltimatesDashboard — paginação do roster no modo desligado", () =>
       <UltimatesDashboard
         cycle={makeCycle({ counts_new_buyers: false })}
         role="gestor"
-        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)}
       />
     );
 
@@ -479,7 +484,7 @@ describe("UltimatesDashboard — paginação do roster no modo desligado", () =>
 describe("UltimatesDashboard — granularidade do card Evolução", () => {
   it("busca a série horária junto com roster e daily", async () => {
     mockRosterAndDailyFetch();
-    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     await screen.findByTestId("ultimates-cumulative-chart");
 
@@ -489,7 +494,7 @@ describe("UltimatesDashboard — granularidade do card Evolução", () => {
 
   it("abre em dia e alterna o card para hora", async () => {
     mockRosterAndDailyFetch();
-    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     const card = await screen.findByTestId("ultimates-cumulative-chart");
     expect(card).toHaveAttribute("data-granularity", "dia");
@@ -502,7 +507,7 @@ describe("UltimatesDashboard — granularidade do card Evolução", () => {
 
   it("a descrição da seção 02 segue a granularidade", async () => {
     mockRosterAndDailyFetch();
-    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     await screen.findByTestId("ultimates-cumulative-chart");
     expect(screen.getByText("Renovações e novos compradores, dia a dia")).toBeInTheDocument();
@@ -522,7 +527,7 @@ describe("UltimatesDashboard — granularidade do card Evolução", () => {
       <UltimatesDashboard
         cycle={makeCycle({ counts_new_buyers: false })}
         role="gestor"
-        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)}
       />
     );
 
@@ -541,7 +546,7 @@ describe("UltimatesDashboard — granularidade do card Evolução", () => {
   it("a granularidade escolhida sobrevive à troca de ciclo", async () => {
     mockRosterAndDailyFetch();
     const { rerender } = render(
-      <UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />
+      <UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />
     );
 
     await screen.findByTestId("ultimates-cumulative-chart");
@@ -552,7 +557,7 @@ describe("UltimatesDashboard — granularidade do card Evolução", () => {
       <UltimatesDashboard
         cycle={makeCycle({ id: "c2", name: "Ciclo Agosto" })}
         role="gestor"
-        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)}
       />
     );
 
@@ -575,7 +580,7 @@ describe("UltimatesDashboard — granularidade do card Evolução", () => {
       return Promise.resolve({ ok: true, json: async () => ({ days: DAILY }) });
     }) as unknown as typeof global.fetch;
 
-    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     const card = await screen.findByTestId("ultimates-cumulative-chart");
     expect(screen.queryByTestId("ultimates-dashboard-error")).toBeNull();
@@ -601,7 +606,7 @@ describe("UltimatesDashboard — granularidade do card Evolução", () => {
       return Promise.resolve({ ok: true, json: async () => ({ days: DAILY }) });
     }) as unknown as typeof global.fetch;
 
-    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     expect(await screen.findByTestId("ultimates-cumulative-chart")).toBeInTheDocument();
     expect(screen.queryByTestId("ultimates-dashboard-error")).toBeNull();
@@ -621,7 +626,7 @@ describe("UltimatesDashboard — granularidade do card Evolução", () => {
       return Promise.resolve({ ok: true, json: async () => ({ rows: ROSTER }) });
     }) as unknown as typeof global.fetch;
 
-    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     expect(await screen.findByText("Tentar novamente")).toBeInTheDocument();
     expect(screen.queryByTestId("ultimates-cumulative-chart")).toBeNull();
@@ -666,7 +671,7 @@ function mockEditRosterFetch(excluidos: unknown[] = []) {
 describe("UltimatesDashboard — edição do roster (PRD editar_roster)", () => {
   it("gestor em ciclo ativo vê as três ações na linha da base", async () => {
     mockEditRosterFetch();
-    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     await screen.findByTestId("ultimates-kpi-row");
 
@@ -678,7 +683,7 @@ describe("UltimatesDashboard — edição do roster (PRD editar_roster)", () => 
 
   it("ciclo encerrado mantém só 'Excluir' na linha da base", async () => {
     mockEditRosterFetch();
-    render(<UltimatesDashboard cycle={makeCycle({ status: "encerrado" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle({ status: "encerrado" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     await screen.findByTestId("ultimates-kpi-row");
 
@@ -690,7 +695,7 @@ describe("UltimatesDashboard — edição do roster (PRD editar_roster)", () => 
 
   it("analista não vê nenhuma ação de edição", async () => {
     mockEditRosterFetch();
-    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="analista" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="analista" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     await screen.findByTestId("ultimates-kpi-row");
 
@@ -700,7 +705,7 @@ describe("UltimatesDashboard — edição do roster (PRD editar_roster)", () => 
 
   it("abre o modal de exclusão a partir da linha", async () => {
     mockEditRosterFetch();
-    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     await screen.findByTestId("ultimates-kpi-row");
     fireEvent.click(screen.getByTestId("ultimates-exclude-buyer-n1@example.com"));
@@ -710,7 +715,7 @@ describe("UltimatesDashboard — edição do roster (PRD editar_roster)", () => 
 
   it("abre o vínculo invertido com as compras não atribuídas do ciclo", async () => {
     mockEditRosterFetch();
-    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     await screen.findByTestId("ultimates-kpi-row");
     fireEvent.click(screen.getByTestId("ultimates-mark-renewed-n1@example.com"));
@@ -721,7 +726,7 @@ describe("UltimatesDashboard — edição do roster (PRD editar_roster)", () => 
 
   it("abre o modal de edição de cadastro a partir da linha", async () => {
     mockEditRosterFetch();
-    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     await screen.findByTestId("ultimates-kpi-row");
     fireEvent.click(screen.getByTestId("ultimates-edit-buyer-n1@example.com"));
@@ -733,7 +738,7 @@ describe("UltimatesDashboard — edição do roster (PRD editar_roster)", () => 
 describe("UltimatesDashboard — sinalização de leads excluídos", () => {
   it("exibe o contador no botão e no tile Base", async () => {
     mockEditRosterFetch(EXCLUIDOS);
-    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     await screen.findByTestId("ultimates-kpi-row");
 
@@ -745,7 +750,7 @@ describe("UltimatesDashboard — sinalização de leads excluídos", () => {
 
   it("sem exclusões, o botão aparece sem contador", async () => {
     mockEditRosterFetch();
-    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle({ status: "ativo" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     await screen.findByTestId("ultimates-kpi-row");
 
@@ -755,7 +760,7 @@ describe("UltimatesDashboard — sinalização de leads excluídos", () => {
 
   it("o botão abre o modal de gestão mesmo em ciclo encerrado", async () => {
     mockEditRosterFetch(EXCLUIDOS);
-    render(<UltimatesDashboard cycle={makeCycle({ status: "encerrado" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} />);
+    render(<UltimatesDashboard cycle={makeCycle({ status: "encerrado" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     await screen.findByTestId("ultimates-kpi-row");
     fireEvent.click(screen.getByTestId("ultimates-excluded-buyers-btn"));
@@ -798,24 +803,14 @@ describe("UltimatesDashboard — filtro de datas", () => {
     }) as unknown as typeof global.fetch;
   }
 
-  async function aplicarIntervalo() {
-    fireEvent.change(await screen.findByTestId("ultimates-date-start"), {
-      target: { value: "2026-07-01" },
-    });
-    fireEvent.change(screen.getByTestId("ultimates-date-end"), {
-      target: { value: "2026-07-02" },
-    });
-    fireEvent.click(screen.getByTestId("ultimates-date-apply"));
-  }
+  // Ciclo COM janela salva (migration 063). O período não é mais escolhido na
+  // tela: ele chega pronto na prop, e o dashboard só o aplica.
+  const COM_JANELA = { view_start_date: "2026-07-01", view_end_date: "2026-07-02" };
 
-  beforeEach(() => {
-    localStorage.clear();
-  });
-
-  it("sem intervalo, não busca o roster recortado", async () => {
+  it("ciclo sem janela não busca o roster recortado", async () => {
     mockComJanela();
     render(
-      <UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn()} />
+      <UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn()} onViewRangeChange={jest.fn().mockResolvedValue(true)} />
     );
 
     await screen.findByTestId("ultimates-kpi-row");
@@ -824,88 +819,131 @@ describe("UltimatesDashboard — filtro de datas", () => {
     expect(screen.queryByTestId("ultimates-date-note")).not.toBeInTheDocument();
   });
 
-  it("aplicado, mistura estoque do ciclo com movimento da janela e avisa", async () => {
+  it("ciclo com janela recorta na PRIMEIRA carga, sem ninguém clicar", async () => {
     mockComJanela();
     render(
-      <UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn()} />
+      <UltimatesDashboard cycle={makeCycle(COM_JANELA)} role="gestor" onCountsNewBuyersChange={jest.fn()} onViewRangeChange={jest.fn().mockResolvedValue(true)} />
     );
-    await screen.findByTestId("ultimates-kpi-row");
-    await aplicarIntervalo();
 
     // Base = 3 (roster do ciclo, inalterado). Renovados = 1 e novos = 1 (janela).
     expect(await screen.findByTestId("ultimates-date-note")).toBeInTheDocument();
     expect(screen.getByTestId("ultimates-kpi-base")).toHaveTextContent("3");
     expect(screen.getByTestId("ultimates-kpi-renovados")).toHaveTextContent("1");
     expect(screen.getByTestId("ultimates-kpi-novos-compradores")).toHaveTextContent("1");
+
+    const urls = (global.fetch as jest.Mock).mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.includes("start=2026-07-01&end=2026-07-02"))).toBe(true);
   });
 
-  it("aplicado, a tabela mostra só quem movimentou — sem os não renovados", async () => {
+  it("com janela, a tabela mostra só quem movimentou — sem os não renovados", async () => {
     mockComJanela();
     render(
-      <UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn()} />
+      <UltimatesDashboard cycle={makeCycle(COM_JANELA)} role="gestor" onCountsNewBuyersChange={jest.fn()} onViewRangeChange={jest.fn().mockResolvedValue(true)} />
     );
-    await screen.findByTestId("ultimates-kpi-row");
-    await aplicarIntervalo();
 
     expect(await screen.findByText("Novo")).toBeInTheDocument();
     expect(screen.getByText("Renovou 1")).toBeInTheDocument();
     expect(screen.queryByText("Não Renovou")).not.toBeInTheDocument();
   });
 
-  it("grava o intervalo no localStorage e o restaura na montagem", async () => {
+  it("gestor salvando manda o intervalo para o pai, não para o navegador", async () => {
     mockComJanela();
-    const { unmount } = render(
-      <UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn()} />
+    const onViewRangeChange = jest.fn().mockResolvedValue(true);
+    render(
+      <UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn()} onViewRangeChange={onViewRangeChange} />
     );
-    await screen.findByTestId("ultimates-kpi-row");
-    await aplicarIntervalo();
-    await screen.findByTestId("ultimates-date-note");
 
-    expect(JSON.parse(localStorage.getItem("ultimates-date-range") as string)).toEqual({
+    fireEvent.change(await screen.findByTestId("ultimates-date-start"), {
+      target: { value: "2026-07-01" },
+    });
+    fireEvent.change(screen.getByTestId("ultimates-date-end"), {
+      target: { value: "2026-07-02" },
+    });
+    fireEvent.click(screen.getByTestId("ultimates-date-apply"));
+
+    expect(onViewRangeChange).toHaveBeenCalledWith("c1", {
       start: "2026-07-01",
       end: "2026-07-02",
     });
-
-    unmount();
-    render(
-      <UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn()} />
-    );
-
-    expect(await screen.findByTestId("ultimates-date-note")).toBeInTheDocument();
-    expect((screen.getByTestId("ultimates-date-start") as HTMLInputElement).value).toBe(
-      "2026-07-01"
-    );
+    // A janela só muda quando a prop muda: o dashboard NÃO aplica localmente o
+    // que ainda não foi confirmado pelo banco.
+    expect(screen.queryByTestId("ultimates-date-note")).not.toBeInTheDocument();
   });
 
-  it("limpar volta ao ciclo inteiro e apaga a chave", async () => {
+  it("gestor limpando manda null para o pai", async () => {
+    mockComJanela();
+    const onViewRangeChange = jest.fn().mockResolvedValue(true);
+    render(
+      <UltimatesDashboard cycle={makeCycle(COM_JANELA)} role="gestor" onCountsNewBuyersChange={jest.fn()} onViewRangeChange={onViewRangeChange} />
+    );
+
+    fireEvent.click(await screen.findByTestId("ultimates-date-clear"));
+    expect(onViewRangeChange).toHaveBeenCalledWith("c1", null);
+  });
+
+  it("analista vê a janela do ciclo, sem poder mexer", async () => {
     mockComJanela();
     render(
-      <UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn()} />
+      <UltimatesDashboard cycle={makeCycle(COM_JANELA)} role="analista" onCountsNewBuyersChange={jest.fn()} onViewRangeChange={jest.fn().mockResolvedValue(true)} />
     );
-    await screen.findByTestId("ultimates-kpi-row");
-    await aplicarIntervalo();
-    await screen.findByTestId("ultimates-date-note");
 
-    fireEvent.click(screen.getByTestId("ultimates-date-clear"));
-
-    expect(await screen.findByText("Não Renovou")).toBeInTheDocument();
-    expect(screen.queryByTestId("ultimates-date-note")).not.toBeInTheDocument();
-    expect(localStorage.getItem("ultimates-date-range")).toBeNull();
+    expect(await screen.findByTestId("ultimates-date-readonly")).toHaveTextContent(
+      "01/07/2026 – 02/07/2026"
+    );
+    expect(screen.queryByTestId("ultimates-date-start")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-date-apply")).not.toBeInTheDocument();
+    // E o recorte vale para ele igualzinho.
+    expect(screen.getByTestId("ultimates-kpi-renovados")).toHaveTextContent("1");
   });
 
-  it("501 no recorte degrada sozinho: dash inteiro do ciclo + aviso", async () => {
+  it("analista em ciclo sem janela não vê barra nenhuma", async () => {
+    mockComJanela();
+    render(
+      <UltimatesDashboard cycle={makeCycle()} role="analista" onCountsNewBuyersChange={jest.fn()} onViewRangeChange={jest.fn().mockResolvedValue(true)} />
+    );
+
+    await screen.findByTestId("ultimates-kpi-row");
+    expect(screen.queryByTestId("ultimates-date-filter")).not.toBeInTheDocument();
+  });
+
+  it("a janela acompanha a troca de ciclo, em vez de vazar para o próximo", async () => {
+    mockComJanela();
+    const { rerender } = render(
+      <UltimatesDashboard cycle={makeCycle(COM_JANELA)} role="gestor" onCountsNewBuyersChange={jest.fn()} onViewRangeChange={jest.fn().mockResolvedValue(true)} />
+    );
+    await screen.findByTestId("ultimates-date-note");
+
+    rerender(
+      <UltimatesDashboard cycle={makeCycle({ id: "c2", name: "Ciclo Agosto" })} role="gestor" onCountsNewBuyersChange={jest.fn()} onViewRangeChange={jest.fn().mockResolvedValue(true)} />
+    );
+
+    // Ciclo novo não tem janela: volta a base inteira, sem nota e sem os campos
+    // preenchidos com as datas do ciclo anterior.
+    expect(await screen.findByText("Não Renovou")).toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-date-note")).not.toBeInTheDocument();
+    expect((screen.getByTestId("ultimates-date-start") as HTMLInputElement).value).toBe("");
+  });
+
+  it("recorte que falha degrada sozinho: dash inteiro do ciclo + aviso", async () => {
     mockComJanela(false);
     render(
-      <UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn()} />
+      <UltimatesDashboard cycle={makeCycle(COM_JANELA)} role="gestor" onCountsNewBuyersChange={jest.fn()} onViewRangeChange={jest.fn().mockResolvedValue(true)} />
     );
-    await screen.findByTestId("ultimates-kpi-row");
-    await aplicarIntervalo();
 
     expect(await screen.findByTestId("ultimates-date-unavailable")).toBeInTheDocument();
     // Nada zerado nem em branco: todos os tiles caem de volta para o ciclo.
     expect(screen.getByTestId("ultimates-kpi-renovados")).toHaveTextContent("2");
     expect(screen.queryByTestId("ultimates-date-note")).not.toBeInTheDocument();
     expect(screen.queryByTestId("ultimates-dashboard-error")).not.toBeInTheDocument();
+  });
+
+  it("o aviso de recorte falho chega até quem não edita", async () => {
+    mockComJanela(false);
+    render(
+      <UltimatesDashboard cycle={makeCycle(COM_JANELA)} role="analista" onCountsNewBuyersChange={jest.fn()} onViewRangeChange={jest.fn().mockResolvedValue(true)} />
+    );
+
+    expect(await screen.findByTestId("ultimates-date-unavailable")).toBeInTheDocument();
   });
 });
 
@@ -916,7 +954,7 @@ describe("UltimatesDashboard — modo Apenas Compras (#154)", () => {
       <UltimatesDashboard
         cycle={makeCycle({ purchases_only: true, ...overrides })}
         role="gestor"
-        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)}
       />
     );
   }

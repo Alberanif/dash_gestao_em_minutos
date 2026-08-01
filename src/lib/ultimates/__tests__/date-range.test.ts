@@ -1,17 +1,4 @@
-/** @jest-environment jsdom */
-import {
-  parseDateRange,
-  readStoredRange,
-  writeStoredRange,
-  clearStoredRange,
-  keyInRange,
-} from "../date-range";
-
-const KEY = "ultimates-date-range";
-
-beforeEach(() => {
-  localStorage.clear();
-});
+import { parseDateRange, viewRangeFrom, keyInRange } from "../date-range";
 
 describe("parseDateRange", () => {
   it("aceita duas datas ISO com fim >= início", () => {
@@ -40,46 +27,31 @@ describe("parseDateRange", () => {
   });
 });
 
-describe("localStorage", () => {
-  it("faz round-trip do intervalo gravado", () => {
-    writeStoredRange({ start: "2026-07-10", end: "2026-07-20" });
-    expect(JSON.parse(localStorage.getItem(KEY) as string)).toEqual({
+describe("viewRangeFrom", () => {
+  it("lê a janela salva no ciclo", () => {
+    expect(viewRangeFrom("2026-07-10", "2026-07-20")).toEqual({
       start: "2026-07-10",
       end: "2026-07-20",
     });
-    expect(readStoredRange()).toEqual({ start: "2026-07-10", end: "2026-07-20" });
   });
 
-  it("devolve null quando não há nada gravado", () => {
-    expect(readStoredRange()).toBeNull();
+  it("ciclo sem janela: null nas duas pontas", () => {
+    expect(viewRangeFrom(null, null)).toBeNull();
   });
 
-  it("ignora E APAGA payload corrompido, meia ponta ou invertido", () => {
-    localStorage.setItem(KEY, "{isso não é json");
-    expect(readStoredRange()).toBeNull();
-    expect(localStorage.getItem(KEY)).toBeNull();
-
-    localStorage.setItem(KEY, JSON.stringify({ start: "2026-07-10" }));
-    expect(readStoredRange()).toBeNull();
-    expect(localStorage.getItem(KEY)).toBeNull();
-
-    localStorage.setItem(KEY, JSON.stringify({ start: "2026-07-20", end: "2026-07-10" }));
-    expect(readStoredRange()).toBeNull();
-    expect(localStorage.getItem(KEY)).toBeNull();
+  it("migration 063 ainda não aplicada: as colunas nem vêm na resposta", () => {
+    expect(viewRangeFrom(undefined, undefined)).toBeNull();
   });
 
-  it("clearStoredRange remove a chave", () => {
-    writeStoredRange({ start: "2026-07-10", end: "2026-07-20" });
-    clearStoredRange();
-    expect(localStorage.getItem(KEY)).toBeNull();
+  it("meia janela degrada para ciclo inteiro, nunca para meio recorte", () => {
+    expect(viewRangeFrom("2026-07-10", null)).toBeNull();
+    expect(viewRangeFrom(null, "2026-07-20")).toBeNull();
   });
 
-  it("não lança quando o localStorage é inacessível", () => {
-    const spy = jest.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      throw new Error("QuotaExceeded");
-    });
-    expect(() => writeStoredRange({ start: "2026-07-10", end: "2026-07-20" })).not.toThrow();
-    spy.mockRestore();
+  it("recusa lixo vindo do banco em vez de confiar", () => {
+    expect(viewRangeFrom("2026-07-20", "2026-07-10")).toBeNull();
+    expect(viewRangeFrom(20260710, 20260720)).toBeNull();
+    expect(viewRangeFrom("2026-07-10T00:00:00Z", "2026-07-20T00:00:00Z")).toBeNull();
   });
 });
 

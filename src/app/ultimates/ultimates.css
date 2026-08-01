@@ -198,6 +198,14 @@
   color: var(--text-3);
 }
 
+/* Variante de leitura da barra (quem não é gestor). Peso e cor de rótulo forte
+   porque aqui o intervalo é a informação, não a legenda de um controle. */
+.ult-date-readonly {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
 @media (max-width: 640px) {
   .ult-date-filter {
     align-items: stretch;

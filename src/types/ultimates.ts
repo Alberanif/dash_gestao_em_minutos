@@ -29,6 +29,21 @@ export interface UltimatesCycleRecord {
   // ciclo. A ramificação de nomenclatura/KPIs roda no cliente
   // (src/lib/ultimates/purchases-mode.ts).
   purchases_only: boolean;
+  // Janela de visualização do ciclo (migration 063): "YYYY-MM-DD" ou null.
+  // Definida por gestor e aplicada a TODOS que abrem o ciclo — é propriedade do
+  // ciclo, não preferência de quem olha. Null nas duas = produto inteiro, o
+  // comportamento de antes da 063. O CHECK do banco garante que ou as duas são
+  // nulas ou nenhuma é, então quem lê nunca precisa tratar meia janela — mas
+  // viewRangeFrom trata mesmo assim, porque um UPDATE manual no painel pode
+  // preceder a constraint.
+  //
+  // OPCIONAIS de propósito, pela mesma razão de `from_manual_link` no roster: a
+  // fila de migrations deste ambiente anda dias atrás do código, e o GET dos
+  // ciclos faz `select *`. Sem a 063 aplicada as chaves simplesmente não vêm, e
+  // `undefined` = "esse banco não tem janela" — que cai no mesmo lugar de "este
+  // ciclo não tem janela". Tipar como obrigatório mentiria sobre a resposta.
+  view_start_date?: string | null;
+  view_end_date?: string | null;
   refresh_started_at: string | null;
   last_refresh_at: string | null;
   created_by: string | null;
