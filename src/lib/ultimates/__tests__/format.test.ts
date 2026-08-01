@@ -1,4 +1,13 @@
-import { fmtBRL, fmtPercent1, fmtDateFull, fmtDateShort, fmtHourShort, fmtHourLong, categoryLabel } from "../format";
+import {
+  fmtBRL,
+  fmtPercent1,
+  fmtDateFull,
+  fmtDateShort,
+  fmtHourShort,
+  fmtHourLong,
+  categoryLabel,
+  formatCycleProducts,
+} from "../format";
 
 // Intl.NumberFormat("pt-BR", { style: "currency" }) usa NBSP (U+00A0) entre
 // "R$" e o valor, nao espaco comum -- normaliza antes de comparar para nao
@@ -94,5 +103,47 @@ describe("fmtHourLong", () => {
 
   it("preserva o zero a esquerda da meia-noite", () => {
     expect(fmtHourLong("2026-07-30T00")).toBe("30/07 às 00h");
+  });
+});
+
+describe("formatCycleProducts", () => {
+  it("junta até 3 nomes com separador", () => {
+    expect(
+      formatCycleProducts([
+        { product_id: "1", product_name: "Anual" },
+        { product_id: "2", product_name: "Mensal" },
+      ])
+    ).toBe("Anual · Mensal");
+  });
+
+  // Fronteira exata entre juntar nomes e resumir em contagem. Sem este caso,
+  // trocar `> 3` por `>= 3` no formatador passaria despercebido.
+  it("com exatamente 3 produtos ainda junta os nomes", () => {
+    expect(
+      formatCycleProducts([
+        { product_id: "1", product_name: "Anual" },
+        { product_id: "2", product_name: "Mensal" },
+        { product_id: "3", product_name: "Trimestral" },
+      ])
+    ).toBe("Anual · Mensal · Trimestral");
+  });
+
+  it("resume a partir de 4 produtos", () => {
+    expect(
+      formatCycleProducts([
+        { product_id: "1", product_name: "A" },
+        { product_id: "2", product_name: "B" },
+        { product_id: "3", product_name: "C" },
+        { product_id: "4", product_name: "D" },
+      ])
+    ).toBe("4 produtos");
+  });
+
+  it("cai no product_id quando o nome não foi sincronizado", () => {
+    expect(formatCycleProducts([{ product_id: "1234567", product_name: null }])).toBe("1234567");
+  });
+
+  it("conjunto vazio mantém o texto de ausência do módulo", () => {
+    expect(formatCycleProducts([])).toBe("Produto não identificado");
   });
 });

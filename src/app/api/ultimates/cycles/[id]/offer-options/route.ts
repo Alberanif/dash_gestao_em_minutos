@@ -53,6 +53,8 @@ export async function GET(
   const offers: UltimatesOfferOption[] = ((data as RawOfferOption[]) ?? []).map((row) => ({
     offer_code: row.offer_code,
     offer_name: row.offer_name,
+    product_id: row.product_id,
+    product_name: row.product_name,
     sales_count: Number(row.sales_count ?? 0),
     is_excluded: row.is_excluded,
   }));

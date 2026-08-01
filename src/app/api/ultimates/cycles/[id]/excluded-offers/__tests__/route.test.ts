@@ -18,6 +18,7 @@ jest.mock("@/lib/supabase/server", () => ({
 // Terminais de cada tabela — cada teste decide o que o banco devolve sem
 // precisar montar a cadeia de builders do client Supabase.
 const cycleSingle = jest.fn();
+const cycleProductsEq = jest.fn();
 const excludedOrder = jest.fn();
 const offerNamesIn = jest.fn();
 const offerSingle = jest.fn();
@@ -45,9 +46,10 @@ beforeEach(() => {
   mockListAllUsers.mockResolvedValue({ users: [], error: null });
 
   cycleSingle.mockResolvedValue({
-    data: { id: "c1", product_id: "PROD1", status: "ativo" },
+    data: { id: "c1", status: "ativo" },
     error: null,
   });
+  cycleProductsEq.mockResolvedValue({ data: [{ product_id: "PROD1" }], error: null });
   excludedOrder.mockResolvedValue({ data: [], error: null });
   offerNamesIn.mockResolvedValue({ data: [], error: null });
   offerSingle.mockResolvedValue({
@@ -73,6 +75,8 @@ beforeEach(() => {
         };
       case "dash_gestao_hotmart_offers":
         return { select: () => ({ in: offerNamesIn, eq: () => ({ single: offerSingle }) }) };
+      case "dash_gestao_ultimates_cycle_products":
+        return { select: () => ({ eq: cycleProductsEq }) };
       default:
         throw new Error(`tabela inesperada: ${table}`);
     }
@@ -239,7 +243,7 @@ describe("POST /api/ultimates/cycles/[id]/excluded-offers", () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toBe("Oferta não encontrada para o produto deste ciclo");
+    expect(body.error).toBe("Oferta não encontrada para os produtos deste ciclo");
   });
 
   it("returns 400 when the offer belongs to another product", async () => {
@@ -253,7 +257,37 @@ describe("POST /api/ultimates/cycles/[id]/excluded-offers", () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toBe("Oferta não encontrada para o produto deste ciclo");
+    expect(body.error).toBe("Oferta não encontrada para os produtos deste ciclo");
+  });
+
+  it("aceita oferta do segundo produto do ciclo", async () => {
+    cycleProductsEq.mockResolvedValueOnce({
+      data: [{ product_id: "PROD1" }, { product_id: "PROD2" }],
+      error: null,
+    });
+    offerSingle.mockResolvedValueOnce({
+      data: { offer_code: "OF2", offer_name: "Do segundo produto", product_id: "PROD2" },
+      error: null,
+    });
+    insertSingle.mockResolvedValueOnce({ data: { id: "e1" }, error: null });
+
+    const { POST } = await import("../route");
+    const res = await POST(makeRequest("POST", { offerCode: "OF2" }), params);
+
+    expect(res.status).toBe(201);
+  });
+
+  it("recusa oferta de produto fora do ciclo", async () => {
+    cycleProductsEq.mockResolvedValueOnce({ data: [{ product_id: "PROD1" }], error: null });
+    offerSingle.mockResolvedValueOnce({
+      data: { offer_code: "OUTRA", offer_name: "De outro produto", product_id: "PROD9" },
+      error: null,
+    });
+
+    const { POST } = await import("../route");
+    const res = await POST(makeRequest("POST", { offerCode: "OUTRA" }), params);
+
+    expect(res.status).toBe(400);
   });
 
   it("returns 409 when the offer is already excluded in this cycle", async () => {
@@ -298,7 +332,7 @@ describe("POST /api/ultimates/cycles/[id]/excluded-offers", () => {
 
   it("accepts the write on an encerrado cycle", async () => {
     cycleSingle.mockResolvedValueOnce({
-      data: { id: "c1", product_id: "PROD1", status: "encerrado" },
+      data: { id: "c1", status: "encerrado" },
       error: null,
     });
     insertSingle.mockResolvedValueOnce({ data: created, error: null });
@@ -367,7 +401,7 @@ describe("DELETE /api/ultimates/cycles/[id]/excluded-offers", () => {
 
   it("accepts the removal on an encerrado cycle", async () => {
     cycleSingle.mockResolvedValueOnce({
-      data: { id: "c1", product_id: "PROD1", status: "encerrado" },
+      data: { id: "c1", status: "encerrado" },
       error: null,
     });
 

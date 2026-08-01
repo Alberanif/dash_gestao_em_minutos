@@ -70,7 +70,7 @@ export async function GET(
 
   const { data: cycle, error: cycleError } = await supabase
     .from("dash_gestao_ultimates_cycles")
-    .select("id, product_id, status")
+    .select("id, status")
     .eq("id", id)
     .single();
 
@@ -146,7 +146,7 @@ export async function POST(
 
   const { data: cycle, error: cycleError } = await supabase
     .from("dash_gestao_ultimates_cycles")
-    .select("id, product_id, status")
+    .select("id, status")
     .eq("id", id)
     .single();
 
@@ -214,7 +214,7 @@ export async function DELETE(
 
   const { data: cycle, error: cycleError } = await supabase
     .from("dash_gestao_ultimates_cycles")
-    .select("id, product_id, status")
+    .select("id, status")
     .eq("id", id)
     .single();
 

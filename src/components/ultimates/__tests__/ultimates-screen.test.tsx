@@ -3,17 +3,16 @@ import React from "react";
 import { render, screen, within, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { UltimatesScreen } from "../ultimates-screen";
-import type { CycleWithProduct, HotmartProductOption } from "../types";
+import type { CycleWithProducts, HotmartProductOption } from "../types";
 
-const PRODUCTS: HotmartProductOption[] = [{ product_id: "p1", product_name: "Produto Um" }];
+const PRODUCTS: HotmartProductOption[] = [{ product_id: "p1", product_name: "Produto Um", account_id: "acc-1" }];
 
-function makeCycle(overrides: Partial<CycleWithProduct> = {}): CycleWithProduct {
+function makeCycle(overrides: Partial<CycleWithProducts> = {}): CycleWithProducts {
   return {
     id: "c1",
     name: "Ciclo 1",
     account_id: "acc-1",
-    product_id: "p1",
-    product_name: "Produto Um",
+    products: [{ product_id: "p1", product_name: "Produto Um" }],
     goal_percent: 50,
     status: "ativo",
     refresh_started_at: null,
@@ -27,7 +26,7 @@ function makeCycle(overrides: Partial<CycleWithProduct> = {}): CycleWithProduct 
   };
 }
 
-function mockCyclesFetch(cycles: CycleWithProduct[]) {
+function mockCyclesFetch(cycles: CycleWithProducts[]) {
   global.fetch = jest.fn().mockResolvedValue({
     ok: true,
     json: async () => ({ cycles }),
@@ -119,7 +118,7 @@ describe("UltimatesScreen — seletor de ciclo", () => {
 });
 
 describe("UltimatesScreen — exclusão de ciclo", () => {
-  function mockCyclesAndDelete(cycles: CycleWithProduct[], deleteOk = true) {
+  function mockCyclesAndDelete(cycles: CycleWithProducts[], deleteOk = true) {
     const fetchMock = jest.fn((url: string, init?: RequestInit) => {
       if (init?.method === "DELETE") {
         return Promise.resolve({ ok: deleteOk, status: deleteOk ? 200 : 500, json: async () => ({}) });

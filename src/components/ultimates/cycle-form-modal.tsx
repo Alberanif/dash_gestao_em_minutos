@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { UltimatesCycleStatus } from "@/types/ultimates";
-import type { CycleWithProduct, HotmartProductOption } from "./types";
+import type { CycleWithProducts, HotmartProductOption } from "./types";
 
 interface CycleFormModalProps {
   products: HotmartProductOption[];
-  editTarget?: CycleWithProduct | null;
-  onSave: (cycle: CycleWithProduct) => void;
+  editTarget?: CycleWithProducts | null;
+  onSave: (cycle: CycleWithProducts) => void;
   onCancel: () => void;
   onDelete?: (cycleId: string) => void;
 }
@@ -21,7 +21,7 @@ interface CycleFormModalProps {
 export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelete }: CycleFormModalProps) {
   const isEdit = !!editTarget;
   const [name, setName] = useState(editTarget?.name ?? "");
-  const [productId, setProductId] = useState(editTarget?.product_id ?? "");
+  const [productIds, setProductIds] = useState<string[]>([]);
   const [productSearch, setProductSearch] = useState("");
   const [goalPercentInput, setGoalPercentInput] = useState(
     editTarget?.goal_percent != null ? String(editTarget.goal_percent) : ""
@@ -57,9 +57,20 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
     );
   }, [products, productSearch]);
 
+  // Derivada, não guardada em estado: zerar a seleção destrava sozinho, sem
+  // um segundo setState que pudesse ficar dessincronizado da lista.
+  const lockedAccountId =
+    products.find((p) => p.product_id === productIds[0])?.account_id ?? null;
+
+  function toggleProduct(productId: string) {
+    setProductIds((prev) =>
+      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
+    );
+  }
+
   useEffect(() => {
     setConfirmEncerrar(false);
-  }, [name, productId, goalPercentInput, status]);
+  }, [name, productIds, goalPercentInput, status]);
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -82,8 +93,8 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
       setError("Nome é obrigatório.");
       return;
     }
-    if (!isEdit && !productId) {
-      setError("Selecione um produto.");
+    if (!isEdit && productIds.length === 0) {
+      setError("Selecione ao menos um produto.");
       return;
     }
     const goalPercent = parseGoalPercent();
@@ -106,7 +117,7 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
       const method = isEdit ? "PATCH" : "POST";
       const body = isEdit
         ? { name: name.trim(), goalPercent, status }
-        : { name: name.trim(), productId, goalPercent, purchasesOnly };
+        : { name: name.trim(), productIds, goalPercent, purchasesOnly };
 
       const res = await fetch(url, {
         method,
@@ -119,16 +130,20 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
         return;
       }
 
-      const savedRaw = data?.cycle as CycleWithProduct | undefined;
+      const savedRaw = data?.cycle as CycleWithProducts | undefined;
       if (!savedRaw) {
         setError("Erro ao salvar ciclo.");
         return;
       }
-      const productName =
-        products.find((p) => p.product_id === savedRaw.product_id)?.product_name ??
-        editTarget?.product_name ??
-        null;
-      onSave({ ...savedRaw, product_name: productName });
+      // A rota devolve só a linha do ciclo; os nomes dos produtos já estão
+      // aqui na prop, então montamos o formato da tela sem um GET extra.
+      const savedProducts = isEdit
+        ? editTarget!.products
+        : productIds.map((id) => ({
+            product_id: id,
+            product_name: products.find((p) => p.product_id === id)?.product_name ?? null,
+          }));
+      onSave({ ...savedRaw, products: savedProducts });
     } catch {
       setError("Falha de rede ao salvar o ciclo.");
     } finally {
@@ -217,7 +232,7 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
         {!isEdit && (
           <div>
             <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
-              Produto Hotmart
+              Produtos Hotmart (1 ou mais)
             </label>
             {products.length === 0 ? (
               <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: 0 }}>
@@ -249,40 +264,62 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
                       Nenhum produto encontrado.
                     </li>
                   )}
-                  {filteredProducts.map((p) => (
-                    <li key={p.product_id}>
-                      <button
-                        type="button"
-                        aria-pressed={productId === p.product_id}
-                        className={productId === p.product_id ? "btn-primary" : "btn-secondary"}
-                        data-testid={`cycle-form-product-option-${p.product_id}`}
-                        onClick={() => setProductId(p.product_id)}
-                        style={{
-                          width: "100%",
-                          textAlign: "left",
-                          fontSize: 13,
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          gap: 8,
-                        }}
-                      >
-                        <span>{p.product_name}</span>
-                        <span style={{ opacity: 0.7 }}>{p.product_id}</span>
-                      </button>
-                    </li>
-                  ))}
+                  {filteredProducts.map((p) => {
+                    const selected = productIds.includes(p.product_id);
+                    const blocked = lockedAccountId !== null && p.account_id !== lockedAccountId;
+                    return (
+                      <li key={p.product_id}>
+                        <button
+                          type="button"
+                          aria-pressed={selected}
+                          disabled={blocked}
+                          title={
+                            blocked
+                              ? "Produto de outra conta Hotmart. Um ciclo acompanha produtos de uma conta só."
+                              : undefined
+                          }
+                          className={selected ? "btn-primary" : "btn-secondary"}
+                          data-testid={`cycle-form-product-option-${p.product_id}`}
+                          onClick={() => toggleProduct(p.product_id)}
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            fontSize: 13,
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            gap: 8,
+                            opacity: blocked ? 0.45 : 1,
+                            cursor: blocked ? "not-allowed" : "pointer",
+                          }}
+                        >
+                          <span>{p.product_name}</span>
+                          <span style={{ opacity: 0.7 }}>{p.product_id}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
-                {productId && (
+                {productIds.length > 0 && (
                   <p
                     data-testid="cycle-form-product-selected"
                     style={{ fontSize: 12, color: "var(--color-text)", margin: "6px 0 0" }}
                   >
-                    Selecionado:{" "}
+                    Selecionados:{" "}
                     <strong>
-                      {products.find((p) => p.product_id === productId)?.product_name ?? productId}
+                      {productIds
+                        .map((id) => products.find((p) => p.product_id === id)?.product_name ?? id)
+                        .join(", ")}
                     </strong>{" "}
-                    ({productId})
+                    ({productIds.length})
+                  </p>
+                )}
+                {lockedAccountId !== null && (
+                  <p
+                    data-testid="cycle-form-account-lock"
+                    style={{ fontSize: 11, color: "var(--color-warning)", margin: "4px 0 0" }}
+                  >
+                    Conta travada pelo 1º produto selecionado — um ciclo acompanha produtos de uma conta só.
                   </p>
                 )}
               </>
