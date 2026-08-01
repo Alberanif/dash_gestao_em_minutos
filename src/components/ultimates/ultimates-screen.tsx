@@ -68,6 +68,20 @@ export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
     setEditTarget(null);
   }
 
+  // Após excluir, a seleção é recalculada pela MESMA regra da carga inicial
+  // (selectInitialCycleId), para que "excluí um ciclo" e "recarreguei a página"
+  // terminem no mesmo lugar. Sem isso, selectedId ficaria apontando para um id
+  // morto. A lista já vem ordenada por created_at desc do GET e as operações
+  // acima preservam essa ordem — contrato de que selectInitialCycleId depende.
+  function handleDeleted(cycleId: string) {
+    const next = (cycles ?? []).filter((c) => c.id !== cycleId);
+    setCycles(next);
+    setSelectedId((current) =>
+      current && next.some((c) => c.id === current) ? current : selectInitialCycleId(next)
+    );
+    setEditTarget(null);
+  }
+
   // Aplicação OTIMISTA: a reclassificação é client-side e leva microssegundos,
   // então esperar a rede seria inventar latência. Devolve se deu certo — o
   // toggle usa isso para decidir se mostra o feedback de erro.
@@ -138,7 +152,13 @@ export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
         <CycleFormModal products={products} onSave={handleCreated} onCancel={() => setCreateOpen(false)} />
       )}
       {editTarget && isGestor && (
-        <CycleFormModal products={products} editTarget={editTarget} onSave={handleEdited} onCancel={() => setEditTarget(null)} />
+        <CycleFormModal
+          products={products}
+          editTarget={editTarget}
+          onSave={handleEdited}
+          onCancel={() => setEditTarget(null)}
+          onDelete={handleDeleted}
+        />
       )}
 
       {cycles === null && !loadError && (

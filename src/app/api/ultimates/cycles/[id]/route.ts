@@ -104,3 +104,43 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   return NextResponse.json({ cycle: data });
 }
+
+// Exclusão DEFINITIVA do ciclo. Não há soft delete: o estado "encerrado" já
+// cobre o caso reversível (congela a operação, preserva os dados), então quem
+// chega aqui quer o ciclo fora do banco.
+//
+// Um único DELETE basta — as tabelas filhas (buyers, manual_links,
+// excluded_offers, excluded_buyers) têm `on delete cascade` no cycle_id
+// (migrations 049/052/055), então nada fica órfão e nenhuma limpeza manual
+// (nem transação) é necessária aqui.
+//
+// NÃO checamos refresh_started_at de propósito: esse lock tem TTL e já nasceu
+// órfão uma vez (fetch Hotmart pendurado antes do finally). Amarrar a exclusão
+// a ele tornaria o ciclo temporariamente inexcluível sem explicação visível. Um
+// refresh em voo que tente gravar depois do DELETE simplesmente esbarra na FK e
+// falha — sem resíduo, porque o cascade já levou tudo.
+export async function DELETE(_request: NextRequest, { params }: { params: Promise<Params> }) {
+  const { error } = await requireRole(["gestor"]);
+  if (error) return error;
+
+  const { id } = await params;
+
+  const supabase = createSupabaseServiceClient();
+  // .select() após o delete é o que permite distinguir "apagou" de "não
+  // existia" — sem ele o PostgREST devolve sucesso vazio nos dois casos.
+  const { data, error: dbError } = await supabase
+    .from("dash_gestao_ultimates_cycles")
+    .delete()
+    .eq("id", id)
+    .select("id");
+
+  if (dbError) {
+    return NextResponse.json({ error: dbError.message }, { status: 500 });
+  }
+
+  if (!data || data.length === 0) {
+    return NextResponse.json({ error: "Ciclo não encontrado" }, { status: 404 });
+  }
+
+  return NextResponse.json({ deleted: id });
+}

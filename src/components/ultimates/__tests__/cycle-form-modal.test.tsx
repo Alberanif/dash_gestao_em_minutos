@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { CycleFormModal } from "../cycle-form-modal";
 import type { HotmartProductOption, CycleWithProduct } from "../types";
@@ -176,5 +176,199 @@ describe("CycleFormModal — estados vazios", () => {
     renderCreate();
     fireEvent.change(screen.getByTestId("cycle-form-product-search"), { target: { value: "zzz" } });
     expect(screen.getByText("Nenhum produto encontrado.")).toBeInTheDocument();
+  });
+});
+
+// Exclusão definitiva: zona de perigo recolhida + confirmação por digitação do
+// nome. O ponto de todos estes testes é que nenhum caminho de clique repetido
+// chegue ao DELETE — só a digitação exata do nome persistido destrava.
+describe("CycleFormModal — excluir ciclo", () => {
+  function renderEditWithDelete(
+    cycle: CycleWithProduct = makeCycle(),
+    onDelete: jest.Mock = jest.fn()
+  ) {
+    render(
+      <CycleFormModal
+        products={PRODUCTS}
+        editTarget={cycle}
+        onSave={jest.fn()}
+        onCancel={jest.fn()}
+        onDelete={onDelete}
+      />
+    );
+    return onDelete;
+  }
+
+  function mockFetch(response: { ok: boolean; status: number; body?: object }) {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: response.ok,
+      status: response.status,
+      json: async () => response.body ?? {},
+    });
+    global.fetch = fetchMock as unknown as typeof global.fetch;
+    return fetchMock;
+  }
+
+  it("modo criação não oferece exclusão", () => {
+    renderCreate();
+    expect(screen.queryByTestId("cycle-form-delete-open")).not.toBeInTheDocument();
+  });
+
+  it("sem onDelete, o modo edição não oferece exclusão", () => {
+    renderEdit(makeCycle());
+    expect(screen.queryByTestId("cycle-form-delete-open")).not.toBeInTheDocument();
+  });
+
+  it("zona de perigo vem recolhida: sem campo nem botão de excluir visíveis", () => {
+    renderEditWithDelete();
+    expect(screen.getByTestId("cycle-form-delete-open")).toBeInTheDocument();
+    expect(screen.queryByTestId("cycle-form-delete-confirm-input")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("cycle-form-delete-confirm")).not.toBeInTheDocument();
+  });
+
+  it("abrir a zona de perigo revela aviso, campo e botão desabilitado", () => {
+    renderEditWithDelete();
+    fireEvent.click(screen.getByTestId("cycle-form-delete-open"));
+
+    expect(screen.getByTestId("cycle-form-delete-warning")).toBeInTheDocument();
+    expect(screen.getByTestId("cycle-form-delete-confirm-input")).toBeInTheDocument();
+    expect(screen.getByTestId("cycle-form-delete-confirm")).toBeDisabled();
+  });
+
+  it("nome errado mantém o botão desabilitado e não chama a API", () => {
+    const fetchMock = mockFetch({ ok: true, status: 200 });
+    renderEditWithDelete();
+    fireEvent.click(screen.getByTestId("cycle-form-delete-open"));
+    fireEvent.change(screen.getByTestId("cycle-form-delete-confirm-input"), {
+      target: { value: "Ciclo Junho" },
+    });
+
+    const confirm = screen.getByTestId("cycle-form-delete-confirm");
+    expect(confirm).toBeDisabled();
+    fireEvent.click(confirm);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("nome parcial não destrava (exige igualdade exata, não prefixo)", () => {
+    renderEditWithDelete();
+    fireEvent.click(screen.getByTestId("cycle-form-delete-open"));
+    fireEvent.change(screen.getByTestId("cycle-form-delete-confirm-input"), {
+      target: { value: "Ciclo" },
+    });
+    expect(screen.getByTestId("cycle-form-delete-confirm")).toBeDisabled();
+  });
+
+  it("nome com caixa diferente não destrava", () => {
+    renderEditWithDelete();
+    fireEvent.click(screen.getByTestId("cycle-form-delete-open"));
+    fireEvent.change(screen.getByTestId("cycle-form-delete-confirm-input"), {
+      target: { value: "ciclo julho" },
+    });
+    expect(screen.getByTestId("cycle-form-delete-confirm")).toBeDisabled();
+  });
+
+  // A confirmação confere contra o nome PERSISTIDO. Se conferisse contra o campo
+  // Nome do formulário, bastaria digitar o mesmo texto nos dois para destravar.
+  it("editar o campo Nome não muda o texto exigido na confirmação", () => {
+    const fetchMock = mockFetch({ ok: true, status: 200 });
+    renderEditWithDelete();
+    fireEvent.change(screen.getByTestId("cycle-form-name"), { target: { value: "Outro Nome" } });
+    fireEvent.click(screen.getByTestId("cycle-form-delete-open"));
+    fireEvent.change(screen.getByTestId("cycle-form-delete-confirm-input"), {
+      target: { value: "Outro Nome" },
+    });
+
+    expect(screen.getByTestId("cycle-form-delete-confirm")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("cycle-form-delete-confirm"));
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("nome exato dispara DELETE na rota do ciclo e propaga o id excluído", async () => {
+    const fetchMock = mockFetch({ ok: true, status: 200, body: { deleted: "c1" } });
+    const onDelete = renderEditWithDelete();
+
+    fireEvent.click(screen.getByTestId("cycle-form-delete-open"));
+    fireEvent.change(screen.getByTestId("cycle-form-delete-confirm-input"), {
+      target: { value: "Ciclo Julho" },
+    });
+    fireEvent.click(screen.getByTestId("cycle-form-delete-confirm"));
+
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith("c1"));
+    expect(fetchMock).toHaveBeenCalledWith("/api/ultimates/cycles/c1", { method: "DELETE" });
+  });
+
+  it("espaços em volta do nome digitado são tolerados", async () => {
+    mockFetch({ ok: true, status: 200 });
+    const onDelete = renderEditWithDelete();
+
+    fireEvent.click(screen.getByTestId("cycle-form-delete-open"));
+    fireEvent.change(screen.getByTestId("cycle-form-delete-confirm-input"), {
+      target: { value: "  Ciclo Julho  " },
+    });
+    fireEvent.click(screen.getByTestId("cycle-form-delete-confirm"));
+
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith("c1"));
+  });
+
+  // 404 = alguém já excluiu. O objetivo do gestor foi atingido; travar a tela
+  // num erro só deixaria um fantasma na frente dele.
+  it("404 é tratado como sucesso", async () => {
+    mockFetch({ ok: false, status: 404, body: { error: "Ciclo não encontrado" } });
+    const onDelete = renderEditWithDelete();
+
+    fireEvent.click(screen.getByTestId("cycle-form-delete-open"));
+    fireEvent.change(screen.getByTestId("cycle-form-delete-confirm-input"), {
+      target: { value: "Ciclo Julho" },
+    });
+    fireEvent.click(screen.getByTestId("cycle-form-delete-confirm"));
+
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith("c1"));
+    expect(screen.queryByTestId("cycle-form-delete-error")).not.toBeInTheDocument();
+  });
+
+  it("erro de servidor mostra a mensagem e NÃO propaga a exclusão", async () => {
+    mockFetch({ ok: false, status: 500, body: { error: "boom" } });
+    const onDelete = renderEditWithDelete();
+
+    fireEvent.click(screen.getByTestId("cycle-form-delete-open"));
+    fireEvent.change(screen.getByTestId("cycle-form-delete-confirm-input"), {
+      target: { value: "Ciclo Julho" },
+    });
+    fireEvent.click(screen.getByTestId("cycle-form-delete-confirm"));
+
+    expect(await screen.findByTestId("cycle-form-delete-error")).toHaveTextContent("boom");
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(screen.getByTestId("cycle-form-delete-confirm-input")).toBeInTheDocument();
+  });
+
+  it("falha de rede mostra mensagem e NÃO propaga a exclusão", async () => {
+    global.fetch = jest.fn().mockRejectedValue(new Error("offline")) as unknown as typeof global.fetch;
+    const onDelete = renderEditWithDelete();
+
+    fireEvent.click(screen.getByTestId("cycle-form-delete-open"));
+    fireEvent.change(screen.getByTestId("cycle-form-delete-confirm-input"), {
+      target: { value: "Ciclo Julho" },
+    });
+    fireEvent.click(screen.getByTestId("cycle-form-delete-confirm"));
+
+    expect(await screen.findByTestId("cycle-form-delete-error")).toHaveTextContent(
+      "Falha de rede ao excluir o ciclo."
+    );
+    expect(onDelete).not.toHaveBeenCalled();
+  });
+
+  it("Voltar recolhe a zona de perigo e limpa o texto digitado", () => {
+    renderEditWithDelete();
+    fireEvent.click(screen.getByTestId("cycle-form-delete-open"));
+    fireEvent.change(screen.getByTestId("cycle-form-delete-confirm-input"), {
+      target: { value: "Ciclo Julho" },
+    });
+    fireEvent.click(screen.getByTestId("cycle-form-delete-cancel"));
+
+    expect(screen.queryByTestId("cycle-form-delete-confirm-input")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("cycle-form-delete-open"));
+    expect(screen.getByTestId("cycle-form-delete-confirm-input")).toHaveValue("");
+    expect(screen.getByTestId("cycle-form-delete-confirm")).toBeDisabled();
   });
 });

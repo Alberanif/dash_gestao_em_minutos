@@ -118,6 +118,103 @@ describe("UltimatesScreen — seletor de ciclo", () => {
   });
 });
 
+describe("UltimatesScreen — exclusão de ciclo", () => {
+  function mockCyclesAndDelete(cycles: CycleWithProduct[], deleteOk = true) {
+    const fetchMock = jest.fn((url: string, init?: RequestInit) => {
+      if (init?.method === "DELETE") {
+        return Promise.resolve({ ok: deleteOk, status: deleteOk ? 200 : 500, json: async () => ({}) });
+      }
+      // Rotas do dashboard (roster / daily / excluded-offers) — vazias bastam.
+      if (url.includes("/api/ultimates/cycles/")) {
+        return Promise.resolve({ ok: true, json: async () => ({ rows: [], days: [], offers: [] }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ cycles }) });
+    });
+    global.fetch = fetchMock as unknown as typeof global.fetch;
+    return fetchMock;
+  }
+
+  async function deleteSelectedCycle(name: string) {
+    fireEvent.click(screen.getByTestId("ultimates-edit-cycle-btn"));
+    fireEvent.click(await screen.findByTestId("cycle-form-delete-open"));
+    fireEvent.change(screen.getByTestId("cycle-form-delete-confirm-input"), {
+      target: { value: name },
+    });
+    fireEvent.click(screen.getByTestId("cycle-form-delete-confirm"));
+  }
+
+  // A reseleção usa selectInitialCycleId, não "o primeiro da lista": com um
+  // encerrado mais recente sobrando, cair no primeiro abriria o encerrado.
+  it("remove o ciclo excluído do seletor e reseleciona o ativo mais recente restante", async () => {
+    const cycles = [
+      makeCycle({ id: "c3", name: "Encerrado Recente", status: "encerrado", created_at: "2026-07-19T00:00:00Z" }),
+      makeCycle({ id: "c2", name: "Ativo Recente", status: "ativo", created_at: "2026-07-18T00:00:00Z" }),
+      makeCycle({ id: "c1", name: "Ativo Antigo", status: "ativo", created_at: "2026-07-01T00:00:00Z" }),
+    ];
+    const fetchMock = mockCyclesAndDelete(cycles);
+    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
+
+    expect(await screen.findByTestId("ultimates-selected-cycle")).toHaveTextContent("Ativo Recente");
+
+    await deleteSelectedCycle("Ativo Recente");
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("ultimates-cycle-option-c2")).not.toBeInTheDocument()
+    );
+    expect(fetchMock).toHaveBeenCalledWith("/api/ultimates/cycles/c2", { method: "DELETE" });
+    expect(screen.getByTestId("ultimates-selected-cycle")).toHaveTextContent("Ativo Antigo");
+    expect(screen.getByTestId("ultimates-cycle-option-c3")).toBeInTheDocument();
+    expect(screen.getByTestId("ultimates-cycle-option-c1")).toBeInTheDocument();
+  });
+
+  it("excluir o último ciclo cai no estado vazio, sem seleção pendurada", async () => {
+    mockCyclesAndDelete([makeCycle({ id: "c1", name: "Único Ciclo" })]);
+    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
+
+    await screen.findByTestId("ultimates-dashboard-slot");
+    await deleteSelectedCycle("Único Ciclo");
+
+    expect(await screen.findByTestId("ultimates-empty-state")).toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-cycle-selector")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-dashboard-slot")).not.toBeInTheDocument();
+  });
+
+  it("fecha o modal ao concluir a exclusão", async () => {
+    mockCyclesAndDelete([
+      makeCycle({ id: "c2", name: "Ciclo Alvo", created_at: "2026-07-19T00:00:00Z" }),
+      makeCycle({ id: "c1", name: "Ciclo Restante", created_at: "2026-07-01T00:00:00Z" }),
+    ]);
+    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
+
+    await screen.findByTestId("ultimates-dashboard-slot");
+    await deleteSelectedCycle("Ciclo Alvo");
+
+    await waitFor(() => expect(screen.queryByTestId("cycle-form-save")).not.toBeInTheDocument());
+    expect(screen.getByTestId("ultimates-selected-cycle")).toHaveTextContent("Ciclo Restante");
+  });
+
+  it("falha na exclusão mantém o ciclo na lista e o modal aberto", async () => {
+    mockCyclesAndDelete([makeCycle({ id: "c1", name: "Único Ciclo" })], false);
+    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
+
+    await screen.findByTestId("ultimates-dashboard-slot");
+    await deleteSelectedCycle("Único Ciclo");
+
+    expect(await screen.findByTestId("cycle-form-delete-error")).toBeInTheDocument();
+    expect(screen.getByTestId("ultimates-cycle-option-c1")).toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-empty-state")).not.toBeInTheDocument();
+  });
+
+  it("analista não alcança a exclusão: sem botão de editar, sem modal", async () => {
+    mockCyclesAndDelete([makeCycle({ id: "c1", name: "Único Ciclo" })]);
+    render(<UltimatesScreen role="analista" products={PRODUCTS} />);
+
+    await screen.findByTestId("ultimates-dashboard-slot");
+    expect(screen.queryByTestId("ultimates-edit-cycle-btn")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("cycle-form-delete-open")).not.toBeInTheDocument();
+  });
+});
+
 describe("UltimatesScreen — persistência do switch Novas Compras", () => {
   function mockCyclesAndPatch(patchOk: boolean, initialCountsNewBuyers = true) {
     const fetchMock = jest.fn((url: string, init?: RequestInit) => {
