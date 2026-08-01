@@ -162,6 +162,17 @@ export interface UltimatesHourlyRow {
   new_buyers: number;
 }
 
+// Contagens devolvidas por dash_gestao_ultimates_set_cycle_products (migration
+// 062) quando o conjunto de produtos de um ciclo é trocado. buyers_removed é a
+// que importa na tela: são linhas de roster que sumiram porque o produto que as
+// materializou saiu do ciclo, e o gestor não teria como contá-las depois.
+export interface SetProductsResult {
+  products_added: number;
+  products_removed: number;
+  buyers_removed: number;
+  buyers_materialized: number;
+}
+
 // Uma linha por oferta do produto do ciclo, vinda de
 // dash_gestao_ultimates_offer_options (migration 052). Alimenta o seletor do
 // modal "Ofertas excluídas": sales_count conta vendas em qualquer status e

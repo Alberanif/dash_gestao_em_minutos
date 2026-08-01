@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { UltimatesCycleStatus } from "@/types/ultimates";
+import type { UltimatesCycleStatus, SetProductsResult } from "@/types/ultimates";
 import type { CycleWithProducts, HotmartProductOption } from "./types";
 
 interface CycleFormModalProps {
   products: HotmartProductOption[];
   editTarget?: CycleWithProducts | null;
-  onSave: (cycle: CycleWithProducts) => void;
+  // O 2º argumento só vem quando o conjunto de produtos mudou: são as contagens
+  // da RPC de troca. A tela usa buyers_removed para dizer quantas linhas de
+  // roster sumiram — o modal já fechou quando isso precisa aparecer.
+  onSave: (cycle: CycleWithProducts, products?: SetProductsResult | null) => void;
   onCancel: () => void;
   onDelete?: (cycleId: string) => void;
 }
@@ -21,7 +24,12 @@ interface CycleFormModalProps {
 export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelete }: CycleFormModalProps) {
   const isEdit = !!editTarget;
   const [name, setName] = useState(editTarget?.name ?? "");
-  const [productIds, setProductIds] = useState<string[]>([]);
+  // Na edição, a seleção começa no conjunto ATUAL do ciclo — o modal é aberto
+  // por rotina (mudar nome, mudar meta) e uma lista vazia aqui pareceria que o
+  // ciclo perdeu os produtos.
+  const [productIds, setProductIds] = useState<string[]>(
+    editTarget?.products.map((p) => p.product_id) ?? []
+  );
   const [productSearch, setProductSearch] = useState("");
   const [goalPercentInput, setGoalPercentInput] = useState(
     editTarget?.goal_percent != null ? String(editTarget.goal_percent) : ""
@@ -32,6 +40,9 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
   const [purchasesOnly, setPurchasesOnly] = useState(false);
   const isPurchasesOnly = isEdit ? !!editTarget?.purchases_only : purchasesOnly;
   const [confirmEncerrar, setConfirmEncerrar] = useState(false);
+  // Segundo clique exigido quando algum produto SAI do conjunto. Adicionar é
+  // inofensivo (só traz venda); remover apaga linha de roster.
+  const [confirmRemoveProducts, setConfirmRemoveProducts] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   // Zona de perigo: recolhida por padrão. Este modal é aberto por rotina (mudar
@@ -68,8 +79,28 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
     );
   }
 
+  // Ciclo encerrado é histórico: trocar o produto reescreveria todos os números
+  // dele de uma vez. O mesmo gate de canWrite que já bloqueia upload, vínculo e
+  // refresh (a RPC repete a regra — esta checagem é só pela tela).
+  const canEditProducts = !isEdit || editTarget!.status === "ativo";
+
+  // Produtos que estavam no ciclo e não estão mais na seleção. Derivado do
+  // editTarget PERSISTIDO, não de um snapshot em estado, para não descolar da
+  // realidade se o ciclo for recarregado por baixo.
+  const removedProducts = isEdit
+    ? editTarget!.products.filter((p) => !productIds.includes(p.product_id))
+    : [];
+
+  const productsChanged =
+    isEdit &&
+    (removedProducts.length > 0 || productIds.length !== editTarget!.products.length);
+
+  // Mexer no formulário derruba as duas confirmações: elas valem para o
+  // conjunto de mudanças que estava na tela quando o gestor as leu, não para
+  // qualquer estado futuro.
   useEffect(() => {
     setConfirmEncerrar(false);
+    setConfirmRemoveProducts(false);
   }, [name, productIds, goalPercentInput, status]);
 
   useEffect(() => {
@@ -93,7 +124,9 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
       setError("Nome é obrigatório.");
       return;
     }
-    if (!isEdit && productIds.length === 0) {
+    // Vale na criação E na edição: um ciclo sem produto nenhum não dá erro em
+    // lugar nenhum, só carrega o dashboard zerado.
+    if (canEditProducts && productIds.length === 0) {
       setError("Selecione ao menos um produto.");
       return;
     }
@@ -110,13 +143,26 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
       return;
     }
 
+    // Remover produto apaga do roster os compradores que só existiam por causa
+    // dele. Os nomes dos removidos ficam na tela junto do segundo clique — sem
+    // isso o gestor confirmaria uma perda sem saber de qual produto ela vem.
+    if (removedProducts.length > 0 && !confirmRemoveProducts) {
+      setConfirmRemoveProducts(true);
+      return;
+    }
+
     setError("");
     setSaving(true);
     try {
       const url = isEdit ? `/api/ultimates/cycles/${editTarget!.id}` : "/api/ultimates/cycles";
       const method = isEdit ? "PATCH" : "POST";
+      // productIds só entra no PATCH se o conjunto mudou: a RPC de troca apaga
+      // e materializa comprador, e mandá-la a cada renomeação de ciclo seria
+      // pagar esse trabalho — e esse risco — à toa.
       const body = isEdit
-        ? { name: name.trim(), goalPercent, status }
+        ? productsChanged
+          ? { name: name.trim(), goalPercent, status, productIds }
+          : { name: name.trim(), goalPercent, status }
         : { name: name.trim(), productIds, goalPercent, purchasesOnly };
 
       const res = await fetch(url, {
@@ -136,14 +182,20 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
         return;
       }
       // A rota devolve só a linha do ciclo; os nomes dos produtos já estão
-      // aqui na prop, então montamos o formato da tela sem um GET extra.
-      const savedProducts = isEdit
-        ? editTarget!.products
-        : productIds.map((id) => ({
-            product_id: id,
-            product_name: products.find((p) => p.product_id === id)?.product_name ?? null,
-          }));
-      onSave({ ...savedRaw, products: savedProducts });
+      // aqui na prop, então montamos o formato da tela sem um GET extra. Na
+      // edição SEM troca de produtos o conjunto é o de antes; com troca, é o
+      // que acabou de ser enviado.
+      const savedProducts =
+        isEdit && !productsChanged
+          ? editTarget!.products
+          : productIds.map((id) => ({
+              product_id: id,
+              product_name: products.find((p) => p.product_id === id)?.product_name ?? null,
+            }));
+      onSave(
+        { ...savedRaw, products: savedProducts },
+        (data?.products as SetProductsResult | null | undefined) ?? null
+      );
     } catch {
       setError("Falha de rede ao salvar o ciclo.");
     } finally {
@@ -229,7 +281,25 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
           />
         </div>
 
-        {!isEdit && (
+        {/* Ciclo encerrado mostra o conjunto, mas não deixa mexer: trocar o
+            produto reescreveria todos os números de um histórico fechado. */}
+        {isEdit && !canEditProducts && (
+          <div>
+            <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
+              Produtos Hotmart
+            </label>
+            <p
+              data-testid="cycle-form-products-readonly"
+              style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0, lineHeight: 1.5 }}
+            >
+              {editTarget!.products.map((p) => p.product_name ?? p.product_id).join(" · ")}
+              <br />
+              Ciclo encerrado — reative o ciclo para alterar os produtos.
+            </p>
+          </div>
+        )}
+
+        {canEditProducts && (
           <div>
             <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
               Produtos Hotmart (1 ou mais)
@@ -386,6 +456,35 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
             }}
           >
             Encerrar congela a operação deste ciclo — o dashboard continua acessível, só upload/vínculo/atualização ficam bloqueados. Clique em Salvar novamente para confirmar.
+          </p>
+        )}
+
+        {/* Nomeia os produtos que SAEM, não só a quantidade: o gestor precisa
+            reconhecer o que está prestes a perder, e "1 produto será removido"
+            não permite isso. A contagem de compradores apagados não cabe aqui —
+            ela só existe depois que a RPC roda. */}
+        {confirmRemoveProducts && (
+          <p
+            role="status"
+            data-testid="cycle-form-confirm-remove-products"
+            style={{
+              fontSize: 12,
+              color: "var(--color-warning)",
+              margin: 0,
+              padding: "8px 10px",
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid color-mix(in srgb, var(--color-warning) 35%, transparent)",
+              background: "color-mix(in srgb, var(--color-warning) 10%, transparent)",
+              lineHeight: 1.5,
+            }}
+          >
+            Sai do ciclo:{" "}
+            <strong>
+              {removedProducts.map((p) => p.product_name ?? p.product_id).join(" · ")}
+            </strong>
+            . As compras desse produto deixam de contar, e os compradores que só existiam por
+            causa dele saem do roster. Vínculos manuais e ofertas excluídas são preservados —
+            readicionar o produto devolve tudo. Clique em Salvar novamente para confirmar.
           </p>
         )}
 

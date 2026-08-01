@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import type { UltimatesCycleStatus } from "@/types/ultimates";
+import type { UltimatesCycleStatus, SetProductsResult } from "@/types/ultimates";
 
 type Params = { id: string };
 
 const VALID_STATUSES: UltimatesCycleStatus[] = ["ativo", "encerrado"];
+
+// SQLSTATEs próprios levantados pela RPC (migrations 061/062).
+const RPC_ERROR_STATUS: Record<string, number> = {
+  UL001: 400, // conjunto vazio
+  UL002: 400, // produto inexistente
+  UL003: 400, // produto de outra conta Hotmart
+  UL004: 404, // ciclo inexistente
+  UL005: 409, // ciclo encerrado
+};
 
 // Gestão de ciclo (renomear, ajustar meta, encerrar/reativar) NÃO é bloqueada
 // pelo status encerrado — RF-12 bloqueia upload/vínculo/refresh, que são
@@ -25,11 +34,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   // imutável depois (PRD "Apenas Compras"). Trocar o modo no meio do ciclo
   // corromperia a contabilidade — um purchasesOnly no body é simplesmente
   // ignorado, nunca aplicado.
-  const { name, goalPercent, status, countsNewBuyers } = body as {
+  const { name, goalPercent, status, countsNewBuyers, productIds } = body as {
     name?: unknown;
     goalPercent?: unknown;
     status?: unknown;
     countsNewBuyers?: unknown;
+    productIds?: unknown;
   };
 
   const update: Record<string, unknown> = {};
@@ -77,13 +87,72 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     update.counts_new_buyers = countsNewBuyers;
   }
 
-  if (Object.keys(update).length === 0) {
+  // Conjunto de produtos do ciclo (migration 062). Vem COMPLETO, não como
+  // delta: o corpo diz o que o ciclo passa a ter, e o diff é feito no banco.
+  let ids: string[] | null = null;
+
+  if (productIds !== undefined) {
+    if (!Array.isArray(productIds)) {
+      return NextResponse.json({ error: "productIds deve ser um array" }, { status: 400 });
+    }
+    ids = Array.from(
+      new Set(
+        productIds
+          .filter((value): value is string => typeof value === "string")
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0)
+      )
+    );
+    if (ids.length === 0) {
+      return NextResponse.json({ error: "Selecione ao menos um produto" }, { status: 400 });
+    }
+  }
+
+  if (Object.keys(update).length === 0 && ids === null) {
     return NextResponse.json({ error: "nenhum campo válido para atualizar" }, { status: 400 });
+  }
+
+  const supabase = createSupabaseServiceClient();
+
+  // A troca de produtos vai PRIMEIRO, e sozinha numa transação (a RPC). É a
+  // única escrita daqui que apaga linha de roster, e é a que tem invariantes
+  // reais para checar — ciclo ativo, conta única, conjunto não vazio. Se ela
+  // recusar, nada mais foi tocado.
+  let productsResult: SetProductsResult | null = null;
+
+  if (ids !== null) {
+    const { data: rpcData, error: rpcError } = await supabase.rpc(
+      "dash_gestao_ultimates_set_cycle_products",
+      { p_cycle_id: id, p_product_ids: ids }
+    );
+
+    if (rpcError) {
+      // As exceções da RPC carregam SQLSTATE próprio (UL001..UL005). Sem este
+      // mapa, "ciclo encerrado" viraria um 500 genérico e a tela mostraria
+      // "erro ao salvar" para uma regra de negócio que o gestor pode corrigir.
+      const status = RPC_ERROR_STATUS[rpcError.code ?? ""] ?? 500;
+      return NextResponse.json({ error: rpcError.message }, { status });
+    }
+
+    // returns table (...) chega como array de uma linha pelo PostgREST.
+    productsResult = (Array.isArray(rpcData) ? rpcData[0] : rpcData) ?? null;
+  }
+
+  if (Object.keys(update).length === 0) {
+    const { data: cycle, error: readError } = await supabase
+      .from("dash_gestao_ultimates_cycles")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (readError || !cycle) {
+      return NextResponse.json({ error: "Ciclo não encontrado" }, { status: 404 });
+    }
+    return NextResponse.json({ cycle, products: productsResult });
   }
 
   update.updated_at = new Date().toISOString();
 
-  const supabase = createSupabaseServiceClient();
   const { data, error: dbError } = await supabase
     .from("dash_gestao_ultimates_cycles")
     .update(update)
@@ -102,7 +171,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: "Ciclo não encontrado" }, { status: 404 });
   }
 
-  return NextResponse.json({ cycle: data });
+  return NextResponse.json({ cycle: data, products: productsResult });
 }
 
 // Exclusão DEFINITIVA do ciclo. Não há soft delete: o estado "encerrado" já

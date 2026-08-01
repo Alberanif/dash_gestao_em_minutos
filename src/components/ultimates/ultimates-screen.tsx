@@ -6,6 +6,7 @@ import type { UserRole } from "@/types/auth";
 import { selectInitialCycleId } from "@/lib/ultimates/select-initial-cycle";
 import { UltimatesDashboard } from "./ultimates-dashboard";
 import { CycleFormModal } from "./cycle-form-modal";
+import type { SetProductsResult } from "@/types/ultimates";
 import type { CycleWithProducts, HotmartProductOption } from "./types";
 
 interface UltimatesScreenProps {
@@ -27,6 +28,9 @@ export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<CycleWithProducts | null>(null);
+  // Recibo da última troca de produtos. Null = nenhuma troca desde a última vez
+  // que o gestor dispensou o aviso.
+  const [productsNotice, setProductsNotice] = useState<SetProductsResult | null>(null);
   // Incrementado pelo botão "Tentar novamente" para reexecutar o efeito de
   // carga abaixo — mesmo padrão de EventosPage (fetch inline no efeito, com
   // flag de cancelamento), evitado setState fora do corpo do efeito.
@@ -63,9 +67,16 @@ export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
     setCreateOpen(false);
   }
 
-  function handleEdited(cycle: CycleWithProducts) {
+  // O resultado da troca de produtos é informado AQUI e não no modal, que já
+  // fechou. Só aparece quando houve troca (products != null) e não é erro — é
+  // recibo: quantas linhas de roster sumiram e quantas entraram, números que o
+  // gestor não teria como conferir sozinho depois do fato.
+  function handleEdited(cycle: CycleWithProducts, products?: SetProductsResult | null) {
     setCycles((prev) => (prev ?? []).map((c) => (c.id === cycle.id ? cycle : c)));
     setEditTarget(null);
+    setProductsNotice(products ?? null);
+    // Força a recarga do dashboard: roster, KPIs e curva mudaram de universo.
+    if (products) setReloadToken((t) => t + 1);
   }
 
   // Após excluir, a seleção é recalculada pela MESMA regra da carga inicial
@@ -159,6 +170,50 @@ export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
           onCancel={() => setEditTarget(null)}
           onDelete={handleDeleted}
         />
+      )}
+
+      {/* Recibo da troca de produtos. Fica fora do modal de propósito: o modal
+          fecha no salvar, e é justamente depois dele que a contagem existe.
+          Dispensável no clique — não é erro, é informação de uma vez só. */}
+      {productsNotice && (
+        <div
+          role="status"
+          data-testid="ultimates-products-notice"
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 12,
+            fontSize: 12,
+            color: "var(--text-muted)",
+            margin: "0 0 16px",
+            padding: "10px 12px",
+            borderRadius: "var(--radius-sm)",
+            border: "1px solid var(--border-vis)",
+            background: "var(--surface)",
+            lineHeight: 1.5,
+          }}
+        >
+          <span>
+            Produtos do ciclo atualizados: {productsNotice.products_added} adicionado(s),{" "}
+            {productsNotice.products_removed} removido(s).
+            {productsNotice.buyers_removed > 0 &&
+              ` ${productsNotice.buyers_removed} comprador(es) saíram do roster por não terem mais compra nos produtos do ciclo.`}
+            {productsNotice.buyers_materialized > 0 &&
+              ` ${productsNotice.buyers_materialized} comprador(es) entraram a partir das compras já coletadas.`}
+            {productsNotice.products_added > 0 &&
+              " Compras ainda não coletadas entram no próximo Atualizar agora."}
+          </span>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setProductsNotice(null)}
+            data-testid="ultimates-products-notice-dismiss"
+            style={{ fontSize: 12, flexShrink: 0 }}
+          >
+            Ok
+          </button>
+        </div>
       )}
 
       {cycles === null && !loadError && (
