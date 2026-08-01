@@ -16,12 +16,7 @@ import {
   applyNewPurchasesModeToRoster,
   applyNewPurchasesModeToCounts,
 } from "@/lib/ultimates/new-purchases-mode";
-import {
-  readStoredRange,
-  writeStoredRange,
-  clearStoredRange,
-  type DateRange,
-} from "@/lib/ultimates/date-range";
+import { viewRangeFrom, type DateRange } from "@/lib/ultimates/date-range";
 import { fmtDateShort, formatCycleProducts } from "@/lib/ultimates/format";
 import { DateRangeFilter } from "./date-range-filter";
 import { KpiRow } from "./kpi-row";
@@ -55,6 +50,11 @@ export interface UltimatesDashboardProps {
   // Persiste a política do ciclo e devolve se deu certo. Mora no pai porque a
   // fonte de verdade é a lista de ciclos — ver comentário em ultimates-screen.
   onCountsNewBuyersChange: (cycleId: string, value: boolean) => Promise<boolean>;
+  // Persiste a janela de visualização do ciclo (migration 063). Mora no pai
+  // pela MESMA razão do callback acima: o valor de verdade é a lista de ciclos,
+  // e este componente é renderizado sem key — uma cópia local em useState
+  // carregaria a janela do ciclo anterior na troca de ciclo.
+  onViewRangeChange: (cycleId: string, range: DateRange | null) => Promise<boolean>;
 }
 
 // Bloco de pulso do skeleton no tema escuro (o skeleton compartilhado de
@@ -87,7 +87,12 @@ async function lerHourly(res: Response | null): Promise<UltimatesHourlyRow[] | n
   }
 }
 
-export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: UltimatesDashboardProps) {
+export function UltimatesDashboard({
+  cycle,
+  role,
+  onCountsNewBuyersChange,
+  onViewRangeChange,
+}: UltimatesDashboardProps) {
   const [roster, setRoster] = useState<UltimatesRosterRow[] | null>(null);
   const [daily, setDaily] = useState<UltimatesDailyRow[] | null>(null);
   // `null` aqui NÃO é "carregando" como nos dois acima: é "indisponível". A
@@ -131,10 +136,6 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
   // Mesma razão do `series` acima: granularidade é preferência de quem olha e
   // deve sobreviver à troca de ciclo.
   const [granularity, setGranularity] = useState<UltimatesGranularity>("dia");
-  // Intervalo aplicado pelo filtro De/Até. Mora aqui pela MESMA razão de
-  // `series` e `granularity` — é preferência de quem olha, então sobrevive à
-  // troca de ciclo (o dashboard é renderizado sem key). `null` = ciclo inteiro.
-  const [range, setRange] = useState<DateRange | null>(null);
   // Roster recortado pela janela. Como o `hourly` lá em cima, `null` aqui é
   // INDISPONÍVEL, não "carregando": ele só existe quando há intervalo E a
   // migration 058 já subiu. Sem ele o dashboard inteiro mostra o ciclo.
@@ -143,6 +144,22 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
   // porque `rosterRange = null` sozinho não distingue "não pedi" de "pedi e não
   // deu", e só o segundo caso merece aviso na barra.
   const [rangeUnavailable, setRangeUnavailable] = useState(false);
+
+  // Janela de visualização DO CICLO (migration 063). Derivada da prop, nunca
+  // estado: ela é propriedade do ciclo e não preferência de quem olha, então
+  // trocar de ciclo tem de trocar a janela junto — o oposto de `series` e
+  // `granularity`, que sobrevivem à troca de propósito. Como o dashboard é
+  // renderizado sem key, um useState aqui manteria a janela do ciclo anterior
+  // aplicada ao ciclo novo, e os números da tela seriam de um recorte que o
+  // ciclo exibido não define.
+  //
+  // useMemo obrigatório, não otimização: viewRangeFrom devolve objeto NOVO a
+  // cada chamada, e este valor é dependência do efeito de carga logo abaixo —
+  // sem memo, todo re-render refaria o fetch do roster recortado.
+  const range = useMemo(
+    () => viewRangeFrom(cycle.view_start_date, cycle.view_end_date),
+    [cycle.view_start_date, cycle.view_end_date]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -236,21 +253,6 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
     };
   }, [cycle.id, reloadToken]);
 
-  // Restauração do intervalo salvo, em efeito e não no useState inicial: este
-  // componente é renderizado no servidor, onde localStorage não existe, e ler
-  // durante o render daria divergência de hidratação. Roda uma vez — a chave é
-  // única (não é por ciclo), então trocar de ciclo não a relê.
-  useEffect(() => {
-    // Leitura numa função, não direto no corpo do efeito —
-    // react-hooks/set-state-in-effect rejeita setState síncrono ali (mesmo
-    // contorno das cargas abaixo e de ultimates-screen.tsx).
-    function restaurar() {
-      const salvo = readStoredRange();
-      if (salvo) setRange(salvo);
-    }
-    restaurar();
-  }, []);
-
   // Carga do roster recortado, em efeito PRÓPRIO e tolerante a falha — mesma
   // razão dos contadores de excluídos: o recorte não pode derrubar o dashboard
   // para o estado de erro nem atrasar KPIs, gráfico e tabela do ciclo, que já
@@ -274,10 +276,14 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
         if (cancelled) return;
         if (!res.ok) {
           setRosterRange(null);
-          // 501 = migration 058 pendente (ver a rota). Qualquer outro código é
-          // falha real e também cai para o ciclo, mas sem prometer na tela que
-          // o recorte volta sozinho depois de um deploy de banco.
-          setRangeUnavailable(res.status === 501);
+          // QUALQUER falha marca indisponível, não só o 501 de migration
+          // pendente. Quando o intervalo era escolha pessoal, cair calado para
+          // o ciclo era aceitável — quem pediu o recorte tinha acabado de
+          // clicar e via os números mudarem. Agora o período é institucional:
+          // quem abre o ciclo não pediu nada, não sabe qual janela deveria
+          // estar valendo, e um fallback silencioso mostraria números MAIORES
+          // que o período define sem ninguém perceber.
+          setRangeUnavailable(true);
           return;
         }
         const data = await res.json();
@@ -287,7 +293,9 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
       } catch {
         if (cancelled) return;
         setRosterRange(null);
-        setRangeUnavailable(false);
+        // Mesma razão do bloco acima: rede fora com período salvo continua
+        // sendo "os números na tela não são os do período".
+        setRangeUnavailable(true);
       }
     }
 
@@ -299,12 +307,6 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
 
   function handleRefreshed() {
     setReloadToken((t) => t + 1);
-  }
-
-  function handleRangeChange(next: DateRange | null) {
-    setRange(next);
-    if (next) writeStoredRange(next);
-    else clearStoredRange();
   }
 
   // `hourly` fora do guarda de propósito: ela é opcional (ver o estado acima),
@@ -489,9 +491,20 @@ export function UltimatesDashboard({ cycle, role, onCountsNewBuyersChange }: Ult
 
       {/* Acima dos blocos de erro/loading de propósito: a barra é o controle
           que produziu o estado atual, e escondê-la enquanto o dashboard
-          recarrega deixaria quem acabou de aplicar um intervalo sem como
-          desfazê-lo. */}
-      <DateRangeFilter value={range} onChange={handleRangeChange} unavailable={rangeUnavailable} />
+          recarrega deixaria quem acabou de salvar um período sem como
+          desfazê-lo.
+
+          `role === "gestor"` e NÃO `canWrite`: definir o período atravessa o
+          encerramento do ciclo, como as listas de ofertas e leads excluídos
+          (decisões 8 e 13 dos PRDs anteriores). O período é lente de leitura —
+          não altera nenhum dado —, e um ciclo encerrado é justamente o que se
+          analisa em recorte depois. */}
+      <DateRangeFilter
+        value={range}
+        canEdit={role === "gestor"}
+        onSave={(next) => onViewRangeChange(cycle.id, next)}
+        unavailable={rangeUnavailable}
+      />
 
       {loadError && (
         <div

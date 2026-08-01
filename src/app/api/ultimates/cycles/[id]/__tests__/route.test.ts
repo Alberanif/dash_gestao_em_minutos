@@ -293,6 +293,141 @@ describe("PATCH /api/ultimates/cycles/[id]", () => {
 // Troca do conjunto de produtos (migration 062). A rota não faz o diff — ela
 // delega para a RPC atômica, que é quem apaga comprador. O que se testa aqui é
 // o contrato: o que sobe, o que desce, e que erro de regra não vire 500.
+describe("PATCH /api/ultimates/cycles/[id] — janela de visualização", () => {
+  function patchJanela(body: object) {
+    return makeRequest("PATCH", "http://localhost/api/ultimates/cycles/cycle-uuid", body);
+  }
+
+  it("grava as duas datas quando o par é válido", async () => {
+    mockSingle.mockResolvedValue({
+      data: { id: "cycle-uuid", view_start_date: "2026-07-01", view_end_date: "2026-07-15" },
+      error: null,
+    });
+
+    const { PATCH } = await import("../route");
+    const res = await PATCH(
+      patchJanela({ viewStartDate: "2026-07-01", viewEndDate: "2026-07-15" }),
+      { params: Promise.resolve(params) }
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ view_start_date: "2026-07-01", view_end_date: "2026-07-15" })
+    );
+  });
+
+  it("aceita janela de um único dia", async () => {
+    mockSingle.mockResolvedValue({ data: { id: "cycle-uuid" }, error: null });
+
+    const { PATCH } = await import("../route");
+    const res = await PATCH(
+      patchJanela({ viewStartDate: "2026-07-01", viewEndDate: "2026-07-01" }),
+      { params: Promise.resolve(params) }
+    );
+
+    expect(res.status).toBe(200);
+  });
+
+  it("null nos dois limpa a janela", async () => {
+    mockSingle.mockResolvedValue({
+      data: { id: "cycle-uuid", view_start_date: null, view_end_date: null },
+      error: null,
+    });
+
+    const { PATCH } = await import("../route");
+    const res = await PATCH(patchJanela({ viewStartDate: null, viewEndDate: null }), {
+      params: Promise.resolve(params),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ view_start_date: null, view_end_date: null })
+    );
+  });
+
+  // A CHAVE AUSENTE e a chave presente com meio par são erros DIFERENTES, e a
+  // mensagem é a única coisa que os separa (o status é 400 nos dois). Sem
+  // afirmar o texto, este teste passaria mesmo se o guarda de "devem vir
+  // juntos" sumisse: a validação genérica logo abaixo também recusa, mas
+  // dizendo "Janela inválida" para quem simplesmente esqueceu um campo.
+  it("chave sozinha é 400 dizendo que o par é obrigatório", async () => {
+    const { PATCH } = await import("../route");
+
+    for (const body of [{ viewStartDate: "2026-07-01" }, { viewEndDate: "2026-07-15" }]) {
+      const res = await PATCH(patchJanela(body), { params: Promise.resolve(params) });
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toContain("devem vir juntos");
+    }
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("uma data com a outra null é 400, não recorte aberto de um lado", async () => {
+    const { PATCH } = await import("../route");
+
+    for (const body of [
+      { viewStartDate: "2026-07-01", viewEndDate: null },
+      { viewStartDate: null, viewEndDate: "2026-07-15" },
+    ]) {
+      const res = await PATCH(patchJanela(body), { params: Promise.resolve(params) });
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toContain("Janela inválida");
+    }
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("fim anterior ao início é 400", async () => {
+    const { PATCH } = await import("../route");
+    const res = await PATCH(
+      patchJanela({ viewStartDate: "2026-07-15", viewEndDate: "2026-07-01" }),
+      { params: Promise.resolve(params) }
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("formato fora de YYYY-MM-DD é 400", async () => {
+    const { PATCH } = await import("../route");
+
+    for (const body of [
+      { viewStartDate: "01/07/2026", viewEndDate: "15/07/2026" },
+      { viewStartDate: "2026-7-1", viewEndDate: "2026-07-15" },
+      { viewStartDate: "2026-07-01T00:00:00Z", viewEndDate: "2026-07-15T00:00:00Z" },
+      { viewStartDate: 20260701, viewEndDate: 20260715 },
+    ]) {
+      const res = await PATCH(patchJanela(body), { params: Promise.resolve(params) });
+      expect(res.status).toBe(400);
+    }
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("não toca nas colunas quando o par não vem no body", async () => {
+    mockSingle.mockResolvedValue({ data: { id: "cycle-uuid" }, error: null });
+
+    const { PATCH } = await import("../route");
+    await PATCH(patchJanela({ name: "Só o nome" }), { params: Promise.resolve(params) });
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.not.objectContaining({ view_start_date: expect.anything() })
+    );
+  });
+
+  it("ciclo encerrado NÃO bloqueia: o período é lente de leitura", async () => {
+    mockSingle.mockResolvedValue({
+      data: { id: "cycle-uuid", status: "encerrado", view_start_date: "2026-07-01" },
+      error: null,
+    });
+
+    const { PATCH } = await import("../route");
+    const res = await PATCH(
+      patchJanela({ viewStartDate: "2026-07-01", viewEndDate: "2026-07-15" }),
+      { params: Promise.resolve(params) }
+    );
+
+    expect(res.status).toBe(200);
+  });
+});
+
 describe("PATCH /api/ultimates/cycles/[id] — productIds", () => {
   it("delega para a RPC com o conjunto deduplicado e devolve as contagens", async () => {
     const { PATCH } = await import("../route");

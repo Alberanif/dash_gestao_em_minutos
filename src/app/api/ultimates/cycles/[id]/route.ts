@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import { parseDateRange } from "@/lib/ultimates/date-range";
 import type { UltimatesCycleStatus, SetProductsResult } from "@/types/ultimates";
 
 type Params = { id: string };
@@ -34,13 +35,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   // imutável depois (PRD "Apenas Compras"). Trocar o modo no meio do ciclo
   // corromperia a contabilidade — um purchasesOnly no body é simplesmente
   // ignorado, nunca aplicado.
-  const { name, goalPercent, status, countsNewBuyers, productIds } = body as {
-    name?: unknown;
-    goalPercent?: unknown;
-    status?: unknown;
-    countsNewBuyers?: unknown;
-    productIds?: unknown;
-  };
+  const { name, goalPercent, status, countsNewBuyers, productIds, viewStartDate, viewEndDate } =
+    body as {
+      name?: unknown;
+      goalPercent?: unknown;
+      status?: unknown;
+      countsNewBuyers?: unknown;
+      productIds?: unknown;
+      viewStartDate?: unknown;
+      viewEndDate?: unknown;
+    };
 
   const update: Record<string, unknown> = {};
 
@@ -85,6 +89,46 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: "countsNewBuyers deve ser booleano" }, { status: 400 });
     }
     update.counts_new_buyers = countsNewBuyers;
+  }
+
+  // Janela de visualização do ciclo (migration 063). Vale para TODOS que abrem
+  // o ciclo, e por isso é escrita aqui, na rota que já é gestor-only — o resto
+  // do dash a consome como leitura.
+  //
+  // O PAR É UM VALOR SÓ, e este é o único campo do PATCH em que uma chave
+  // sozinha é erro em vez de atualização parcial. Aceitar `viewStartDate`
+  // isolado deixaria a decisão de qual é o outro extremo para o banco (que
+  // recusa, pelo CHECK, com um 500 ilegível) ou pior, para o acaso de a coluna
+  // já ter um valor antigo — um recorte que ninguém pediu. Mesma regra que o
+  // GET /roster já aplica à query string.
+  //
+  // `null` nos dois limpa a janela: o ciclo volta a mostrar o produto inteiro.
+  const pediuJanela = viewStartDate !== undefined || viewEndDate !== undefined;
+
+  if (pediuJanela) {
+    if (viewStartDate === undefined || viewEndDate === undefined) {
+      return NextResponse.json(
+        { error: "viewStartDate e viewEndDate devem vir juntos" },
+        { status: 400 }
+      );
+    }
+    if (viewStartDate === null && viewEndDate === null) {
+      update.view_start_date = null;
+      update.view_end_date = null;
+    } else {
+      const janela =
+        typeof viewStartDate === "string" && typeof viewEndDate === "string"
+          ? parseDateRange(viewStartDate, viewEndDate)
+          : null;
+      if (janela === null) {
+        return NextResponse.json(
+          { error: "Janela inválida: use YYYY-MM-DD com fim >= início, ou null nos dois" },
+          { status: 400 }
+        );
+      }
+      update.view_start_date = janela.start;
+      update.view_end_date = janela.end;
+    }
   }
 
   // Conjunto de produtos do ciclo (migration 062). Vem COMPLETO, não como

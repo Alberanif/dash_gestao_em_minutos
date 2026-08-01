@@ -7,6 +7,7 @@ import { selectInitialCycleId } from "@/lib/ultimates/select-initial-cycle";
 import { UltimatesDashboard } from "./ultimates-dashboard";
 import { CycleFormModal } from "./cycle-form-modal";
 import type { SetProductsResult } from "@/types/ultimates";
+import type { DateRange } from "@/lib/ultimates/date-range";
 import type { CycleWithProducts, HotmartProductOption } from "./types";
 
 interface UltimatesScreenProps {
@@ -120,6 +121,48 @@ export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
       setCycles((prev) =>
         (prev ?? []).map((c) => (c.id === cycleId ? { ...c, counts_new_buyers: previous } : c))
       );
+      return false;
+    }
+  }
+
+  // Janela de visualização do ciclo (migration 063). NÃO é otimista, ao
+  // contrário do handler acima: aqui a escrita muda o que TODOS os usuários
+  // veem, e uma aplicação otimista dispararia a carga do roster recortado antes
+  // da confirmação — se o PATCH falhasse, o rollback dispararia uma segunda
+  // carga e o dashboard piscaria entre dois recortes, um deles inexistente no
+  // banco. Esperar o ida-e-volta de um botão "Salvar" é a latência que o
+  // usuário já espera.
+  //
+  // A resposta traz o ciclo autoritativo (com as datas normalizadas pelo
+  // Postgres), e é ela que entra na lista — não o que mandamos.
+  async function handleViewRangeChange(
+    cycleId: string,
+    range: DateRange | null
+  ): Promise<boolean> {
+    try {
+      const res = await fetch(`/api/ultimates/cycles/${cycleId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          viewStartDate: range?.start ?? null,
+          viewEndDate: range?.end ?? null,
+        }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      const updated = data?.cycle as CycleWithProducts | undefined;
+      if (!updated) return false;
+      // O PATCH devolve a linha da tabela, SEM os produtos (o join só existe no
+      // GET da lista). Preservamos os que já temos em vez de aceitar o
+      // `products: undefined` da resposta — senão o header do dashboard perderia
+      // os nomes dos produtos a cada período salvo.
+      setCycles((prev) =>
+        (prev ?? []).map((c) =>
+          c.id === cycleId ? { ...updated, products: c.products } : c
+        )
+      );
+      return true;
+    } catch {
       return false;
     }
   }
@@ -358,6 +401,7 @@ export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
             cycle={selectedCycle}
             role={role}
             onCountsNewBuyersChange={handleCountsNewBuyersChange}
+            onViewRangeChange={handleViewRangeChange}
           />
         </>
       )}

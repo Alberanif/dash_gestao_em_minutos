@@ -1,6 +1,13 @@
-// Intervalo de datas do dash Ultimates: validação, persistência e o predicado
-// de recorte do gráfico. Tudo que dá para decidir sem React mora aqui — o
-// componente da barra só cuida do formulário.
+// Intervalo de datas do dash Ultimates: validação, leitura do que veio do banco
+// e o predicado de recorte do gráfico. Tudo que dá para decidir sem React mora
+// aqui — o componente da barra só cuida do formulário.
+//
+// NÃO HÁ MAIS PERSISTÊNCIA NO NAVEGADOR (migration 063). O intervalo era estado
+// de quem olhava, guardado em localStorage sob uma chave global; agora é
+// propriedade do ciclo, guardada em cycles.view_start_date/view_end_date e
+// aplicada igualmente a todo mundo. Quem escreve é o PATCH do ciclo, não este
+// módulo — se você procura readStoredRange/writeStoredRange, elas foram
+// removidas, não movidas.
 //
 // As datas são STRINGS "YYYY-MM-DD" do começo ao fim, nunca Date. Esse formato
 // é o mesmo do <input type="date">, o mesmo das chaves de bucket que a RPC
@@ -14,8 +21,6 @@ export interface DateRange {
   start: string;
   end: string;
 }
-
-const STORAGE_KEY = "ultimates-date-range";
 
 // Estrito de propósito: "2026-7-10" ordena errado numa comparação de string
 // ("2026-7-10" > "2026-07-20"), e a comparação de string é justamente o
@@ -33,47 +38,19 @@ export function parseDateRange(start: string, end: string): DateRange | null {
   return { start, end };
 }
 
-// Lê o intervalo salvo. APAGA a chave quando ela não sobrevive à validação —
-// efeito colateral deliberado num getter: sem ele, uma chave corrompida (por
-// mão humana no DevTools ou por uma versão futura que mude o payload) ficaria
-// para sempre no navegador, sendo relida e descartada a cada montagem.
-export function readStoredRange(): DateRange | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw === null) return null;
-    const parsed: unknown = JSON.parse(raw);
-    const start = (parsed as { start?: unknown } | null)?.start;
-    const end = (parsed as { end?: unknown } | null)?.end;
-    const range =
-      typeof start === "string" && typeof end === "string"
-        ? parseDateRange(start, end)
-        : null;
-    if (range === null) clearStoredRange();
-    return range;
-  } catch {
-    clearStoredRange();
-    return null;
-  }
-}
-
-export function writeStoredRange(range: DateRange): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(range));
-  } catch {
-    // localStorage pode estar cheio ou bloqueado (modo privado, política de
-    // cookies). Perder a persistência é aceitável; quebrar a aba não é.
-  }
-}
-
-export function clearStoredRange(): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // Mesmo motivo do writeStoredRange.
-  }
+// Lê a janela que veio do ciclo (cycles.view_start_date/view_end_date). Aceita
+// `unknown` porque isto é a fronteira com o banco: a resposta do PostgREST não
+// é validada em lugar nenhum, e sem a migration 063 aplicada as duas chaves nem
+// existem no objeto.
+//
+// TUDO que não for um par completo e ordenado de "YYYY-MM-DD" vira `null` = sem
+// janela = ciclo inteiro. Isso inclui o caso que o CHECK do banco deveria tornar
+// impossível (uma ponta só): a constraint protege escritas futuras, mas um
+// UPDATE manual no painel do Supabase pode ter precedido a 063, e degradar para
+// "sem janela" é o único desfecho que não inventa uma fronteira.
+export function viewRangeFrom(start: unknown, end: unknown): DateRange | null {
+  if (typeof start !== "string" || typeof end !== "string") return null;
+  return parseDateRange(start, end);
 }
 
 // Recorte do gráfico. `key` é "YYYY-MM-DD" (bucket de dia) ou "YYYY-MM-DDTHH"
