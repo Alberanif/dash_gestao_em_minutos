@@ -314,3 +314,90 @@ describe("UltimatesScreen — persistência do switch Novas Compras", () => {
     expect(await screen.findByTestId("ultimates-new-purchases-toggle")).toBeDisabled();
   });
 });
+
+// O recibo da troca de produtos vive na TELA, não no modal: quando a contagem
+// existe, o modal já fechou. Se ele sumir, a única evidência de que N linhas de
+// roster foram apagadas some com ele.
+describe("UltimatesScreen — recibo da troca de produtos", () => {
+  const PRODUCTS_2: HotmartProductOption[] = [
+    { product_id: "p1", product_name: "Produto Um", account_id: "acc-1" },
+    { product_id: "p2", product_name: "Produto Dois", account_id: "acc-1" },
+  ];
+
+  function mockCyclesAndPatch(products: unknown) {
+    const fetchMock = jest.fn((url: string, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ cycle: makeCycle(), products }),
+        });
+      }
+      if (url.includes("/api/ultimates/cycles/")) {
+        return Promise.resolve({ ok: true, json: async () => ({ rows: [], days: [], offers: [] }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ cycles: [makeCycle()] }) });
+    });
+    global.fetch = fetchMock as unknown as typeof global.fetch;
+    return fetchMock;
+  }
+
+  async function trocarProdutos() {
+    fireEvent.click(screen.getByTestId("ultimates-edit-cycle-btn"));
+    fireEvent.click(await screen.findByTestId("cycle-form-product-option-p2"));
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-p1"));
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+    // Segundo clique: p1 sai do ciclo.
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+  }
+
+  it("mostra quantos compradores saíram do roster", async () => {
+    mockCyclesAndPatch({
+      products_added: 1,
+      products_removed: 1,
+      buyers_removed: 12,
+      buyers_materialized: 4,
+    });
+    render(<UltimatesScreen role="gestor" products={PRODUCTS_2} />);
+    await screen.findByTestId("ultimates-dashboard-slot");
+
+    await trocarProdutos();
+
+    const aviso = await screen.findByTestId("ultimates-products-notice");
+    expect(aviso).toHaveTextContent("1 adicionado(s)");
+    expect(aviso).toHaveTextContent("1 removido(s)");
+    expect(aviso).toHaveTextContent("12 comprador(es) saíram do roster");
+    expect(aviso).toHaveTextContent("4 comprador(es) entraram");
+  });
+
+  it("o recibo é dispensável e some no clique", async () => {
+    mockCyclesAndPatch({
+      products_added: 0,
+      products_removed: 1,
+      buyers_removed: 2,
+      buyers_materialized: 0,
+    });
+    render(<UltimatesScreen role="gestor" products={PRODUCTS_2} />);
+    await screen.findByTestId("ultimates-dashboard-slot");
+
+    await trocarProdutos();
+    await screen.findByTestId("ultimates-products-notice");
+
+    fireEvent.click(screen.getByTestId("ultimates-products-notice-dismiss"));
+    expect(screen.queryByTestId("ultimates-products-notice")).not.toBeInTheDocument();
+  });
+
+  it("edição sem troca de produtos não mostra recibo nenhum", async () => {
+    mockCyclesAndPatch(null);
+    render(<UltimatesScreen role="gestor" products={PRODUCTS_2} />);
+    await screen.findByTestId("ultimates-dashboard-slot");
+
+    fireEvent.click(screen.getByTestId("ultimates-edit-cycle-btn"));
+    fireEvent.change(await screen.findByTestId("cycle-form-name"), {
+      target: { value: "Outro nome" },
+    });
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+
+    await waitFor(() => expect(screen.queryByTestId("cycle-form-save")).not.toBeInTheDocument());
+    expect(screen.queryByTestId("ultimates-products-notice")).not.toBeInTheDocument();
+  });
+});

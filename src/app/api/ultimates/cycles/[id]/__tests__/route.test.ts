@@ -13,10 +13,18 @@ const mockDelete = jest.fn();
 const mockDeleteEq = jest.fn();
 const mockDeleteSelect = jest.fn();
 
+// Releitura do ciclo quando o PATCH só troca produtos (nada a atualizar na
+// linha de cycles — a RPC já cuidou dela).
+const mockSelect = jest.fn();
+const mockSelectEq = jest.fn();
+const mockSelectSingle = jest.fn();
+
+const mockRpc = jest.fn();
+
 const mockFrom = jest.fn();
 
 jest.mock("@/lib/supabase/server", () => ({
-  createSupabaseServiceClient: jest.fn(() => ({ from: mockFrom })),
+  createSupabaseServiceClient: jest.fn(() => ({ from: mockFrom, rpc: mockRpc })),
 }));
 
 function makeRequest(method: string, url: string, body?: object): NextRequest {
@@ -47,7 +55,24 @@ beforeEach(() => {
   mockDeleteEq.mockReturnValue({ select: mockDeleteSelect });
   mockDeleteSelect.mockResolvedValue({ data: [{ id: "cycle-uuid" }], error: null });
 
-  mockFrom.mockReturnValue({ update: mockUpdate, delete: mockDelete });
+  mockSelect.mockReturnValue({ eq: mockSelectEq });
+  mockSelectEq.mockReturnValue({ single: mockSelectSingle });
+  mockSelectSingle.mockResolvedValue({ data: { id: "cycle-uuid" }, error: null });
+
+  // returns table (...) chega como array de uma linha pelo PostgREST.
+  mockRpc.mockResolvedValue({
+    data: [
+      {
+        products_added: 1,
+        products_removed: 1,
+        buyers_removed: 3,
+        buyers_materialized: 5,
+      },
+    ],
+    error: null,
+  });
+
+  mockFrom.mockReturnValue({ update: mockUpdate, delete: mockDelete, select: mockSelect });
 });
 
 describe("PATCH /api/ultimates/cycles/[id]", () => {
@@ -261,6 +286,111 @@ describe("PATCH /api/ultimates/cycles/[id]", () => {
     const res = await PATCH(req, { params: Promise.resolve(params) });
 
     expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+});
+
+// Troca do conjunto de produtos (migration 062). A rota não faz o diff — ela
+// delega para a RPC atômica, que é quem apaga comprador. O que se testa aqui é
+// o contrato: o que sobe, o que desce, e que erro de regra não vire 500.
+describe("PATCH /api/ultimates/cycles/[id] — productIds", () => {
+  it("delega para a RPC com o conjunto deduplicado e devolve as contagens", async () => {
+    const { PATCH } = await import("../route");
+    const res = await PATCH(
+      makeRequest("PATCH", "http://localhost/api/ultimates/cycles/cycle-uuid", {
+        productIds: ["  p1  ", "p2", "p1", ""],
+      }),
+      { params: Promise.resolve(params) }
+    );
+
+    expect(mockRpc).toHaveBeenCalledWith("dash_gestao_ultimates_set_cycle_products", {
+      p_cycle_id: "cycle-uuid",
+      p_product_ids: ["p1", "p2"],
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).products).toEqual({
+      products_added: 1,
+      products_removed: 1,
+      buyers_removed: 3,
+      buyers_materialized: 5,
+    });
+    // Sem outro campo no corpo, a linha de cycles não é tocada: a RPC já
+    // atualizou o que precisava.
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("troca de produtos roda ANTES do update dos demais campos", async () => {
+    const order: string[] = [];
+    mockRpc.mockImplementation(async () => {
+      order.push("rpc");
+      return { data: [{ products_added: 0, products_removed: 0, buyers_removed: 0, buyers_materialized: 0 }], error: null };
+    });
+    mockUpdate.mockImplementation(() => {
+      order.push("update");
+      return { eq: mockUpdateEq };
+    });
+    mockSingle.mockResolvedValue({ data: { id: "cycle-uuid" }, error: null });
+
+    const { PATCH } = await import("../route");
+    await PATCH(
+      makeRequest("PATCH", "http://localhost/api/ultimates/cycles/cycle-uuid", {
+        name: "Novo nome",
+        productIds: ["p1"],
+      }),
+      { params: Promise.resolve(params) }
+    );
+
+    expect(order).toEqual(["rpc", "update"]);
+  });
+
+  it("conjunto vazio é recusado sem chamar a RPC", async () => {
+    const { PATCH } = await import("../route");
+    const res = await PATCH(
+      makeRequest("PATCH", "http://localhost/api/ultimates/cycles/cycle-uuid", {
+        productIds: ["", "   "],
+      }),
+      { params: Promise.resolve(params) }
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("productIds que não é array vira 400", async () => {
+    const { PATCH } = await import("../route");
+    const res = await PATCH(
+      makeRequest("PATCH", "http://localhost/api/ultimates/cycles/cycle-uuid", {
+        productIds: "p1",
+      }),
+      { params: Promise.resolve(params) }
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  // Cada SQLSTATE da RPC tem um HTTP que o gestor consegue interpretar. Sem o
+  // mapa, "ciclo encerrado" viraria 500 e a tela diria só "erro ao salvar".
+  it.each([
+    ["UL001", 400],
+    ["UL002", 400],
+    ["UL003", 400],
+    ["UL004", 404],
+    ["UL005", 409],
+    ["XX000", 500],
+  ])("erro %s da RPC vira HTTP %i", async (code, expected) => {
+    mockRpc.mockResolvedValue({ data: null, error: { code, message: "boom" } });
+
+    const { PATCH } = await import("../route");
+    const res = await PATCH(
+      makeRequest("PATCH", "http://localhost/api/ultimates/cycles/cycle-uuid", {
+        productIds: ["p1"],
+      }),
+      { params: Promise.resolve(params) }
+    );
+
+    expect(res.status).toBe(expected);
+    // Falhou a troca, nada mais é escrito.
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 });

@@ -427,6 +427,8 @@ describe("CycleFormModal — seleção múltipla", () => {
 
     const sentBody = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(sentBody.productIds).toEqual(["4567890", "1234567"]);
+    // 2º argumento null: criação não troca conjunto de produtos de ciclo
+    // nenhum, então não há contagem de troca para reportar.
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "c9",
@@ -434,7 +436,153 @@ describe("CycleFormModal — seleção múltipla", () => {
           { product_id: "4567890", product_name: "Mentoria Ultimates" },
           { product_id: "1234567", product_name: "Curso Avançado" },
         ],
-      })
+      }),
+      null
     );
+  });
+});
+
+// Edição do conjunto de produtos (migration 062). O que estes testes protegem
+// não é a feature, é o custo dela: a RPC de troca APAGA linha de roster, então
+// mandá-la sem necessidade, ou sem o gestor ter lido o que sai, é o estrago.
+describe("CycleFormModal — editar produtos do ciclo", () => {
+  function okResponse(products: unknown = null) {
+    return jest.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ cycle: makeCycle(), products }),
+    });
+  }
+
+  it("edição abre com os produtos atuais do ciclo já selecionados", () => {
+    renderEdit(makeCycle());
+
+    expect(screen.getByTestId("cycle-form-product-option-4567890")).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(screen.getByTestId("cycle-form-product-option-1234567")).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
+  });
+
+  it("salvar sem mexer nos produtos NÃO manda productIds", async () => {
+    const fetchMock = okResponse();
+    global.fetch = fetchMock as unknown as typeof global.fetch;
+
+    renderEdit(makeCycle());
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.productIds).toBeUndefined();
+  });
+
+  it("adicionar produto manda o conjunto completo, sem pedir confirmação", async () => {
+    const fetchMock = okResponse({
+      products_added: 1,
+      products_removed: 0,
+      buyers_removed: 0,
+      buyers_materialized: 7,
+    });
+    global.fetch = fetchMock as unknown as typeof global.fetch;
+
+    renderEdit(makeCycle());
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-1234567"));
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.productIds).toEqual(["4567890", "1234567"]);
+  });
+
+  it("remover produto exige segundo clique e NOMEIA o que sai", async () => {
+    const fetchMock = okResponse();
+    global.fetch = fetchMock as unknown as typeof global.fetch;
+
+    renderEdit(makeCycle());
+    // Desmarca o único produto e marca outro — o primeiro sai do ciclo.
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-1234567"));
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+
+    const aviso = screen.getByTestId("cycle-form-confirm-remove-products");
+    expect(aviso).toHaveTextContent("Mentoria Ultimates");
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.productIds).toEqual(["1234567"]);
+  });
+
+  it("mexer na seleção depois de confirmar derruba a confirmação", async () => {
+    const fetchMock = okResponse();
+    global.fetch = fetchMock as unknown as typeof global.fetch;
+
+    renderEdit(makeCycle());
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-1234567"));
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+    expect(screen.getByTestId("cycle-form-confirm-remove-products")).toBeInTheDocument();
+
+    // Readiciona o produto que sairia: não há mais remoção, nem confirmação.
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    expect(
+      screen.queryByTestId("cycle-form-confirm-remove-products")
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+  });
+
+  it("deixar o ciclo sem nenhum produto é recusado antes do PATCH", () => {
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof global.fetch;
+
+    renderEdit(makeCycle());
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+
+    expect(screen.getByText("Selecione ao menos um produto.")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("ciclo encerrado mostra os produtos, sem controle de seleção", () => {
+    renderEdit(makeCycle({ status: "encerrado" }));
+
+    expect(screen.getByTestId("cycle-form-products-readonly")).toHaveTextContent(
+      "Mentoria Ultimates"
+    );
+    expect(screen.queryByTestId("cycle-form-product-option-4567890")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("cycle-form-product-search")).not.toBeInTheDocument();
+  });
+
+  it("repassa as contagens da troca para o pai", async () => {
+    const counts = {
+      products_added: 1,
+      products_removed: 1,
+      buyers_removed: 12,
+      buyers_materialized: 4,
+    };
+    const fetchMock = okResponse(counts);
+    global.fetch = fetchMock as unknown as typeof global.fetch;
+
+    const onSave = jest.fn();
+    render(
+      <CycleFormModal
+        products={PRODUCTS}
+        editTarget={makeCycle()}
+        onSave={onSave}
+        onCancel={jest.fn()}
+      />
+    );
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-1234567"));
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave).toHaveBeenCalledWith(expect.any(Object), counts);
   });
 });
