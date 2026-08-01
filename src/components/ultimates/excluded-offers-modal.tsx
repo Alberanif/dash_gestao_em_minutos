@@ -1,12 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { UltimatesOfferOption } from "@/types/ultimates";
+import type { UltimatesOfferOption, UltimatesCycleProductRef } from "@/types/ultimates";
 import { fmtDateFull } from "@/lib/ultimates/format";
 import type { ExcludedOffer } from "./types";
 
 interface ExcludedOffersModalProps {
   cycleId: string;
+  // Produtos do ciclo. Vêm por prop e não são derivados de `options` de
+  // propósito: um produto sem nenhuma oferta cadastrada não aparece em
+  // options, e ele é justamente um dos que o gestor precisa ver nomeado
+  // quando a busca não acha nada.
+  cycleProducts: UltimatesCycleProductRef[];
   // gestor gerencia; analista só lê (espelha o gate real dos endpoints).
   canWrite: boolean;
   // Disparado após cada escrita bem-sucedida — o pai recarrega o dashboard e
@@ -29,6 +34,7 @@ interface ExcludedOffersModalProps {
 // vendas à contabilidade na leitura seguinte, sem refresh.
 export function ExcludedOffersModal({
   cycleId,
+  cycleProducts,
   canWrite,
   onChanged,
   onClose,
@@ -116,6 +122,13 @@ export function ExcludedOffersModal({
   // Ofertas já excluídas saem do seletor — o POST as recusaria com 409, e
   // oferecer a opção seria convidar o gestor ao erro.
   const available = options.filter((o) => !o.is_excluded);
+
+  // Lista COMPLETA, sem colapsar em "N produtos" como o header do dashboard: aqui
+  // o nome de cada produto é a informação que resolve a dúvida, não enfeite.
+  const productLabel =
+    cycleProducts.length === 0
+      ? "produto não identificado"
+      : cycleProducts.map((p) => p.product_name ?? p.product_id).join(" · ");
   const visible = available.filter((o) => matchesSearch(o, search));
 
   // Trocar a busca pode esconder a oferta que estava selecionada. Manter a
@@ -148,6 +161,17 @@ export function ExcludedOffersModal({
           Compras feitas nas ofertas listadas aqui não entram nos KPIs, no gráfico nem no roster
           deste ciclo. Nenhuma venda é apagada — remover a oferta da lista devolve as compras à
           contabilidade.
+        </p>
+
+        {/* Escopo explícito. O seletor abaixo só oferece ofertas destes
+            produtos, e sem dizer quais são, uma busca por um código legítimo de
+            OUTRO produto devolve "nenhuma oferta" — que se lê como "essa oferta
+            não existe" em vez de "você está no ciclo errado". */}
+        <p
+          data-testid="ultimates-excluded-offers-scope"
+          style={{ fontSize: 12, color: "var(--text-3)", margin: 0, lineHeight: 1.5 }}
+        >
+          Ofertas de: <strong style={{ color: "var(--text-muted)" }}>{productLabel}</strong>
         </p>
 
         {loadError && (
@@ -252,17 +276,24 @@ export function ExcludedOffersModal({
               <option value="">Selecione a oferta...</option>
               {visible.map((option) => (
                 <option key={option.offer_code} value={option.offer_code}>
-                  {option.offer_name} · {option.offer_code} · {option.sales_count} venda(s)
+                  {option.product_name} · {option.offer_name} · {option.offer_code} · {option.sales_count} venda(s)
                 </option>
               ))}
             </select>
 
+            {/* A mensagem nomeia o termo E os produtos do ciclo porque a causa
+                real do vazio quase nunca é typo: é a oferta pertencer a outro
+                produto, num ciclo que o gestor não selecionou. Dizer só
+                "nenhuma oferta corresponde" manda procurar o erro no lugar
+                errado. */}
             {search.trim() !== "" && visible.length === 0 && (
               <p
                 data-testid="ultimates-excluded-offer-search-empty"
-                style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}
+                style={{ fontSize: 12, color: "var(--text-muted)", margin: 0, lineHeight: 1.5 }}
               >
-                Nenhuma oferta deste produto corresponde à busca.
+                Nenhuma oferta de <strong>{productLabel}</strong> corresponde a &quot;
+                {search.trim()}&quot;. Se ela existe na Hotmart mas não aparece aqui, é oferta de
+                outro produto — confira se o ciclo selecionado é o certo.
               </p>
             )}
 
@@ -313,7 +344,8 @@ function matchesSearch(option: UltimatesOfferOption, term: string): boolean {
   if (needle === "") return true;
   return (
     option.offer_code.toLowerCase().includes(needle) ||
-    (option.offer_name ?? "").toLowerCase().includes(needle)
+    (option.offer_name ?? "").toLowerCase().includes(needle) ||
+    (option.product_name ?? "").toLowerCase().includes(needle)
   );
 }
 

@@ -21,6 +21,8 @@ let upsertError: { message: string } | null;
 // Captura as chamadas de RPC (a sincronização de buyers do modo Apenas Compras).
 let rpcCalls: Array<{ fn: string; args: unknown }>;
 let syncError: { message: string } | null;
+let cycleProductRows: Array<{ product_id: string }>;
+let cycleProductsError: { message: string } | null;
 
 // Captura os payloads passados para cycles.update (lock e finally).
 let cycleUpdatePayloads: Array<Record<string, unknown>>;
@@ -74,6 +76,8 @@ beforeEach(() => {
   releaseError = null;
   accountRow = { id: "acc-1", credentials: { client_id: "cid", client_secret: "csecret" } };
   upsertError = null;
+  cycleProductRows = [{ product_id: "prod-99" }];
+  cycleProductsError = null;
   cycleUpdatePayloads = [];
   cycleUpdateOptions = [];
   releaseFilter = null;
@@ -142,6 +146,22 @@ beforeEach(() => {
     if (table === "dash_gestao_hotmart_sales") {
       return { upsert: salesUpsert };
     }
+    if (table === "dash_gestao_ultimates_cycle_products") {
+      return {
+        // .select("product_id").eq("cycle_id", id).order("product_id").abortSignal(deadline)
+        select: () => ({
+          eq: () => {
+            const afterEq = {
+              order: () => afterEq,
+              abortSignal: () => afterEq,
+              then: (resolve: (v: { data: unknown; error: unknown }) => void) =>
+                resolve({ data: cycleProductRows, error: cycleProductsError }),
+            };
+            return afterEq;
+          },
+        }),
+      };
+    }
     return {};
   });
 });
@@ -150,7 +170,6 @@ function activeCycle(overrides: Record<string, unknown> = {}) {
   return {
     id: "cycle-1",
     account_id: "acc-1",
-    product_id: "prod-99",
     status: "ativo",
     created_at: "2026-01-01T00:00:00.000Z",
     last_refresh_at: null,
@@ -439,5 +458,95 @@ describe("POST /api/ultimates/cycles/[id]/refresh", () => {
 
     const clearing = cycleUpdatePayloads.find((p) => p.refresh_started_at === null);
     expect(clearing).toBeDefined();
+  });
+
+  // ── Multi-produto: uma paginação por produto do ciclo ───────────────────────
+  it("pagina uma vez por produto do ciclo e soma o upserted", async () => {
+    cycleRow = activeCycle();
+    lockCount = 1;
+    cycleProductRows = [{ product_id: "prod-a" }, { product_id: "prod-b" }];
+
+    // 1 chamada de token + 1 página por produto, cada uma com 1 item e sem
+    // next_page_token — o total upsertado tem que ser 2.
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ access_token: "tok-abc" }),
+        text: () => Promise.resolve(""),
+      })
+      .mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({ items: [saleItem()], page_info: { next_page_token: undefined } }),
+        text: () => Promise.resolve(""),
+      });
+
+    const res = await callRoute();
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+
+    const salesUrls = (global.fetch as jest.Mock).mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.includes("product_id="));
+
+    expect(salesUrls.some((url) => url.includes("product_id=prod-a"))).toBe(true);
+    expect(salesUrls.some((url) => url.includes("product_id=prod-b"))).toBe(true);
+    expect(body.upserted).toBe(2);
+  });
+
+  it("falha parcial no 2º produto não descarta o upsert já feito do 1º (persistência por produto)", async () => {
+    cycleRow = activeCycle();
+    lockCount = 1;
+    cycleProductRows = [{ product_id: "prod-a" }, { product_id: "prod-b" }];
+
+    // token ok -> página de prod-a ok (1 item, sem next_page_token) -> página
+    // de prod-b falha (resposta não-2xx da Hotmart). Se o upsert só acontecesse
+    // depois do laço inteiro, a venda de prod-a nunca chegaria a ser gravada.
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ access_token: "tok-abc" }),
+        text: () => Promise.resolve(""),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ items: [saleItem()], page_info: {} }),
+        text: () => Promise.resolve(""),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve("boom"),
+      });
+
+    const res = await callRoute();
+    expect(res.status).toBe(502);
+
+    // A venda de prod-a foi upsertada ANTES da falha em prod-b — persistência
+    // por produto, não acumulada em memória até o fim do laço.
+    expect(salesUpsert).toHaveBeenCalledTimes(1);
+    expect(salesUpsert).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ transaction_code: "HP-TX-1" })]),
+      expect.objectContaining({ onConflict: "transaction_code" })
+    );
+
+    // finally libera o lock e grava last_refresh_at mesmo com a falha parcial —
+    // o throttle passa a valer a partir desta tentativa (comportamento inalterado).
+    const clearing = cycleUpdatePayloads.find((p) => p.refresh_started_at === null);
+    expect(clearing).toBeDefined();
+  });
+
+  it("falha com mensagem clara quando o ciclo não tem produtos", async () => {
+    cycleRow = activeCycle();
+    lockCount = 1;
+    cycleProductRows = [];
+    mockTokenAndSales([]);
+
+    const res = await callRoute();
+
+    expect(res.status).toBe(502);
+    expect((await res.json()).error).toMatch(/sem produtos/i);
   });
 });

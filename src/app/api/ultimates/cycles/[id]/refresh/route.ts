@@ -13,8 +13,8 @@ import type { HotmartCredentials } from "@/types/accounts";
 /**
  * Dash Ultimates — "Atualizar agora" (PRD issue #114, seção 6.3, RF-7, critério 8).
  *
- * Busca sob demanda das vendas Hotmart do produto de UM ciclo, sem tocar nos
- * crons globais. Protegida por dois mecanismos:
+ * Busca sob demanda das vendas Hotmart de todos os produtos de UM ciclo, sem
+ * tocar nos crons globais. Protegida por dois mecanismos:
  *  - Throttle: bloqueia refreshes em rajada (< THROTTLE_MS desde last_refresh_at).
  *  - Lock atômico: um único UPDATE condicional em refresh_started_at resolve a
  *    corrida no Postgres. Perdedor sai imediatamente com 409, sem chamar a Hotmart.
@@ -29,6 +29,11 @@ import type { HotmartCredentials } from "@/types/accounts";
  * recompilação do `next dev`, kill de cold start — maxDuration não vale em dev),
  * o TTL do lock é a rede de segurança: outra invocação o rouba após LOCK_TTL_MS.
  * Escrita via service_role (a tabela só permite escrita fora da RLS).
+ *
+ * O orçamento REFRESH_BUDGET_MS é COMPARTILHADO entre todos os produtos do
+ * ciclo, não por produto: um conjunto grande com muito histórico pode estourar
+ * e virar 502. É limitação conhecida (ver spec de 2026-07-30) — aumentar o
+ * orçamento exige rever LOCK_TTL_MS e maxDuration junto.
  */
 
 // A busca escopada pagina a API da Hotmart; folga para não ser cortado pela
@@ -63,7 +68,7 @@ export async function POST(
   // 1. Ciclo existe?
   const { data: cycle, error: cycleErr } = await supabase
     .from("dash_gestao_ultimates_cycles")
-    .select("id, account_id, product_id, status, created_at, last_refresh_at, purchases_only")
+    .select("id, account_id, status, created_at, last_refresh_at, purchases_only")
     .eq("id", id)
     .single();
 
@@ -149,56 +154,107 @@ export async function POST(
     const { client_id, client_secret } = account.credentials as HotmartCredentials;
     const accessToken = await fetchHotmartToken(client_id, client_secret, deadline);
 
+    const { data: cycleProducts, error: cycleProductsErr } = await supabase
+      .from("dash_gestao_ultimates_cycle_products")
+      .select("product_id")
+      .eq("cycle_id", id)
+      // Ordem estável: numa falha parcial (orçamento estourado no meio do laço),
+      // quem fica sem venda gravada nesta tentativa precisa ser sempre o mesmo
+      // sufixo da lista — não um conjunto que varia a cada execução por causa da
+      // ordem de retorno do Postgres.
+      .order("product_id")
+      .abortSignal(deadline);
+
+    if (cycleProductsErr) {
+      throw new Error(`Falha ao ler produtos do ciclo: ${cycleProductsErr.message}`);
+    }
+
+    const productIds = ((cycleProducts ?? []) as { product_id: string }[]).map(
+      (row) => row.product_id
+    );
+
+    if (productIds.length === 0) {
+      throw new Error("Ciclo sem produtos associados");
+    }
+
     // Período do ciclo: da criação até agora. Escopo por product_id (parâmetro
-    // nativo da API sales/history) — busca só as vendas do produto do ciclo.
+    // nativo da API sales/history) — uma paginação completa POR PRODUTO.
     const startMs = new Date(cycle.created_at).getTime();
     const endMs = now.getTime();
 
-    const allItems: HotmartSaleItem[] = [];
-    let pageToken: string | undefined;
-
-    do {
-      const url = new URL(HOTMART_SALES_URL);
-      url.searchParams.set("start_date", String(startMs));
-      url.searchParams.set("end_date", String(endMs));
-      url.searchParams.set("product_id", cycle.product_id);
-      url.searchParams.set("max_results", "500");
-      if (pageToken) url.searchParams.set("page_token", pageToken);
-
-      const res = await fetch(url.toString(), {
-        headers: { Authorization: `Bearer ${accessToken}` },
-        signal: deadline,
-      });
-
-      if (!res.ok) {
-        throw new Error(`Hotmart sales API error: ${res.status} ${await res.text()}`);
-      }
-
-      const data = await res.json();
-      allItems.push(...(data.items ?? []));
-      pageToken = data.page_info?.next_page_token;
-    } while (pageToken);
-
+    // Instante único da coleta: todas as linhas gravadas nesta execução — de
+    // qualquer produto — levam o mesmo collectedAt. Não recalcular dentro do
+    // laço; é o carimbo da EXECUÇÃO, não do produto.
+    const collectedAt = now.toISOString();
     let upserted = 0;
-    if (allItems.length > 0) {
-      const collectedAt = now.toISOString();
-      const rows = allItems.map((item) =>
-        mapHotmartSaleItem(item, cycle.account_id, collectedAt)
-      );
 
-      // Garante que os offer_codes das vendas existam em hotmart_offers antes do
-      // upsert (FK offer_code -> dash_gestao_hotmart_offers) — mesmo pré-upsert
-      // usado por collectHotmart. Necessário para ofertas novas ainda não
-      // sincronizadas por syncHotmartProducts.
-      await upsertPlaceholderOffers(supabase, rows, collectedAt, deadline);
+    // Sequencial de propósito: buscar os produtos em paralelo multiplicaria a
+    // taxa de chamadas à Hotmart pelo tamanho do conjunto.
+    //
+    // pageToken é escopado ao laço de produtos por higiene defensiva. Hoje isso
+    // NÃO muda comportamento: o do...while só sai quando pageToken já é falsy,
+    // então cada produto começaria zerado de qualquer jeito. Passa a ser
+    // load-bearing no instante em que alguém acrescentar um break ou return
+    // antecipado dentro da paginação de um produto.
+    //
+    // O upsert acontece AQUI DENTRO, ao fim da paginação de cada produto — não
+    // depois do laço inteiro. REFRESH_BUDGET_MS é compartilhado por todos os
+    // produtos do ciclo: se o produto seguinte estourar o orçamento (ou a
+    // Hotmart falhar), o throw sobe e o catch responde 502 — mas o que já foi
+    // paginado dos produtos anteriores já está gravado, não é descartado. Sem
+    // essa granularidade, uma falha no meio do laço perderia dezenas de
+    // milhares de linhas em memória, e a retentativa seguinte (determinística:
+    // mesmo start_date, mesma lista de produtos) repetiria o mesmo trabalho até
+    // estourar de novo no mesmo lugar — os produtos do fim da lista nunca
+    // receberiam venda nenhuma.
+    for (const productId of productIds) {
+      const items: HotmartSaleItem[] = [];
+      let pageToken: string | undefined;
 
-      const { error: upsertErr } = await supabase
-        .from("dash_gestao_hotmart_sales")
-        .upsert(rows, { onConflict: "transaction_code" })
-        .abortSignal(deadline);
+      do {
+        const url = new URL(HOTMART_SALES_URL);
+        url.searchParams.set("start_date", String(startMs));
+        url.searchParams.set("end_date", String(endMs));
+        url.searchParams.set("product_id", productId);
+        url.searchParams.set("max_results", "500");
+        if (pageToken) url.searchParams.set("page_token", pageToken);
 
-      if (upsertErr) throw new Error(`Hotmart upsert error: ${upsertErr.message}`);
-      upserted = rows.length;
+        const res = await fetch(url.toString(), {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          signal: deadline,
+        });
+
+        if (!res.ok) {
+          throw new Error(`Hotmart sales API error: ${res.status} ${await res.text()}`);
+        }
+
+        const data = await res.json();
+        items.push(...(data.items ?? []));
+        pageToken = data.page_info?.next_page_token;
+      } while (pageToken);
+
+      if (items.length > 0) {
+        const rows = items.map((item) =>
+          mapHotmartSaleItem(item, cycle.account_id, collectedAt)
+        );
+
+        // Garante que os offer_codes das vendas existam em hotmart_offers antes do
+        // upsert (FK offer_code -> dash_gestao_hotmart_offers) — mesmo pré-upsert
+        // usado por collectHotmart. Necessário para ofertas novas ainda não
+        // sincronizadas por syncHotmartProducts. Precisa continuar valendo POR
+        // LOTE (por produto): se o pré-upsert de offers do produto 3 nunca
+        // rodar, o upsert de sales do produto 3 nem chega a acontecer — mas os
+        // lotes 1 e 2, já com offers + sales gravados, não são afetados.
+        await upsertPlaceholderOffers(supabase, rows, collectedAt, deadline);
+
+        const { error: upsertErr } = await supabase
+          .from("dash_gestao_hotmart_sales")
+          .upsert(rows, { onConflict: "transaction_code" })
+          .abortSignal(deadline);
+
+        if (upsertErr) throw new Error(`Hotmart upsert error: ${upsertErr.message}`);
+        upserted += rows.length;
+      }
     }
 
     // Modo Apenas Compras (migration 059): materializa cada email de venda

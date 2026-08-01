@@ -15,6 +15,7 @@ const mockInsert = jest.fn();
 const mockDeleteEq = jest.fn();
 const mockDelete = jest.fn();
 const mockFrom = jest.fn();
+const mockCycleProductsEq = jest.fn();
 
 jest.mock("@/lib/supabase/server", () => ({
   createSupabaseServiceClient: jest.fn(() => ({ from: mockFrom })),
@@ -36,6 +37,14 @@ beforeEach(() => {
   // Nenhuma oferta excluída por padrão — os casos abaixo que se importam com
   // isso sobrescrevem.
   mockMaybeSingle.mockResolvedValue({ data: null, error: null });
+  // Default de higiene: sem isso, um teste que não enfileira todos os
+  // .single() da rota (com mockResolvedValueOnce) deixa a chamada extra
+  // retornar undefined, e a rota quebra ao desestruturar `{ data }` de
+  // undefined — o teste morre por TypeError, não pela asserção que importa.
+  // Com o default, uma guarda afrouxada deixa a rota seguir até o fim (e
+  // devolver 201), e é a asserção de status que passa a matar o mutante.
+  mockSingle.mockResolvedValue({ data: null, error: null });
+  mockInsertSingle.mockResolvedValue({ data: { id: "link-default" }, error: null });
   mockEq.mockReturnValue({ single: mockSingle, eq: mockEq, maybeSingle: mockMaybeSingle });
   mockSelect.mockReturnValue({ eq: mockEq });
   mockInsertSelect.mockReturnValue({ single: mockInsertSingle });
@@ -43,10 +52,15 @@ beforeEach(() => {
   mockDeleteEq.mockResolvedValue({ error: null });
   mockDelete.mockReturnValue({ eq: mockDeleteEq });
 
-  mockFrom.mockReturnValue({
-    select: mockSelect,
-    insert: mockInsert,
-    delete: mockDelete,
+  // Por padrão o ciclo acompanha só PROD1 — os testes que precisam de mais
+  // sobrescrevem com mockResolvedValueOnce.
+  mockCycleProductsEq.mockResolvedValue({ data: [{ product_id: "PROD1" }], error: null });
+
+  mockFrom.mockImplementation((table: string) => {
+    if (table === "dash_gestao_ultimates_cycle_products") {
+      return { select: () => ({ eq: mockCycleProductsEq }) };
+    }
+    return { select: mockSelect, insert: mockInsert, delete: mockDelete };
   });
 });
 
@@ -87,7 +101,7 @@ describe("POST /api/ultimates/links", () => {
 
   it("returns 409 when cycle is encerrado", async () => {
     mockSingle.mockResolvedValueOnce({
-      data: { id: "c1", product_id: "PROD1", status: "encerrado" },
+      data: { id: "c1", status: "encerrado" },
       error: null,
     });
 
@@ -101,7 +115,7 @@ describe("POST /api/ultimates/links", () => {
 
   it("returns 404 when buyer does not exist", async () => {
     mockSingle
-      .mockResolvedValueOnce({ data: { id: "c1", product_id: "PROD1", status: "ativo" }, error: null })
+      .mockResolvedValueOnce({ data: { id: "c1", status: "ativo" }, error: null })
       .mockResolvedValueOnce({ data: null, error: { code: "PGRST116" } });
 
     const { POST } = await import("../route");
@@ -114,7 +128,7 @@ describe("POST /api/ultimates/links", () => {
 
   it("returns 404 when buyer belongs to a different cycle", async () => {
     mockSingle
-      .mockResolvedValueOnce({ data: { id: "c1", product_id: "PROD1", status: "ativo" }, error: null })
+      .mockResolvedValueOnce({ data: { id: "c1", status: "ativo" }, error: null })
       .mockResolvedValueOnce({ data: { id: "b1", cycle_id: "other-cycle" }, error: null });
 
     const { POST } = await import("../route");
@@ -127,7 +141,7 @@ describe("POST /api/ultimates/links", () => {
 
   it("returns 400 when the transaction does not exist", async () => {
     mockSingle
-      .mockResolvedValueOnce({ data: { id: "c1", product_id: "PROD1", status: "ativo" }, error: null })
+      .mockResolvedValueOnce({ data: { id: "c1", status: "ativo" }, error: null })
       .mockResolvedValueOnce({ data: { id: "b1", cycle_id: "c1" }, error: null })
       .mockResolvedValueOnce({ data: null, error: { code: "PGRST116" } });
 
@@ -136,12 +150,12 @@ describe("POST /api/ultimates/links", () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toBe("Transação não encontrada para o produto deste ciclo");
+    expect(body.error).toBe("Transação não encontrada para os produtos deste ciclo");
   });
 
   it("returns 400 when the transaction belongs to a different product", async () => {
     mockSingle
-      .mockResolvedValueOnce({ data: { id: "c1", product_id: "PROD1", status: "ativo" }, error: null })
+      .mockResolvedValueOnce({ data: { id: "c1", status: "ativo" }, error: null })
       .mockResolvedValueOnce({ data: { id: "b1", cycle_id: "c1" }, error: null })
       .mockResolvedValueOnce({ data: { transaction_code: "T1", product_id: "OTHER_PRODUCT" }, error: null });
 
@@ -150,14 +164,58 @@ describe("POST /api/ultimates/links", () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toBe("Transação não encontrada para o produto deste ciclo");
+    expect(body.error).toBe("Transação não encontrada para os produtos deste ciclo");
+  });
+
+  it("aceita venda de qualquer produto do ciclo", async () => {
+    mockCycleProductsEq.mockResolvedValueOnce({
+      data: [{ product_id: "PROD1" }, { product_id: "PROD2" }],
+      error: null,
+    });
+    // A rota faz quatro .single() em sequência: ciclo, comprador, venda e a
+    // checagem de vínculo já existente (que aqui não existe, por isso "not found").
+    mockSingle
+      .mockResolvedValueOnce({ data: { id: "c1", status: "ativo" }, error: null })
+      .mockResolvedValueOnce({ data: { id: "b1", cycle_id: "c1" }, error: null })
+      .mockResolvedValueOnce({
+        data: { transaction_code: "T1", product_id: "PROD2", offer_code: null },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: null, error: { code: "PGRST116" } });
+    mockInsertSingle.mockResolvedValueOnce({ data: { id: "l1" }, error: null });
+
+    const { POST } = await import("../route");
+    const res = await POST(
+      makeRequest("POST", { cycleId: "c1", buyerId: "b1", transactionCode: "T1" })
+    );
+
+    expect(res.status).toBe(201);
+  });
+
+  it("recusa venda de produto fora do conjunto do ciclo", async () => {
+    mockCycleProductsEq.mockResolvedValueOnce({ data: [{ product_id: "PROD1" }], error: null });
+    mockSingle
+      .mockResolvedValueOnce({ data: { id: "c1", status: "ativo" }, error: null })
+      .mockResolvedValueOnce({ data: { id: "b1", cycle_id: "c1" }, error: null })
+      .mockResolvedValueOnce({
+        data: { transaction_code: "T1", product_id: "FORA", offer_code: null },
+        error: null,
+      });
+
+    const { POST } = await import("../route");
+    const res = await POST(
+      makeRequest("POST", { cycleId: "c1", buyerId: "b1", transactionCode: "T1" })
+    );
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/produtos deste ciclo/i);
   });
 
   it("returns 400 when the transaction belongs to an excluded offer", async () => {
     // A exclusão de oferta vence o vínculo manual (PRD 2026-07-30, decisão 4):
     // vincular aqui criaria um vínculo que nasce sem efeito nenhum.
     mockSingle
-      .mockResolvedValueOnce({ data: { id: "c1", product_id: "PROD1", status: "ativo" }, error: null })
+      .mockResolvedValueOnce({ data: { id: "c1", status: "ativo" }, error: null })
       .mockResolvedValueOnce({ data: { id: "b1", cycle_id: "c1" }, error: null })
       .mockResolvedValueOnce({
         data: { transaction_code: "T1", product_id: "PROD1", offer_code: "OFERTA_TESTE" },
@@ -176,7 +234,7 @@ describe("POST /api/ultimates/links", () => {
 
   it("returns 409 when the transaction is already linked", async () => {
     mockSingle
-      .mockResolvedValueOnce({ data: { id: "c1", product_id: "PROD1", status: "ativo" }, error: null })
+      .mockResolvedValueOnce({ data: { id: "c1", status: "ativo" }, error: null })
       .mockResolvedValueOnce({ data: { id: "b1", cycle_id: "c1" }, error: null })
       .mockResolvedValueOnce({ data: { transaction_code: "T1", product_id: "PROD1" }, error: null })
       .mockResolvedValueOnce({ data: { id: "existing-link" }, error: null });
@@ -191,7 +249,7 @@ describe("POST /api/ultimates/links", () => {
 
   it("creates the link with linked_by set to the authenticated user and returns 201", async () => {
     mockSingle
-      .mockResolvedValueOnce({ data: { id: "c1", product_id: "PROD1", status: "ativo" }, error: null })
+      .mockResolvedValueOnce({ data: { id: "c1", status: "ativo" }, error: null })
       .mockResolvedValueOnce({ data: { id: "b1", cycle_id: "c1" }, error: null })
       .mockResolvedValueOnce({ data: { transaction_code: "T1", product_id: "PROD1" }, error: null })
       .mockResolvedValueOnce({ data: null, error: { code: "PGRST116" } });

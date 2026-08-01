@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
   const { data: cycle, error: cycleError } = await supabase
     .from("dash_gestao_ultimates_cycles")
-    .select("id, product_id, status")
+    .select("id, status")
     .eq("id", cycleId)
     .single();
 
@@ -47,6 +47,21 @@ export async function POST(request: NextRequest) {
   if (cycle.status === "encerrado") {
     return NextResponse.json({ error: "Ciclo encerrado" }, { status: 409 });
   }
+
+  // O conjunto de produtos vive em dash_gestao_ultimates_cycle_products desde a
+  // migration 061 — a venda precisa ser de ALGUM deles.
+  const { data: cycleProducts, error: cycleProductsError } = await supabase
+    .from("dash_gestao_ultimates_cycle_products")
+    .select("product_id")
+    .eq("cycle_id", cycleId);
+
+  if (cycleProductsError) {
+    return NextResponse.json({ error: cycleProductsError.message }, { status: 500 });
+  }
+
+  const cycleProductIds = new Set(
+    ((cycleProducts ?? []) as { product_id: string }[]).map((row) => row.product_id)
+  );
 
   const { data: buyer, error: buyerError } = await supabase
     .from("dash_gestao_ultimates_buyers")
@@ -64,9 +79,9 @@ export async function POST(request: NextRequest) {
     .eq("transaction_code", transactionCode)
     .single();
 
-  if (saleError || !sale || sale.product_id !== cycle.product_id) {
+  if (saleError || !sale || !cycleProductIds.has(sale.product_id)) {
     return NextResponse.json(
-      { error: "Transação não encontrada para o produto deste ciclo" },
+      { error: "Transação não encontrada para os produtos deste ciclo" },
       { status: 400 }
     );
   }

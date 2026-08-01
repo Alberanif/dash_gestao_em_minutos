@@ -16,9 +16,30 @@ const EXCLUDED = [
   },
 ];
 
+// Produtos do ciclo — vêm por prop, não das opções: um produto sem oferta
+// nenhuma não apareceria em OPTIONS e ainda assim precisa ser nomeado na tela.
+const CYCLE_PRODUCTS = [
+  { product_id: "p1", product_name: "Anual" },
+  { product_id: "p2", product_name: "Mensal" },
+];
+
 const OPTIONS = [
-  { offer_code: "PRINCIPAL", offer_name: "Oferta principal", sales_count: 412, is_excluded: false },
-  { offer_code: "OFERTA_TESTE", offer_name: "Oferta interna", sales_count: 3, is_excluded: true },
+  {
+    offer_code: "PRINCIPAL",
+    offer_name: "Oferta principal",
+    product_id: "p1",
+    product_name: "Anual",
+    sales_count: 412,
+    is_excluded: false,
+  },
+  {
+    offer_code: "OFERTA_TESTE",
+    offer_name: "Oferta interna",
+    product_id: "p1",
+    product_name: "Anual",
+    sales_count: 3,
+    is_excluded: true,
+  },
 ];
 
 // Roteia por URL/método em vez de por ordem de chamada — o componente dispara
@@ -56,7 +77,7 @@ describe("ExcludedOffersModal — leitura", () => {
   it("lista cada oferta excluída com nome, código, nota e autor", async () => {
     installFetch({});
     render(
-      <ExcludedOffersModal cycleId="c1" canWrite onChanged={jest.fn()} onClose={jest.fn()} />
+      <ExcludedOffersModal cycleId="c1" cycleProducts={CYCLE_PRODUCTS} canWrite onChanged={jest.fn()} onClose={jest.fn()} />
     );
 
     const row = await screen.findByTestId("ultimates-excluded-offer-OFERTA_TESTE");
@@ -69,7 +90,7 @@ describe("ExcludedOffersModal — leitura", () => {
   it("mostra o estado vazio quando nenhuma oferta está excluída", async () => {
     installFetch({ excluded: [] });
     render(
-      <ExcludedOffersModal cycleId="c1" canWrite onChanged={jest.fn()} onClose={jest.fn()} />
+      <ExcludedOffersModal cycleId="c1" cycleProducts={CYCLE_PRODUCTS} canWrite onChanged={jest.fn()} onClose={jest.fn()} />
     );
 
     expect(await screen.findByTestId("ultimates-excluded-offers-empty")).toBeInTheDocument();
@@ -78,7 +99,7 @@ describe("ExcludedOffersModal — leitura", () => {
   it("oferece no seletor apenas ofertas ainda não excluídas, com o número de vendas", async () => {
     installFetch({});
     render(
-      <ExcludedOffersModal cycleId="c1" canWrite onChanged={jest.fn()} onClose={jest.fn()} />
+      <ExcludedOffersModal cycleId="c1" cycleProducts={CYCLE_PRODUCTS} canWrite onChanged={jest.fn()} onClose={jest.fn()} />
     );
 
     const select = (await screen.findByTestId(
@@ -94,15 +115,36 @@ describe("ExcludedOffersModal — leitura", () => {
 
 describe("ExcludedOffersModal — busca de oferta", () => {
   const SEARCHABLE = [
-    { offer_code: "PRINCIPAL", offer_name: "Oferta principal", sales_count: 412, is_excluded: false },
-    { offer_code: "XYZ123", offer_name: "Cortesia equipe", sales_count: 2, is_excluded: false },
-    { offer_code: "OFERTA_TESTE", offer_name: "Oferta interna", sales_count: 3, is_excluded: true },
+    {
+      offer_code: "PRINCIPAL",
+      offer_name: "Oferta principal",
+      product_id: "p1",
+      product_name: "Anual",
+      sales_count: 412,
+      is_excluded: false,
+    },
+    {
+      offer_code: "XYZ123",
+      offer_name: "Cortesia equipe",
+      product_id: "p1",
+      product_name: "Anual",
+      sales_count: 2,
+      is_excluded: false,
+    },
+    {
+      offer_code: "OFERTA_TESTE",
+      offer_name: "Oferta interna",
+      product_id: "p1",
+      product_name: "Anual",
+      sales_count: 3,
+      is_excluded: true,
+    },
   ];
 
   async function renderWithSearch() {
     installFetch({ options: SEARCHABLE });
     render(
-      <ExcludedOffersModal cycleId="c1" canWrite onChanged={jest.fn()} onClose={jest.fn()} />
+      <ExcludedOffersModal cycleId="c1" cycleProducts={CYCLE_PRODUCTS} canWrite onChanged={jest.fn()} onClose={jest.fn()} />
     );
     return (await screen.findByTestId("ultimates-excluded-offer-select")) as HTMLSelectElement;
   }
@@ -158,6 +200,29 @@ describe("ExcludedOffersModal — busca de oferta", () => {
 
     expect(screen.getByTestId("ultimates-excluded-offer-search-empty")).toBeInTheDocument();
   });
+
+  // O caso real que motivou isto: o gestor busca um código que EXISTE na
+  // Hotmart, mas é de um produto fora do ciclo aberto. A mensagem tem que
+  // apontar para o ciclo errado, não deixar a impressão de que a oferta não
+  // existe.
+  it("a busca vazia nomeia o termo e os produtos do ciclo", async () => {
+    await renderWithSearch();
+    search("6hi1qtmg");
+
+    const aviso = screen.getByTestId("ultimates-excluded-offer-search-empty");
+    expect(aviso).toHaveTextContent("6hi1qtmg");
+    expect(aviso).toHaveTextContent("Anual");
+    expect(aviso).toHaveTextContent("Mensal");
+    expect(aviso).toHaveTextContent(/ciclo selecionado/i);
+  });
+
+  it("declara de quais produtos são as ofertas listadas", async () => {
+    await renderWithSearch();
+
+    expect(screen.getByTestId("ultimates-excluded-offers-scope")).toHaveTextContent(
+      "Anual · Mensal"
+    );
+  });
 });
 
 describe("ExcludedOffersModal — escrita", () => {
@@ -165,7 +230,7 @@ describe("ExcludedOffersModal — escrita", () => {
     const fetchMock = installFetch({});
     const onChanged = jest.fn();
     render(
-      <ExcludedOffersModal cycleId="c1" canWrite onChanged={onChanged} onClose={jest.fn()} />
+      <ExcludedOffersModal cycleId="c1" cycleProducts={CYCLE_PRODUCTS} canWrite onChanged={onChanged} onClose={jest.fn()} />
     );
 
     await screen.findByTestId("ultimates-excluded-offer-select");
@@ -191,7 +256,7 @@ describe("ExcludedOffersModal — escrita", () => {
     const fetchMock = installFetch({ writeStatus: 204 });
     const onChanged = jest.fn();
     render(
-      <ExcludedOffersModal cycleId="c1" canWrite onChanged={onChanged} onClose={jest.fn()} />
+      <ExcludedOffersModal cycleId="c1" cycleProducts={CYCLE_PRODUCTS} canWrite onChanged={onChanged} onClose={jest.fn()} />
     );
 
     fireEvent.click(await screen.findByTestId("ultimates-excluded-offer-remove-OFERTA_TESTE"));
@@ -205,7 +270,7 @@ describe("ExcludedOffersModal — escrita", () => {
   it("mostra a mensagem do servidor quando a exclusão falha", async () => {
     installFetch({ writeStatus: 409, writeError: "Oferta já excluída neste ciclo" });
     render(
-      <ExcludedOffersModal cycleId="c1" canWrite onChanged={jest.fn()} onClose={jest.fn()} />
+      <ExcludedOffersModal cycleId="c1" cycleProducts={CYCLE_PRODUCTS} canWrite onChanged={jest.fn()} onClose={jest.fn()} />
     );
 
     await screen.findByTestId("ultimates-excluded-offer-select");
@@ -222,7 +287,7 @@ describe("ExcludedOffersModal — escrita", () => {
   it("não deixa excluir sem escolher uma oferta", async () => {
     installFetch({});
     render(
-      <ExcludedOffersModal cycleId="c1" canWrite onChanged={jest.fn()} onClose={jest.fn()} />
+      <ExcludedOffersModal cycleId="c1" cycleProducts={CYCLE_PRODUCTS} canWrite onChanged={jest.fn()} onClose={jest.fn()} />
     );
 
     await screen.findByTestId("ultimates-excluded-offer-select");
@@ -236,6 +301,7 @@ describe("ExcludedOffersModal — analista", () => {
     render(
       <ExcludedOffersModal
         cycleId="c1"
+        cycleProducts={CYCLE_PRODUCTS}
         canWrite={false}
         onChanged={jest.fn()}
         onClose={jest.fn()}
@@ -247,5 +313,65 @@ describe("ExcludedOffersModal — analista", () => {
     expect(
       screen.queryByTestId("ultimates-excluded-offer-remove-OFERTA_TESTE")
     ).not.toBeInTheDocument();
+  });
+});
+
+// Cenário que motivou mostrar o produto na linha: com N produtos no ciclo, duas
+// ofertas homônimas de produtos diferentes ficariam indistinguíveis no seletor e
+// o gestor excluiria a errada.
+describe("ExcludedOffersModal — ofertas homônimas de produtos diferentes", () => {
+  // Códigos deliberadamente sem "anual"/"mensal" no texto: se o código
+  // vazasse o termo buscado, a mutação que remove product_name do filtro
+  // passaria escondida atrás do match por código.
+  const HOMONIMAS = [
+    {
+      offer_code: "OFR001",
+      offer_name: "Oferta principal",
+      product_id: "p1",
+      product_name: "Ultimates Anual",
+      sales_count: 412,
+      is_excluded: false,
+    },
+    {
+      offer_code: "OFR002",
+      offer_name: "Oferta principal",
+      product_id: "p2",
+      product_name: "Ultimates Mensal",
+      sales_count: 87,
+      is_excluded: false,
+    },
+  ];
+
+  async function renderHomonimas() {
+    installFetch({ options: HOMONIMAS });
+    render(
+      <ExcludedOffersModal cycleId="c1" cycleProducts={CYCLE_PRODUCTS} canWrite onChanged={jest.fn()} onClose={jest.fn()} />
+    );
+    return (await screen.findByTestId("ultimates-excluded-offer-select")) as HTMLSelectElement;
+  }
+
+  it("mostra o nome do produto em cada linha, distinguindo as duas ofertas", async () => {
+    const select = await renderHomonimas();
+    const textos = Array.from(select.options)
+      .filter((o) => o.value !== "")
+      .map((o) => o.textContent ?? "");
+
+    expect(textos).toHaveLength(2);
+    // Sem o nome do produto na linha, as duas leriam exatamente igual.
+    expect(textos[0]).not.toBe(textos[1]);
+    expect(textos.some((t) => t.includes("Ultimates Anual"))).toBe(true);
+    expect(textos.some((t) => t.includes("Ultimates Mensal"))).toBe(true);
+  });
+
+  it("filtra pelo nome do produto, não só por código e nome da oferta", async () => {
+    const select = await renderHomonimas();
+    fireEvent.change(screen.getByTestId("ultimates-excluded-offer-search"), {
+      target: { value: "mensal" },
+    });
+
+    const codigos = Array.from(select.options)
+      .map((o) => o.value)
+      .filter((v) => v !== "");
+    expect(codigos).toEqual(["OFR002"]);
   });
 });

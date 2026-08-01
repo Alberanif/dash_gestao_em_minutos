@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import type { UltimatesCycleRecord } from "@/types/ultimates";
+import type { UltimatesCycleRecord, UltimatesCycleProductRef } from "@/types/ultimates";
 
-// Ciclo com o nome do produto anexado (join manual com
-// dash_gestao_hotmart_products, feito em memória porque as tabelas não têm
-// FK direto para join via PostgREST). Específico desta rota — ver
-// restrição de não editar src/types/ultimates.ts.
-export interface UltimatesCycleWithProductName extends UltimatesCycleRecord {
-  product_name: string | null;
+// Ciclo com o conjunto de produtos anexado. O join é manual (duas queries em
+// memória) porque as tabelas não têm FK direto para join via PostgREST —
+// mesma razão do join de produto que existia antes da migration 061.
+export interface UltimatesCycleWithProducts extends UltimatesCycleRecord {
+  products: UltimatesCycleProductRef[];
 }
 
 export async function GET() {
@@ -27,15 +26,36 @@ export async function GET() {
   }
 
   const rows = (cycles ?? []) as UltimatesCycleRecord[];
-  const productIds = Array.from(new Set(rows.map((cycle) => cycle.product_id)));
+  const cycleIds = rows.map((cycle) => cycle.id);
+
+  const productIdsByCycle = new Map<string, string[]>();
+  const allProductIds = new Set<string>();
+
+  if (cycleIds.length > 0) {
+    const { data: pairs, error: pairsError } = await supabase
+      .from("dash_gestao_ultimates_cycle_products")
+      .select("cycle_id, product_id")
+      .in("cycle_id", cycleIds);
+
+    if (pairsError) {
+      return NextResponse.json({ error: pairsError.message }, { status: 500 });
+    }
+
+    for (const pair of (pairs ?? []) as { cycle_id: string; product_id: string }[]) {
+      const list = productIdsByCycle.get(pair.cycle_id) ?? [];
+      list.push(pair.product_id);
+      productIdsByCycle.set(pair.cycle_id, list);
+      allProductIds.add(pair.product_id);
+    }
+  }
 
   const productNameById = new Map<string, string>();
 
-  if (productIds.length > 0) {
+  if (allProductIds.size > 0) {
     const { data: products, error: productsError } = await supabase
       .from("dash_gestao_hotmart_products")
       .select("product_id, product_name")
-      .in("product_id", productIds);
+      .in("product_id", Array.from(allProductIds));
 
     if (productsError) {
       return NextResponse.json({ error: productsError.message }, { status: 500 });
@@ -46,12 +66,21 @@ export async function GET() {
     }
   }
 
-  const withProductName: UltimatesCycleWithProductName[] = rows.map((cycle) => ({
+  const withProducts: UltimatesCycleWithProducts[] = rows.map((cycle) => ({
     ...cycle,
-    product_name: productNameById.get(cycle.product_id) ?? null,
+    // Ordem por nome para o header do dashboard ser estável entre requisições
+    // — o PostgREST não garante ordem numa tabela sem order by.
+    products: (productIdsByCycle.get(cycle.id) ?? [])
+      .map((productId) => ({
+        product_id: productId,
+        product_name: productNameById.get(productId) ?? null,
+      }))
+      .sort((a, b) =>
+        (a.product_name ?? a.product_id).localeCompare(b.product_name ?? b.product_id, "pt-BR")
+      ),
   }));
 
-  return NextResponse.json({ cycles: withProductName });
+  return NextResponse.json({ cycles: withProducts });
 }
 
 export async function POST(request: NextRequest) {
@@ -59,7 +88,7 @@ export async function POST(request: NextRequest) {
   if (error) return error;
 
   const body = await request.json().catch(() => null);
-  const { name, productId, goalPercent, purchasesOnly } = body ?? {};
+  const { name, productIds, goalPercent, purchasesOnly } = body ?? {};
 
   if (typeof name !== "string" || name.trim().length === 0) {
     return NextResponse.json({ error: "name é obrigatório" }, { status: 400 });
@@ -78,19 +107,40 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (typeof productId !== "string" || productId.trim().length === 0) {
-    return NextResponse.json({ error: "productId é obrigatório" }, { status: 400 });
+  // Deduplica antes de tudo: a PK composta de cycle_products rejeitaria a
+  // duplicata com um 23505 que não diz nada ao gestor.
+  const ids = Array.isArray(productIds)
+    ? Array.from(
+        new Set(
+          productIds
+            .filter((value): value is string => typeof value === "string")
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0)
+        )
+      )
+    : [];
+
+  if (ids.length === 0) {
+    return NextResponse.json({ error: "Selecione ao menos um produto" }, { status: 400 });
   }
 
   const supabase = createSupabaseServiceClient();
 
-  const { data: product, error: productError } = await supabase
+  // As duas checagens abaixo existem SÓ pela mensagem: quem garante a
+  // invariante é dash_gestao_ultimates_create_cycle, que repete as duas e
+  // levanta exceção. Não remova a validação da RPC confiando nesta.
+  const { data: products, error: productsError } = await supabase
     .from("dash_gestao_hotmart_products")
-    .select("account_id")
-    .eq("product_id", productId)
-    .single();
+    .select("product_id, account_id")
+    .in("product_id", ids);
 
-  if (productError || !product) {
+  if (productsError) {
+    return NextResponse.json({ error: productsError.message }, { status: 500 });
+  }
+
+  const found = (products ?? []) as { product_id: string; account_id: string }[];
+
+  if (found.length !== ids.length) {
     return NextResponse.json(
       {
         error:
@@ -100,22 +150,29 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data: cycle, error: insertError } = await supabase
-    .from("dash_gestao_ultimates_cycles")
-    .insert({
-      name: name.trim(),
-      product_id: productId,
-      account_id: (product as { account_id: string }).account_id,
-      goal_percent: goalPercent ?? null,
-      purchases_only: purchasesOnly ?? false,
-      status: "ativo",
-      created_by: userId,
-    })
-    .select()
-    .single();
+  if (new Set(found.map((product) => product.account_id)).size > 1) {
+    return NextResponse.json(
+      { error: "Todos os produtos devem ser da mesma conta Hotmart" },
+      { status: 400 }
+    );
+  }
 
-  if (insertError) {
-    return NextResponse.json({ error: insertError.message }, { status: 500 });
+  // purchases_only entra pela RPC, não por um update depois: o modo do ciclo é
+  // imutável após a criação (PRD da 059) e um segundo statement poderia falhar
+  // deixando um ciclo de renovação onde o gestor pediu Apenas Compras.
+  const { data: cycle, error: rpcError } = await supabase.rpc(
+    "dash_gestao_ultimates_create_cycle",
+    {
+      p_name: name.trim(),
+      p_product_ids: ids,
+      p_goal_percent: goalPercent ?? null,
+      p_purchases_only: purchasesOnly ?? false,
+      p_created_by: userId,
+    }
+  );
+
+  if (rpcError) {
+    return NextResponse.json({ error: rpcError.message }, { status: 500 });
   }
 
   return NextResponse.json({ cycle }, { status: 201 });
