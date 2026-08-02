@@ -206,6 +206,86 @@
   color: var(--text-strong);
 }
 
+/* Tabelas de origem das compras (cruzamento com a base de inscritos). Markup
+   próprio em vez do DataTable compartilhado: aquele é ordenável por clique, e
+   aqui a ordem É a informação (conversão desc, "Não encontrados" sempre por
+   último). São 2 a 5 linhas — paginação e ordenação não têm o que servir. */
+.ult-origin-card {
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border-vis);
+  border-radius: 11px;
+}
+
+.ult-origin-title {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+/* A rolagem é do container, nunca da página: a tabela tem 4 colunas e no
+   celular a de rótulo pode estourar sozinha. */
+.ult-origin-scroll {
+  overflow-x: auto;
+}
+
+.ult-origin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ult-origin-table th,
+.ult-origin-table td {
+  padding: 9px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-vis);
+  white-space: nowrap;
+}
+
+.ult-origin-table thead th {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-label);
+}
+
+.ult-origin-table tbody tr:last-child th,
+.ult-origin-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Rótulo da linha é <th scope="row">: leitor de tela anuncia "Presencial" ao
+   ler cada célula da linha, em vez de soltar números sem referência. O reset do
+   peso vem porque th é bold por padrão e aqui o destaque é a conversão. */
+.ult-origin-label {
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.ult-origin-num {
+  text-align: right;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.ult-origin-table thead th.ult-origin-num {
+  text-align: right;
+}
+
+.ult-origin-strong {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.ult-origin-empty {
+  color: var(--text-3);
+  text-align: center;
+  padding: 24px 10px;
+}
+
 @media (max-width: 640px) {
   .ult-date-filter {
     align-items: stretch;

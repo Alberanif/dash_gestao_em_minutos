@@ -17,6 +17,8 @@ import {
   applyNewPurchasesModeToCounts,
 } from "@/lib/ultimates/new-purchases-mode";
 import { viewRangeFrom, type DateRange } from "@/lib/ultimates/date-range";
+import { originSourceFor } from "@/lib/ultimates/origin-source";
+import type { OriginBreakdownBlock } from "@/lib/ultimates/origin-breakdown";
 import { fmtDateShort, formatCycleProducts } from "@/lib/ultimates/format";
 import { DateRangeFilter } from "./date-range-filter";
 import { KpiRow } from "./kpi-row";
@@ -25,6 +27,7 @@ import { CumulativeChart } from "./cumulative-chart";
 import { RosterTable } from "./roster-table";
 import { RefreshControls } from "./refresh-controls";
 import { SectionHeader } from "./section-header";
+import { OriginBreakdownTable } from "./origin-breakdown-table";
 import { UploadBuyersModal } from "./upload-buyers-modal";
 import { LinkBuyerModal } from "./link-buyer-modal";
 import { UnlinkBuyerModal } from "./unlink-buyer-modal";
@@ -144,6 +147,13 @@ export function UltimatesDashboard({
   // porque `rosterRange = null` sozinho não distingue "não pedi" de "pedi e não
   // deu", e só o segundo caso merece aviso na barra.
   const [rangeUnavailable, setRangeUnavailable] = useState(false);
+  // Cruzamento das compras com a base de inscritos do evento (seção "Por
+  // origem"). Só existe para o punhado de ciclos configurados em
+  // origin-source.ts — nos demais nada aqui é usado. `null` é "carregando";
+  // a falha tem estado próprio porque a base de inscritos mora fora da fila de
+  // migrations e some sem aviso, e nesse caso a seção precisa DIZER, não sumir.
+  const [originBlocks, setOriginBlocks] = useState<OriginBreakdownBlock[] | null>(null);
+  const [originError, setOriginError] = useState(false);
 
   // Janela de visualização DO CICLO (migration 063). Derivada da prop, nunca
   // estado: ela é propriedade do ciclo e não preferência de quem olha, então
@@ -407,6 +417,75 @@ export function UltimatesDashboard({
   // (ou "Renovação sem vínculo", conforme o modo do ciclo).
   const unattributedRows = viewRoster.filter((r) => r.buyer_id === null);
 
+  // Ciclo com cruzamento de origem configurado, ou null (quase todos). A
+  // referência é estável — vem de um mapa de módulo —, então serve de
+  // dependência de efeito sem memo.
+  const originSource = originSourceFor(cycle.id);
+  // Emails que a tela está exibindo COMO COMPRA, em chave canônica.
+  //
+  // É uma string, e não um array, de propósito: `tableRows` é recalculado a
+  // cada render e um array novo dispararia o efeito abaixo para sempre. String
+  // compara por VALOR na lista de dependências, então o efeito só refaz o
+  // cruzamento quando o conjunto de compras realmente muda. O sort torna a
+  // chave canônica — reordenar o roster não vale um refetch.
+  //
+  // Filtrar por `renovado` é o que faz a soma da coluna "Compras" fechar com o
+  // tile "Compras" do topo: é a mesma categoria que derivePurchaseKpis conta.
+  // Compra reembolsada tem tile próprio e fica de fora dos dois.
+  const originEmailsKey = originSource
+    ? tableRows
+        .filter((r) => r.category === "renovado")
+        .map((r) => r.email)
+        .sort()
+        .join("\n")
+    : "";
+  // O recorte por data chega DEPOIS do roster do ciclo (efeito separado). Sem
+  // esta espera a seção cruzaria primeiro o ciclo inteiro e depois a janela —
+  // no ciclo real são 88 compras piscando antes de virarem 19. O resto do
+  // dashboard tem a mesma janela de transição, mas ali ela é imperceptível; num
+  // número que cai pela metade, não é.
+  const aguardandoRecorte = range !== null && rosterRange === null && !rangeUnavailable;
+
+  useEffect(() => {
+    if (!originSource || loading || aguardandoRecorte) return;
+    let cancelled = false;
+
+    async function load() {
+      // Reset dentro da função async, e não no corpo síncrono do efeito —
+      // react-hooks/set-state-in-effect rejeita setState direto ali (mesmo
+      // contorno das demais cargas deste componente).
+      setOriginBlocks(null);
+      setOriginError(false);
+      try {
+        const res = await fetch(`/api/ultimates/cycles/${cycle.id}/origin-breakdown`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            // "" é ciclo sem nenhuma compra no recorte; split("\n") em string
+            // vazia devolveria [""], um email fantasma que viraria "não
+            // encontrado".
+            emails: originEmailsKey === "" ? [] : originEmailsKey.split("\n"),
+          }),
+        });
+        if (cancelled) return;
+        if (!res.ok) {
+          setOriginError(true);
+          return;
+        }
+        const data = await res.json();
+        if (cancelled) return;
+        setOriginBlocks(Array.isArray(data?.blocks) ? data.blocks : []);
+      } catch {
+        if (!cancelled) setOriginError(true);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [cycle.id, originSource, originEmailsKey, loading, aguardandoRecorte, reloadToken]);
+
   function handleWriteDone() {
     setUploadOpen(false);
     setLinkTarget(null);
@@ -645,6 +724,20 @@ export function UltimatesDashboard({
               onExcludeClick={canExcludeBuyers ? setExcludeTarget : undefined}
             />
           </section>
+
+          {/* Só nos ciclos com base de inscritos configurada. Ausência de
+              configuração NÃO é erro: nos outros ciclos a seção simplesmente
+              não existe, e não há o que avisar. */}
+          {originSource && (
+            <section data-testid="ultimates-origin-section">
+              <SectionHeader index="04" title="Por origem" desc={originSource.desc} />
+              <OriginBreakdownTable
+                blocks={originBlocks}
+                loading={originBlocks === null && !originError}
+                error={originError}
+              />
+            </section>
+          )}
         </div>
       )}
 
