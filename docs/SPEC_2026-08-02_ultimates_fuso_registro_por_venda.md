@@ -285,10 +285,22 @@ os testes. Rodar `npx tsc --noEmit` e `npm test`.
    deixa de bater com prints antigos.
 2. **Vendas entre 21:00 e 23:59 BRT trocam de dia** no gráfico e no filtro.
    Correto e visível — é o sintoma que motivou o trabalho.
-3. **Inlining.** Uma função `sql stable` com CTEs pode não ser inlineada pelo
-   planner, e aí as quatro RPCs pagam uma materialização a mais. O volume é
-   pequeno — `dash_gestao_hotmart_sales` tem 11.902 linhas, das quais 276 nos 9
-   produtos do ciclo — mas medir antes e depois em vez de supor.
+3. **`cycle_sales` NÃO é inlinable — e isso é por construção, não por acaso.**
+   A redação anterior desta spec dizia "pode não ser inlineada, medir antes e
+   depois". Está errado: o planner só faz inlining de função SQL quando
+   `prosecdef = false` **e** `proconfig IS NULL`. Nossa função é
+   `security definer` e tem `set search_path = public` — cada uma das duas,
+   sozinha, já bloqueia. Não há o que medir; a materialização é certa.
+
+   Por que é aceitável mesmo assim: a janela `p_start`/`p_end` é **argumento**
+   da função, então desce para dentro e continua sendo predicado de scan. O
+   filtro de produtos também é interno. O que fica de fora é o
+   `status in ('APPROVED','COMPLETE')` de `daily`/`hourly`, aplicado depois da
+   materialização — sobre o universo do ciclo, que tem 276 linhas dos 11.902
+   registros de `dash_gestao_hotmart_sales`. É ruído.
+
+   Tornar a função inlinable exigiria abrir mão de `security definer`, o que
+   quebraria o modelo de RLS do módulo. Não vale a troca.
 4. **Blast radius.** `roster`, `daily` e `hourly` são reescritas ao mesmo tempo. A
    assinatura e o retorno das três não mudam, mas o corpo muda inteiro; a
    verificação precisa cobrir o ciclo de renovação, não só o Apenas Compras.
