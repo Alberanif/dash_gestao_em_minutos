@@ -5,7 +5,7 @@ import type { UserRole } from "@/types/auth";
 import type { UltimatesDailyRow, UltimatesHourlyRow, UltimatesRosterRow } from "@/types/ultimates";
 import type { CycleWithProducts } from "./types";
 import { aggregateRosterKpis } from "@/lib/ultimates/kpi-aggregation";
-import { derivePurchaseKpis } from "@/lib/ultimates/purchases-mode";
+import { countPurchasesForEmail, derivePurchaseKpis } from "@/lib/ultimates/purchases-mode";
 import {
   buildCumulativeSeries,
   buildHourlyCumulativeSeries,
@@ -732,7 +732,11 @@ export function UltimatesDashboard({
             <SectionHeader
               index={originSource ? "04" : "03"}
               title="Roster"
-              desc="Compradores do ciclo, busca e exportação"
+              desc={
+                purchasesOnly
+                  ? "Compras do ciclo, busca e exportação"
+                  : "Compradores do ciclo, busca e exportação"
+              }
             />
             <RosterTable
               rows={tableRows}
@@ -784,6 +788,7 @@ export function UltimatesDashboard({
         <ExcludeBuyerModal
           cycleId={cycle.id}
           targetRow={excludeTarget}
+          purchaseCount={countPurchasesForEmail(tableRows, excludeTarget.email)}
           onExcluded={handleWriteDone}
           onCancel={() => setExcludeTarget(null)}
         />

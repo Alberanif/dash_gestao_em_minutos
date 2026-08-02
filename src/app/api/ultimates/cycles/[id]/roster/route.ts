@@ -37,7 +37,7 @@ export async function GET(
 
   const { data: cycle, error: cycleError } = await supabase
     .from("dash_gestao_ultimates_cycles")
-    .select("id")
+    .select("id, purchases_only")
     .eq("id", id)
     .single();
 
@@ -45,7 +45,16 @@ export async function GET(
     return NextResponse.json({ error: "Ciclo não encontrado" }, { status: 404 });
   }
 
-  const { data, error: rpcError } = await supabase.rpc("dash_gestao_ultimates_roster", {
+  // Modo Apenas Compras (spec 2026-08-02): o objeto do ciclo é a COMPRA, não a
+  // pessoa, então a lista vem com uma linha por VENDA. As duas RPCs devolvem o
+  // MESMO shape de linha — só a granularidade muda —, e é por isso que nada
+  // abaixo daqui, nem no cliente, precisa ramificar.
+  const porVenda = cycle.purchases_only === true;
+  const rpcName = porVenda
+    ? "dash_gestao_ultimates_purchases"
+    : "dash_gestao_ultimates_roster";
+
+  const { data, error: rpcError } = await supabase.rpc(rpcName, {
     p_cycle_id: id,
     // Só manda as chaves quando há intervalo: assim a chamada sem filtro
     // continua batendo na assinatura de um argumento e segue funcionando com a
@@ -54,17 +63,26 @@ export async function GET(
   });
 
   if (rpcError) {
-    // PGRST202 = "função não existe com essa assinatura". Com intervalo pedido,
-    // isso significa migration 058 pendente — situação esperada neste ambiente,
-    // cuja fila de migrations anda dias atrás do código. 501 ("não
-    // implementado") deixa o cliente distinguir "ainda não subiu" de falha real
-    // e degradar só o recorte, sem derrubar o dashboard. Sem intervalo não há
-    // recorte a degradar, então ali o mesmo código continua sendo 500.
-    if (range && rpcError.code === "PGRST202") {
-      return NextResponse.json(
-        { error: "Recorte por data indisponível" },
-        { status: 501 }
-      );
+    // PGRST202 = "função não existe com essa assinatura". Duas causas
+    // possíveis, e o cliente precisa distinguir para degradar certo.
+    if (rpcError.code === "PGRST202") {
+      // Migration 064 pendente: a lista por venda não existe. NÃO caímos de
+      // volta na roster — mostraria o número por comprador em silêncio, que é
+      // exatamente o bug que a 064 corrige.
+      if (porVenda) {
+        return NextResponse.json(
+          { error: "Lista por venda indisponível: aplique a migration 064" },
+          { status: 501 }
+        );
+      }
+      // Migration 058 pendente: só o recorte por data degrada. Sem intervalo
+      // não há recorte a degradar, então ali o mesmo código continua sendo 500.
+      if (range) {
+        return NextResponse.json(
+          { error: "Recorte por data indisponível" },
+          { status: 501 }
+        );
+      }
     }
     return NextResponse.json({ error: rpcError.message }, { status: 500 });
   }
@@ -76,5 +94,8 @@ export async function GET(
       : Number(row.total_value),
   }));
 
-  return NextResponse.json({ rows });
+  return NextResponse.json({
+    rows,
+    granularity: porVenda ? "venda" : "comprador",
+  });
 }

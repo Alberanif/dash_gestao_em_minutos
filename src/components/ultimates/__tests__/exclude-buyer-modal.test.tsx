@@ -120,3 +120,56 @@ describe("ExcludeBuyerModal — POST", () => {
     expect(onCancel).toHaveBeenCalled();
   });
 });
+
+// No modo Apenas Compras (migration 064) a lista é por VENDA: um comprador
+// ocupa uma linha por compra. A exclusão continua gravada por EMAIL, então
+// excluir a partir de uma linha remove todas as outras junto — e isso precisa
+// estar dito antes da confirmação, não descoberto depois.
+describe("ExcludeBuyerModal — aviso de múltiplas compras", () => {
+  it("com uma compra só, mantém o aviso no singular", () => {
+    render(
+      <ExcludeBuyerModal
+        cycleId="c1"
+        targetRow={COM_COMPRA}
+        purchaseCount={1}
+        onExcluded={jest.fn()}
+        onCancel={jest.fn()}
+      />
+    );
+
+    const aviso = screen.getByTestId("ultimates-exclude-sale-warning");
+    expect(aviso.textContent).not.toMatch(/2 compras/);
+    expect(aviso).toHaveTextContent("497");
+  });
+
+  it("com mais de uma compra, avisa que TODAS saem", () => {
+    render(
+      <ExcludeBuyerModal
+        cycleId="c1"
+        targetRow={COM_COMPRA}
+        purchaseCount={2}
+        onExcluded={jest.fn()}
+        onCancel={jest.fn()}
+      />
+    );
+
+    const aviso = screen.getByTestId("ultimates-exclude-sale-warning");
+    expect(aviso.textContent).toMatch(/2 compras/);
+    expect(aviso).toHaveTextContent("todas elas");
+  });
+
+  it("sem a prop, não quebra e trata como uma compra", () => {
+    render(
+      <ExcludeBuyerModal
+        cycleId="c1"
+        targetRow={COM_COMPRA}
+        onExcluded={jest.fn()}
+        onCancel={jest.fn()}
+      />
+    );
+
+    const aviso = screen.getByTestId("ultimates-exclude-sale-warning");
+    expect(aviso).toBeTruthy();
+    expect(aviso.textContent).not.toMatch(/compras/);
+  });
+});

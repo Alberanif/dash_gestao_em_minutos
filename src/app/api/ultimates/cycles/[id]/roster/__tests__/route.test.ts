@@ -32,7 +32,7 @@ beforeEach(() => {
   mockSelect.mockReturnValue({ eq: mockEq });
   mockFrom.mockReturnValue({ select: mockSelect });
 
-  mockSingle.mockResolvedValue({ data: { id: "cycle-1" }, error: null });
+  mockSingle.mockResolvedValue({ data: { id: "cycle-1", purchases_only: false }, error: null });
   mockRpc.mockResolvedValue({ data: [], error: null });
 });
 
@@ -256,5 +256,91 @@ describe("GET /api/ultimates/cycles/[id]/roster — recorte por intervalo", () =
     );
 
     expect(res.status).toBe(500);
+  });
+});
+
+describe("GET /api/ultimates/cycles/[id]/roster — granularidade por modo", () => {
+  it("ciclo de renovação usa a RPC de roster e se declara por comprador", async () => {
+    mockSingle.mockResolvedValueOnce({
+      data: { id: "cycle-1", purchases_only: false },
+      error: null,
+    });
+
+    const { GET } = await import("../route");
+    const res = await GET(
+      makeRequest("http://localhost/api/ultimates/cycles/cycle-1/roster"),
+      makeParams("cycle-1")
+    );
+    const body = await res.json();
+
+    expect(mockRpc).toHaveBeenCalledWith("dash_gestao_ultimates_roster", {
+      p_cycle_id: "cycle-1",
+    });
+    expect(body.granularity).toBe("comprador");
+  });
+
+  it("ciclo Apenas Compras usa a RPC de vendas e se declara por venda", async () => {
+    mockSingle.mockResolvedValueOnce({
+      data: { id: "cycle-1", purchases_only: true },
+      error: null,
+    });
+
+    const { GET } = await import("../route");
+    const res = await GET(
+      makeRequest("http://localhost/api/ultimates/cycles/cycle-1/roster"),
+      makeParams("cycle-1")
+    );
+    const body = await res.json();
+
+    expect(mockRpc).toHaveBeenCalledWith("dash_gestao_ultimates_purchases", {
+      p_cycle_id: "cycle-1",
+    });
+    expect(body.granularity).toBe("venda");
+  });
+
+  it("repassa o intervalo à RPC de vendas no modo Apenas Compras", async () => {
+    mockSingle.mockResolvedValueOnce({
+      data: { id: "cycle-1", purchases_only: true },
+      error: null,
+    });
+
+    const { GET } = await import("../route");
+    await GET(
+      makeRequest(
+        "http://localhost/api/ultimates/cycles/cycle-1/roster?start=2026-08-01&end=2026-08-02"
+      ),
+      makeParams("cycle-1")
+    );
+
+    expect(mockRpc).toHaveBeenCalledWith("dash_gestao_ultimates_purchases", {
+      p_cycle_id: "cycle-1",
+      p_start: "2026-08-01",
+      p_end: "2026-08-02",
+    });
+  });
+
+  it("devolve 501 nomeando a migration 064 quando a RPC de vendas não existe", async () => {
+    mockSingle.mockResolvedValueOnce({
+      data: { id: "cycle-1", purchases_only: true },
+      error: null,
+    });
+    mockRpc.mockResolvedValueOnce({
+      data: null,
+      error: {
+        code: "PGRST202",
+        message:
+          "Could not find the function public.dash_gestao_ultimates_purchases(p_cycle_id) in the schema cache",
+      },
+    });
+
+    const { GET } = await import("../route");
+    const res = await GET(
+      makeRequest("http://localhost/api/ultimates/cycles/cycle-1/roster"),
+      makeParams("cycle-1")
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(501);
+    expect(body.error).toContain("064");
   });
 });

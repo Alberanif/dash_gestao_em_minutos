@@ -1,4 +1,8 @@
-import { purchaseCategoryLabel, derivePurchaseKpis } from "../purchases-mode";
+import {
+  purchaseCategoryLabel,
+  derivePurchaseKpis,
+  countPurchasesForEmail,
+} from "../purchases-mode";
 import { categoryLabel } from "../format";
 import type { UltimatesRosterRow } from "@/types/ultimates";
 
@@ -78,5 +82,53 @@ describe("derivePurchaseKpis", () => {
       comprasReembolsadas: 0,
       valorTotal: 0,
     });
+  });
+});
+
+// Com a lista por venda (migration 064) o mesmo email ocupa uma linha por
+// compra. Estes dois travam a contagem POR LINHA contra uma regressão futura
+// que voltasse a deduplicar por comprador.
+describe("derivePurchaseKpis — uma linha por venda", () => {
+  it("conta as duas compras do mesmo email como duas", () => {
+    const rows = [
+      row({ email: "tati@x.com", category: "renovado", total_value: 100, transaction_code: "T1" }),
+      row({ email: "tati@x.com", category: "renovado", total_value: 250, transaction_code: "T2" }),
+    ];
+
+    const kpis = derivePurchaseKpis(rows, true);
+
+    expect(kpis).toEqual({ compras: 2, comprasReembolsadas: 0, valorTotal: 350 });
+  });
+
+  it("separa compra aprovada de compra estornada do mesmo email", () => {
+    const rows = [
+      row({ email: "tati@x.com", category: "renovado", total_value: 100, transaction_code: "T1" }),
+      row({
+        email: "tati@x.com",
+        category: "renovacao_reembolsada",
+        total_value: null,
+        transaction_code: "T2",
+      }),
+    ];
+
+    const kpis = derivePurchaseKpis(rows, true);
+
+    expect(kpis).toEqual({ compras: 1, comprasReembolsadas: 1, valorTotal: 100 });
+  });
+});
+
+describe("countPurchasesForEmail", () => {
+  it("conta as linhas do mesmo email, ignorando caixa e espaços de borda", () => {
+    const rows = [
+      row({ email: "Tati@X.com ", transaction_code: "T1" }),
+      row({ email: "tati@x.com", transaction_code: "T2" }),
+      row({ email: "outro@x.com", transaction_code: "T3" }),
+    ];
+
+    expect(countPurchasesForEmail(rows, "tati@x.com")).toBe(2);
+  });
+
+  it("devolve 0 para email ausente", () => {
+    expect(countPurchasesForEmail([], "ninguem@x.com")).toBe(0);
   });
 });

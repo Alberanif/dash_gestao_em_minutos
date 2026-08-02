@@ -63,3 +63,23 @@ export function derivePurchaseKpis(
 
   return { compras, comprasReembolsadas, valorTotal };
 }
+
+// Quantas linhas da visão atual pertencem a este email. Existe por causa da
+// granularidade por venda: excluir age por COMPRADOR, então clicar em "excluir"
+// numa linha remove todas as compras daquele email — e quem confirma precisa
+// saber quantas são antes, não depois.
+//
+// Normaliza dos dois lados no mesmo idioma do resto do módulo (lower + btrim),
+// porque a linha de venda traz o email da Hotmart e a linha de comprador traz o
+// do cadastro; as duas grafias convivem na mesma tabela.
+export function countPurchasesForEmail(
+  rows: UltimatesRosterRow[],
+  email: string
+): number {
+  const alvo = email.trim().toLowerCase();
+  let n = 0;
+  for (const r of rows) {
+    if (r.email.trim().toLowerCase() === alvo) n += 1;
+  }
+  return n;
+}
