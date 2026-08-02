@@ -151,6 +151,43 @@ describe("seção Por origem", () => {
     expect(screen.queryByTestId("ultimates-dashboard-error")).not.toBeInTheDocument();
   });
 
+  // A ordem das seções É informação: origem antes do Roster porque a leitura
+  // vai do agregado para o nominal, e o Roster é a seção mais longa da página.
+  // Sem esta guarda, qualquer refactor do JSX de ~120 linhas do dashboard
+  // desfaz a ordem sem ninguém notar.
+  it("renderiza Por origem antes do Roster", async () => {
+    mockFetch();
+    renderDashboard(makeCycle({ id: CYCLE_COM_ORIGEM, name: "Pitch PC Ao Vivo - 2026" }));
+
+    await screen.findByTestId("ultimates-origin-section");
+
+    const titulos = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    expect(titulos).toEqual(["Visão do ciclo", "Evolução", "Por origem", "Roster"]);
+  });
+
+  // O índice do Roster é derivado, não literal: com "04" fixo, todo ciclo SEM
+  // cruzamento de origem — que é a maioria — exibiria 01 → 02 → 04.
+  it("numera as seções sem buraco nos dois casos", async () => {
+    const indiceDe = (titulo: string) =>
+      screen.getByText(titulo).previousElementSibling?.textContent;
+
+    mockFetch();
+    const comOrigem = renderDashboard(
+      makeCycle({ id: CYCLE_COM_ORIGEM, name: "Pitch PC Ao Vivo - 2026" })
+    );
+    await screen.findByTestId("ultimates-origin-section");
+    expect(indiceDe("Por origem")).toBe("03");
+    expect(indiceDe("Roster")).toBe("04");
+    comOrigem.unmount();
+
+    mockFetch();
+    renderDashboard(makeCycle());
+    await screen.findByTestId("ultimates-selected-cycle");
+    await waitFor(() => expect(screen.getByText("Roster")).toBeInTheDocument());
+    expect(screen.queryByTestId("ultimates-origin-section")).not.toBeInTheDocument();
+    expect(indiceDe("Roster")).toBe("03");
+  });
+
   it("não cruza o ciclo inteiro antes da janela chegar", async () => {
     // Com período salvo, o roster recortado chega DEPOIS do roster do ciclo.
     // Cruzar no meio do caminho mostraria o número do ciclo inteiro piscando.

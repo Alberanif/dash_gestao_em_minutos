@@ -84,6 +84,16 @@ function KpiTile({
           letterSpacing: "-0.02em",
           color: "var(--text-strong)",
           lineHeight: 1.1,
+          // Rede de segurança, não o conserto: quem dá largura ao valor no
+          // celular é a regra `:last-child:nth-child(odd)` de ultimates.css.
+          // `anywhere` existe porque moeda formatada é um token inquebrável
+          // (NBSP entre "R$" e o número) — sem isso, um valor grande o bastante
+          // volta a sair para fora do card em vez de quebrar. Não dispara com
+          // dado realista.
+          overflowWrap: "anywhere",
+          // Dígitos de mesma largura: os tiles ficam lado a lado e números de
+          // tamanhos diferentes não dançam. Mesmo tratamento de .ult-origin-num.
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {value}
