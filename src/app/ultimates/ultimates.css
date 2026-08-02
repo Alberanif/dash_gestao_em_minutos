@@ -64,6 +64,20 @@
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
   }
+
+  /* Contagem ímpar de tiles: o último ocupa a linha inteira. Em 360px a coluna
+     de meia largura deixa ~121px de conteúdo, e `R$ 211.867,76` é um token
+     INQUEBRÁVEL de ~170px a 26px — o NBSP que o Intl põe entre símbolo e número
+     não é oportunidade de quebra. Com `minWidth: 0` no tile (kpi-row.tsx) a
+     track não estica, então o valor transbordava para fora do card.
+
+     `:nth-child(odd)` e não `:nth-child(3)` de propósito: vale igual para os 3
+     tiles do modo Apenas Compras e para os 5 do modo renovação — amarrar a uma
+     contagem faria a regra deixar de valer em silêncio ao ganhar ou perder um
+     tile. Como efeito colateral desejado, some o card órfão com buraco ao lado. */
+  .ult-kpi-grid > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
 }
 
 /* Corpo do gráfico — altura via CSS para o mobile reduzir sem re-render */

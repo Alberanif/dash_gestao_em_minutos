@@ -707,8 +707,33 @@ export function UltimatesDashboard({
             />
           </section>
 
+          {/* Só nos ciclos com base de inscritos configurada. Ausência de
+              configuração NÃO é erro: nos outros ciclos a seção simplesmente
+              não existe, e não há o que avisar.
+
+              Vem ANTES do Roster: a leitura natural é ciclo → evolução → de
+              onde vieram as vendas, e só então a lista nominal, que é a seção
+              de trabalho e a mais longa da página. */}
+          {originSource && (
+            <section data-testid="ultimates-origin-section">
+              <SectionHeader index="03" title="Por origem" desc={originSource.desc} />
+              <OriginBreakdownTable
+                blocks={originBlocks}
+                loading={originBlocks === null && !originError}
+                error={originError}
+              />
+            </section>
+          )}
+
           <section>
-            <SectionHeader index="03" title="Roster" desc="Compradores do ciclo, busca e exportação" />
+            {/* Índice derivado da presença da seção acima, e não literal: sem
+                isso os ciclos sem cruzamento de origem — todos os outros —
+                exibiriam 01 → 02 → 04. */}
+            <SectionHeader
+              index={originSource ? "04" : "03"}
+              title="Roster"
+              desc="Compradores do ciclo, busca e exportação"
+            />
             <RosterTable
               rows={tableRows}
               role={role}
@@ -724,20 +749,6 @@ export function UltimatesDashboard({
               onExcludeClick={canExcludeBuyers ? setExcludeTarget : undefined}
             />
           </section>
-
-          {/* Só nos ciclos com base de inscritos configurada. Ausência de
-              configuração NÃO é erro: nos outros ciclos a seção simplesmente
-              não existe, e não há o que avisar. */}
-          {originSource && (
-            <section data-testid="ultimates-origin-section">
-              <SectionHeader index="04" title="Por origem" desc={originSource.desc} />
-              <OriginBreakdownTable
-                blocks={originBlocks}
-                loading={originBlocks === null && !originError}
-                error={originError}
-              />
-            </section>
-          )}
         </div>
       )}
 
