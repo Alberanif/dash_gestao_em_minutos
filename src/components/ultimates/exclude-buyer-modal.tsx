@@ -8,6 +8,10 @@ interface ExcludeBuyerModalProps {
   cycleId: string;
   // Linha da BASE (buyer_id != null) que sai da contabilidade do ciclo.
   targetRow: UltimatesRosterRow;
+  // Quantas linhas da visão atual são deste email. No modo Apenas Compras a
+  // lista é por VENDA, então um comprador pode ocupar várias linhas — e excluir
+  // remove todas de uma vez, porque a exclusão é gravada por email.
+  purchaseCount?: number;
   onExcluded: () => void;
   onCancel: () => void;
 }
@@ -23,7 +27,13 @@ interface ExcludeBuyerModalProps {
 // aplicar sem perceber: excluir alguém que renovou tira a RECEITA dele das
 // curvas e do total, não só a linha da tabela. Quem confirma precisa ver o
 // valor antes.
-export function ExcludeBuyerModal({ cycleId, targetRow, onExcluded, onCancel }: ExcludeBuyerModalProps) {
+export function ExcludeBuyerModal({
+  cycleId,
+  targetRow,
+  purchaseCount,
+  onExcluded,
+  onCancel,
+}: ExcludeBuyerModalProps) {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -39,6 +49,11 @@ export function ExcludeBuyerModal({ cycleId, targetRow, onExcluded, onCancel }: 
   // "Tem compra" é ter transação aprovada — total_value/renewed_at só existem
   // quando alguma venda foi atribuída a esta pessoa.
   const temCompra = targetRow.transaction_code !== null;
+
+  // Ausência da prop = chamador que ainda não conta linhas (ciclo de renovação,
+  // onde a lista é por comprador e uma linha é sempre uma pessoa).
+  const compras = purchaseCount ?? 1;
+  const temVarias = compras > 1;
 
   async function handleConfirm() {
     setError("");
@@ -84,10 +99,20 @@ export function ExcludeBuyerModal({ cycleId, targetRow, onExcluded, onCancel }: 
 
         {temCompra && (
           <p data-testid="ultimates-exclude-sale-warning" style={feedbackStyle("var(--amber)")}>
-            Esta pessoa tem uma renovação de{" "}
-            <strong>{targetRow.total_value === null ? "valor não informado" : fmtBRL(targetRow.total_value)}</strong>{" "}
-            em {fmtDateFull(targetRow.renewed_at)}. Excluí-la remove também essa compra da
-            contabilidade do ciclo.
+            {temVarias ? (
+              <>
+                Esta pessoa tem <strong>{compras} compras</strong> no período exibido.
+                Excluí-la remove <strong>todas elas</strong> da contabilidade do ciclo,
+                não só a linha clicada — a exclusão é gravada por email.
+              </>
+            ) : (
+              <>
+                Esta pessoa tem uma renovação de{" "}
+                <strong>{targetRow.total_value === null ? "valor não informado" : fmtBRL(targetRow.total_value)}</strong>{" "}
+                em {fmtDateFull(targetRow.renewed_at)}. Excluí-la remove também essa compra da
+                contabilidade do ciclo.
+              </>
+            )}
           </p>
         )}
 
