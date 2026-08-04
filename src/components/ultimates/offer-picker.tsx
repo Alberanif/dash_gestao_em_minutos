@@ -2,6 +2,11 @@
 
 import { useMemo, useState } from "react";
 import type { UltimatesOfferOption } from "@/types/ultimates";
+import {
+  OFFERLESS_LABEL,
+  offerMatchesSearch,
+  offerlessMatchesSearch,
+} from "@/lib/ultimates/cycle-offers";
 
 // Sanfona de ofertas de UM produto do ciclo (migration 065, PRD
 // docs/PRD_2026-08-04_ultimates_ofertas_do_ciclo.md, seção 4.1).
@@ -14,10 +19,11 @@ import type { UltimatesOfferOption } from "@/types/ultimates";
 // Recolhida por padrão: o modal é aberto por rotina (renomear ciclo, mudar
 // meta) e um ciclo com muitos produtos viraria uma página de rolagem antes de
 // mostrar o campo Nome.
-
-// A partir de quantas ofertas a sanfona ganha campo de busca. Abaixo disso o
-// campo só ocuparia espaço — a lista inteira cabe sem rolar.
-const BUSCA_A_PARTIR_DE = 6;
+//
+// A BUSCA é do modal, não daqui. Houve um campo por sanfona; ele morreu quando
+// a busca subiu para baixo da barra de produtos. Dois campos filtrando a mesma
+// lista obrigariam a repetir o termo em cada produto para varrer o ciclo, que é
+// justamente o trabalho que a busca deveria poupar.
 
 export interface OfferPickerProps {
   productId: string;
@@ -29,6 +35,13 @@ export interface OfferPickerProps {
   offerlessCount: number;
   selectedOfferCodes: string[];
   includeOfferless: boolean;
+  // Termo CRU da busca do modal (vazio = sem busca). A normalização mora em
+  // cycle-offers.ts, junto com o filtro que decide se este produto entra na
+  // lista — os dois precisam concordar sobre o que casa.
+  search: string;
+  // Busca ativa: a sanfona abre sozinha. Ter de expandir produto por produto
+  // depois de buscar devolveria o trabalho que a busca acabou de tirar.
+  forceOpen: boolean;
   loading: boolean;
   loadError: boolean;
   // Produto sem nenhuma escolha — borda de erro no item e mensagem aqui.
@@ -44,6 +57,8 @@ export function OfferPicker({
   offerlessCount,
   selectedOfferCodes,
   includeOfferless,
+  search,
+  forceOpen,
   loading,
   loadError,
   invalid,
@@ -52,9 +67,14 @@ export function OfferPicker({
   onRetry,
 }: OfferPickerProps) {
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const buscando = search.trim() !== "";
+  // `open` continua sendo a preferência do gestor e sobrevive à busca: limpar o
+  // termo devolve cada sanfona ao estado em que ele a deixou.
+  const aberta = open || forceOpen;
 
   const temOfferless = offerlessCount > 0;
+  // Contadores do cabeçalho são do PRODUTO, não do resultado da busca: é o
+  // número que ele leva para o salvar.
   const total = offers.length + (temOfferless ? 1 : 0);
   const escolhidas = selectedOfferCodes.length + (includeOfferless ? 1 : 0);
 
@@ -62,15 +82,17 @@ export function OfferPicker({
   // esconder o que está contando faria o contador do cabeçalho discordar da
   // lista, e desmarcar por engano custaria linha de roster (PRD 3.5).
   const visiveis = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    if (needle === "") return offers;
+    if (!buscando) return offers;
     return offers.filter(
       (offer) =>
-        selectedOfferCodes.includes(offer.offer_code) ||
-        offer.offer_name.toLowerCase().includes(needle) ||
-        offer.offer_code.toLowerCase().includes(needle)
+        selectedOfferCodes.includes(offer.offer_code) || offerMatchesSearch(offer, search)
     );
-  }, [offers, search, selectedOfferCodes]);
+  }, [offers, search, buscando, selectedOfferCodes]);
+
+  // Mesma regra da linha fixa: some na busca que não a nomeia, a não ser que
+  // esteja marcada.
+  const mostrarOfferless =
+    temOfferless && (!buscando || includeOfferless || offerlessMatchesSearch(search));
 
   return (
     <div
@@ -103,30 +125,42 @@ export function OfferPicker({
 
       {!loading && !loadError && (
         <>
-          <button
-            type="button"
-            aria-expanded={open}
-            onClick={() => setOpen((v) => !v)}
-            data-testid={`cycle-form-offers-toggle-${productId}`}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              background: "none",
-              border: "none",
-              padding: 0,
-              fontSize: 12,
-              fontFamily: "inherit",
-              color: "var(--text-muted)",
-              cursor: "pointer",
-              textAlign: "left",
-            }}
-          >
-            <span aria-hidden="true">{open ? "▾" : "▸"}</span>
-            <span>
+          {/* Sob busca o cabeçalho vira texto: a sanfona está aberta porque o
+              termo a abriu, e um botão que não recolhe nada seria um clique
+              morto. Sem busca ele volta a ser o controle de sempre. */}
+          {forceOpen ? (
+            <p
+              data-testid={`cycle-form-offers-count-${productId}`}
+              style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}
+            >
               {escolhidas} de {total} {total === 1 ? "oferta" : "ofertas"}
-            </span>
-          </button>
+            </p>
+          ) : (
+            <button
+              type="button"
+              aria-expanded={open}
+              onClick={() => setOpen((v) => !v)}
+              data-testid={`cycle-form-offers-toggle-${productId}`}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                background: "none",
+                border: "none",
+                padding: 0,
+                fontSize: 12,
+                fontFamily: "inherit",
+                color: "var(--text-muted)",
+                cursor: "pointer",
+                textAlign: "left",
+              }}
+            >
+              <span aria-hidden="true">{open ? "▾" : "▸"}</span>
+              <span>
+                {escolhidas} de {total} {total === 1 ? "oferta" : "ofertas"}
+              </span>
+            </button>
+          )}
 
           {/* Mensagem visível mesmo com a sanfona recolhida: é o que explica a
               borda de erro do item sem obrigar a abrir tudo para descobrir. */}
@@ -139,7 +173,7 @@ export function OfferPicker({
             </p>
           )}
 
-          {open && total === 0 && (
+          {aberta && total === 0 && (
             <p
               data-testid={`cycle-form-offers-empty-${productId}`}
               style={{ fontSize: 11, color: "var(--text-muted)", margin: 0, lineHeight: 1.5 }}
@@ -149,71 +183,50 @@ export function OfferPicker({
             </p>
           )}
 
-          {open && total > 0 && (
-            <>
-              {offers.length > BUSCA_A_PARTIR_DE && (
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Buscar oferta por nome ou código"
-                  aria-label="Buscar oferta por nome ou código"
-                  className="field-control"
-                  data-testid={`cycle-form-offer-search-${productId}`}
-                  style={{ fontSize: 12 }}
-                />
-              )}
-
-              <ul
-                style={{
-                  listStyle: "none",
-                  margin: 0,
-                  padding: 0,
-                  maxHeight: 180,
-                  overflowY: "auto",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 4,
-                }}
-              >
-                {visiveis.map((offer) => {
-                  const marcada = selectedOfferCodes.includes(offer.offer_code);
-                  return (
-                    <li key={offer.offer_code}>
-                      <OfferRow
-                        testId={`cycle-form-offer-${productId}-${offer.offer_code}`}
-                        label={offer.offer_name}
-                        count={offer.sales_count}
-                        selected={marcada}
-                        onClick={() => onToggleOffer(offer.offer_code)}
-                      />
-                    </li>
-                  );
-                })}
-
-                {/* Linha fixa, sempre no fim: é decisão sobre a venda que
-                    NÃO tem oferta (PRD 3.3), não uma oferta a mais. Só
-                    aparece para produto que tem venda nessa condição — sem
-                    isso ela seria uma pergunta sobre um conjunto vazio. */}
-                {temOfferless && (
-                  <li>
+          {aberta && total > 0 && (
+            <ul
+              style={{
+                listStyle: "none",
+                margin: 0,
+                padding: 0,
+                maxHeight: 180,
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+              }}
+            >
+              {visiveis.map((offer) => {
+                const marcada = selectedOfferCodes.includes(offer.offer_code);
+                return (
+                  <li key={offer.offer_code}>
                     <OfferRow
-                      testId={`cycle-form-offerless-${productId}`}
-                      label="(sem oferta)"
-                      count={offerlessCount}
-                      selected={includeOfferless}
-                      onClick={onToggleOfferless}
+                      testId={`cycle-form-offer-${productId}-${offer.offer_code}`}
+                      label={offer.offer_name}
+                      count={offer.sales_count}
+                      selected={marcada}
+                      onClick={() => onToggleOffer(offer.offer_code)}
                     />
                   </li>
-                )}
+                );
+              })}
 
-                {visiveis.length === 0 && (
-                  <li style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                    Nenhuma oferta corresponde à busca.
-                  </li>
-                )}
-              </ul>
-            </>
+              {/* Linha fixa, sempre no fim: é decisão sobre a venda que
+                  NÃO tem oferta (PRD 3.3), não uma oferta a mais. Só
+                  aparece para produto que tem venda nessa condição — sem
+                  isso ela seria uma pergunta sobre um conjunto vazio. */}
+              {mostrarOfferless && (
+                <li>
+                  <OfferRow
+                    testId={`cycle-form-offerless-${productId}`}
+                    label={OFFERLESS_LABEL}
+                    count={offerlessCount}
+                    selected={includeOfferless}
+                    onClick={onToggleOfferless}
+                  />
+                </li>
+              )}
+            </ul>
           )}
         </>
       )}

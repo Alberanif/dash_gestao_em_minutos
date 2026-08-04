@@ -176,10 +176,9 @@ describe("CycleFormModal — busca de produto", () => {
     expect(screen.queryByTestId("cycle-form-product-option-4567890")).not.toBeInTheDocument();
     const selected = screen.getByTestId("cycle-form-product-selected");
     expect(selected).toHaveTextContent("Mentoria Ultimates");
-    // O resumo de seleção múltipla mostra a contagem, não mais o ID —
-    // formato do card mudou de "Selecionado: <nome> (id)" para
-    // "Selecionados: <nomes> (N)".
-    expect(selected).toHaveTextContent("(1)");
+    // O resumo virou LISTA (produto + ofertas dele), no lugar do texto corrido
+    // "Selecionados: <nomes> (N)" que condensava tudo numa linha só.
+    expect(selected).toHaveTextContent("1 produto no ciclo");
   });
 });
 
@@ -650,8 +649,289 @@ describe("CycleFormModal — sanfona de ofertas", () => {
     renderEdit(makeCycle({ status: "encerrado" }));
 
     expect(await screen.findByTestId("cycle-form-offers-readonly")).toHaveTextContent("Oferta Principal");
-    expect(screen.getByText("Ciclo encerrado — reative o ciclo para alterar as ofertas.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Ciclo encerrado — reative o ciclo para alterar os produtos e as ofertas.")
+    ).toBeInTheDocument();
     expect(screen.queryByTestId("cycle-form-offers-toggle-4567890")).not.toBeInTheDocument();
+    // Nem checkbox nem ×: a configuração de um histórico fechado é exibida,
+    // não operada.
+    expect(screen.queryByTestId("cycle-form-selected-product-4567890")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("cycle-form-selected-offer-remove-4567890-OF-A")
+    ).not.toBeInTheDocument();
+  });
+});
+
+// Resumo da seleção: a lista de produtos com as ofertas escolhidas indentadas
+// sob cada um. O que estes testes protegem é que ele seja OPERÁVEL e que a
+// operação seja a MESMA da sanfona — um caminho de escrita próprio aqui
+// poderia tirar a oferta sem registrá-la como recusa no submit, e a faixa de
+// aviso do dashboard voltaria a apontá-la.
+describe("CycleFormModal — resumo da seleção", () => {
+  it("lista cada produto com as ofertas escolhidas dele logo abaixo", async () => {
+    renderCreate();
+    await escolherProdutoEOferta("4567890");
+    await escolherProdutoEOferta("1234567");
+
+    const resumo = screen.getByTestId("cycle-form-product-selected");
+    expect(resumo).toHaveTextContent("2 produtos no ciclo");
+    // A oferta aparece com nome e contagem de vendas, não como código cru.
+    expect(screen.getByTestId("cycle-form-selected-offer-4567890-OF-A")).toHaveTextContent(
+      "Oferta Principal"
+    );
+    expect(screen.getByTestId("cycle-form-selected-offer-4567890-OF-A")).toHaveTextContent("312");
+    expect(screen.getByTestId("cycle-form-selected-offer-1234567-OF-C")).toHaveTextContent(
+      "Turma 2026"
+    );
+    // Pareamento: a oferta do outro produto não vaza para este.
+    expect(
+      screen.queryByTestId("cycle-form-selected-offer-4567890-OF-C")
+    ).not.toBeInTheDocument();
+  });
+
+  it("a checkbox do produto vem marcada e desmarcar tira o produto do ciclo", async () => {
+    renderCreate();
+    await escolherProdutoEOferta("4567890");
+
+    const check = screen.getByTestId("cycle-form-selected-product-4567890");
+    expect(check).toBeChecked();
+
+    fireEvent.click(check);
+    expect(screen.queryByTestId("cycle-form-selected-product-4567890")).not.toBeInTheDocument();
+    expect(screen.getByTestId("cycle-form-product-option-4567890")).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
+  });
+
+  it("o × tira só aquela oferta, e o produto continua no ciclo", async () => {
+    renderCreate();
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    fireEvent.click(await screen.findByTestId("cycle-form-offers-toggle-4567890"));
+    fireEvent.click(screen.getByTestId("cycle-form-offer-4567890-OF-A"));
+    fireEvent.click(screen.getByTestId("cycle-form-offer-4567890-OF-B"));
+
+    fireEvent.click(screen.getByTestId("cycle-form-selected-offer-remove-4567890-OF-A"));
+
+    expect(screen.queryByTestId("cycle-form-selected-offer-4567890-OF-A")).not.toBeInTheDocument();
+    expect(screen.getByTestId("cycle-form-selected-offer-4567890-OF-B")).toBeInTheDocument();
+    expect(screen.getByTestId("cycle-form-selected-product-4567890")).toBeInTheDocument();
+    // A sanfona é a mesma decisão, e tem de refletir na hora.
+    expect(screen.getByTestId("cycle-form-offer-4567890-OF-A")).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
+  });
+
+  it("o × da linha '(sem oferta)' desfaz a marcação dela, não de uma oferta", async () => {
+    renderCreate();
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    fireEvent.click(await screen.findByTestId("cycle-form-offers-toggle-4567890"));
+    fireEvent.click(screen.getByTestId("cycle-form-offer-4567890-OF-A"));
+    fireEvent.click(screen.getByTestId("cycle-form-offerless-4567890"));
+
+    expect(screen.getByTestId("cycle-form-selected-offer-4567890-offerless")).toHaveTextContent(
+      "(sem oferta)"
+    );
+    fireEvent.click(screen.getByTestId("cycle-form-selected-offer-remove-4567890-offerless"));
+
+    expect(
+      screen.queryByTestId("cycle-form-selected-offer-4567890-offerless")
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("cycle-form-selected-offer-4567890-OF-A")).toBeInTheDocument();
+    expect(screen.getByTestId("cycle-form-offerless-4567890")).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
+  });
+
+  // Tirar a última oferta pelo × deixa o produto no estado que trava o salvar.
+  // Dizer isso na própria linha é o que evita a caça ao produto culpado.
+  it("produto que fica sem oferta é nomeado como tal no resumo", async () => {
+    renderCreate();
+    await escolherProdutoEOferta("4567890");
+    fireEvent.click(screen.getByTestId("cycle-form-selected-offer-remove-4567890-OF-A"));
+
+    expect(screen.getByTestId("cycle-form-selected-empty-4567890")).toHaveTextContent(
+      "Nenhuma oferta escolhida"
+    );
+  });
+
+  // O × precisa registrar a saída como RECUSA, igual ao desmarcar na sanfona:
+  // é o que impede a oferta de voltar a alertar como "nunca decidida".
+  it("oferta tirada pelo × vira recusa registrada no salvar", async () => {
+    const salvar = installFetch(
+      jest.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ cycle: makeCycle() }) })
+    );
+    renderCreate();
+    fireEvent.change(screen.getByTestId("cycle-form-name"), { target: { value: "Ciclo Julho" } });
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    fireEvent.click(await screen.findByTestId("cycle-form-offers-toggle-4567890"));
+    fireEvent.click(screen.getByTestId("cycle-form-offer-4567890-OF-A"));
+    fireEvent.click(screen.getByTestId("cycle-form-offer-4567890-OF-B"));
+    fireEvent.click(screen.getByTestId("cycle-form-selected-offer-remove-4567890-OF-B"));
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+
+    await waitFor(() => expect(salvar).toHaveBeenCalled());
+    const body = JSON.parse(salvar.mock.calls[0][1].body);
+    expect(body.products[0].offer_codes).toEqual(["OF-A"]);
+    expect(body.products[0].rejected_offer_codes).toEqual(["OF-B"]);
+  });
+
+  // O resumo é a resposta a "o que este ciclo vai contar". Filtrá-lo junto com
+  // a lista deixaria o gestor sem lugar nenhum para conferir o conjunto antes
+  // de salvar.
+  it("o resumo não é filtrado pelas buscas de produto nem de oferta", async () => {
+    renderCreate();
+    await escolherProdutoEOferta("4567890");
+
+    fireEvent.change(screen.getByTestId("cycle-form-product-search"), { target: { value: "curso" } });
+    expect(screen.getByTestId("cycle-form-selected-product-4567890")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("cycle-form-offer-search"), { target: { value: "zzz" } });
+    expect(screen.getByTestId("cycle-form-selected-offer-4567890-OF-A")).toBeInTheDocument();
+  });
+
+  // Na edição o resumo tem de estar completo já no primeiro render: o ciclo
+  // guarda os CÓDIGOS, e esperar a rede para mostrar qualquer coisa deixaria o
+  // gestor olhando uma lista vazia de um ciclo configurado.
+  it("na edição, o resumo aparece antes das ofertas carregarem — com o código no lugar do nome", () => {
+    global.fetch = jest.fn(() => new Promise(() => {})) as unknown as typeof global.fetch;
+    renderEdit(makeCycle());
+
+    const linha = screen.getByTestId("cycle-form-selected-offer-4567890-OF-A");
+    expect(linha).toHaveTextContent("OF-A");
+    // Número NENHUM na linha: sem cache não há contagem, e exibir 0 afirmaria
+    // que a oferta escolhida não vendeu — que é diferente de não saber ainda.
+    expect(linha.textContent).not.toMatch(/\d/);
+  });
+});
+
+// Busca de ofertas — a barra abaixo da de produtos. O que estes testes
+// protegem é o recorte dela: ela varre APENAS os produtos já selecionados, que
+// são os únicos cujas ofertas a tela carregou. Buscar nos demais devolveria
+// "não achei" sobre uma lista que nunca foi lida.
+describe("CycleFormModal — busca de ofertas", () => {
+  async function selecionarECarregar(productId: string) {
+    fireEvent.click(screen.getByTestId(`cycle-form-product-option-${productId}`));
+    await screen.findByTestId(`cycle-form-offers-toggle-${productId}`);
+  }
+
+  function buscarOferta(termo: string) {
+    fireEvent.change(screen.getByTestId("cycle-form-offer-search"), { target: { value: termo } });
+  }
+
+  it("a barra só existe depois que há produto selecionado", async () => {
+    renderCreate();
+    expect(screen.queryByTestId("cycle-form-offer-search")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    expect(await screen.findByTestId("cycle-form-offer-search")).toBeInTheDocument();
+  });
+
+  it("buscar abre a sanfona sozinha e deixa só a oferta que casa", async () => {
+    renderCreate();
+    await selecionarECarregar("4567890");
+    buscarOferta("cortesia");
+
+    expect(screen.getByTestId("cycle-form-offer-4567890-OF-B")).toHaveTextContent("Cortesia Equipe");
+    expect(screen.queryByTestId("cycle-form-offer-4567890-OF-A")).not.toBeInTheDocument();
+    // Sanfona aberta pela busca: o cabeçalho vira texto, sem botão de recolher.
+    expect(screen.queryByTestId("cycle-form-offers-toggle-4567890")).not.toBeInTheDocument();
+    // O contador continua sendo o do PRODUTO, não o do resultado da busca.
+    expect(screen.getByTestId("cycle-form-offers-count-4567890")).toHaveTextContent("0 de 3 ofertas");
+  });
+
+  it("acha por código, não só por nome", async () => {
+    renderCreate();
+    await selecionarECarregar("4567890");
+    buscarOferta("of-a");
+
+    expect(screen.getByTestId("cycle-form-offer-4567890-OF-A")).toBeInTheDocument();
+    expect(screen.queryByTestId("cycle-form-offer-4567890-OF-B")).not.toBeInTheDocument();
+  });
+
+  // O recorte pedido: a oferta OF-C existe, mas é de um produto que ninguém
+  // selecionou — e cujas ofertas a tela nem carregou.
+  it("não enxerga oferta de produto NÃO selecionado", async () => {
+    renderCreate();
+    await selecionarECarregar("4567890");
+    buscarOferta("turma");
+
+    expect(screen.queryByTestId("cycle-form-product-option-1234567")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("cycle-form-product-option-4567890")).not.toBeInTheDocument();
+    expect(screen.getByText("Nenhuma oferta corresponde à busca.")).toBeInTheDocument();
+  });
+
+  it("produto selecionado sem oferta correspondente sai da lista; o que tem, fica", async () => {
+    renderCreate();
+    await selecionarECarregar("4567890");
+    await selecionarECarregar("1234567");
+    buscarOferta("turma");
+
+    expect(screen.getByTestId("cycle-form-product-option-1234567")).toBeInTheDocument();
+    expect(screen.queryByTestId("cycle-form-product-option-4567890")).not.toBeInTheDocument();
+  });
+
+  // Mesma regra da sanfona antes da busca subir: esconder o que está contando
+  // faria o contador do cabeçalho discordar da lista (PRD 3.5).
+  it("oferta MARCADA não some do resultado, mesmo fora do termo", async () => {
+    renderCreate();
+    await escolherProdutoEOferta("4567890");
+    buscarOferta("cortesia");
+
+    expect(screen.getByTestId("cycle-form-offer-4567890-OF-A")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("cycle-form-offer-4567890-OF-B")).toBeInTheDocument();
+  });
+
+  it("a linha '(sem oferta)' é achável pelo termo — e some quando ele não a nomeia", async () => {
+    renderCreate();
+    await selecionarECarregar("4567890");
+
+    buscarOferta("sem oferta");
+    expect(screen.getByTestId("cycle-form-offerless-4567890")).toBeInTheDocument();
+    expect(screen.queryByTestId("cycle-form-offer-4567890-OF-A")).not.toBeInTheDocument();
+
+    buscarOferta("cortesia");
+    expect(screen.queryByTestId("cycle-form-offerless-4567890")).not.toBeInTheDocument();
+  });
+
+  // Sem este guard a busca diria "não achei" sobre uma lista que ainda está a
+  // caminho da rede.
+  it("produto cujas ofertas ainda não chegaram não some da busca", async () => {
+    global.fetch = jest.fn(() => new Promise(() => {})) as unknown as typeof global.fetch;
+    renderCreate();
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    buscarOferta("zzz");
+
+    expect(screen.getByTestId("cycle-form-product-option-4567890")).toBeInTheDocument();
+    expect(screen.getByText("Carregando ofertas...")).toBeInTheDocument();
+  });
+
+  it("limpar a busca devolve a lista inteira e a sanfona recolhida", async () => {
+    renderCreate();
+    await selecionarECarregar("4567890");
+    buscarOferta("cortesia");
+    buscarOferta("");
+
+    expect(screen.getByTestId("cycle-form-product-option-1234567")).toBeInTheDocument();
+    expect(screen.getByTestId("cycle-form-offers-toggle-4567890")).toHaveAttribute(
+      "aria-expanded",
+      "false"
+    );
+    expect(screen.queryByTestId("cycle-form-offer-4567890-OF-B")).not.toBeInTheDocument();
+  });
+
+  it("desmarcar o último produto limpa o termo junto com a barra", async () => {
+    renderCreate();
+    await selecionarECarregar("4567890");
+    buscarOferta("cortesia");
+
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    expect(screen.queryByTestId("cycle-form-offer-search")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    expect(await screen.findByTestId("cycle-form-offer-search")).toHaveValue("");
   });
 });
 

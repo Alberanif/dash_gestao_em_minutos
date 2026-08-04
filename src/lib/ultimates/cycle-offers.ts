@@ -110,3 +110,33 @@ export function pendingOffers(
 export function pendingSalesCount(pending: PendingOffer[]): number {
   return pending.reduce((total, item) => total + item.sales_count, 0);
 }
+
+// Rótulo da linha fixa da sanfona. Mora aqui, e não só no componente, porque a
+// busca de ofertas precisa casar contra o MESMO texto que a tela exibe — um
+// literal duplicado deixaria "sem oferta" achar a linha num lugar e não no
+// outro.
+export const OFFERLESS_LABEL = "(sem oferta)";
+
+// Casamento da busca de ofertas. Está no módulo puro porque DOIS lados
+// dependem dele e precisam concordar: a sanfona decide quais linhas exibir, e o
+// formulário decide quais produtos continuam na lista. Se divergirem, aparece
+// produto sem nenhuma linha visível — ou some produto que tinha resultado.
+//
+// Recebem o termo CRU e normalizam por dentro de propósito: um dos dois
+// esquecer o trim/lower é justamente a divergência que se quer evitar.
+export function offerMatchesSearch(
+  offer: Pick<UltimatesOfferOption, "offer_code" | "offer_name">,
+  search: string
+): boolean {
+  const needle = search.trim().toLowerCase();
+  if (needle === "") return true;
+  return (
+    offer.offer_name.toLowerCase().includes(needle) ||
+    offer.offer_code.toLowerCase().includes(needle)
+  );
+}
+
+export function offerlessMatchesSearch(search: string): boolean {
+  const needle = search.trim().toLowerCase();
+  return needle === "" || OFFERLESS_LABEL.includes(needle);
+}

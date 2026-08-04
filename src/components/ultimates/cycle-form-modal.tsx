@@ -9,8 +9,15 @@ import type {
   UltimatesOfferOption,
   UltimatesOfferlessOption,
 } from "@/types/ultimates";
-import { unconfiguredProducts } from "@/lib/ultimates/cycle-offers";
+import {
+  OFFERLESS_LABEL,
+  offerMatchesSearch,
+  offerlessMatchesSearch,
+  unconfiguredProducts,
+} from "@/lib/ultimates/cycle-offers";
 import { OfferPicker } from "./offer-picker";
+import { CycleSelectionSummary } from "./cycle-selection-summary";
+import type { SummaryOffer, SummaryProduct } from "./cycle-selection-summary";
 import type { CycleWithProducts, HotmartProductOption } from "./types";
 
 interface CycleFormModalProps {
@@ -93,6 +100,11 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
   const [offersError, setOffersError] = useState(false);
   const [offersRetry, setOffersRetry] = useState(0);
   const [productSearch, setProductSearch] = useState("");
+  // Busca de OFERTAS, separada da busca de produtos. Só enxerga os produtos já
+  // selecionados: as ofertas dos demais nem foram carregadas, e prometer buscar
+  // no que não está em memória devolveria "nenhum resultado" para oferta que
+  // existe.
+  const [offerSearch, setOfferSearch] = useState("");
   const [goalPercentInput, setGoalPercentInput] = useState(
     editTarget?.goal_percent != null ? String(editTarget.goal_percent) : ""
   );
@@ -133,15 +145,42 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
     );
   }, [products, productSearch]);
 
+  const offerSearchAtivo = offerSearch.trim() !== "";
+
+  // Enquanto a busca de ofertas está ativa, a lista mostra só produto
+  // SELECIONADO que tem oferta casando com o termo. Manter os demais aqui
+  // encheria a tela de produtos que a busca nem consegue examinar.
+  //
+  // Produto cujas ofertas ainda não chegaram (ou falharam) fica visível de
+  // propósito: escondê-lo diria "não tem essa oferta" sobre uma lista que
+  // ninguém leu ainda.
+  const listedProducts = useMemo(() => {
+    if (!offerSearchAtivo) return filteredProducts;
+    return filteredProducts.filter((p) => {
+      if (!productIds.includes(p.product_id)) return false;
+      const carregadas = offerCache[p.product_id];
+      if (!carregadas) return true;
+      return (
+        carregadas.offers.some((offer) => offerMatchesSearch(offer, offerSearch)) ||
+        (carregadas.offerlessCount > 0 && offerlessMatchesSearch(offerSearch))
+      );
+    });
+  }, [filteredProducts, offerSearchAtivo, offerSearch, productIds, offerCache]);
+
   // Derivada, não guardada em estado: zerar a seleção destrava sozinho, sem
   // um segundo setState que pudesse ficar dessincronizado da lista.
   const lockedAccountId =
     products.find((p) => p.product_id === productIds[0])?.account_id ?? null;
 
   function toggleProduct(productId: string) {
-    setProductIds((prev) =>
-      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
-    );
+    const proximo = productIds.includes(productId)
+      ? productIds.filter((id) => id !== productId)
+      : [...productIds, productId];
+    setProductIds(proximo);
+    // Sem produto selecionado o campo de busca de ofertas some. Guardar o termo
+    // faria ele reaparecer preenchido na próxima seleção, filtrando a lista por
+    // algo que ninguém digitou agora.
+    if (proximo.length === 0) setOfferSearch("");
   }
 
   function toggleOffer(productId: string, offerCode: string) {
@@ -283,6 +322,45 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
     return (
       offerCache[productId]?.offers.find((o) => o.offer_code === offerCode)?.offer_name ?? offerCode
     );
+  }
+
+  // Monta uma linha do resumo. Serve os DOIS resumos — o editável (decisão
+  // viva) e o do ciclo encerrado (decisão persistida) — porque a diferença
+  // entre eles é só de onde vêm os códigos, não de como se lê a lista.
+  //
+  // Nome e contagem saem do cache; enquanto ele não chegou, o código cru vira
+  // rótulo e a contagem fica null. É o que faz o resumo aparecer inteiro
+  // desde o primeiro render da edição, sem esperar a rede.
+  function summaryFor(
+    productId: string,
+    offerCodes: string[],
+    includeOfferless: boolean | null
+  ): SummaryProduct {
+    const carregadas = offerCache[productId];
+    const offers: SummaryOffer[] = offerCodes.map((code) => {
+      const opcao = carregadas?.offers.find((o) => o.offer_code === code);
+      return {
+        offerCode: code,
+        label: opcao?.offer_name ?? code,
+        salesCount: opcao?.sales_count ?? null,
+      };
+    });
+    if (includeOfferless === true) {
+      offers.push({
+        offerCode: null,
+        label: OFFERLESS_LABEL,
+        salesCount: carregadas?.offerlessCount ?? null,
+      });
+    }
+    return { productId, productName: productLabel(productId), offers };
+  }
+
+  // O × de uma oferta é o mesmo toggle da sanfona — inclusive para a linha
+  // "(sem oferta)", cujo código é null. Um caminho de escrita próprio aqui
+  // poderia registrar a saída sem convertê-la em recusa no submit.
+  function removeOffer(productId: string, offerCode: string | null) {
+    if (offerCode === null) toggleOfferless(productId);
+    else toggleOffer(productId, offerCode);
   }
 
   // Produtos que estavam no ciclo e não estão mais na seleção. Derivado do
@@ -550,37 +628,22 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
             fechado. As ofertas são EXIBIDAS aqui, e não só as contagens: quem
             abre um ciclo antigo precisa saber o que ele estava contando. */}
         {isEdit && !canEditProducts && (
-          <div>
+          <div data-testid="cycle-form-products-readonly">
             <label className="mb-1 block text-sm font-medium" style={{ color: "var(--color-text-muted)" }}>
               Produtos Hotmart
             </label>
-            <p
-              data-testid="cycle-form-products-readonly"
-              style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0, lineHeight: 1.5 }}
-            >
-              {editTarget!.products.map((p) => p.product_name ?? p.product_id).join(" · ")}
-              <br />
-              Ciclo encerrado — reative o ciclo para alterar os produtos.
-            </p>
-            <ul
-              data-testid="cycle-form-offers-readonly"
-              style={{ listStyle: "none", margin: "8px 0 0", padding: 0, display: "flex", flexDirection: "column", gap: 6 }}
-            >
-              {editTarget!.products.map((p) => (
-                <li key={p.product_id} style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
-                  <strong style={{ color: "var(--text-strong)" }}>
-                    {p.product_name ?? p.product_id}
-                  </strong>
-                  :{" "}
-                  {[
-                    ...p.offer_codes.map((code) => offerLabel(p.product_id, code)),
-                    ...(p.include_offerless === true ? ["(sem oferta)"] : []),
-                  ].join(" · ") || "nenhuma oferta escolhida"}
-                </li>
-              ))}
-            </ul>
-            <p style={{ fontSize: 11, color: "var(--text-3)", margin: "4px 0 0", lineHeight: 1.5 }}>
-              Ciclo encerrado — reative o ciclo para alterar as ofertas.
+            <CycleSelectionSummary
+              testId="cycle-form-offers-readonly"
+              readOnly
+              products={editTarget!.products.map((p) =>
+                summaryFor(p.product_id, p.offer_codes, p.include_offerless)
+              )}
+            />
+            {/* Um aviso só, e não um por lista: produto e oferta agora são a
+                mesma lista, e repetir a frase duas vezes só faria o gestor
+                parar de ler as duas. */}
+            <p style={{ fontSize: 11, color: "var(--text-3)", margin: "6px 0 0", lineHeight: 1.5 }}>
+              Ciclo encerrado — reative o ciclo para alterar os produtos e as ofertas.
             </p>
           </div>
         )}
@@ -603,6 +666,36 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
                   className="field-control"
                   data-testid="cycle-form-product-search"
                 />
+
+                {/* Só existe depois que há produto selecionado — é o conjunto
+                    que ela varre. Sem seleção o campo prometeria uma busca
+                    sobre nada. */}
+                {productIds.length > 0 && (
+                  <div style={{ marginTop: 6 }}>
+                    <input
+                      type="search"
+                      value={offerSearch}
+                      onChange={(e) => setOfferSearch(e.target.value)}
+                      placeholder="Buscar oferta por nome ou código..."
+                      aria-label="Buscar oferta nos produtos selecionados"
+                      className="field-control"
+                      data-testid="cycle-form-offer-search"
+                    />
+                    {offerSearchAtivo && (
+                      <p
+                        data-testid="cycle-form-offer-search-scope"
+                        style={{ fontSize: 11, color: "var(--color-warning)", margin: "4px 0 0", lineHeight: 1.4 }}
+                      >
+                        Buscando nas ofertas{" "}
+                        {productIds.length === 1
+                          ? "do produto selecionado"
+                          : `dos ${productIds.length} produtos selecionados`}
+                        {" "}— limpe a busca para ver a lista completa de produtos.
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <ul
                   style={{
                     listStyle: "none",
@@ -615,12 +708,14 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
                     gap: 6,
                   }}
                 >
-                  {filteredProducts.length === 0 && (
+                  {listedProducts.length === 0 && (
                     <li style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-                      Nenhum produto encontrado.
+                      {offerSearchAtivo
+                        ? "Nenhuma oferta corresponde à busca."
+                        : "Nenhum produto encontrado."}
                     </li>
                   )}
-                  {filteredProducts.map((p) => {
+                  {listedProducts.map((p) => {
                     const selected = productIds.includes(p.product_id);
                     const blocked = lockedAccountId !== null && p.account_id !== lockedAccountId;
                     const invalid = selected && semEscolhaIds.includes(p.product_id);
@@ -676,6 +771,8 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
                             includeOfferless={
                               (offerChoice[p.product_id] ?? CHOICE_VAZIA).offerless === true
                             }
+                            search={offerSearch}
+                            forceOpen={offerSearchAtivo}
                             loading={!carregadas && offersLoading}
                             loadError={!carregadas && offersError}
                             invalid={invalid}
@@ -688,19 +785,22 @@ export function CycleFormModal({ products, editTarget, onSave, onCancel, onDelet
                     );
                   })}
                 </ul>
+                {/* O resumo NÃO é filtrado pelas duas buscas acima: ele é a
+                    resposta a "o que este ciclo vai contar", e uma resposta
+                    que muda conforme o termo digitado não serve para conferir
+                    antes de salvar. */}
                 {productIds.length > 0 && (
-                  <p
-                    data-testid="cycle-form-product-selected"
-                    style={{ fontSize: 12, color: "var(--color-text)", margin: "6px 0 0" }}
-                  >
-                    Selecionados:{" "}
-                    <strong>
-                      {productIds
-                        .map((id) => products.find((p) => p.product_id === id)?.product_name ?? id)
-                        .join(", ")}
-                    </strong>{" "}
-                    ({productIds.length})
-                  </p>
+                  <div style={{ marginTop: 8 }}>
+                    <CycleSelectionSummary
+                      testId="cycle-form-product-selected"
+                      products={productIds.map((id) => {
+                        const choice = offerChoice[id] ?? CHOICE_VAZIA;
+                        return summaryFor(id, choice.codes, choice.offerless);
+                      })}
+                      onRemoveProduct={toggleProduct}
+                      onRemoveOffer={removeOffer}
+                    />
+                  </div>
                 )}
                 {lockedAccountId !== null && (
                   <p
