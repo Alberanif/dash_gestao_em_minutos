@@ -300,6 +300,143 @@
   padding: 24px 10px;
 }
 
+/* Resumo da seleção do ciclo (produto + ofertas escolhidas dele), no modal de
+   criação/edição. Mora aqui, e não em style inline como o resto do modal,
+   porque o botão × precisa de :hover/:focus-visible — o alvo tem 20px e some
+   no meio da lista sem a confirmação visual de que está sob o cursor. Todas as
+   cores vêm dos tokens do .dash-dark; nenhuma é própria daqui. */
+.ult-selection {
+  border: 1px solid var(--border-vis);
+  border-radius: 11px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.ult-selection-head {
+  margin: 0;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border-vis);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-label);
+}
+
+.ult-selection-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ult-selection-item {
+  padding: 9px 12px;
+}
+
+.ult-selection-item + .ult-selection-item {
+  border-top: 1px solid var(--border);
+}
+
+.ult-selection-product {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+label.ult-selection-product {
+  cursor: pointer;
+}
+
+.ult-selection-product input {
+  accent-color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.ult-selection-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.ult-selection-id {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+/* Indentação alinhada ao NOME do produto, não à checkbox: é o que faz a oferta
+   ser lida como filha daquele produto e não como um item de mesmo nível. */
+.ult-selection-offers {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0 0 0 25px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ult-selection-offer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.ult-selection-offer-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ult-selection-offer-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.ult-selection-remove {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-3);
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.ult-selection-remove:hover,
+.ult-selection-remove:focus-visible {
+  color: var(--badge-red-fg);
+  background: var(--badge-red-bg);
+  border-color: color-mix(in srgb, var(--color-danger) 35%, transparent);
+}
+
+.ult-selection-empty {
+  margin: 6px 0 0 25px;
+  font-size: 11px;
+  color: var(--color-danger);
+}
+
 @media (max-width: 640px) {
   .ult-date-filter {
     align-items: stretch;
@@ -308,5 +445,10 @@
 
   .ult-date-field input {
     flex: 1;
+  }
+
+  /* O ID vira ruído antes do nome no celular: o nome é o que identifica. */
+  .ult-selection-id {
+    display: none;
   }
 }

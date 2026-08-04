@@ -34,9 +34,9 @@ beforeEach(() => {
 
   mockRequireRole.mockResolvedValue({ error: null, userId: "user-1", role: "gestor" });
 
-  // Nenhuma oferta excluída por padrão — os casos abaixo que se importam com
-  // isso sobrescrevem.
-  mockMaybeSingle.mockResolvedValue({ data: null, error: null });
+  // Oferta ESCOLHIDA por padrão (a allowlist da 065 achou a linha) — os casos
+  // abaixo que se importam com isso sobrescrevem com data null.
+  mockMaybeSingle.mockResolvedValue({ data: { offer_code: "OFERTA_OK" }, error: null });
   // Default de higiene: sem isso, um teste que não enfileira todos os
   // .single() da rota (com mockResolvedValueOnce) deixa a chamada extra
   // retornar undefined, e a rota quebra ao desestruturar `{ data }` de
@@ -52,9 +52,13 @@ beforeEach(() => {
   mockDeleteEq.mockResolvedValue({ error: null });
   mockDelete.mockReturnValue({ eq: mockDeleteEq });
 
-  // Por padrão o ciclo acompanha só PROD1 — os testes que precisam de mais
-  // sobrescrevem com mockResolvedValueOnce.
-  mockCycleProductsEq.mockResolvedValue({ data: [{ product_id: "PROD1" }], error: null });
+  // Por padrão o ciclo acompanha só PROD1, e com include_offerless true — os
+  // testes que precisam de mais (ou do contrário) sobrescrevem com
+  // mockResolvedValueOnce.
+  mockCycleProductsEq.mockResolvedValue({
+    data: [{ product_id: "PROD1", include_offerless: true }],
+    error: null,
+  });
 
   mockFrom.mockImplementation((table: string) => {
     if (table === "dash_gestao_ultimates_cycle_products") {
@@ -169,7 +173,10 @@ describe("POST /api/ultimates/links", () => {
 
   it("aceita venda de qualquer produto do ciclo", async () => {
     mockCycleProductsEq.mockResolvedValueOnce({
-      data: [{ product_id: "PROD1" }, { product_id: "PROD2" }],
+      data: [
+        { product_id: "PROD1", include_offerless: true },
+        { product_id: "PROD2", include_offerless: true },
+      ],
       error: null,
     });
     // A rota faz quatro .single() em sequência: ciclo, comprador, venda e a
@@ -193,7 +200,10 @@ describe("POST /api/ultimates/links", () => {
   });
 
   it("recusa venda de produto fora do conjunto do ciclo", async () => {
-    mockCycleProductsEq.mockResolvedValueOnce({ data: [{ product_id: "PROD1" }], error: null });
+    mockCycleProductsEq.mockResolvedValueOnce({
+      data: [{ product_id: "PROD1", include_offerless: true }],
+      error: null,
+    });
     mockSingle
       .mockResolvedValueOnce({ data: { id: "c1", status: "ativo" }, error: null })
       .mockResolvedValueOnce({ data: { id: "b1", cycle_id: "c1" }, error: null })
@@ -211,25 +221,117 @@ describe("POST /api/ultimates/links", () => {
     expect((await res.json()).error).toMatch(/produtos deste ciclo/i);
   });
 
-  it("returns 400 when the transaction belongs to an excluded offer", async () => {
-    // A exclusão de oferta vence o vínculo manual (PRD 2026-07-30, decisão 4):
-    // vincular aqui criaria um vínculo que nasce sem efeito nenhum.
+  // A allowlist da 065 INVERTEU o guard: agora não basta a oferta não estar
+  // excluída, ela precisa estar escolhida. Oferta nova nasce fora da
+  // contabilidade, e antes desta inversão ela era aceita em silêncio.
+  it("returns 400 when the transaction belongs to an offer the cycle does not track", async () => {
     mockSingle
       .mockResolvedValueOnce({ data: { id: "c1", status: "ativo" }, error: null })
       .mockResolvedValueOnce({ data: { id: "b1", cycle_id: "c1" }, error: null })
       .mockResolvedValueOnce({
-        data: { transaction_code: "T1", product_id: "PROD1", offer_code: "OFERTA_TESTE" },
+        data: { transaction_code: "T1", product_id: "PROD1", offer_code: "OFERTA_NOVA" },
         error: null,
       });
-    mockMaybeSingle.mockResolvedValueOnce({ data: { id: "eo-1" }, error: null });
+    // Nenhuma linha em cycle_offers com included=true para essa oferta.
+    mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
 
     const { POST } = await import("../route");
     const res = await POST(makeRequest("POST", { cycleId: "c1", buyerId: "b1", transactionCode: "T1" }));
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toBe("Transação pertence a uma oferta excluída deste ciclo");
+    expect(body.error).toBe("Transação pertence a uma oferta que este ciclo não acompanha");
     expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it("aceita venda de oferta escolhida, filtrando por included=true", async () => {
+    mockSingle
+      .mockResolvedValueOnce({ data: { id: "c1", status: "ativo" }, error: null })
+      .mockResolvedValueOnce({ data: { id: "b1", cycle_id: "c1" }, error: null })
+      .mockResolvedValueOnce({
+        data: { transaction_code: "T1", product_id: "PROD1", offer_code: "OFERTA_OK" },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: null, error: { code: "PGRST116" } });
+    mockMaybeSingle.mockResolvedValueOnce({ data: { offer_code: "OFERTA_OK" }, error: null });
+
+    const { POST } = await import("../route");
+    const res = await POST(makeRequest("POST", { cycleId: "c1", buyerId: "b1", transactionCode: "T1" }));
+
+    expect(res.status).toBe(201);
+    // Oferta RECUSADA (included=false) não pode passar por aqui: sem este
+    // filtro a consulta acharia a linha da recusa e liberaria o vínculo.
+    expect(mockEq).toHaveBeenCalledWith("included", true);
+  });
+
+  // Venda com offer_code null existe (mapHotmartSaleItem grava
+  // `item.purchase.offer?.code ?? null`) e passou a depender de uma decisão
+  // explícita do produto: sem include_offerless ela não entra em cycle_sales, e
+  // o vínculo nasceria inerte.
+  it("recusa venda sem oferta quando o produto não inclui vendas sem oferta", async () => {
+    mockCycleProductsEq.mockResolvedValueOnce({
+      data: [{ product_id: "PROD1", include_offerless: false }],
+      error: null,
+    });
+    mockSingle
+      .mockResolvedValueOnce({ data: { id: "c1", status: "ativo" }, error: null })
+      .mockResolvedValueOnce({ data: { id: "b1", cycle_id: "c1" }, error: null })
+      .mockResolvedValueOnce({
+        data: { transaction_code: "T1", product_id: "PROD1", offer_code: null },
+        error: null,
+      });
+
+    const { POST } = await import("../route");
+    const res = await POST(makeRequest("POST", { cycleId: "c1", buyerId: "b1", transactionCode: "T1" }));
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toBe(
+      "Transação não tem oferta e este ciclo não acompanha vendas sem oferta"
+    );
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  // include_offerless ausente = banco sem a 065 aplicada. Vale como "não
+  // decidido", que é o mesmo lugar de "não incluir": nada conta.
+  it("recusa venda sem oferta quando include_offerless nem existe", async () => {
+    mockCycleProductsEq.mockResolvedValueOnce({
+      data: [{ product_id: "PROD1" }],
+      error: null,
+    });
+    mockSingle
+      .mockResolvedValueOnce({ data: { id: "c1", status: "ativo" }, error: null })
+      .mockResolvedValueOnce({ data: { id: "b1", cycle_id: "c1" }, error: null })
+      .mockResolvedValueOnce({
+        data: { transaction_code: "T1", product_id: "PROD1", offer_code: null },
+        error: null,
+      });
+
+    const { POST } = await import("../route");
+    const res = await POST(makeRequest("POST", { cycleId: "c1", buyerId: "b1", transactionCode: "T1" }));
+
+    expect(res.status).toBe(400);
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it("aceita venda sem oferta quando o produto tem include_offerless", async () => {
+    mockCycleProductsEq.mockResolvedValueOnce({
+      data: [{ product_id: "PROD1", include_offerless: true }],
+      error: null,
+    });
+    mockSingle
+      .mockResolvedValueOnce({ data: { id: "c1", status: "ativo" }, error: null })
+      .mockResolvedValueOnce({ data: { id: "b1", cycle_id: "c1" }, error: null })
+      .mockResolvedValueOnce({
+        data: { transaction_code: "T1", product_id: "PROD1", offer_code: null },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: null, error: { code: "PGRST116" } });
+
+    const { POST } = await import("../route");
+    const res = await POST(makeRequest("POST", { cycleId: "c1", buyerId: "b1", transactionCode: "T1" }));
+
+    expect(res.status).toBe(201);
   });
 
   it("returns 409 when the transaction is already linked", async () => {

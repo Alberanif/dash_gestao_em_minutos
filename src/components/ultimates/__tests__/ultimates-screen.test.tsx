@@ -12,7 +12,17 @@ function makeCycle(overrides: Partial<CycleWithProducts> = {}): CycleWithProduct
     id: "c1",
     name: "Ciclo 1",
     account_id: "acc-1",
-    products: [{ product_id: "p1", product_name: "Produto Um" }],
+    // Produto CONFIGURADO (migration 065): sem oferta escolhida o dashboard
+    // troca todos os números pelo bloco "Ofertas não configuradas".
+    products: [
+      {
+        product_id: "p1",
+        product_name: "Produto Um",
+        offer_codes: ["OF-1"],
+        rejected_offer_codes: [],
+        include_offerless: false,
+      },
+    ],
     goal_percent: 50,
     status: "ativo",
     refresh_started_at: null,
@@ -324,12 +334,25 @@ describe("UltimatesScreen — recibo da troca de produtos", () => {
     { product_id: "p2", product_name: "Produto Dois", account_id: "acc-1" },
   ];
 
+  // Uma oferta por produto (migration 065). Sem isto o form não deixa salvar:
+  // produto sem oferta escolhida não configura o ciclo.
+  const OFFER_OPTIONS = [
+    { offer_code: "OF-1", offer_name: "Oferta Um", product_id: "p1", product_name: "Produto Um", sales_count: 10 },
+    { offer_code: "OF-2", offer_name: "Oferta Dois", product_id: "p2", product_name: "Produto Dois", sales_count: 5 },
+  ];
+
   function mockCyclesAndPatch(products: unknown) {
     const fetchMock = jest.fn((url: string, init?: RequestInit) => {
       if (init?.method === "PATCH") {
         return Promise.resolve({
           ok: true,
           json: async () => ({ cycle: makeCycle(), products }),
+        });
+      }
+      if (url.includes("/api/ultimates/offer-options")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ offers: OFFER_OPTIONS, offerless: [] }),
         });
       }
       if (url.includes("/api/ultimates/cycles/")) {
@@ -344,6 +367,9 @@ describe("UltimatesScreen — recibo da troca de produtos", () => {
   async function trocarProdutos() {
     fireEvent.click(screen.getByTestId("ultimates-edit-cycle-btn"));
     fireEvent.click(await screen.findByTestId("cycle-form-product-option-p2"));
+    // p2 entra com oferta escolhida; sem ela o salvar para na validação.
+    fireEvent.click(await screen.findByTestId("cycle-form-offers-toggle-p2"));
+    fireEvent.click(screen.getByTestId("cycle-form-offer-p2-OF-2"));
     fireEvent.click(screen.getByTestId("cycle-form-product-option-p1"));
     fireEvent.click(screen.getByTestId("cycle-form-save"));
     // Segundo clique: p1 sai do ciclo.

@@ -49,19 +49,24 @@ export async function POST(request: NextRequest) {
   }
 
   // O conjunto de produtos vive em dash_gestao_ultimates_cycle_products desde a
-  // migration 061 — a venda precisa ser de ALGUM deles.
+  // migration 061 — a venda precisa ser de ALGUM deles. include_offerless vem
+  // junto porque é a decisão do produto sobre venda sem offer_code (065), e
+  // buscá-la aqui evita uma segunda ida ao banco no guard abaixo.
   const { data: cycleProducts, error: cycleProductsError } = await supabase
     .from("dash_gestao_ultimates_cycle_products")
-    .select("product_id")
+    .select("product_id, include_offerless")
     .eq("cycle_id", cycleId);
 
   if (cycleProductsError) {
     return NextResponse.json({ error: cycleProductsError.message }, { status: 500 });
   }
 
-  const cycleProductIds = new Set(
-    ((cycleProducts ?? []) as { product_id: string }[]).map((row) => row.product_id)
+  const includeOfferlessByProduct = new Map(
+    ((cycleProducts ?? []) as { product_id: string; include_offerless?: boolean | null }[]).map(
+      (row) => [row.product_id, row.include_offerless ?? false] as const
+    )
   );
+  const cycleProductIds = new Set(includeOfferlessByProduct.keys());
 
   const { data: buyer, error: buyerError } = await supabase
     .from("dash_gestao_ultimates_buyers")
@@ -86,24 +91,38 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Oferta excluída vence o vínculo manual (PRD de 2026-07-30, decisão 4): as
-  // RPCs descartam a venda antes de olhar para manual_links, então o vínculo
-  // nasceria sem efeito algum. Recusar aqui evita um vínculo que o gestor
-  // acharia ter resolvido a classificação.
+  // A allowlist de ofertas vence o vínculo manual (migration 065, herdando a
+  // decisão 4 do PRD de 2026-07-30): as RPCs descartam a venda antes de olhar
+  // para manual_links, então o vínculo nasceria sem efeito algum. Recusar aqui
+  // evita um vínculo que o gestor acharia ter resolvido a classificação.
+  //
+  // O sentido INVERTEU na 065: antes bastava não estar na lista de excluídas,
+  // agora é preciso estar na lista de escolhidas. Oferta nova, que nasce fora
+  // da contabilidade por construção (upsertPlaceholderOffers), passa a ser
+  // recusada aqui em vez de aceita em silêncio.
   if (sale.offer_code) {
-    const { data: excludedOffer } = await supabase
-      .from("dash_gestao_ultimates_excluded_offers")
-      .select("id")
+    const { data: chosenOffer } = await supabase
+      .from("dash_gestao_ultimates_cycle_offers")
+      .select("offer_code")
       .eq("cycle_id", cycleId)
       .eq("offer_code", sale.offer_code)
+      .eq("included", true)
       .maybeSingle();
 
-    if (excludedOffer) {
+    if (!chosenOffer) {
       return NextResponse.json(
-        { error: "Transação pertence a uma oferta excluída deste ciclo" },
+        { error: "Transação pertence a uma oferta que este ciclo não acompanha" },
         { status: 400 }
       );
     }
+  } else if (includeOfferlessByProduct.get(sale.product_id) !== true) {
+    // Venda sem offer_code só conta quando o produto tem a decisão explícita
+    // include_offerless = true. Sem ela a venda não entra em cycle_sales, e o
+    // vínculo seria igualmente inerte.
+    return NextResponse.json(
+      { error: "Transação não tem oferta e este ciclo não acompanha vendas sem oferta" },
+      { status: 400 }
+    );
   }
 
   const { data: existingLink } = await supabase

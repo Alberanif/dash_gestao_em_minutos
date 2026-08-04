@@ -7,9 +7,40 @@ export type UltimatesCycleStatus = "ativo" | "encerrado";
 // dash_gestao_ultimates_cycle_products (migration 061), que substituiu a
 // coluna escalar cycles.product_id. product_name é null quando o produto
 // ainda não foi sincronizado por /api/hotmart/sync-products.
+//
+// A partir da migration 065 o produto não entra INTEIRO no ciclo: ele carrega
+// as ofertas que o ciclo acompanha. Venda de oferta fora de offer_codes não
+// conta em lugar nenhum do dashboard.
 export interface UltimatesCycleProductRef {
   product_id: string;
   product_name: string | null;
+  // Ofertas ESCOLHIDAS (dash_gestao_ultimates_cycle_offers com included=true).
+  // Só as vendas destas contam.
+  offer_codes: string[];
+  // Ofertas que o gestor VIU e recusou (included=false). Não contam — o mesmo
+  // efeito de não estar em offer_codes — mas a distinção é o que faz o aviso de
+  // oferta nova existir: uma oferta AUSENTE das duas listas nunca foi decidida,
+  // e só essa alerta. Sem isso, a cortesia recusada de propósito alertaria para
+  // sempre e o aviso viraria ruído que ninguém lê.
+  rejected_offer_codes: string[];
+  // Decisão sobre venda com offer_code null (existe: mapHotmartSaleItem grava
+  // `item.purchase.offer?.code ?? null`). `null` = nunca decidido, e é o estado
+  // de todo ciclo anterior à 065.
+  include_offerless: boolean | null;
+}
+
+// O que a UI envia ao criar/editar um ciclo: o conjunto COMPLETO de produtos
+// com suas decisões de oferta, nunca um delta. O diff é feito no banco, como
+// já era com productIds na migration 062.
+//
+// rejected_offer_codes vem do cliente porque só ele sabe o que foi EXIBIDO ao
+// gestor — "vista e recusada" é um fato sobre a tela, e o servidor não tem como
+// derivá-lo de "não está na lista de escolhidas".
+export interface UltimatesCycleProductSelection {
+  product_id: string;
+  offer_codes: string[];
+  rejected_offer_codes: string[];
+  include_offerless: boolean | null;
 }
 
 export interface UltimatesCycleRecord {
@@ -67,18 +98,6 @@ export interface UltimatesManualLinkRecord {
   buyer_id: string;
   transaction_code: string;
   linked_by: string;
-  created_at: string;
-}
-
-// Oferta Hotmart cujas compras não contam para a contabilidade do ciclo
-// (migration 052). A exclusão é por ciclo e não altera nenhuma venda — é um
-// filtro aplicado em leitura dentro das RPCs.
-export interface UltimatesExcludedOfferRecord {
-  id: string;
-  cycle_id: string;
-  offer_code: string;
-  note: string | null;
-  excluded_by: string;
   created_at: string;
 }
 
@@ -186,12 +205,25 @@ export interface SetProductsResult {
   products_removed: number;
   buyers_removed: number;
   buyers_materialized: number;
+  // Migration 065: desmarcar oferta encolhe o universo de vendas exatamente
+  // como remover produto, e por isso passa pela MESMA recontagem — buyers_removed
+  // conta as linhas materializadas que ficaram sem venda por qualquer um dos
+  // dois motivos.
+  offers_added: number;
+  offers_removed: number;
 }
 
-// Uma linha por oferta do produto do ciclo, vinda de
-// dash_gestao_ultimates_offer_options (migration 052). Alimenta o seletor do
-// modal "Ofertas excluídas": sales_count conta vendas em qualquer status e
-// serve para o gestor reconhecer a oferta, não para contabilidade.
+// Uma linha por oferta de um produto, vinda de
+// dash_gestao_ultimates_offer_options (reescrita pela migration 065).
+//
+// Escopada por PRODUTO e não por ciclo desde a 065: a sanfona do form precisa
+// da lista ANTES do ciclo existir, na criação. Por isso também não carrega mais
+// nenhum campo de estado do ciclo (o antigo is_excluded) — quem cruza opção com
+// decisão é o cliente, com as listas de UltimatesCycleProductRef.
+//
+// sales_count conta vendas em QUALQUER status e sem recorte de data: o número
+// serve para o gestor reconhecer a oferta, não para conferir contabilidade — e
+// na criação não existe período de ciclo pelo qual recortar.
 export interface UltimatesOfferOption {
   offer_code: string;
   offer_name: string;
@@ -201,7 +233,15 @@ export interface UltimatesOfferOption {
   product_id: string;
   product_name: string;
   sales_count: number;
-  is_excluded: boolean;
+}
+
+// Quantas vendas do produto não têm offer_code nenhum. Alimenta a linha fixa
+// "(sem oferta)" da sanfona — a venda sem oferta contava por acidente até a
+// 065 (a blocklist nunca a pegava) e vira uma decisão explícita do gestor.
+// Produto sem nenhuma venda assim NÃO aparece nesta lista.
+export interface UltimatesOfferlessOption {
+  product_id: string;
+  sales_count: number;
 }
 
 // Contadores devolvidos por dash_gestao_ultimates_replace_buyers.

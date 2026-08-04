@@ -2,9 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { UserRole } from "@/types/auth";
-import type { UltimatesDailyRow, UltimatesHourlyRow, UltimatesRosterRow } from "@/types/ultimates";
+import type {
+  UltimatesDailyRow,
+  UltimatesHourlyRow,
+  UltimatesRosterRow,
+  UltimatesOfferOption,
+  UltimatesOfferlessOption,
+} from "@/types/ultimates";
 import type { CycleWithProducts } from "./types";
 import { aggregateRosterKpis } from "@/lib/ultimates/kpi-aggregation";
+import { isCycleConfigured, pendingOffers, pendingSalesCount } from "@/lib/ultimates/cycle-offers";
 import { countPurchasesForEmail, derivePurchaseKpis } from "@/lib/ultimates/purchases-mode";
 import {
   buildCumulativeSeries,
@@ -31,7 +38,6 @@ import { OriginBreakdownTable } from "./origin-breakdown-table";
 import { UploadBuyersModal } from "./upload-buyers-modal";
 import { LinkBuyerModal } from "./link-buyer-modal";
 import { UnlinkBuyerModal } from "./unlink-buyer-modal";
-import { ExcludedOffersModal } from "./excluded-offers-modal";
 import { ExcludedBuyersModal } from "./excluded-buyers-modal";
 import { ExcludeBuyerModal } from "./exclude-buyer-modal";
 import { EditBuyerModal } from "./edit-buyer-modal";
@@ -58,6 +64,12 @@ export interface UltimatesDashboardProps {
   // e este componente é renderizado sem key — uma cópia local em useState
   // carregaria a janela do ciclo anterior na troca de ciclo.
   onViewRangeChange: (cycleId: string, range: DateRange | null) => Promise<boolean>;
+  // Abre o CycleFormModal em edição neste ciclo. Mora no pai porque é ele quem
+  // tem a lista de produtos Hotmart e o estado `editTarget` — daqui só sai o
+  // pedido. OPCIONAL: sem ele o bloco de "ofertas não configuradas" continua
+  // explicando o que houve, só não oferece o atalho (o lápis do seletor de
+  // ciclo continua servindo).
+  onConfigureOffers?: () => void;
 }
 
 // Bloco de pulso do skeleton no tema escuro (o skeleton compartilhado de
@@ -95,6 +107,7 @@ export function UltimatesDashboard({
   role,
   onCountsNewBuyersChange,
   onViewRangeChange,
+  onConfigureOffers,
 }: UltimatesDashboardProps) {
   const [roster, setRoster] = useState<UltimatesRosterRow[] | null>(null);
   const [daily, setDaily] = useState<UltimatesDailyRow[] | null>(null);
@@ -114,12 +127,12 @@ export function UltimatesDashboard({
   const [uploadOpen, setUploadOpen] = useState(false);
   const [linkTarget, setLinkTarget] = useState<UltimatesRosterRow | null>(null);
   const [unlinkTarget, setUnlinkTarget] = useState<UltimatesRosterRow | null>(null);
-  // Ofertas excluídas da contabilidade (PRD 2026-07-30). Só o CONTADOR mora
-  // aqui — a lista completa é do modal. Serve para sinalizar que os números
-  // exibidos passaram por um filtro; sem isso o dashboard mentiria por omissão
-  // para quem não configurou a exclusão.
-  const [excludedOpen, setExcludedOpen] = useState(false);
-  const [excludedCount, setExcludedCount] = useState(0);
+  // Ofertas dos produtos do ciclo (migration 065). Servem a UMA pergunta: há
+  // oferta com venda sobre a qual ninguém decidiu nada? `[]` é resposta
+  // legítima (produto sem oferta cadastrada) e falha é silêncio — a faixa
+  // some, mas nada mais do dashboard depende disto.
+  const [offerOptions, setOfferOptions] = useState<UltimatesOfferOption[]>([]);
+  const [offerlessOptions, setOfferlessOptions] = useState<UltimatesOfferlessOption[]>([]);
   // Leads excluídos da contabilidade (PRD editar_roster). Mesmo desenho do
   // par acima: só o CONTADOR mora aqui, porque ele alimenta duas sinalizações
   // (o rótulo do botão e o subtítulo do tile "Base") — a lista completa é do
@@ -155,6 +168,16 @@ export function UltimatesDashboard({
   const [originBlocks, setOriginBlocks] = useState<OriginBreakdownBlock[] | null>(null);
   const [originError, setOriginError] = useState(false);
 
+  // Ciclo com allowlist de ofertas resolvida (migration 065). Estado DERIVADO
+  // dos produtos, não coluna: um ciclo é não configurado enquanto algum produto
+  // seu não tem escolha nenhuma. Como a validação impede salvar assim, os
+  // únicos ciclos neste estado são os que existiam antes da 065.
+  //
+  // Governa as cargas ABAIXO: sem ofertas escolhidas o universo de vendas é
+  // vazio por definição, e as RPCs devolveriam zeros que a tela é proibida de
+  // mostrar (PRD 3.4) — buscar seria pagar três round-trips para descartar.
+  const isConfigured = isCycleConfigured(cycle.products);
+
   // Janela de visualização DO CICLO (migration 063). Derivada da prop, nunca
   // estado: ela é propriedade do ciclo e não preferência de quem olha, então
   // trocar de ciclo tem de trocar a janela junto — o oposto de `series` e
@@ -172,6 +195,7 @@ export function UltimatesDashboard({
   );
 
   useEffect(() => {
+    if (!isConfigured) return;
     let cancelled = false;
 
     async function load() {
@@ -213,36 +237,50 @@ export function UltimatesDashboard({
     return () => {
       cancelled = true;
     };
-  }, [cycle.id, reloadToken]);
+  }, [cycle.id, reloadToken, isConfigured]);
 
-  // Carga do contador em efeito PRÓPRIO e tolerante a falha: é informação
-  // acessória, não pode derrubar o dashboard para o estado de erro nem
-  // atrasar KPIs/gráfico/tabela se a rota estiver lenta.
+  // Ofertas dos produtos do ciclo, em efeito PRÓPRIO e tolerante a falha: é
+  // informação acessória (alimenta só a faixa de aviso), não pode derrubar o
+  // dashboard para o estado de erro nem atrasar KPIs/gráfico/tabela.
+  //
+  // A chave é o conjunto de PRODUTOS, não o ciclo: a rota da 065 é escopada
+  // por produto porque a sanfona do form precisa dela antes de existir ciclo.
+  const productIdsKey = cycle.products
+    .map((p) => p.product_id)
+    .slice()
+    .sort()
+    .join(",");
+
   useEffect(() => {
+    if (!isConfigured || productIdsKey === "") return;
     let cancelled = false;
 
-    async function loadExcludedCount() {
+    async function loadOfferOptions() {
       try {
-        const res = await fetch(`/api/ultimates/cycles/${cycle.id}/excluded-offers`);
+        const res = await fetch(
+          `/api/ultimates/offer-options?productIds=${encodeURIComponent(productIdsKey)}`
+        );
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled) return;
-        setExcludedCount(Array.isArray(data?.offers) ? data.offers.length : 0);
+        setOfferOptions(Array.isArray(data?.offers) ? data.offers : []);
+        setOfferlessOptions(Array.isArray(data?.offerless) ? data.offerless : []);
       } catch {
         // Silencioso de propósito — ver comentário acima.
       }
     }
 
-    loadExcludedCount();
+    loadOfferOptions();
     return () => {
       cancelled = true;
     };
-  }, [cycle.id, reloadToken]);
+  }, [productIdsKey, isConfigured, reloadToken]);
 
   // Contador de leads excluídos, em efeito próprio pelo mesmo motivo do de
   // ofertas: informação acessória não derruba o dashboard nem atrasa
   // KPIs/gráfico/tabela.
   useEffect(() => {
+    if (!isConfigured) return;
     let cancelled = false;
 
     async function loadExcludedBuyersCount() {
@@ -261,13 +299,14 @@ export function UltimatesDashboard({
     return () => {
       cancelled = true;
     };
-  }, [cycle.id, reloadToken]);
+  }, [cycle.id, reloadToken, isConfigured]);
 
   // Carga do roster recortado, em efeito PRÓPRIO e tolerante a falha — mesma
   // razão dos contadores de excluídos: o recorte não pode derrubar o dashboard
   // para o estado de erro nem atrasar KPIs, gráfico e tabela do ciclo, que já
   // funcionam sem ele.
   useEffect(() => {
+    if (!isConfigured) return;
     let cancelled = false;
 
     async function loadRange(r: DateRange | null) {
@@ -313,7 +352,7 @@ export function UltimatesDashboard({
     return () => {
       cancelled = true;
     };
-  }, [cycle.id, range, reloadToken]);
+  }, [cycle.id, range, reloadToken, isConfigured]);
 
   function handleRefreshed() {
     setReloadToken((t) => t + 1);
@@ -336,7 +375,7 @@ export function UltimatesDashboard({
   // `filtered` do RosterTable (useMemo com `rows` na dependência) e dispara o
   // reset de página do DataTable/RosterCards (que comparam identidade de
   // array) em QUALQUER re-render do dashboard — inclusive abrir um modal
-  // ("Vincular à base", "Ofertas excluídas", "Carregar base") jogava o
+  // ("Vincular à base", "Leads excluídos", "Carregar base") jogava o
   // usuário de volta para a página 1 atrás do próprio modal.
   const viewRoster = useMemo(
     () => applyNewPurchasesModeToRoster(roster ?? [], countsNewBuyers),
@@ -416,6 +455,17 @@ export function UltimatesDashboard({
   // nova: são as mesmas linhas que a tabela já mostra como "Novos Compradores"
   // (ou "Renovação sem vínculo", conforme o modo do ciclo).
   const unattributedRows = viewRoster.filter((r) => r.buyer_id === null);
+
+  // Ofertas que existem no produto e sobre as quais NINGUÉM decidiu nada — nem
+  // marcar, nem recusar. São as únicas que alertam: `upsertPlaceholderOffers`
+  // cria oferta a partir de venda, então toda oferta nova nasce fora da
+  // contabilidade por construção, e sem esta faixa a allowlist trocaria um erro
+  // visível (número maior que o esperado) por um invisível (número menor).
+  const pendentes = useMemo(
+    () => pendingOffers(cycle.products, offerOptions, offerlessOptions),
+    [cycle.products, offerOptions, offerlessOptions]
+  );
+  const pendentesVendas = pendingSalesCount(pendentes);
 
   // Ciclo com cruzamento de origem configurado, ou null (quase todos). A
   // referência é estável — vem de um mapa de módulo —, então serve de
@@ -530,14 +580,6 @@ export function UltimatesDashboard({
           <button
             type="button"
             className="btn-secondary"
-            onClick={() => setExcludedOpen(true)}
-            data-testid="ultimates-excluded-offers-btn"
-          >
-            {excludedCount > 0 ? `Ofertas excluídas (${excludedCount})` : "Ofertas excluídas"}
-          </button>
-          <button
-            type="button"
-            className="btn-secondary"
             onClick={() => setExcludedBuyersOpen(true)}
             data-testid="ultimates-excluded-buyers-btn"
           >
@@ -585,7 +627,57 @@ export function UltimatesDashboard({
         unavailable={rangeUnavailable}
       />
 
-      {loadError && (
+      {/* Ciclo sem ofertas escolhidas: NENHUM número na tela — nem antigo, nem
+          zerado (decisão 4 da entrevista). Zero seria lido como operação morta;
+          o número antigo seria mentira, porque ele foi calculado com a
+          semântica permissiva que a 065 derruba. A barra de ações e o seletor
+          de ciclo (no pai) continuam de pé: quem cai aqui precisa poder trocar
+          de ciclo sem recarregar a página. */}
+      {!isConfigured && (
+        <div
+          data-testid="ultimates-offers-unconfigured"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 12,
+            padding: "56px 24px",
+            textAlign: "center",
+            borderRadius: "var(--radius-sm)",
+            border: "1px solid var(--border-vis)",
+            background: "var(--surface)",
+          }}
+        >
+          <p style={{ fontSize: 15, fontWeight: 600, color: "var(--text-strong)", margin: 0 }}>
+            Ofertas não configuradas
+          </p>
+          <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0, maxWidth: 420, lineHeight: 1.6 }}>
+            Este ciclo ainda não tem ofertas escolhidas, então nenhum número pode ser calculado.
+          </p>
+          {role === "gestor" ? (
+            onConfigureOffers && (
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={onConfigureOffers}
+                data-testid="ultimates-configure-offers-btn"
+              >
+                Configurar ofertas
+              </button>
+            )
+          ) : (
+            <p
+              data-testid="ultimates-offers-unconfigured-analista"
+              style={{ fontSize: 13, color: "var(--text-3)", margin: 0 }}
+            >
+              Peça a um gestor para configurar as ofertas deste ciclo.
+            </p>
+          )}
+        </div>
+      )}
+
+      {isConfigured && loadError && (
         <div
           data-testid="ultimates-dashboard-error"
           style={{
@@ -607,7 +699,7 @@ export function UltimatesDashboard({
         </div>
       )}
 
-      {!loadError && loading && (
+      {isConfigured && !loadError && loading && (
         <div data-testid="ultimates-dashboard-loading" className="z-layout">
           <div className="ult-kpi-grid">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -648,15 +740,52 @@ export function UltimatesDashboard({
                   : `Renovações e novos compradores restritos a ${fmtDateShort(range.start)} – ${fmtDateShort(range.end)} · Base e meta seguem o ciclo inteiro`}
               </p>
             )}
-            {excludedCount > 0 && (
-              <p
-                data-testid="ultimates-excluded-offers-note"
-                style={{ fontSize: 12, color: "var(--text-3)", margin: "0 0 12px" }}
+            {/* Faixa de oferta nova. Sem pendência NADA é renderizado — mesmo
+                princípio da nota de recorte acima, que só aparece quando há
+                recorte. `flexWrap` e `minWidth: 0` porque no celular a lista de
+                nomes é o que estoura: ela cresce sem limite, ao contrário do
+                resto da faixa. */}
+            {pendentes.length > 0 && (
+              <div
+                data-testid="ultimates-pending-offers-note"
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 8,
+                  fontSize: 12,
+                  color: "var(--color-warning)",
+                  margin: "0 0 12px",
+                  padding: "8px 10px",
+                  borderRadius: "var(--radius-sm)",
+                  border: "1px solid color-mix(in srgb, var(--color-warning) 35%, transparent)",
+                  background: "color-mix(in srgb, var(--color-warning) 10%, transparent)",
+                  lineHeight: 1.5,
+                }}
               >
-                {excludedCount === 1
-                  ? "1 oferta excluída da contabilidade"
-                  : `${excludedCount} ofertas excluídas da contabilidade`}
-              </p>
+                <span style={{ minWidth: 0 }}>
+                  ⚠{" "}
+                  <strong>
+                    {pendentes.length === 1
+                      ? "1 oferta fora da contabilidade"
+                      : `${pendentes.length} ofertas fora da contabilidade`}{" "}
+                    ({pendentesVendas === 1 ? "1 venda" : `${pendentesVendas} vendas`})
+                  </strong>{" "}
+                  — {pendentes.map((p) => p.offer_name ?? "(sem oferta)").join(" · ")}
+                </span>
+                {role === "gestor" && onConfigureOffers && (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={onConfigureOffers}
+                    data-testid="ultimates-pending-offers-review"
+                    style={{ fontSize: 12, flexShrink: 0 }}
+                  >
+                    Revisar
+                  </button>
+                )}
+              </div>
             )}
             {!countsNewBuyers && !purchasesOnly && (
               <p
@@ -756,25 +885,9 @@ export function UltimatesDashboard({
         </div>
       )}
 
-      {/* Diferente dos demais modais, este NÃO é gateado por ciclo ativo:
-          a lista de ofertas excluídas continua editável em ciclo encerrado
-          (decisão 8 do PRD de 2026-07-30). Só o papel decide quem escreve. */}
-      {excludedOpen && (
-        <ExcludedOffersModal
-          cycleId={cycle.id}
-          // O seletor só lista ofertas dos produtos DESTE ciclo. Sem saber quais
-          // são, uma busca por um código legítimo de outro produto devolve
-          // "nenhuma oferta" e se lê como "essa oferta não existe".
-          cycleProducts={cycle.products}
-          canWrite={role === "gestor"}
-          onChanged={handleRefreshed}
-          onClose={() => setExcludedOpen(false)}
-        />
-      )}
-
-      {/* Como o de ofertas, este NÃO é gateado por ciclo ativo — a lista de
-          leads excluídos continua editável em ciclo encerrado (decisão 13 do
-          PRD editar_roster). Só o papel decide quem escreve. */}
+      {/* NÃO é gateado por ciclo ativo — a lista de leads excluídos continua
+          editável em ciclo encerrado (decisão 13 do PRD editar_roster). Só o
+          papel decide quem escreve. */}
       {excludedBuyersOpen && (
         <ExcludedBuyersModal
           cycleId={cycle.id}

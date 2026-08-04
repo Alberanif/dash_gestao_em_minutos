@@ -67,6 +67,8 @@ beforeEach(() => {
         products_removed: 1,
         buyers_removed: 3,
         buyers_materialized: 5,
+        offers_added: 2,
+        offers_removed: 1,
       },
     ],
     error: null,
@@ -428,26 +430,68 @@ describe("PATCH /api/ultimates/cycles/[id] — janela de visualização", () => 
   });
 });
 
-describe("PATCH /api/ultimates/cycles/[id] — productIds", () => {
+describe("PATCH /api/ultimates/cycles/[id] — products", () => {
+  // Produto CONFIGURADO no formato do corpo (065): sem oferta escolhida o
+  // conjunto é recusado antes de chegar à RPC.
+  function produto(
+    productId: string,
+    extra: Record<string, unknown> = {}
+  ): Record<string, unknown> {
+    return {
+      product_id: productId,
+      offer_codes: [`OF_${productId}`],
+      rejected_offer_codes: [],
+      include_offerless: null,
+      ...extra,
+    };
+  }
+
   it("delega para a RPC com o conjunto deduplicado e devolve as contagens", async () => {
     const { PATCH } = await import("../route");
     const res = await PATCH(
       makeRequest("PATCH", "http://localhost/api/ultimates/cycles/cycle-uuid", {
-        productIds: ["  p1  ", "p2", "p1", ""],
+        products: [
+          produto("  p1  ", { offer_codes: [" OF_1 "] }),
+          {
+            product_id: "p2",
+            offer_codes: ["OF_A", "OF_A"],
+            rejected_offer_codes: ["OF_B"],
+            include_offerless: true,
+          },
+          produto("p1", { offer_codes: ["OF_OUTRA"] }),
+          produto(""),
+        ],
       }),
       { params: Promise.resolve(params) }
     );
 
     expect(mockRpc).toHaveBeenCalledWith("dash_gestao_ultimates_set_cycle_products", {
       p_cycle_id: "cycle-uuid",
-      p_product_ids: ["p1", "p2"],
+      p_selection: [
+        {
+          product_id: "p1",
+          offer_codes: ["OF_1"],
+          rejected_offer_codes: [],
+          include_offerless: null,
+        },
+        {
+          product_id: "p2",
+          offer_codes: ["OF_A"],
+          rejected_offer_codes: ["OF_B"],
+          include_offerless: true,
+        },
+      ],
     });
     expect(res.status).toBe(200);
+    // offers_added/offers_removed contam o que a recontagem de oferta mexeu —
+    // é o número que a tela usa para dizer o que saiu do roster.
     expect((await res.json()).products).toEqual({
       products_added: 1,
       products_removed: 1,
       buyers_removed: 3,
       buyers_materialized: 5,
+      offers_added: 2,
+      offers_removed: 1,
     });
     // Sem outro campo no corpo, a linha de cycles não é tocada: a RPC já
     // atualizou o que precisava.
@@ -458,7 +502,7 @@ describe("PATCH /api/ultimates/cycles/[id] — productIds", () => {
     const order: string[] = [];
     mockRpc.mockImplementation(async () => {
       order.push("rpc");
-      return { data: [{ products_added: 0, products_removed: 0, buyers_removed: 0, buyers_materialized: 0 }], error: null };
+      return { data: [{ products_added: 0, products_removed: 0, buyers_removed: 0, buyers_materialized: 0, offers_added: 0, offers_removed: 0 }], error: null };
     });
     mockUpdate.mockImplementation(() => {
       order.push("update");
@@ -470,7 +514,7 @@ describe("PATCH /api/ultimates/cycles/[id] — productIds", () => {
     await PATCH(
       makeRequest("PATCH", "http://localhost/api/ultimates/cycles/cycle-uuid", {
         name: "Novo nome",
-        productIds: ["p1"],
+        products: [produto("p1")],
       }),
       { params: Promise.resolve(params) }
     );
@@ -482,7 +526,7 @@ describe("PATCH /api/ultimates/cycles/[id] — productIds", () => {
     const { PATCH } = await import("../route");
     const res = await PATCH(
       makeRequest("PATCH", "http://localhost/api/ultimates/cycles/cycle-uuid", {
-        productIds: ["", "   "],
+        products: [produto(""), produto("   ")],
       }),
       { params: Promise.resolve(params) }
     );
@@ -491,16 +535,66 @@ describe("PATCH /api/ultimates/cycles/[id] — productIds", () => {
     expect(mockRpc).not.toHaveBeenCalled();
   });
 
-  it("productIds que não é array vira 400", async () => {
+  it("products que não é array vira 400", async () => {
     const { PATCH } = await import("../route");
     const res = await PATCH(
       makeRequest("PATCH", "http://localhost/api/ultimates/cycles/cycle-uuid", {
-        productIds: "p1",
+        products: "p1",
       }),
       { params: Promise.resolve(params) }
     );
 
     expect(res.status).toBe(400);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  // A mesma invariante da criação, com a mesma mensagem: o gestor precisa saber
+  // QUAL produto ficou sem escolha, e a RPC devolveria só UL006.
+  it("recusa produto sem oferta escolhida, nomeando quem falta", async () => {
+    const { PATCH } = await import("../route");
+    const res = await PATCH(
+      makeRequest("PATCH", "http://localhost/api/ultimates/cycles/cycle-uuid", {
+        products: [
+          produto("p1"),
+          { product_id: "p2", offer_codes: [], rejected_offer_codes: ["OF_X"], include_offerless: false },
+        ],
+      }),
+      { params: Promise.resolve(params) }
+    );
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("Selecione ao menos uma oferta para: p2");
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("recusa oferta escolhida e recusada ao mesmo tempo", async () => {
+    const { PATCH } = await import("../route");
+    const res = await PATCH(
+      makeRequest("PATCH", "http://localhost/api/ultimates/cycles/cycle-uuid", {
+        products: [
+          { product_id: "p1", offer_codes: ["OF1"], rejected_offer_codes: ["OF1"], include_offerless: null },
+        ],
+      }),
+      { params: Promise.resolve(params) }
+    );
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/OF1/);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("PATCH sem products não chama a RPC (o corpo é parcial)", async () => {
+    mockSingle.mockResolvedValue({ data: { id: "cycle-uuid", name: "Novo nome" }, error: null });
+
+    const { PATCH } = await import("../route");
+    const res = await PATCH(
+      makeRequest("PATCH", "http://localhost/api/ultimates/cycles/cycle-uuid", {
+        name: "Novo nome",
+      }),
+      { params: Promise.resolve(params) }
+    );
+
+    expect(res.status).toBe(200);
     expect(mockRpc).not.toHaveBeenCalled();
   });
 
@@ -512,6 +606,7 @@ describe("PATCH /api/ultimates/cycles/[id] — productIds", () => {
     ["UL003", 400],
     ["UL004", 404],
     ["UL005", 409],
+    ["UL006", 400],
     ["XX000", 500],
   ])("erro %s da RPC vira HTTP %i", async (code, expected) => {
     mockRpc.mockResolvedValue({ data: null, error: { code, message: "boom" } });
@@ -519,7 +614,7 @@ describe("PATCH /api/ultimates/cycles/[id] — productIds", () => {
     const { PATCH } = await import("../route");
     const res = await PATCH(
       makeRequest("PATCH", "http://localhost/api/ultimates/cycles/cycle-uuid", {
-        productIds: ["p1"],
+        products: [produto("p1")],
       }),
       { params: Promise.resolve(params) }
     );

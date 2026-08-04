@@ -402,6 +402,11 @@ export function UltimatesScreen({ role, products }: UltimatesScreenProps) {
             role={role}
             onCountsNewBuyersChange={handleCountsNewBuyersChange}
             onViewRangeChange={handleViewRangeChange}
+            // "Configurar ofertas" e "Revisar" (migration 065) abrem ESTE
+            // modal, o mesmo do lápis do seletor: o editTarget mora aqui
+            // porque é aqui que está a lista de produtos Hotmart. Só gestor —
+            // para analista o dashboard mostra o texto no lugar do botão.
+            onConfigureOffers={isGestor ? () => setEditTarget(selectedCycle) : undefined}
           />
         </>
       )}
