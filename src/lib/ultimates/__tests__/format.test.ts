@@ -8,6 +8,7 @@ import {
   categoryLabel,
   formatCycleProducts,
 } from "../format";
+import type { UltimatesCycleProductRef } from "@/types/ultimates";
 
 // Intl.NumberFormat("pt-BR", { style: "currency" }) usa NBSP (U+00A0) entre
 // "R$" e o valor, nao espaco comum -- normaliza antes de comparar para nao
@@ -106,41 +107,41 @@ describe("fmtHourLong", () => {
   });
 });
 
+// formatCycleProducts só lê id e nome, mas recebe UltimatesCycleProductRef
+// inteiro — e a migration 065 acrescentou as três colunas de oferta ao tipo.
+// O helper preenche o que o formatador ignora, para o fixture continuar
+// dizendo só o que o teste é sobre.
+function prod(product_id: string, product_name: string | null): UltimatesCycleProductRef {
+  return {
+    product_id,
+    product_name,
+    offer_codes: [],
+    rejected_offer_codes: [],
+    include_offerless: null,
+  };
+}
+
 describe("formatCycleProducts", () => {
   it("junta até 3 nomes com separador", () => {
-    expect(
-      formatCycleProducts([
-        { product_id: "1", product_name: "Anual" },
-        { product_id: "2", product_name: "Mensal" },
-      ])
-    ).toBe("Anual · Mensal");
+    expect(formatCycleProducts([prod("1", "Anual"), prod("2", "Mensal")])).toBe("Anual · Mensal");
   });
 
   // Fronteira exata entre juntar nomes e resumir em contagem. Sem este caso,
   // trocar `> 3` por `>= 3` no formatador passaria despercebido.
   it("com exatamente 3 produtos ainda junta os nomes", () => {
     expect(
-      formatCycleProducts([
-        { product_id: "1", product_name: "Anual" },
-        { product_id: "2", product_name: "Mensal" },
-        { product_id: "3", product_name: "Trimestral" },
-      ])
+      formatCycleProducts([prod("1", "Anual"), prod("2", "Mensal"), prod("3", "Trimestral")])
     ).toBe("Anual · Mensal · Trimestral");
   });
 
   it("resume a partir de 4 produtos", () => {
     expect(
-      formatCycleProducts([
-        { product_id: "1", product_name: "A" },
-        { product_id: "2", product_name: "B" },
-        { product_id: "3", product_name: "C" },
-        { product_id: "4", product_name: "D" },
-      ])
+      formatCycleProducts([prod("1", "A"), prod("2", "B"), prod("3", "C"), prod("4", "D")])
     ).toBe("4 produtos");
   });
 
   it("cai no product_id quando o nome não foi sincronizado", () => {
-    expect(formatCycleProducts([{ product_id: "1234567", product_name: null }])).toBe("1234567");
+    expect(formatCycleProducts([prod("1234567", null)])).toBe("1234567");
   });
 
   it("conjunto vazio mantém o texto de ausência do módulo", () => {

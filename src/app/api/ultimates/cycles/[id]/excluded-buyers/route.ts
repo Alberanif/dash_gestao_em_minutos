@@ -20,8 +20,14 @@ import type { UltimatesExcludedBuyerRecord } from "@/types/ultimates";
  *
  * DIFERENTE do upload da base, do vínculo manual e do refresh, ciclo encerrado
  * NÃO bloqueia: um email de teste descoberto depois do encerramento também
- * suja o histórico (decisão 13 do PRD, mesmo racional de excluded-offers). Não
- * introduza checagem de status aqui achando que é uma inconsistência esquecida.
+ * suja o histórico (decisão 13 do PRD de 2026-07-30). Não introduza checagem de
+ * status aqui achando que é uma inconsistência esquecida.
+ *
+ * ATENÇÃO — esta feature (leads excluídos) NÃO é a de ofertas excluídas, que foi
+ * removida pela migration 065 quando o ciclo passou a acompanhar uma allowlist
+ * de ofertas. As duas tinham nome parecido e mecânicas irmãs; só esta sobrou.
+ * Ofertas agora seguem a regra OPOSTA: ciclo encerrado congela a configuração
+ * (docs/OPS_2026-08-04_ultimates_ofertas_do_ciclo.md).
  */
 
 type Params = { id: string };

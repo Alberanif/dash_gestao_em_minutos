@@ -18,6 +18,9 @@ const mockProductsSingle = jest.fn();
 const mockCycleProductsSelect = jest.fn();
 const mockCycleProductsIn = jest.fn();
 
+const mockCycleOffersSelect = jest.fn();
+const mockCycleOffersIn = jest.fn();
+
 const mockFrom = jest.fn();
 const mockRpc = jest.fn();
 
@@ -35,6 +38,22 @@ function makeRequest(method: string, url: string, body?: object): NextRequest {
 
 function requireRoleMock() {
   return jest.requireMock("@/lib/utils/api-auth").requireRole as jest.Mock;
+}
+
+// Produto CONFIGURADO no formato do corpo desde a 065: com ao menos uma oferta
+// escolhida. Produto sem escolha nenhuma é recusado antes de qualquer I/O, por
+// isso os testes que não falam de oferta precisam deste default.
+function produto(
+  productId: string,
+  extra: Record<string, unknown> = {}
+): Record<string, unknown> {
+  return {
+    product_id: productId,
+    offer_codes: [`OF_${productId}`],
+    rejected_offer_codes: [],
+    include_offerless: null,
+    ...extra,
+  };
 }
 
 beforeEach(() => {
@@ -57,6 +76,9 @@ beforeEach(() => {
   mockCycleProductsSelect.mockReturnValue({ in: mockCycleProductsIn });
   mockCycleProductsIn.mockResolvedValue({ data: [], error: null });
 
+  mockCycleOffersSelect.mockReturnValue({ in: mockCycleOffersIn });
+  mockCycleOffersIn.mockResolvedValue({ data: [], error: null });
+
   mockRpc.mockResolvedValue({ data: null, error: null });
 
   mockFrom.mockImplementation((table: string) => {
@@ -68,6 +90,9 @@ beforeEach(() => {
     }
     if (table === "dash_gestao_ultimates_cycle_products") {
       return { select: mockCycleProductsSelect };
+    }
+    if (table === "dash_gestao_ultimates_cycle_offers") {
+      return { select: mockCycleOffersSelect };
     }
     throw new Error(`Unexpected table: ${table}`);
   });
@@ -137,9 +162,9 @@ describe("GET /api/ultimates/cycles", () => {
       // antes de p2 ("Produto Dois"). Se o sort do GET sumir, a asserção abaixo
       // falha. Com os dois na ordem alfabética o teste passaria verde sem sort.
       data: [
-        { cycle_id: "c1", product_id: "p1" },
-        { cycle_id: "c1", product_id: "p2" },
-        { cycle_id: "c2", product_id: "p2" },
+        { cycle_id: "c1", product_id: "p1", include_offerless: false },
+        { cycle_id: "c1", product_id: "p2", include_offerless: false },
+        { cycle_id: "c2", product_id: "p2", include_offerless: false },
       ],
       error: null,
     });
@@ -158,13 +183,86 @@ describe("GET /api/ultimates/cycles", () => {
     expect(res.status).toBe(200);
     expect(mockCyclesOrder).toHaveBeenCalledWith("created_at", { ascending: false });
     // Ordenados por nome dentro do ciclo, para o header ser determinístico.
-    expect(body.cycles[0].products).toEqual([
-      { product_id: "p2", product_name: "Produto Dois" },
-      { product_id: "p1", product_name: "Produto Um" },
+    expect(body.cycles[0].products.map((p: { product_id: string }) => p.product_id)).toEqual([
+      "p2",
+      "p1",
     ]);
-    expect(body.cycles[1].products).toEqual([
-      { product_id: "p2", product_name: "Produto Dois" },
+    expect(body.cycles[0].products[0].product_name).toBe("Produto Dois");
+    expect(body.cycles[1].products.map((p: { product_id: string }) => p.product_id)).toEqual([
+      "p2",
     ]);
+  });
+
+  // A allowlist da 065: cada produto do ciclo carrega o que foi escolhido, o
+  // que foi recusado e a decisão sobre venda sem oferta. Sem isso o dashboard
+  // não tem como saber se o ciclo está configurado.
+  it("anexa as ofertas escolhidas, as recusadas e include_offerless por produto", async () => {
+    mockCyclesOrder.mockResolvedValueOnce({
+      data: [
+        { id: "c1", name: "Ciclo 1", account_id: "acc-1", status: "ativo", created_at: "2026-08-04T00:00:00Z" },
+        { id: "c2", name: "Ciclo 2", account_id: "acc-1", status: "ativo", created_at: "2026-08-03T00:00:00Z" },
+      ],
+      error: null,
+    });
+    mockCycleProductsIn.mockResolvedValueOnce({
+      data: [
+        { cycle_id: "c1", product_id: "p1", include_offerless: true },
+        { cycle_id: "c1", product_id: "p2", include_offerless: false },
+        { cycle_id: "c2", product_id: "p1", include_offerless: null },
+      ],
+      error: null,
+    });
+    mockProductsIn.mockResolvedValueOnce({
+      data: [
+        { product_id: "p1", product_name: "Anual" },
+        { product_id: "p2", product_name: "Mensal" },
+      ],
+      error: null,
+    });
+    mockCycleOffersIn.mockResolvedValueOnce({
+      // Ordem de chegada embaralhada de propósito, e com linhas de OUTRO ciclo
+      // e de OUTRO produto no meio: a chave é o par (cycle_id, product_id).
+      data: [
+        { cycle_id: "c1", product_id: "p1", offer_code: "OF_B", included: true },
+        { cycle_id: "c2", product_id: "p1", offer_code: "OF_DE_OUTRO_CICLO", included: true },
+        { cycle_id: "c1", product_id: "p1", offer_code: "OF_A", included: true },
+        { cycle_id: "c1", product_id: "p1", offer_code: "OF_RECUSADA", included: false },
+        { cycle_id: "c1", product_id: "p2", offer_code: "OF_DO_P2", included: true },
+      ],
+      error: null,
+    });
+
+    const { GET } = await import("../route");
+    const body = await (await GET()).json();
+
+    const c1 = body.cycles[0].products.find(
+      (p: { product_id: string }) => p.product_id === "p1"
+    );
+    expect(c1).toEqual({
+      product_id: "p1",
+      product_name: "Anual",
+      offer_codes: ["OF_A", "OF_B"],
+      rejected_offer_codes: ["OF_RECUSADA"],
+      include_offerless: true,
+    });
+    expect(
+      body.cycles[0].products.find((p: { product_id: string }) => p.product_id === "p2")
+    ).toEqual({
+      product_id: "p2",
+      product_name: "Mensal",
+      offer_codes: ["OF_DO_P2"],
+      rejected_offer_codes: [],
+      include_offerless: false,
+    });
+    // Ciclo anterior à 065: nada decidido, e include_offerless null é o que
+    // distingue "não configurado" de "decidiu não incluir".
+    expect(body.cycles[1].products[0]).toEqual({
+      product_id: "p1",
+      product_name: "Anual",
+      offer_codes: ["OF_DE_OUTRO_CICLO"],
+      rejected_offer_codes: [],
+      include_offerless: null,
+    });
   });
 
   it("produto não sincronizado entra com product_name null", async () => {
@@ -173,7 +271,7 @@ describe("GET /api/ultimates/cycles", () => {
       error: null,
     });
     mockCycleProductsIn.mockResolvedValueOnce({
-      data: [{ cycle_id: "c1", product_id: "desconhecido" }],
+      data: [{ cycle_id: "c1", product_id: "desconhecido", include_offerless: false }],
       error: null,
     });
     mockProductsIn.mockResolvedValueOnce({ data: [], error: null });
@@ -182,7 +280,13 @@ describe("GET /api/ultimates/cycles", () => {
     const body = await (await GET()).json();
 
     expect(body.cycles[0].products).toEqual([
-      { product_id: "desconhecido", product_name: null },
+      {
+        product_id: "desconhecido",
+        product_name: null,
+        offer_codes: [],
+        rejected_offer_codes: [],
+        include_offerless: false,
+      },
     ]);
   });
 
@@ -233,7 +337,7 @@ describe("POST /api/ultimates/cycles", () => {
     const { POST } = await import("../route");
     const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
       name: "Ciclo X",
-      productIds: ["p1"],
+      products: [produto("p1")],
     });
     const res = await POST(req);
     expect(res.status).toBe(403);
@@ -250,7 +354,7 @@ describe("POST /api/ultimates/cycles", () => {
     const { POST } = await import("../route");
     const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
       name: "Ciclo X",
-      productIds: ["p1"],
+      products: [produto("p1")],
     });
     const res = await POST(req);
     expect(res.status).toBe(403);
@@ -267,7 +371,7 @@ describe("POST /api/ultimates/cycles", () => {
     const { POST } = await import("../route");
     const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
       name: "Ciclo X",
-      productIds: ["p1"],
+      products: [produto("p1")],
     });
     const res = await POST(req);
     expect(res.status).toBe(401);
@@ -277,7 +381,7 @@ describe("POST /api/ultimates/cycles", () => {
     const { POST } = await import("../route");
     const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
       name: "   ",
-      productIds: ["p1"],
+      products: [produto("p1")],
     });
     const res = await POST(req);
     expect(res.status).toBe(400);
@@ -287,7 +391,7 @@ describe("POST /api/ultimates/cycles", () => {
     const { POST } = await import("../route");
     const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
       name: "Ciclo X",
-      productIds: ["p1"],
+      products: [produto("p1")],
       goalPercent: "abc",
     });
     const res = await POST(req);
@@ -298,26 +402,130 @@ describe("POST /api/ultimates/cycles", () => {
     const { POST } = await import("../route");
     const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
       name: "Ciclo X",
-      productIds: ["p1"],
+      products: [produto("p1")],
       goalPercent: 150,
     });
     const res = await POST(req);
     expect(res.status).toBe(400);
   });
 
-  it("returns 400 when productIds is missing or empty", async () => {
+  it("returns 400 when products is missing or empty", async () => {
     const { POST } = await import("../route");
 
     for (const body of [
       { name: "Ciclo X" },
-      { name: "Ciclo X", productIds: [] },
-      { name: "Ciclo X", productIds: "p1" },
+      { name: "Ciclo X", products: [] },
+      { name: "Ciclo X", products: "p1" },
+      // Entrada sem product_id não é produto nenhum: se ela fosse aceita, o
+      // ciclo nasceria com uma linha vazia em cycle_products.
+      { name: "Ciclo X", products: [{ offer_codes: ["OF1"] }] },
+      { name: "Ciclo X", products: [produto("   ")] },
     ]) {
       const res = await POST(makeRequest("POST", "http://localhost/api/ultimates/cycles", body));
       expect(res.status).toBe(400);
       expect((await res.json()).error).toMatch(/ao menos um produto/i);
     }
     expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  // A invariante da 065. Estas checagens existem SÓ pela mensagem — a RPC
+  // repete todas —, e por isso o que se afirma aqui é o texto, não só o 400.
+  it("recusa produto sem oferta escolhida, nomeando quem falta", async () => {
+    const { POST } = await import("../route");
+    const res = await POST(
+      makeRequest("POST", "http://localhost/api/ultimates/cycles", {
+        name: "Ciclo X",
+        products: [
+          produto("p1"),
+          { product_id: "p2", offer_codes: [], rejected_offer_codes: ["OF_X"], include_offerless: null },
+          { product_id: "p3", offer_codes: [], rejected_offer_codes: [], include_offerless: false },
+        ],
+      })
+    );
+
+    expect(res.status).toBe(400);
+    // Recusar TODAS as ofertas (p2) não configura o produto, e include_offerless
+    // false (p3) é "decidi não incluir", não uma escolha do que incluir.
+    expect((await res.json()).error).toBe("Selecione ao menos uma oferta para: p2, p3");
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("aceita produto configurado só por include_offerless", async () => {
+    // Marcar apenas "(sem oferta)" é uma escolha humana explícita, e satisfaz a
+    // regra (PRD seção 3.2): produto cujas vendas não têm offer_code seria
+    // impossível de acompanhar na leitura oposta.
+    mockProductsIn.mockResolvedValueOnce({
+      data: [{ product_id: "p1", account_id: "acc-1" }],
+      error: null,
+    });
+    mockRpc.mockResolvedValueOnce({ data: { id: "new-cycle" }, error: null });
+
+    const { POST } = await import("../route");
+    const res = await POST(
+      makeRequest("POST", "http://localhost/api/ultimates/cycles", {
+        name: "Ciclo X",
+        products: [
+          { product_id: "p1", offer_codes: [], rejected_offer_codes: [], include_offerless: true },
+        ],
+      })
+    );
+
+    expect(res.status).toBe(201);
+  });
+
+  it("recusa oferta escolhida e recusada ao mesmo tempo", async () => {
+    const { POST } = await import("../route");
+    const res = await POST(
+      makeRequest("POST", "http://localhost/api/ultimates/cycles", {
+        name: "Ciclo X",
+        products: [
+          { product_id: "p1", offer_codes: ["OF1"], rejected_offer_codes: ["OF1"], include_offerless: null },
+        ],
+      })
+    );
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/OF1/);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("UL006 da RPC vira 400, não 500", async () => {
+    mockProductsIn.mockResolvedValueOnce({
+      data: [{ product_id: "p1", account_id: "acc-1" }],
+      error: null,
+    });
+    mockRpc.mockResolvedValueOnce({
+      data: null,
+      error: { code: "UL006", message: "produto sem oferta" },
+    });
+
+    const { POST } = await import("../route");
+    const res = await POST(
+      makeRequest("POST", "http://localhost/api/ultimates/cycles", {
+        name: "Ciclo X",
+        products: [produto("p1")],
+      })
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it("erro desconhecido da RPC continua 500", async () => {
+    mockProductsIn.mockResolvedValueOnce({
+      data: [{ product_id: "p1", account_id: "acc-1" }],
+      error: null,
+    });
+    mockRpc.mockResolvedValueOnce({ data: null, error: { code: "XX000", message: "boom" } });
+
+    const { POST } = await import("../route");
+    const res = await POST(
+      makeRequest("POST", "http://localhost/api/ultimates/cycles", {
+        name: "Ciclo X",
+        products: [produto("p1")],
+      })
+    );
+
+    expect(res.status).toBe(500);
   });
 
   it("returns 400 with sync guidance when some product does not exist", async () => {
@@ -331,7 +539,7 @@ describe("POST /api/ultimates/cycles", () => {
     const res = await POST(
       makeRequest("POST", "http://localhost/api/ultimates/cycles", {
         name: "Ciclo X",
-        productIds: ["p1", "fantasma"],
+        products: [produto("p1"), produto("fantasma")],
       })
     );
 
@@ -353,7 +561,7 @@ describe("POST /api/ultimates/cycles", () => {
     const res = await POST(
       makeRequest("POST", "http://localhost/api/ultimates/cycles", {
         name: "Ciclo X",
-        productIds: ["p1", "p2"],
+        products: [produto("p1"), produto("p2")],
       })
     );
 
@@ -362,7 +570,7 @@ describe("POST /api/ultimates/cycles", () => {
     expect(mockRpc).not.toHaveBeenCalled();
   });
 
-  it("creates the cycle through the atomic RPC with deduplicated productIds", async () => {
+  it("creates the cycle through the atomic RPC with deduplicated products", async () => {
     mockProductsIn.mockResolvedValueOnce({
       data: [
         { product_id: "p1", account_id: "acc-1" },
@@ -389,7 +597,18 @@ describe("POST /api/ultimates/cycles", () => {
     const res = await POST(
       makeRequest("POST", "http://localhost/api/ultimates/cycles", {
         name: "  Ciclo X  ",
-        productIds: ["p1", "p2", "p1"],
+        // p1 repetido (a primeira entrada vence) e OF_A repetida dentro do p2:
+        // as duas duplicatas bateriam numa PK do banco com um 23505 ilegível.
+        products: [
+          produto("p1"),
+          {
+            product_id: "p2",
+            offer_codes: ["OF_A", " OF_A ", "OF_B", ""],
+            rejected_offer_codes: ["OF_C"],
+            include_offerless: true,
+          },
+          produto("p1", { offer_codes: ["OF_OUTRA"] }),
+        ],
         goalPercent: 30,
       })
     );
@@ -397,9 +616,24 @@ describe("POST /api/ultimates/cycles", () => {
 
     expect(res.status).toBe(201);
     expect(body.cycle).toEqual(created);
+    // p_selection é jsonb com o conjunto INTEIRO: produto, ofertas escolhidas,
+    // ofertas recusadas e a decisão sobre venda sem oferta.
     expect(mockRpc).toHaveBeenCalledWith("dash_gestao_ultimates_create_cycle", {
       p_name: "Ciclo X",
-      p_product_ids: ["p1", "p2"],
+      p_selection: [
+        {
+          product_id: "p1",
+          offer_codes: ["OF_p1"],
+          rejected_offer_codes: [],
+          include_offerless: null,
+        },
+        {
+          product_id: "p2",
+          offer_codes: ["OF_A", "OF_B"],
+          rejected_offer_codes: ["OF_C"],
+          include_offerless: true,
+        },
+      ],
       p_goal_percent: 30,
       p_purchases_only: false,
       p_created_by: "user-1",
@@ -417,7 +651,7 @@ describe("POST /api/ultimates/cycles", () => {
     await POST(
       makeRequest("POST", "http://localhost/api/ultimates/cycles", {
         name: "Ciclo Sem Meta",
-        productIds: ["p1"],
+        products: [produto("p1")],
       })
     );
 
@@ -439,7 +673,7 @@ describe("POST /api/ultimates/cycles", () => {
     const { POST } = await import("../route");
     const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
       name: "Ciclo Compras",
-      productIds: ["p1"],
+      products: [produto("p1")],
       purchasesOnly: true,
     });
     await POST(req);
@@ -460,7 +694,7 @@ describe("POST /api/ultimates/cycles", () => {
     const { POST } = await import("../route");
     const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
       name: "Ciclo Renovação",
-      productIds: ["p1"],
+      products: [produto("p1")],
     });
     await POST(req);
 
@@ -474,7 +708,7 @@ describe("POST /api/ultimates/cycles", () => {
     const { POST } = await import("../route");
     const req = makeRequest("POST", "http://localhost/api/ultimates/cycles", {
       name: "Ciclo X",
-      productIds: ["p1"],
+      products: [produto("p1")],
       purchasesOnly: "sim",
     });
     const res = await POST(req);

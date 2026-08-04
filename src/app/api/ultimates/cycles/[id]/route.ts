@@ -2,20 +2,111 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { parseDateRange } from "@/lib/ultimates/date-range";
-import type { UltimatesCycleStatus, SetProductsResult } from "@/types/ultimates";
+import { unconfiguredSelection } from "@/lib/ultimates/cycle-offers";
+import type {
+  UltimatesCycleStatus,
+  UltimatesCycleProductSelection,
+  SetProductsResult,
+} from "@/types/ultimates";
 
 type Params = { id: string };
 
 const VALID_STATUSES: UltimatesCycleStatus[] = ["ativo", "encerrado"];
 
-// SQLSTATEs próprios levantados pela RPC (migrations 061/062).
+// SQLSTATEs próprios levantados pela RPC (migrations 061/062/065).
 const RPC_ERROR_STATUS: Record<string, number> = {
   UL001: 400, // conjunto vazio
   UL002: 400, // produto inexistente
   UL003: 400, // produto de outra conta Hotmart
   UL004: 404, // ciclo inexistente
   UL005: 409, // ciclo encerrado
+  UL006: 400, // produto sem oferta escolhida
 };
+
+// Cópia deliberada do parse de POST /api/ultimates/cycles — ver o comentário
+// longo lá. Um route.ts do App Router só exporta handler HTTP, então as duas
+// rotas não têm como compartilhar isto sem um módulo em src/lib; a invariante
+// que precisa ser idêntica nos dois lados já mora em unconfiguredSelection.
+type ParsedSelection =
+  | { selection: UltimatesCycleProductSelection[]; error: null }
+  | { selection: null; error: string };
+
+function parseProductSelection(raw: unknown): ParsedSelection {
+  if (!Array.isArray(raw)) {
+    return { selection: null, error: "Selecione ao menos um produto" };
+  }
+
+  const byProduct = new Map<string, UltimatesCycleProductSelection>();
+
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+
+    const entry = item as Record<string, unknown>;
+    const productId = typeof entry.product_id === "string" ? entry.product_id.trim() : "";
+    if (productId.length === 0) continue;
+    // Primeira ocorrência vence: fundir duas entradas do mesmo produto juntaria
+    // decisões contraditórias num conjunto que ninguém pediu.
+    if (byProduct.has(productId)) continue;
+
+    if (entry.offer_codes !== undefined && !Array.isArray(entry.offer_codes)) {
+      return { selection: null, error: "offer_codes deve ser um array" };
+    }
+    if (entry.rejected_offer_codes !== undefined && !Array.isArray(entry.rejected_offer_codes)) {
+      return { selection: null, error: "rejected_offer_codes deve ser um array" };
+    }
+    if (
+      entry.include_offerless !== undefined &&
+      entry.include_offerless !== null &&
+      typeof entry.include_offerless !== "boolean"
+    ) {
+      return { selection: null, error: "include_offerless deve ser booleano ou null" };
+    }
+
+    const codes = (list: unknown): string[] =>
+      Array.from(
+        new Set(
+          ((list ?? []) as unknown[])
+            .filter((value): value is string => typeof value === "string")
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0)
+        )
+      );
+
+    const offerCodes = codes(entry.offer_codes);
+    const rejectedCodes = codes(entry.rejected_offer_codes);
+
+    const conflito = offerCodes.find((code) => rejectedCodes.includes(code));
+    if (conflito !== undefined) {
+      return {
+        selection: null,
+        error: `Oferta ${conflito} não pode estar escolhida e recusada ao mesmo tempo`,
+      };
+    }
+
+    byProduct.set(productId, {
+      product_id: productId,
+      offer_codes: offerCodes,
+      rejected_offer_codes: rejectedCodes,
+      include_offerless: (entry.include_offerless as boolean | null | undefined) ?? null,
+    });
+  }
+
+  const selection = Array.from(byProduct.values());
+
+  if (selection.length === 0) {
+    return { selection: null, error: "Selecione ao menos um produto" };
+  }
+
+  const semEscolha = unconfiguredSelection(selection);
+  if (semEscolha.length > 0) {
+    return {
+      selection: null,
+      error: `Selecione ao menos uma oferta para: ${semEscolha.join(", ")}`,
+    };
+  }
+
+  return { selection, error: null };
+}
 
 // Gestão de ciclo (renomear, ajustar meta, encerrar/reativar) NÃO é bloqueada
 // pelo status encerrado — RF-12 bloqueia upload/vínculo/refresh, que são
@@ -35,16 +126,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   // imutável depois (PRD "Apenas Compras"). Trocar o modo no meio do ciclo
   // corromperia a contabilidade — um purchasesOnly no body é simplesmente
   // ignorado, nunca aplicado.
-  const { name, goalPercent, status, countsNewBuyers, productIds, viewStartDate, viewEndDate } =
-    body as {
-      name?: unknown;
-      goalPercent?: unknown;
-      status?: unknown;
-      countsNewBuyers?: unknown;
-      productIds?: unknown;
-      viewStartDate?: unknown;
-      viewEndDate?: unknown;
-    };
+  const {
+    name,
+    goalPercent,
+    status,
+    countsNewBuyers,
+    products: rawProducts,
+    viewStartDate,
+    viewEndDate,
+  } = body as {
+    name?: unknown;
+    goalPercent?: unknown;
+    status?: unknown;
+    countsNewBuyers?: unknown;
+    products?: unknown;
+    viewStartDate?: unknown;
+    viewEndDate?: unknown;
+  };
 
   const update: Record<string, unknown> = {};
 
@@ -131,47 +229,42 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
   }
 
-  // Conjunto de produtos do ciclo (migration 062). Vem COMPLETO, não como
-  // delta: o corpo diz o que o ciclo passa a ter, e o diff é feito no banco.
-  let ids: string[] | null = null;
+  // Conjunto de produtos do ciclo COM as ofertas de cada um (migrations
+  // 062/065). Vem COMPLETO, não como delta: o corpo diz o que o ciclo passa a
+  // ter, e o diff é feito no banco. Opcional — o PATCH é parcial, e renomear o
+  // ciclo não pode exigir reenviar a configuração inteira de ofertas.
+  let selection: UltimatesCycleProductSelection[] | null = null;
 
-  if (productIds !== undefined) {
-    if (!Array.isArray(productIds)) {
-      return NextResponse.json({ error: "productIds deve ser um array" }, { status: 400 });
+  if (rawProducts !== undefined) {
+    const parsed = parseProductSelection(rawProducts);
+    if (parsed.error !== null) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
     }
-    ids = Array.from(
-      new Set(
-        productIds
-          .filter((value): value is string => typeof value === "string")
-          .map((value) => value.trim())
-          .filter((value) => value.length > 0)
-      )
-    );
-    if (ids.length === 0) {
-      return NextResponse.json({ error: "Selecione ao menos um produto" }, { status: 400 });
-    }
+    selection = parsed.selection;
   }
 
-  if (Object.keys(update).length === 0 && ids === null) {
+  if (Object.keys(update).length === 0 && selection === null) {
     return NextResponse.json({ error: "nenhum campo válido para atualizar" }, { status: 400 });
   }
 
   const supabase = createSupabaseServiceClient();
 
   // A troca de produtos vai PRIMEIRO, e sozinha numa transação (a RPC). É a
-  // única escrita daqui que apaga linha de roster, e é a que tem invariantes
-  // reais para checar — ciclo ativo, conta única, conjunto não vazio. Se ela
-  // recusar, nada mais foi tocado.
+  // única escrita daqui que apaga linha de roster — desmarcar oferta encolhe o
+  // universo de vendas exatamente como remover produto, e passa pela mesma
+  // recontagem —, e é a que tem invariantes reais para checar: ciclo ativo,
+  // conta única, conjunto não vazio, produto com escolha. Se ela recusar, nada
+  // mais foi tocado.
   let productsResult: SetProductsResult | null = null;
 
-  if (ids !== null) {
+  if (selection !== null) {
     const { data: rpcData, error: rpcError } = await supabase.rpc(
       "dash_gestao_ultimates_set_cycle_products",
-      { p_cycle_id: id, p_product_ids: ids }
+      { p_cycle_id: id, p_selection: selection }
     );
 
     if (rpcError) {
-      // As exceções da RPC carregam SQLSTATE próprio (UL001..UL005). Sem este
+      // As exceções da RPC carregam SQLSTATE próprio (UL001..UL006). Sem este
       // mapa, "ciclo encerrado" viraria um 500 genérico e a tela mostraria
       // "erro ao salvar" para uma regra de negócio que o gestor pode corrigir.
       const status = RPC_ERROR_STATUS[rpcError.code ?? ""] ?? 500;
@@ -223,9 +316,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 // chega aqui quer o ciclo fora do banco.
 //
 // Um único DELETE basta — as tabelas filhas (buyers, manual_links,
-// excluded_offers, excluded_buyers) têm `on delete cascade` no cycle_id
-// (migrations 049/052/055), então nada fica órfão e nenhuma limpeza manual
-// (nem transação) é necessária aqui.
+// excluded_buyers, cycle_products e cycle_offers) têm `on delete cascade` no
+// cycle_id (migrations 049/055/061/065), então nada fica órfão e nenhuma
+// limpeza manual (nem transação) é necessária aqui.
 //
 // NÃO checamos refresh_started_at de propósito: esse lock tem TTL e já nasceu
 // órfão uma vez (fetch Hotmart pendurado antes do finally). Amarrar a exclusão

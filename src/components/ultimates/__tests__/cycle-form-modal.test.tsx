@@ -4,12 +4,62 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { CycleFormModal } from "../cycle-form-modal";
 import type { HotmartProductOption, CycleWithProducts } from "../types";
+import type { UltimatesOfferOption } from "@/types/ultimates";
 
 const PRODUCTS: HotmartProductOption[] = [
   { product_id: "4567890", product_name: "Mentoria Ultimates", account_id: "acc-1" },
   { product_id: "1234567", product_name: "Curso Avançado", account_id: "acc-1" },
   { product_id: "9999999", product_name: "Produto Outra Conta", account_id: "acc-2" },
 ];
+
+// Ofertas de cada produto, no formato de GET /api/ultimates/offer-options.
+const OFFERS: Record<string, UltimatesOfferOption[]> = {
+  "4567890": [
+    { offer_code: "OF-A", offer_name: "Oferta Principal", product_id: "4567890", product_name: "Mentoria Ultimates", sales_count: 312 },
+    { offer_code: "OF-B", offer_name: "Cortesia Equipe", product_id: "4567890", product_name: "Mentoria Ultimates", sales_count: 8 },
+  ],
+  "1234567": [
+    { offer_code: "OF-C", offer_name: "Turma 2026", product_id: "1234567", product_name: "Curso Avançado", sales_count: 40 },
+  ],
+  "9999999": [
+    { offer_code: "OF-D", offer_name: "Outra Conta", product_id: "9999999", product_name: "Produto Outra Conta", sales_count: 1 },
+  ],
+};
+
+// Só o 4567890 tem venda SEM offer_code — é o único que ganha a linha fixa
+// "(sem oferta)" na sanfona.
+const OFFERLESS = [{ product_id: "4567890", sales_count: 3 }];
+
+// Instala o fetch do teste. A rota de ofertas responde sempre (a sanfona a
+// chama assim que um produto é selecionado, em todo teste); o resto delega
+// para `rest`, que é o mock sobre o qual as asserções de salvar/excluir rodam.
+function installFetch(rest: jest.Mock = jest.fn(), extraOffers: UltimatesOfferOption[] = []): jest.Mock {
+  const fetchMock = jest.fn((url: string, init?: RequestInit) => {
+    if (typeof url === "string" && url.includes("/offer-options")) {
+      const ids = (new URLSearchParams(url.split("?")[1] ?? "").get("productIds") ?? "").split(",");
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          offers: [
+            ...ids.flatMap((id) => OFFERS[id] ?? []),
+            ...extraOffers.filter((o) => ids.includes(o.product_id)),
+          ],
+          offerless: OFFERLESS.filter((o) => ids.includes(o.product_id)),
+        }),
+      });
+    }
+    return rest(url, init);
+  });
+  global.fetch = fetchMock as unknown as typeof global.fetch;
+  return rest;
+}
+
+// Marca o produto e a 1ª oferta dele — o par mínimo que destrava o salvar.
+async function escolherProdutoEOferta(productId: string) {
+  fireEvent.click(screen.getByTestId(`cycle-form-product-option-${productId}`));
+  fireEvent.click(await screen.findByTestId(`cycle-form-offers-toggle-${productId}`));
+  fireEvent.click(screen.getByTestId(`cycle-form-offer-${productId}-${OFFERS[productId][0].offer_code}`));
+}
 
 function renderCreate(products: HotmartProductOption[] = PRODUCTS) {
   return render(<CycleFormModal products={products} onSave={jest.fn()} onCancel={jest.fn()} />);
@@ -20,7 +70,19 @@ function makeCycle(overrides: Partial<CycleWithProducts> = {}): CycleWithProduct
     id: "c1",
     name: "Ciclo Julho",
     account_id: "acc-1",
-    products: [{ product_id: "4567890", product_name: "Mentoria Ultimates" }],
+    // Ciclo já CONFIGURADO sob a 065: OF-A escolhida, OF-B vista e recusada,
+    // "(sem oferta)" decidida. Sem as três listas completas, reabrir o modal e
+    // salvar já contaria como mudança — é a decisão que o gestor tomou na tela
+    // anterior, e ela é persistida junto.
+    products: [
+      {
+        product_id: "4567890",
+        product_name: "Mentoria Ultimates",
+        offer_codes: ["OF-A"],
+        rejected_offer_codes: ["OF-B"],
+        include_offerless: false,
+      },
+    ],
     goal_percent: 60,
     status: "ativo",
     counts_new_buyers: true,
@@ -39,6 +101,10 @@ function renderEdit(editTarget: CycleWithProducts) {
     <CycleFormModal products={PRODUCTS} editTarget={editTarget} onSave={jest.fn()} onCancel={jest.fn()} />
   );
 }
+
+beforeEach(() => {
+  installFetch();
+});
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -74,35 +140,31 @@ describe("CycleFormModal — busca de produto", () => {
   });
 
   it("sem seleção, salvar mostra 'Selecione ao menos um produto.' e não faz POST", () => {
-    const fetchMock = jest.fn();
-    global.fetch = fetchMock as unknown as typeof global.fetch;
+    const salvar = installFetch();
     renderCreate();
     fireEvent.change(screen.getByTestId("cycle-form-name"), { target: { value: "Ciclo Julho" } });
     fireEvent.click(screen.getByTestId("cycle-form-save"));
     expect(screen.getByText("Selecione ao menos um produto.")).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(salvar).not.toHaveBeenCalled();
   });
 
   it("falha de rede no salvar mostra erro em vez de falhar em silêncio", async () => {
-    const fetchMock = jest.fn().mockRejectedValue(new TypeError("Failed to fetch"));
-    global.fetch = fetchMock as unknown as typeof global.fetch;
+    installFetch(jest.fn().mockRejectedValue(new TypeError("Failed to fetch")));
     renderCreate();
     fireEvent.change(screen.getByTestId("cycle-form-name"), { target: { value: "Ciclo Julho" } });
-    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    await escolherProdutoEOferta("4567890");
     fireEvent.click(screen.getByTestId("cycle-form-save"));
     expect(await screen.findByText("Falha de rede ao salvar o ciclo.")).toBeInTheDocument();
     expect(screen.getByTestId("cycle-form-save")).not.toBeDisabled();
   });
 
   it("resposta 2xx sem cycle no corpo mostra erro genérico em vez de quebrar", async () => {
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.reject(new Error("empty body")),
-    });
-    global.fetch = fetchMock as unknown as typeof global.fetch;
+    installFetch(
+      jest.fn().mockResolvedValue({ ok: true, json: () => Promise.reject(new Error("empty body")) })
+    );
     renderCreate();
     fireEvent.change(screen.getByTestId("cycle-form-name"), { target: { value: "Ciclo Julho" } });
-    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    await escolherProdutoEOferta("4567890");
     fireEvent.click(screen.getByTestId("cycle-form-save"));
     expect(await screen.findByText("Erro ao salvar ciclo.")).toBeInTheDocument();
   });
@@ -137,20 +199,21 @@ describe("CycleFormModal — Apenas Compras", () => {
   });
 
   it("criar com 'Apenas Compras' ligado envia purchasesOnly: true no POST", async () => {
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ cycle: makeCycle({ purchases_only: true }) }),
-    });
-    global.fetch = fetchMock as unknown as typeof global.fetch;
+    const salvar = installFetch(
+      jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ cycle: makeCycle({ purchases_only: true }) }),
+      })
+    );
 
     renderCreate();
     fireEvent.change(screen.getByTestId("cycle-form-name"), { target: { value: "Compras Julho" } });
-    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    await escolherProdutoEOferta("4567890");
     fireEvent.click(screen.getByTestId("cycle-form-purchases-only"));
     fireEvent.click(screen.getByTestId("cycle-form-save"));
 
-    await screen.findByTestId("cycle-form-save");
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    await waitFor(() => expect(salvar).toHaveBeenCalled());
+    const body = JSON.parse(salvar.mock.calls[0][1].body);
     expect(body.purchasesOnly).toBe(true);
   });
 
@@ -203,13 +266,13 @@ describe("CycleFormModal — excluir ciclo", () => {
   }
 
   function mockFetch(response: { ok: boolean; status: number; body?: object }) {
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: response.ok,
-      status: response.status,
-      json: async () => response.body ?? {},
-    });
-    global.fetch = fetchMock as unknown as typeof global.fetch;
-    return fetchMock;
+    return installFetch(
+      jest.fn().mockResolvedValue({
+        ok: response.ok,
+        status: response.status,
+        json: async () => response.body ?? {},
+      })
+    );
   }
 
   it("modo criação não oferece exclusão", () => {
@@ -239,7 +302,7 @@ describe("CycleFormModal — excluir ciclo", () => {
   });
 
   it("nome errado mantém o botão desabilitado e não chama a API", () => {
-    const fetchMock = mockFetch({ ok: true, status: 200 });
+    const escrever = mockFetch({ ok: true, status: 200 });
     renderEditWithDelete();
     fireEvent.click(screen.getByTestId("cycle-form-delete-open"));
     fireEvent.change(screen.getByTestId("cycle-form-delete-confirm-input"), {
@@ -249,7 +312,7 @@ describe("CycleFormModal — excluir ciclo", () => {
     const confirm = screen.getByTestId("cycle-form-delete-confirm");
     expect(confirm).toBeDisabled();
     fireEvent.click(confirm);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(escrever).not.toHaveBeenCalled();
   });
 
   it("nome parcial não destrava (exige igualdade exata, não prefixo)", () => {
@@ -273,7 +336,7 @@ describe("CycleFormModal — excluir ciclo", () => {
   // A confirmação confere contra o nome PERSISTIDO. Se conferisse contra o campo
   // Nome do formulário, bastaria digitar o mesmo texto nos dois para destravar.
   it("editar o campo Nome não muda o texto exigido na confirmação", () => {
-    const fetchMock = mockFetch({ ok: true, status: 200 });
+    const escrever = mockFetch({ ok: true, status: 200 });
     renderEditWithDelete();
     fireEvent.change(screen.getByTestId("cycle-form-name"), { target: { value: "Outro Nome" } });
     fireEvent.click(screen.getByTestId("cycle-form-delete-open"));
@@ -283,11 +346,11 @@ describe("CycleFormModal — excluir ciclo", () => {
 
     expect(screen.getByTestId("cycle-form-delete-confirm")).toBeDisabled();
     fireEvent.click(screen.getByTestId("cycle-form-delete-confirm"));
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(escrever).not.toHaveBeenCalled();
   });
 
   it("nome exato dispara DELETE na rota do ciclo e propaga o id excluído", async () => {
-    const fetchMock = mockFetch({ ok: true, status: 200, body: { deleted: "c1" } });
+    const escrever = mockFetch({ ok: true, status: 200, body: { deleted: "c1" } });
     const onDelete = renderEditWithDelete();
 
     fireEvent.click(screen.getByTestId("cycle-form-delete-open"));
@@ -297,7 +360,7 @@ describe("CycleFormModal — excluir ciclo", () => {
     fireEvent.click(screen.getByTestId("cycle-form-delete-confirm"));
 
     await waitFor(() => expect(onDelete).toHaveBeenCalledWith("c1"));
-    expect(fetchMock).toHaveBeenCalledWith("/api/ultimates/cycles/c1", { method: "DELETE" });
+    expect(escrever).toHaveBeenCalledWith("/api/ultimates/cycles/c1", { method: "DELETE" });
   });
 
   it("espaços em volta do nome digitado são tolerados", async () => {
@@ -345,7 +408,7 @@ describe("CycleFormModal — excluir ciclo", () => {
   });
 
   it("falha de rede mostra mensagem e NÃO propaga a exclusão", async () => {
-    global.fetch = jest.fn().mockRejectedValue(new Error("offline")) as unknown as typeof global.fetch;
+    installFetch(jest.fn().mockRejectedValue(new Error("offline")));
     const onDelete = renderEditWithDelete();
 
     fireEvent.click(screen.getByTestId("cycle-form-delete-open"));
@@ -409,32 +472,50 @@ describe("CycleFormModal — seleção múltipla", () => {
     expect(screen.getByTestId("cycle-form-product-option-9999999")).not.toBeDisabled();
   });
 
-  it("envia productIds com todos os selecionados e monta products no onSave", async () => {
+  it("envia products com a decisão de cada selecionado e monta o ciclo no onSave", async () => {
     const onSave = jest.fn();
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ cycle: { id: "c9", name: "Ciclo Julho" } }),
-    });
-    global.fetch = fetchMock as unknown as typeof global.fetch;
+    const salvar = installFetch(
+      jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ cycle: { id: "c9", name: "Ciclo Julho" } }),
+      })
+    );
 
     render(<CycleFormModal products={PRODUCTS} onSave={onSave} onCancel={jest.fn()} />);
     fireEvent.change(screen.getByTestId("cycle-form-name"), { target: { value: "Ciclo Julho" } });
-    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
-    fireEvent.click(screen.getByTestId("cycle-form-product-option-1234567"));
+    await escolherProdutoEOferta("4567890");
+    await escolherProdutoEOferta("1234567");
     fireEvent.click(screen.getByTestId("cycle-form-save"));
 
-    await screen.findByText("Salvar");
+    await waitFor(() => expect(salvar).toHaveBeenCalled());
 
-    const sentBody = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(sentBody.productIds).toEqual(["4567890", "1234567"]);
-    // 2º argumento null: criação não troca conjunto de produtos de ciclo
-    // nenhum, então não há contagem de troca para reportar.
+    const sentBody = JSON.parse(salvar.mock.calls[0][1].body);
+    // productIds morreu na 065: o corpo carrega a decisão inteira por produto.
+    expect(sentBody.productIds).toBeUndefined();
+    expect(sentBody.products).toEqual([
+      {
+        product_id: "4567890",
+        offer_codes: ["OF-A"],
+        // OF-B foi EXIBIDA e ficou desmarcada — é recusa, não desconhecimento.
+        rejected_offer_codes: ["OF-B"],
+        // A linha "(sem oferta)" existe para este produto e não foi marcada.
+        include_offerless: false,
+      },
+      {
+        product_id: "1234567",
+        offer_codes: ["OF-C"],
+        rejected_offer_codes: [],
+        // Produto sem venda sem-oferta: a linha nem aparece, então não houve
+        // decisão a registrar.
+        include_offerless: null,
+      },
+    ]);
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "c9",
         products: [
-          { product_id: "4567890", product_name: "Mentoria Ultimates" },
-          { product_id: "1234567", product_name: "Curso Avançado" },
+          expect.objectContaining({ product_id: "4567890", product_name: "Mentoria Ultimates", offer_codes: ["OF-A"] }),
+          expect.objectContaining({ product_id: "1234567", product_name: "Curso Avançado", offer_codes: ["OF-C"] }),
         ],
       }),
       null
@@ -442,15 +523,150 @@ describe("CycleFormModal — seleção múltipla", () => {
   });
 });
 
-// Edição do conjunto de produtos (migration 062). O que estes testes protegem
-// não é a feature, é o custo dela: a RPC de troca APAGA linha de roster, então
-// mandá-la sem necessidade, ou sem o gestor ter lido o que sai, é o estrago.
-describe("CycleFormModal — editar produtos do ciclo", () => {
-  function okResponse(products: unknown = null) {
-    return jest.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ cycle: makeCycle(), products }),
+// Sanfona de ofertas (migration 065). O que estes testes protegem é a
+// invariante que o dashboard inteiro depende: ciclo não salva com produto sem
+// escolha, e o que a tela exibiu vira decisão registrada.
+describe("CycleFormModal — sanfona de ofertas", () => {
+  it("a sanfona só existe sob produto SELECIONADO, e vem recolhida", async () => {
+    renderCreate();
+    expect(screen.queryByTestId("cycle-form-offers-4567890")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+
+    const toggle = await screen.findByTestId("cycle-form-offers-toggle-4567890");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    // 2 ofertas + a linha "(sem oferta)" = 3.
+    expect(toggle).toHaveTextContent("0 de 3 ofertas");
+    expect(screen.queryByTestId("cycle-form-offer-4567890-OF-A")).not.toBeInTheDocument();
+  });
+
+  it("abrir lista as ofertas com a contagem de vendas e a linha '(sem oferta)'", async () => {
+    renderCreate();
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    fireEvent.click(await screen.findByTestId("cycle-form-offers-toggle-4567890"));
+
+    expect(screen.getByTestId("cycle-form-offer-4567890-OF-A")).toHaveTextContent("Oferta Principal");
+    expect(screen.getByTestId("cycle-form-offer-4567890-OF-A")).toHaveTextContent("312");
+    expect(screen.getByTestId("cycle-form-offerless-4567890")).toHaveTextContent("(sem oferta)");
+    expect(screen.getByTestId("cycle-form-offerless-4567890")).toHaveTextContent("3");
+  });
+
+  it("produto sem venda sem-oferta NÃO ganha a linha '(sem oferta)'", async () => {
+    renderCreate();
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-1234567"));
+    fireEvent.click(await screen.findByTestId("cycle-form-offers-toggle-1234567"));
+
+    expect(screen.queryByTestId("cycle-form-offerless-1234567")).not.toBeInTheDocument();
+  });
+
+  it("marcar oferta atualiza o contador do cabeçalho", async () => {
+    renderCreate();
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    fireEvent.click(await screen.findByTestId("cycle-form-offers-toggle-4567890"));
+    fireEvent.click(screen.getByTestId("cycle-form-offer-4567890-OF-A"));
+
+    expect(screen.getByTestId("cycle-form-offers-toggle-4567890")).toHaveTextContent("1 de 3 ofertas");
+    expect(screen.getByTestId("cycle-form-offer-4567890-OF-A")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("produto selecionado sem escolha bloqueia o salvar e NOMEIA quem falta", async () => {
+    const salvar = installFetch();
+    renderCreate();
+    fireEvent.change(screen.getByTestId("cycle-form-name"), { target: { value: "Ciclo Julho" } });
+    await escolherProdutoEOferta("4567890");
+    // O segundo produto entra sem nenhuma oferta marcada.
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-1234567"));
+    await screen.findByTestId("cycle-form-offers-toggle-1234567");
+
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+
+    expect(
+      screen.getByText("Selecione ao menos 1 oferta em: Curso Avançado.")
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("cycle-form-offers-error-1234567")).toBeInTheDocument();
+    expect(salvar).not.toHaveBeenCalled();
+  });
+
+  // Decisão derivada do PRD 3.2: marcar SÓ "(sem oferta)" é uma escolha humana
+  // explícita e configura o produto. Sem isso, produto cujas vendas não têm
+  // offer_code seria impossível de acompanhar.
+  it("marcar apenas '(sem oferta)' configura o produto", async () => {
+    const salvar = installFetch(
+      jest.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ cycle: makeCycle() }) })
+    );
+    renderCreate();
+    fireEvent.change(screen.getByTestId("cycle-form-name"), { target: { value: "Ciclo Julho" } });
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    fireEvent.click(await screen.findByTestId("cycle-form-offers-toggle-4567890"));
+    fireEvent.click(screen.getByTestId("cycle-form-offerless-4567890"));
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+
+    await waitFor(() => expect(salvar).toHaveBeenCalled());
+    const body = JSON.parse(salvar.mock.calls[0][1].body);
+    expect(body.products[0]).toEqual({
+      product_id: "4567890",
+      offer_codes: [],
+      rejected_offer_codes: ["OF-A", "OF-B"],
+      include_offerless: true,
     });
+  });
+
+  // Um clique errado na lista de produtos não pode custar o trabalho de
+  // escolher oferta por oferta.
+  it("desmarcar e remarcar o produto devolve as ofertas já escolhidas", async () => {
+    renderCreate();
+    await escolherProdutoEOferta("4567890");
+    expect(screen.getByTestId("cycle-form-offers-toggle-4567890")).toHaveTextContent("1 de 3");
+
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    expect(screen.queryByTestId("cycle-form-offers-toggle-4567890")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+    expect(await screen.findByTestId("cycle-form-offers-toggle-4567890")).toHaveTextContent("1 de 3");
+  });
+
+  it("edição pré-marca o estado vigente do ciclo", async () => {
+    renderEdit(makeCycle());
+    fireEvent.click(await screen.findByTestId("cycle-form-offers-toggle-4567890"));
+
+    expect(screen.getByTestId("cycle-form-offer-4567890-OF-A")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("cycle-form-offer-4567890-OF-B")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("cycle-form-offerless-4567890")).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("falha ao carregar as ofertas é dita, com opção de tentar de novo", async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, json: async () => ({}) }) as unknown as typeof global.fetch;
+    renderCreate();
+    fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
+
+    expect(await screen.findByTestId("cycle-form-offers-load-error-4567890")).toBeInTheDocument();
+
+    installFetch();
+    fireEvent.click(screen.getByTestId("cycle-form-offers-retry-4567890"));
+    expect(await screen.findByTestId("cycle-form-offers-toggle-4567890")).toBeInTheDocument();
+  });
+
+  it("ciclo encerrado exibe as ofertas escolhidas, sem controle de marcação", async () => {
+    renderEdit(makeCycle({ status: "encerrado" }));
+
+    expect(await screen.findByTestId("cycle-form-offers-readonly")).toHaveTextContent("Oferta Principal");
+    expect(screen.getByText("Ciclo encerrado — reative o ciclo para alterar as ofertas.")).toBeInTheDocument();
+    expect(screen.queryByTestId("cycle-form-offers-toggle-4567890")).not.toBeInTheDocument();
+  });
+});
+
+// Edição do conjunto de produtos (migration 062) e das ofertas (065). O que
+// estes testes protegem não é a feature, é o custo dela: a RPC de troca APAGA
+// linha de roster, então mandá-la sem necessidade, ou sem o gestor ter lido o
+// que sai, é o estrago.
+describe("CycleFormModal — editar produtos e ofertas do ciclo", () => {
+  function okResponse(products: unknown = null) {
+    return installFetch(
+      jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ cycle: makeCycle(), products }),
+      })
+    );
   }
 
   it("edição abre com os produtos atuais do ciclo já selecionados", () => {
@@ -466,62 +682,155 @@ describe("CycleFormModal — editar produtos do ciclo", () => {
     );
   });
 
-  it("salvar sem mexer nos produtos NÃO manda productIds", async () => {
-    const fetchMock = okResponse();
-    global.fetch = fetchMock as unknown as typeof global.fetch;
+  it("salvar sem mexer em nada NÃO manda products", async () => {
+    const salvar = okResponse();
 
     renderEdit(makeCycle());
+    // Espera a sanfona carregar: é justamente depois da carga que um cálculo
+    // errado de rejected_offer_codes inventaria uma mudança.
+    await screen.findByTestId("cycle-form-offers-toggle-4567890");
     fireEvent.click(screen.getByTestId("cycle-form-save"));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.productIds).toBeUndefined();
+    await waitFor(() => expect(salvar).toHaveBeenCalled());
+    const body = JSON.parse(salvar.mock.calls[0][1].body);
+    expect(body.products).toBeUndefined();
+  });
+
+  // O caminho do "Revisar" do dashboard: a oferta nova é EXIBIDA na sanfona e,
+  // deixada desmarcada, vira recusa registrada — é o que desliga a faixa de
+  // aviso sem o gestor precisar clicar em nada além de Salvar.
+  it("oferta nova não decidida faz o salvar mandar products, mesmo sem clique na sanfona", async () => {
+    const salvar = installFetch(
+      jest.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ cycle: makeCycle(), products: null }) }),
+      [{ offer_code: "OF-NOVA", offer_name: "Cortesia Black", product_id: "4567890", product_name: "Mentoria Ultimates", sales_count: 9 }]
+    );
+
+    renderEdit(makeCycle());
+    await screen.findByTestId("cycle-form-offers-toggle-4567890");
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+
+    await waitFor(() => expect(salvar).toHaveBeenCalled());
+    const body = JSON.parse(salvar.mock.calls[0][1].body);
+    expect(body.products[0].rejected_offer_codes).toEqual(["OF-B", "OF-NOVA"]);
+  });
+
+  // O modal é aberto por ROTINA (renomear, mudar meta), e nada obriga o gestor a
+  // esperar a sanfona. Se `rejected_offer_codes` saísse só do que a tela
+  // carregou, salvar aqui mandaria a lista vazia — e a RPC, que apaga toda linha
+  // ausente da seleção, apagaria as recusas já registradas. A cortesia recusada
+  // voltaria a ser "nunca decidida" e a faixa de aviso do dashboard a apontaria
+  // de novo, que é exatamente o ruído que a coluna `included` existe para matar.
+  it("salvar ANTES das ofertas carregarem preserva as recusas já persistidas", async () => {
+    const salvar = jest.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ cycle: makeCycle(), products: null }),
+    });
+    // A rota de ofertas fica pendurada: a sanfona nunca carrega neste teste.
+    global.fetch = jest.fn((url: string, init?: RequestInit) => {
+      if (typeof url === "string" && url.includes("/offer-options")) {
+        return new Promise(() => {});
+      }
+      return salvar(url, init);
+    }) as unknown as typeof global.fetch;
+
+    // Muda o nome para haver o que salvar sem tocar em oferta nenhuma.
+    renderEdit(makeCycle());
+    fireEvent.change(screen.getByTestId("cycle-form-name"), {
+      target: { value: "Ciclo Julho (revisado)" },
+    });
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+
+    await waitFor(() => expect(salvar).toHaveBeenCalled());
+    const body = JSON.parse(salvar.mock.calls[0][1].body);
+    // Ou o corpo não carrega products (nada mudou no conjunto), ou carrega com a
+    // recusa intacta. O que não pode acontecer é mandar a lista vazia.
+    if (body.products !== undefined) {
+      expect(body.products[0].rejected_offer_codes).toEqual(["OF-B"]);
+      expect(body.products[0].offer_codes).toEqual(["OF-A"]);
+    }
   });
 
   it("adicionar produto manda o conjunto completo, sem pedir confirmação", async () => {
-    const fetchMock = okResponse({
+    const salvar = okResponse({
       products_added: 1,
       products_removed: 0,
       buyers_removed: 0,
       buyers_materialized: 7,
+      offers_added: 1,
+      offers_removed: 0,
     });
-    global.fetch = fetchMock as unknown as typeof global.fetch;
 
     renderEdit(makeCycle());
-    fireEvent.click(screen.getByTestId("cycle-form-product-option-1234567"));
+    await escolherProdutoEOferta("1234567");
     fireEvent.click(screen.getByTestId("cycle-form-save"));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.productIds).toEqual(["4567890", "1234567"]);
+    await waitFor(() => expect(salvar).toHaveBeenCalled());
+    const body = JSON.parse(salvar.mock.calls[0][1].body);
+    expect(body.products.map((p: { product_id: string }) => p.product_id)).toEqual([
+      "4567890",
+      "1234567",
+    ]);
   });
 
   it("remover produto exige segundo clique e NOMEIA o que sai", async () => {
-    const fetchMock = okResponse();
-    global.fetch = fetchMock as unknown as typeof global.fetch;
+    const salvar = okResponse();
 
     renderEdit(makeCycle());
-    // Desmarca o único produto e marca outro — o primeiro sai do ciclo.
-    fireEvent.click(screen.getByTestId("cycle-form-product-option-1234567"));
+    // Marca outro produto e desmarca o do ciclo — o primeiro sai.
+    await escolherProdutoEOferta("1234567");
     fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
     fireEvent.click(screen.getByTestId("cycle-form-save"));
 
     const aviso = screen.getByTestId("cycle-form-confirm-remove-products");
     expect(aviso).toHaveTextContent("Mentoria Ultimates");
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(salvar).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByTestId("cycle-form-save"));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.productIds).toEqual(["1234567"]);
+    await waitFor(() => expect(salvar).toHaveBeenCalled());
+    const body = JSON.parse(salvar.mock.calls[0][1].body);
+    expect(body.products.map((p: { product_id: string }) => p.product_id)).toEqual(["1234567"]);
+  });
+
+  // Desmarcar oferta encolhe o universo de vendas igual a remover produto:
+  // quem só comprou por ela some do roster (PRD 3.5).
+  it("desmarcar oferta exige segundo clique e NOMEIA a oferta que sai", async () => {
+    const salvar = okResponse();
+
+    renderEdit(makeCycle());
+    fireEvent.click(await screen.findByTestId("cycle-form-offers-toggle-4567890"));
+    // Marca a outra para o produto continuar configurado, e desmarca a vigente.
+    fireEvent.click(screen.getByTestId("cycle-form-offer-4567890-OF-B"));
+    fireEvent.click(screen.getByTestId("cycle-form-offer-4567890-OF-A"));
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+
+    expect(screen.getByTestId("cycle-form-confirm-remove-offers")).toHaveTextContent(
+      "Oferta Principal"
+    );
+    expect(salvar).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+    await waitFor(() => expect(salvar).toHaveBeenCalled());
+    const body = JSON.parse(salvar.mock.calls[0][1].body);
+    expect(body.products[0].offer_codes).toEqual(["OF-B"]);
+  });
+
+  it("marcar oferta a mais NÃO pede confirmação — só entra venda", async () => {
+    const salvar = okResponse();
+
+    renderEdit(makeCycle());
+    fireEvent.click(await screen.findByTestId("cycle-form-offers-toggle-4567890"));
+    fireEvent.click(screen.getByTestId("cycle-form-offer-4567890-OF-B"));
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+
+    expect(screen.queryByTestId("cycle-form-confirm-remove-products")).not.toBeInTheDocument();
+    await waitFor(() => expect(salvar).toHaveBeenCalled());
   });
 
   it("mexer na seleção depois de confirmar derruba a confirmação", async () => {
-    const fetchMock = okResponse();
-    global.fetch = fetchMock as unknown as typeof global.fetch;
+    const salvar = okResponse();
 
     renderEdit(makeCycle());
-    fireEvent.click(screen.getByTestId("cycle-form-product-option-1234567"));
+    await escolherProdutoEOferta("1234567");
     fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
     fireEvent.click(screen.getByTestId("cycle-form-save"));
     expect(screen.getByTestId("cycle-form-confirm-remove-products")).toBeInTheDocument();
@@ -533,19 +842,34 @@ describe("CycleFormModal — editar produtos do ciclo", () => {
     ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("cycle-form-save"));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    await waitFor(() => expect(salvar).toHaveBeenCalled());
+  });
+
+  // A confirmação vale para o conjunto de perdas que estava na tela quando o
+  // gestor a leu. Mexer numa OFERTA depois de ler tem de derrubá-la igual.
+  it("mexer na sanfona depois de confirmar derruba a confirmação", async () => {
+    okResponse();
+
+    renderEdit(makeCycle());
+    fireEvent.click(await screen.findByTestId("cycle-form-offers-toggle-4567890"));
+    fireEvent.click(screen.getByTestId("cycle-form-offer-4567890-OF-B"));
+    fireEvent.click(screen.getByTestId("cycle-form-offer-4567890-OF-A"));
+    fireEvent.click(screen.getByTestId("cycle-form-save"));
+    expect(screen.getByTestId("cycle-form-confirm-remove-products")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("cycle-form-offerless-4567890"));
+    expect(screen.queryByTestId("cycle-form-confirm-remove-products")).not.toBeInTheDocument();
   });
 
   it("deixar o ciclo sem nenhum produto é recusado antes do PATCH", () => {
-    const fetchMock = jest.fn();
-    global.fetch = fetchMock as unknown as typeof global.fetch;
+    const salvar = okResponse();
 
     renderEdit(makeCycle());
     fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
     fireEvent.click(screen.getByTestId("cycle-form-save"));
 
     expect(screen.getByText("Selecione ao menos um produto.")).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(salvar).not.toHaveBeenCalled();
   });
 
   it("ciclo encerrado mostra os produtos, sem controle de seleção", () => {
@@ -564,9 +888,10 @@ describe("CycleFormModal — editar produtos do ciclo", () => {
       products_removed: 1,
       buyers_removed: 12,
       buyers_materialized: 4,
+      offers_added: 1,
+      offers_removed: 1,
     };
-    const fetchMock = okResponse(counts);
-    global.fetch = fetchMock as unknown as typeof global.fetch;
+    okResponse(counts);
 
     const onSave = jest.fn();
     render(
@@ -577,7 +902,7 @@ describe("CycleFormModal — editar produtos do ciclo", () => {
         onCancel={jest.fn()}
       />
     );
-    fireEvent.click(screen.getByTestId("cycle-form-product-option-1234567"));
+    await escolherProdutoEOferta("1234567");
     fireEvent.click(screen.getByTestId("cycle-form-product-option-4567890"));
     fireEvent.click(screen.getByTestId("cycle-form-save"));
     fireEvent.click(screen.getByTestId("cycle-form-save"));

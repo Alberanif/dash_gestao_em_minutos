@@ -19,20 +19,6 @@ export interface HotmartProductOption {
   account_id: string;
 }
 
-// Linha da lista devolvida por GET /api/ultimates/cycles/[id]/excluded-offers.
-// offer_name e excluded_by_email são resolvidos pela rota e podem ser null
-// (oferta ainda não sincronizada / falha ao consultar o auth) — a exibição
-// sempre cai de volta no offer_code, que é o dado que identifica a oferta.
-export interface ExcludedOffer {
-  id: string;
-  offer_code: string;
-  offer_name: string | null;
-  note: string | null;
-  excluded_by: string;
-  excluded_by_email: string | null;
-  created_at: string;
-}
-
 // Linha da lista devolvida por GET /api/ultimates/cycles/[id]/excluded-buyers.
 // `name` é resolvido pela rota na base do ciclo e vem null quando o email já
 // saiu do CSV — a exclusão sobrevive ao upload, a linha da base não. A

@@ -14,7 +14,17 @@ function makeCycle(overrides: Partial<CycleWithProducts> = {}): CycleWithProduct
     id: "c1",
     name: "Ciclo Julho",
     account_id: "acc-1",
-    products: [{ product_id: "p1", product_name: "Produto Um" }],
+    // Produto CONFIGURADO (migration 065): sem oferta escolhida o dashboard
+    // não renderiza número nenhum, e esta seção não chegaria a existir.
+    products: [
+      {
+        product_id: "p1",
+        product_name: "Produto Um",
+        offer_codes: ["OF-1"],
+        rejected_offer_codes: [],
+        include_offerless: false,
+      },
+    ],
     goal_percent: null,
     status: "ativo",
     refresh_started_at: null,

@@ -4,14 +4,37 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { UltimatesDashboard } from "../ultimates-dashboard";
 import type { CycleWithProducts } from "../types";
-import type { UltimatesRosterRow, UltimatesDailyRow, UltimatesHourlyRow } from "@/types/ultimates";
+import type {
+  UltimatesRosterRow,
+  UltimatesDailyRow,
+  UltimatesHourlyRow,
+  UltimatesCycleProductRef,
+} from "@/types/ultimates";
+
+// Produto CONFIGURADO (migration 065): com oferta escolhida. É o default de
+// todos os testes deste arquivo de propósito — ciclo não configurado não
+// renderiza número nenhum, e cada teste que quisesse KPI teria de repetir isto.
+function produto(
+  product_id: string,
+  product_name: string | null,
+  overrides: Partial<UltimatesCycleProductRef> = {}
+): UltimatesCycleProductRef {
+  return {
+    product_id,
+    product_name,
+    offer_codes: ["OF-1"],
+    rejected_offer_codes: [],
+    include_offerless: false,
+    ...overrides,
+  };
+}
 
 function makeCycle(overrides: Partial<CycleWithProducts> = {}): CycleWithProducts {
   return {
     id: "c1",
     name: "Ciclo Julho",
     account_id: "acc-1",
-    products: [{ product_id: "p1", product_name: "Produto Um" }],
+    products: [produto("p1", "Produto Um")],
     goal_percent: 60,
     status: "ativo",
     refresh_started_at: null,
@@ -139,10 +162,7 @@ describe("UltimatesDashboard — wiring de KPIs/meta/gráfico/tabela sobre a mes
     render(
       <UltimatesDashboard
         cycle={makeCycle({
-          products: [
-            { product_id: "p1", product_name: "Anual" },
-            { product_id: "p2", product_name: "Mensal" },
-          ],
+          products: [produto("p1", "Anual"), produto("p2", "Mensal")],
         })}
         role="gestor"
         onCountsNewBuyersChange={jest.fn()} onViewRangeChange={jest.fn().mockResolvedValue(true)}
@@ -215,20 +235,26 @@ describe("UltimatesDashboard — fluxos de escrita (critérios 6 e 11)", () => {
   });
 });
 
-// ── Ofertas excluídas (PRD 2026-07-30) ──────────────────────────────────────
+// ── Allowlist de ofertas (migration 065) ────────────────────────────────────
 
-function mockFetchWithExcluded(excludedCount: number) {
-  const offers = Array.from({ length: excludedCount }, (_, i) => ({
-    id: `eo-${i}`,
-    offer_code: `OFERTA_${i}`,
-    offer_name: `Oferta ${i}`,
-    note: null,
-    excluded_by: "user-1",
-    excluded_by_email: "gestor@ex.com",
-    created_at: "2026-07-30T12:00:00Z",
-  }));
+// Ciclo NÃO configurado: produto sem oferta escolhida e sem decisão sobre a
+// venda sem oferta. É o estado em que todo ciclo anterior à 065 acorda.
+const PRODUTO_SEM_ESCOLHA: UltimatesCycleProductRef = {
+  product_id: "p1",
+  product_name: "Produto Um",
+  offer_codes: [],
+  rejected_offer_codes: [],
+  include_offerless: null,
+};
 
-  global.fetch = jest.fn((url: string) => {
+function mockOfferOptions(
+  offers: unknown[] = [],
+  offerless: unknown[] = []
+): jest.Mock {
+  const fetchMock = jest.fn((url: string) => {
+    if (url.includes("/offer-options")) {
+      return Promise.resolve({ ok: true, json: async () => ({ offers, offerless }) });
+    }
     if (url.includes("/roster")) {
       return Promise.resolve({ ok: true, json: async () => ({ rows: ROSTER }) });
     }
@@ -238,74 +264,221 @@ function mockFetchWithExcluded(excludedCount: number) {
     if (url.includes("/daily")) {
       return Promise.resolve({ ok: true, json: async () => ({ days: DAILY }) });
     }
-    if (url.includes("/excluded-offers")) {
-      return Promise.resolve({ ok: true, json: async () => ({ offers }) });
-    }
-    if (url.includes("/offer-options")) {
-      return Promise.resolve({ ok: true, json: async () => ({ offers: [] }) });
-    }
     return Promise.resolve({ ok: false, json: async () => ({}) });
-  }) as unknown as typeof global.fetch;
+  });
+  global.fetch = fetchMock as unknown as typeof global.fetch;
+  return fetchMock;
 }
 
-describe("UltimatesDashboard — sinalização de ofertas excluídas", () => {
-  it("mostra o contador no botão e a nota no card quando há ofertas excluídas", async () => {
-    mockFetchWithExcluded(2);
-    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
-
-    // O botão aparece antes da contagem chegar (não some enquanto carrega);
-    // o contador entra no rótulo assim que a lista responde.
-    expect(await screen.findByText("Ofertas excluídas (2)")).toBeInTheDocument();
-
-    const note = await screen.findByTestId("ultimates-excluded-offers-note");
-    expect(note).toHaveTextContent("2 ofertas excluídas da contabilidade");
-  });
-
-  it("usa o singular com uma única oferta excluída", async () => {
-    mockFetchWithExcluded(1);
-    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
-
-    expect(await screen.findByTestId("ultimates-excluded-offers-note")).toHaveTextContent(
-      "1 oferta excluída da contabilidade"
+describe("UltimatesDashboard — ciclo sem ofertas configuradas", () => {
+  it("não mostra número nenhum: sem KPI, sem gráfico, sem roster", async () => {
+    mockOfferOptions();
+    render(
+      <UltimatesDashboard
+        cycle={makeCycle({ products: [PRODUTO_SEM_ESCOLHA] })}
+        role="gestor"
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+        onViewRangeChange={jest.fn().mockResolvedValue(true)}
+      />
     );
+
+    expect(await screen.findByTestId("ultimates-offers-unconfigured")).toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-kpi-row")).toBeNull();
+    expect(screen.queryByTestId("ultimates-cumulative-chart")).toBeNull();
+    expect(screen.queryByText("Roster")).toBeNull();
+    expect(screen.queryByTestId("ultimates-dashboard-loading")).toBeNull();
   });
 
-  it("sem ofertas excluídas, não mostra contador nem nota", async () => {
-    mockFetchWithExcluded(0);
-    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
+  // A carga é o custo real do estado bloqueado: as RPCs devolveriam zeros que
+  // a tela é proibida de exibir, e a fila de migrations deste ambiente já
+  // mostrou que rota nova sob carga inútil é o que derruba o dashboard.
+  it("não dispara os fetches de dados do ciclo", async () => {
+    const fetchMock = mockOfferOptions();
+    render(
+      <UltimatesDashboard
+        cycle={makeCycle({ products: [PRODUTO_SEM_ESCOLHA] })}
+        role="gestor"
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+        onViewRangeChange={jest.fn().mockResolvedValue(true)}
+      />
+    );
+
+    await screen.findByTestId("ultimates-offers-unconfigured");
+    const urls = fetchMock.mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.includes("/roster"))).toBe(false);
+    expect(urls.some((u) => u.includes("/daily"))).toBe(false);
+    expect(urls.some((u) => u.includes("/hourly"))).toBe(false);
+  });
+
+  it("a barra de ações continua visível — quem cai aqui precisa trocar de ciclo", async () => {
+    mockOfferOptions();
+    render(
+      <UltimatesDashboard
+        cycle={makeCycle({ products: [PRODUTO_SEM_ESCOLHA] })}
+        role="gestor"
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+        onViewRangeChange={jest.fn().mockResolvedValue(true)}
+      />
+    );
+
+    await screen.findByTestId("ultimates-offers-unconfigured");
+    expect(screen.getByTestId("ultimates-refresh-controls")).toBeInTheDocument();
+    expect(screen.getByTestId("ultimates-upload-btn")).toBeInTheDocument();
+  });
+
+  it("gestor recebe o atalho de configuração; analista recebe o recado", async () => {
+    const onConfigureOffers = jest.fn();
+    mockOfferOptions();
+    const { unmount } = render(
+      <UltimatesDashboard
+        cycle={makeCycle({ products: [PRODUTO_SEM_ESCOLHA] })}
+        role="gestor"
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+        onViewRangeChange={jest.fn().mockResolvedValue(true)}
+        onConfigureOffers={onConfigureOffers}
+      />
+    );
+
+    fireEvent.click(await screen.findByTestId("ultimates-configure-offers-btn"));
+    expect(onConfigureOffers).toHaveBeenCalled();
+    unmount();
+
+    mockOfferOptions();
+    render(
+      <UltimatesDashboard
+        cycle={makeCycle({ products: [PRODUTO_SEM_ESCOLHA] })}
+        role="analista"
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+        onViewRangeChange={jest.fn().mockResolvedValue(true)}
+        onConfigureOffers={onConfigureOffers}
+      />
+    );
+
+    expect(
+      await screen.findByTestId("ultimates-offers-unconfigured-analista")
+    ).toHaveTextContent("Peça a um gestor para configurar as ofertas deste ciclo.");
+    expect(screen.queryByTestId("ultimates-configure-offers-btn")).toBeNull();
+  });
+
+  it("um produto configurado não salva o ciclo: basta um sem escolha para bloquear", async () => {
+    mockOfferOptions();
+    render(
+      <UltimatesDashboard
+        cycle={makeCycle({ products: [produto("p1", "Anual"), PRODUTO_SEM_ESCOLHA] })}
+        role="gestor"
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+        onViewRangeChange={jest.fn().mockResolvedValue(true)}
+      />
+    );
+
+    expect(await screen.findByTestId("ultimates-offers-unconfigured")).toBeInTheDocument();
+  });
+});
+
+describe("UltimatesDashboard — faixa de oferta fora da contabilidade", () => {
+  const OFERTAS = [
+    { offer_code: "OF-1", offer_name: "Oferta Principal", product_id: "p1", product_name: "Produto Um", sales_count: 312 },
+    { offer_code: "OF-NOVA", offer_name: "Cortesia Black", product_id: "p1", product_name: "Produto Um", sales_count: 9 },
+    { offer_code: "OF-REC", offer_name: "Upsell V2", product_id: "p1", product_name: "Produto Um", sales_count: 5 },
+  ];
+
+  it("nomeia as ofertas pendentes e soma as vendas represadas", async () => {
+    mockOfferOptions(OFERTAS);
+    render(
+      <UltimatesDashboard
+        cycle={makeCycle()}
+        role="gestor"
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+        onViewRangeChange={jest.fn().mockResolvedValue(true)}
+      />
+    );
+
+    const faixa = await screen.findByTestId("ultimates-pending-offers-note");
+    expect(faixa).toHaveTextContent("2 ofertas fora da contabilidade (14 vendas)");
+    expect(faixa).toHaveTextContent("Cortesia Black");
+    expect(faixa).toHaveTextContent("Upsell V2");
+  });
+
+  // O ponto inteiro de rejected_offer_codes: a cortesia recusada de propósito
+  // não pode alertar para sempre, senão a faixa vira ruído que ninguém lê.
+  it("oferta RECUSADA não é pendência", async () => {
+    mockOfferOptions(OFERTAS);
+    render(
+      <UltimatesDashboard
+        cycle={makeCycle({
+          products: [produto("p1", "Produto Um", { rejected_offer_codes: ["OF-NOVA", "OF-REC"] })],
+        })}
+        role="gestor"
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+        onViewRangeChange={jest.fn().mockResolvedValue(true)}
+      />
+    );
 
     await screen.findByTestId("ultimates-kpi-row");
-    expect(screen.getByTestId("ultimates-excluded-offers-btn")).toHaveTextContent(
-      "Ofertas excluídas"
+    expect(screen.queryByTestId("ultimates-pending-offers-note")).toBeNull();
+  });
+
+  it("sem pendência, NADA é renderizado", async () => {
+    mockOfferOptions([OFERTAS[0]]);
+    render(
+      <UltimatesDashboard
+        cycle={makeCycle()}
+        role="gestor"
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+        onViewRangeChange={jest.fn().mockResolvedValue(true)}
+      />
     );
-    expect(screen.getByTestId("ultimates-excluded-offers-btn")).not.toHaveTextContent("(");
-    expect(screen.queryByTestId("ultimates-excluded-offers-note")).not.toBeInTheDocument();
-  });
-
-  it("abre o modal ao clicar no botão", async () => {
-    mockFetchWithExcluded(1);
-    render(<UltimatesDashboard cycle={makeCycle()} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
-
-    fireEvent.click(await screen.findByTestId("ultimates-excluded-offers-btn"));
-
-    expect(await screen.findByTestId("ultimates-excluded-offers-modal")).toBeInTheDocument();
-  });
-
-  it("mantém o botão disponível em ciclo encerrado (a lista continua editável)", async () => {
-    mockFetchWithExcluded(0);
-    render(<UltimatesDashboard cycle={makeCycle({ status: "encerrado" })} role="gestor" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
 
     await screen.findByTestId("ultimates-kpi-row");
-    // "Carregar base" some em ciclo encerrado; esta lista não.
-    expect(screen.queryByTestId("ultimates-upload-btn")).not.toBeInTheDocument();
-    expect(screen.getByTestId("ultimates-excluded-offers-btn")).toBeInTheDocument();
+    expect(screen.queryByTestId("ultimates-pending-offers-note")).toBeNull();
   });
 
-  it("mostra o botão para analista (leitura da lista)", async () => {
-    mockFetchWithExcluded(1);
-    render(<UltimatesDashboard cycle={makeCycle()} role="analista" onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)} onViewRangeChange={jest.fn().mockResolvedValue(true)} />);
+  it("venda sem offer_code pendente entra na faixa como '(sem oferta)'", async () => {
+    mockOfferOptions([OFERTAS[0]], [{ product_id: "p1", sales_count: 3 }]);
+    render(
+      <UltimatesDashboard
+        cycle={makeCycle({ products: [produto("p1", "Produto Um", { include_offerless: null })] })}
+        role="gestor"
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+        onViewRangeChange={jest.fn().mockResolvedValue(true)}
+      />
+    );
 
-    expect(await screen.findByTestId("ultimates-excluded-offers-btn")).toBeInTheDocument();
+    const faixa = await screen.findByTestId("ultimates-pending-offers-note");
+    expect(faixa).toHaveTextContent("1 oferta fora da contabilidade (3 vendas)");
+    expect(faixa).toHaveTextContent("(sem oferta)");
+  });
+
+  it("'Revisar' abre o form em edição, e só para gestor", async () => {
+    const onConfigureOffers = jest.fn();
+    mockOfferOptions(OFERTAS);
+    const { unmount } = render(
+      <UltimatesDashboard
+        cycle={makeCycle()}
+        role="gestor"
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+        onViewRangeChange={jest.fn().mockResolvedValue(true)}
+        onConfigureOffers={onConfigureOffers}
+      />
+    );
+
+    fireEvent.click(await screen.findByTestId("ultimates-pending-offers-review"));
+    expect(onConfigureOffers).toHaveBeenCalled();
+    unmount();
+
+    mockOfferOptions(OFERTAS);
+    render(
+      <UltimatesDashboard
+        cycle={makeCycle()}
+        role="analista"
+        onCountsNewBuyersChange={jest.fn().mockResolvedValue(true)}
+        onViewRangeChange={jest.fn().mockResolvedValue(true)}
+        onConfigureOffers={onConfigureOffers}
+      />
+    );
+
+    await screen.findByTestId("ultimates-pending-offers-note");
+    expect(screen.queryByTestId("ultimates-pending-offers-review")).toBeNull();
   });
 });
 
@@ -444,11 +617,11 @@ describe("UltimatesDashboard — paginação do roster no modo desligado", () =>
       if (url.includes("/daily")) {
         return Promise.resolve({ ok: true, json: async () => ({ days: [] }) });
       }
-      if (url.includes("/excluded-offers")) {
-        return Promise.resolve({ ok: true, json: async () => ({ offers: [] }) });
+      if (url.includes("/excluded-buyers")) {
+        return Promise.resolve({ ok: true, json: async () => ({ buyers: [] }) });
       }
       if (url.includes("/offer-options")) {
-        return Promise.resolve({ ok: true, json: async () => ({ offers: [] }) });
+        return Promise.resolve({ ok: true, json: async () => ({ offers: [], offerless: [] }) });
       }
       return Promise.resolve({ ok: false, json: async () => ({}) });
     }) as unknown as typeof global.fetch;
@@ -471,11 +644,11 @@ describe("UltimatesDashboard — paginação do roster no modo desligado", () =>
     expect(screen.getByTestId("data-table-page-info")).toHaveTextContent("Página 2 de 3");
 
     // Provoca um re-render do dashboard sem tocar em roster/daily — abrir o
-    // modal de ofertas excluídas passa por setExcludedOpen, que não altera
+    // modal de leads excluídos passa por setExcludedBuyersOpen, que não altera
     // `roster` nem `countsNewBuyers`. Sem o useMemo do achado 1, isso ainda
     // assim gera um array novo em viewRoster e reseta a paginação.
-    fireEvent.click(screen.getByTestId("ultimates-excluded-offers-btn"));
-    await screen.findByTestId("ultimates-excluded-offers-modal");
+    fireEvent.click(screen.getByTestId("ultimates-excluded-buyers-btn"));
+    await screen.findByTestId("ultimates-excluded-buyers-modal");
 
     expect(screen.getByTestId("data-table-page-info")).toHaveTextContent("Página 2 de 3");
   });
@@ -966,10 +1139,9 @@ describe("UltimatesDashboard — modo Apenas Compras (#154)", () => {
     expect(screen.queryByTestId("ultimates-new-purchases-toggle")).toBeNull();
   });
 
-  it("mantém Ofertas excluídas, Leads excluídos e Atualizar agora", async () => {
+  it("mantém Leads excluídos e Atualizar agora", async () => {
     renderPurchases();
     await screen.findByTestId("ultimates-kpi-row");
-    expect(screen.getByTestId("ultimates-excluded-offers-btn")).toBeInTheDocument();
     expect(screen.getByTestId("ultimates-excluded-buyers-btn")).toBeInTheDocument();
     expect(screen.getByTestId("ultimates-refresh-controls")).toBeInTheDocument();
   });
