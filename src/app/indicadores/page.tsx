@@ -359,12 +359,19 @@ export default function IndicadoresPage() {
       .catch(() => {});
   }, []);
 
+  // Sequência da última fetchAll disparada. Sem isso, uma resposta de um
+  // período antigo que demore mais para responder do que a do período atual
+  // sobrescreve a tela com dados desatualizados quando chega por último.
+  const fetchAllSeqRef = useRef(0);
+
   const fetchAll = useCallback(async (
     start: string,
     end: string,
     filter: FilterRecord | null,
     offerCode: string | null = null,
   ) => {
+    const seq = ++fetchAllSeqRef.current;
+
     // O que este filtro significa — definido em um único lugar, compartilhado
     // com o agente. Enquanto houver duas cópias dessa lógica, elas divergem.
     const expanded = expandFilter(filter, offerCode);
@@ -412,6 +419,10 @@ export default function IndicadoresPage() {
         ? fetch(`/api/indicadores/conversion-sources${params}`).then(jsonOrThrow)
         : Promise.resolve(null),
     ]);
+
+    // Uma fetchAll mais nova já assumiu o estado enquanto esta esperava —
+    // descarta esta resposta desatualizada em vez de sobrescrever a tela.
+    if (seq !== fetchAllSeqRef.current) return;
 
     setLeadsState({
       data: leadsRes.status === "fulfilled" && leadsRes.value !== null ? leadsRes.value : ZEROED_LEADS,
