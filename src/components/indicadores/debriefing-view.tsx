@@ -62,11 +62,14 @@ export function DebriefingView({ filter, startDate, endDate, onEditFilter, onFil
   const [offerSearchTerm, setOfferSearchTerm] = useState("");
   const [offerDropOpen, setOfferDropOpen] = useState(false);
 
+  const offerCodesPropStr = (filter?.debriefing_offer_codes ?? []).join(",");
+
   useEffect(() => {
     setSelectedOfferCodes(filter?.debriefing_offer_codes ?? []);
-  }, [filter?.id, filter?.debriefing_offer_codes]);
+  }, [filter?.id, offerCodesPropStr]);
 
   const mainProduct = filter?.main_hotmart_product ?? null;
+  const selectedCodesStr = selectedOfferCodes.join(",");
 
   const loadDebriefingData = useCallback(async () => {
     if (!mainProduct?.product_id || !startDate || !endDate) {
@@ -98,7 +101,7 @@ export function DebriefingView({ filter, startDate, endDate, onEditFilter, onFil
     } finally {
       setLoading(false);
     }
-  }, [mainProduct?.product_id, startDate, endDate, selectedOfferCodes]);
+  }, [mainProduct?.product_id, startDate, endDate, selectedCodesStr]);
 
   useEffect(() => {
     loadDebriefingData();
