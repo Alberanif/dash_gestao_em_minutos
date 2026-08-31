@@ -59,8 +59,8 @@ describe("SelectionCards — role: gestor", () => {
     expect(html).not.toContain("Restrito");
   });
 
-  it("Dash Ultimates é link acessível (href=/ultimates)", () => {
-    expect(html).toContain('href="/ultimates"');
+  it("Relatório de Vendas é link acessível (href=/relatorio-de-vendas)", () => {
+    expect(html).toContain('href="/relatorio-de-vendas"');
   });
 });
 
@@ -89,8 +89,8 @@ describe("SelectionCards — role: analista", () => {
     expect(html).toContain('href="/ajustes"');
   });
 
-  it("Dash Ultimates é link acessível (href=/ultimates)", () => {
-    expect(html).toContain('href="/ultimates"');
+  it("Relatório de Vendas é link acessível (href=/relatorio-de-vendas)", () => {
+    expect(html).toContain('href="/relatorio-de-vendas"');
   });
 
   it("módulos restritos exibem badge Restrito", () => {
@@ -123,8 +123,8 @@ describe("SelectionCards — role: comum", () => {
     expect(html).not.toContain('href="/ajustes"');
   });
 
-  it("Dash Ultimates NÃO é link (sem href=/ultimates)", () => {
-    expect(html).not.toContain('href="/ultimates"');
+  it("Relatório de Vendas NÃO é link (sem href=/relatorio-de-vendas)", () => {
+    expect(html).not.toContain('href="/relatorio-de-vendas"');
   });
 
   it("módulos restritos exibem badge Restrito", () => {
