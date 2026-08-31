@@ -60,6 +60,17 @@ function installFetch(filters: FilterRecord[]) {
     if (url.startsWith("/api/indicadores/hotmart"))
       return jsonOk({ products: [], total_sales: 0, total_sales_brl: 0, total_sales_foreign: 0, total_revenue: 0 });
     if (url.startsWith("/api/indicadores/conversion-sources")) return jsonOk([]);
+    if (url.startsWith("/api/indicadores/debriefing"))
+      return jsonOk({
+        product_id: "999",
+        product_name: "Produto Principal Teste",
+        total_sales: 10,
+        total_sales_brl: 10,
+        total_sales_foreign: 0,
+        total_revenue_brl: 5000,
+        daily_series: [],
+        offers_breakdown: [],
+      });
     return jsonOk(null);
   }) as unknown as typeof fetch;
 }
@@ -84,7 +95,7 @@ afterEach(() => {
   window.history.replaceState(null, "", "/indicadores");
 });
 
-describe("IndicadoresPage — abas Dashboard | Planilha", () => {
+describe("IndicadoresPage — abas Dashboard | Planilha | Debriefing", () => {
   it("abre no Dashboard sem o parâmetro view", async () => {
     await renderAt("/indicadores");
 
@@ -101,6 +112,24 @@ describe("IndicadoresPage — abas Dashboard | Planilha", () => {
     expect(screen.queryByText("Resultado")).not.toBeInTheDocument();
   });
 
+  it("abre direto no Debriefing com ?view=debriefing", async () => {
+    const filterWithMainProduct: FilterRecord = {
+      ...FULL_FILTER,
+      main_hotmart_product: { product_id: "999", product_name: "Produto Principal Teste" },
+    };
+    await renderAt("/indicadores?view=debriefing", filterWithMainProduct);
+
+    expect(screen.getByRole("tab", { name: "Debriefing" })).toHaveAttribute("aria-selected", "true");
+    await waitFor(() => expect(screen.getByTestId("debriefing-view")).toBeInTheDocument());
+  });
+
+  it("exibe aviso quando a aba Debriefing é aberta em filtro sem produto principal", async () => {
+    await renderAt("/indicadores?view=debriefing", FULL_FILTER);
+
+    expect(screen.getByRole("tab", { name: "Debriefing" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("debriefing-empty-state")).toBeInTheDocument();
+  });
+
   it("valor inválido de view cai no Dashboard", async () => {
     await renderAt("/indicadores?view=qualquer-coisa");
 
@@ -108,16 +137,18 @@ describe("IndicadoresPage — abas Dashboard | Planilha", () => {
     expect(screen.queryByTestId("planilha-view")).not.toBeInTheDocument();
   });
 
-  it("clicar em Planilha troca o corpo e reflete ?view=planilha na URL sem recarregar", async () => {
+  it("clicar em Planilha e Debriefing troca a view e reflete na URL sem recarregar", async () => {
     await renderAt("/indicadores");
 
     fireEvent.click(screen.getByRole("tab", { name: "Planilha" }));
-
     expect(screen.getByTestId("planilha-view")).toBeInTheDocument();
     expect(new URLSearchParams(window.location.search).get("view")).toBe("planilha");
 
-    fireEvent.click(screen.getByRole("tab", { name: "Dashboard" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Debriefing" }));
+    expect(screen.getByTestId("debriefing-empty-state")).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get("view")).toBe("debriefing");
 
+    fireEvent.click(screen.getByRole("tab", { name: "Dashboard" }));
     expect(screen.getByText("Resultado")).toBeInTheDocument();
     expect(new URLSearchParams(window.location.search).has("view")).toBe(false);
   });

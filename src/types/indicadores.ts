@@ -84,6 +84,8 @@ export interface FilterRecord {
   account_id: string;
   name: string;
   hotmart_products: Array<{ product_id: string; product_name: string }>;
+  main_hotmart_product?: { product_id: string; product_name: string } | null;
+  debriefing_offer_codes?: string[] | null;
   meta_ads_terms: string[];
   captacao_leads_eventos: string[];
   status: FilterStatus;

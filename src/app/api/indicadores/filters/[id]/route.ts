@@ -11,7 +11,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<Pa
 
   const { id } = await params;
   const body = await request.json();
-  const { name, hotmart_products, meta_ads_terms, captacao_leads_eventos, status } = body ?? {};
+  const {
+    name,
+    hotmart_products,
+    main_hotmart_product,
+    debriefing_offer_codes,
+    meta_ads_terms,
+    captacao_leads_eventos,
+    status,
+  } = body ?? {};
 
   if (status !== undefined && !FILTER_STATUSES.includes(status as FilterStatus)) {
     return NextResponse.json(
@@ -23,12 +31,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<Pa
   const supabase = createSupabaseServiceClient();
 
   const update: Record<string, unknown> = {
-    name,
-    hotmart_products,
-    meta_ads_terms,
-    captacao_leads_eventos,
     updated_at: new Date().toISOString(),
   };
+
+  if (name !== undefined) update.name = name;
+  if (hotmart_products !== undefined) update.hotmart_products = hotmart_products;
+  if (meta_ads_terms !== undefined) update.meta_ads_terms = meta_ads_terms;
+  if (captacao_leads_eventos !== undefined) update.captacao_leads_eventos = captacao_leads_eventos;
+  if (main_hotmart_product !== undefined) update.main_hotmart_product = main_hotmart_product;
+  if (debriefing_offer_codes !== undefined) update.debriefing_offer_codes = debriefing_offer_codes;
 
   if (status !== undefined) {
     const { data: current } = await supabase

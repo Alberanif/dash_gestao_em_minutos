@@ -53,6 +53,11 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
     editTarget?.captacao_leads_eventos ?? []
   );
   const [status, setStatus] = useState<FilterStatus>(editTarget?.status ?? "ativo");
+  const [mainHotmartProduct, setMainHotmartProduct] = useState<HotmartProduct | null>(
+    editTarget?.main_hotmart_product ?? null
+  );
+  const [mainProductSearch, setMainProductSearch] = useState("");
+  const [mainProductDropOpen, setMainProductDropOpen] = useState(false);
   const [availableEventos, setAvailableEventos] = useState<string[]>([]);
   const [loadingEventos, setLoadingEventos] = useState(false);
   const [productOptions, setProductOptions] = useState<HotmartProduct[]>([]);
@@ -76,13 +81,12 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
 
   // Server-side search: fires on every keystroke (debounced 300ms).
   // Uses /api/funnels/products which searches by both name and product_id
-  // without requiring account_id — fixing the cross-platform account mismatch bug.
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const q = productSearch.trim();
+        const q = (mainProductDropOpen ? mainProductSearch : productSearch).trim();
         const res = await fetch(`/api/funnels/products?q=${encodeURIComponent(q)}`);
         if (res.ok) {
           const data = await res.json();
@@ -97,7 +101,7 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [productSearch]);
+  }, [productSearch, mainProductSearch, productDropOpen, mainProductDropOpen]);
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -165,8 +169,22 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
         : "/api/indicadores/filters";
       const method = editTarget ? "PUT" : "POST";
       const body = editTarget
-        ? { name: name.trim(), hotmart_products: hotmartProducts, meta_ads_terms: cleanTerms, captacao_leads_eventos: captacaoLeadsEventos, status }
-        : { account_id: accountId, name: name.trim(), hotmart_products: hotmartProducts, meta_ads_terms: cleanTerms, captacao_leads_eventos: captacaoLeadsEventos };
+        ? {
+            name: name.trim(),
+            hotmart_products: hotmartProducts,
+            main_hotmart_product: mainHotmartProduct,
+            meta_ads_terms: cleanTerms,
+            captacao_leads_eventos: captacaoLeadsEventos,
+            status,
+          }
+        : {
+            account_id: accountId,
+            name: name.trim(),
+            hotmart_products: hotmartProducts,
+            main_hotmart_product: mainHotmartProduct,
+            meta_ads_terms: cleanTerms,
+            captacao_leads_eventos: captacaoLeadsEventos,
+          };
 
       const res = await fetch(url, {
         method,
@@ -240,10 +258,10 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
           />
         </div>
 
-        {/* Hotmart products */}
+        {/* Hotmart products (Captura) */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-2)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            Produtos Hotmart
+            Produtos Hotmart (Captura)
           </label>
           <div style={{ position: "relative" }}>
             <input
@@ -251,7 +269,7 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
               onChange={(e) => setProductSearch(e.target.value)}
               onFocus={() => setProductDropOpen(true)}
               onBlur={() => setTimeout(() => setProductDropOpen(false), 150)}
-              placeholder="Buscar produto..."
+              placeholder="Buscar produto de captura..."
               style={{
                 padding: "8px 12px",
                 fontSize: 13,
@@ -339,6 +357,119 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
                   </button>
                 </span>
               ))}
+            </div>
+          )}
+        </div>
+
+        {/* Produto Principal (Debriefing) */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label style={{ fontSize: 11, fontWeight: 600, color: "var(--violet)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Produto Principal (Debriefing)
+          </label>
+          <div style={{ position: "relative" }}>
+            <input
+              value={mainProductSearch}
+              onChange={(e) => setMainProductSearch(e.target.value)}
+              onFocus={() => setMainProductDropOpen(true)}
+              onBlur={() => setTimeout(() => setMainProductDropOpen(false), 150)}
+              placeholder={mainHotmartProduct ? "Trocar produto principal..." : "Buscar produto principal..."}
+              style={{
+                padding: "8px 12px",
+                fontSize: 13,
+                borderRadius: 8,
+                border: "1px solid var(--border-vis)",
+                background: "var(--surface-2)",
+                color: "var(--text)",
+                outline: "none",
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            />
+            {mainProductDropOpen && (searching || productOptions.length > 0 || mainProductSearch.trim().length > 0) && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 4px)",
+                  left: 0,
+                  right: 0,
+                  background: "var(--surface)",
+                  border: "1px solid var(--border-vis)",
+                  borderRadius: 8,
+                  maxHeight: 160,
+                  overflowY: "auto",
+                  zIndex: 300,
+                }}
+              >
+                {searching && (
+                  <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--text-3)" }}>
+                    Buscando...
+                  </div>
+                )}
+                {!searching && productOptions.length === 0 && (
+                  <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--text-3)" }}>
+                    {mainProductSearch.trim() ? "Nenhum produto encontrado." : "Digite para buscar um produto."}
+                  </div>
+                )}
+                {!searching && productOptions.map((p) => (
+                  <button
+                    key={p.product_id}
+                    onMouseDown={() => {
+                      setMainHotmartProduct(p);
+                      setMainProductSearch("");
+                      setMainProductDropOpen(false);
+                    }}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "8px 12px",
+                      fontSize: 12,
+                      color: "var(--text)",
+                      background: "transparent",
+                      border: "none",
+                      borderBottom: "1px solid var(--border)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <span>{p.product_name}</span>
+                    <span style={{ marginLeft: 6, fontSize: 10, color: "var(--text-3)" }}>#{p.product_id}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {mainHotmartProduct && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "4px 10px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: 20,
+                  border: "1px solid color-mix(in srgb, var(--violet) 40%, transparent)",
+                  background: "color-mix(in srgb, var(--violet) 12%, transparent)",
+                  color: "var(--violet)",
+                }}
+              >
+                {mainHotmartProduct.product_name} (#{mainHotmartProduct.product_id})
+                <button
+                  type="button"
+                  onClick={() => setMainHotmartProduct(null)}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--text-3)",
+                    padding: 0,
+                    fontSize: 13,
+                    lineHeight: 1,
+                  }}
+                >
+                  ×
+                </button>
+              </span>
             </div>
           )}
         </div>
