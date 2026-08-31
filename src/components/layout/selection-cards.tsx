@@ -62,8 +62,8 @@ const MODULES = [
     restrictedTo: ["comum"] as UserRole[],
   },
   {
-    href: "/ultimates",
-    label: "Dash Ultimates",
+    href: "/relatorio-de-vendas",
+    label: "Relatório de Vendas",
     description: "Ciclos de renovação e monitoramento de recompra Hotmart",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">

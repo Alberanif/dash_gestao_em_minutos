@@ -4,6 +4,12 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { syncHotmartProducts } from "@/lib/services/hotmart";
 import type { Account } from "@/types/accounts";
 
+// Uma conta real passa de 400 produtos; mesmo com fetch de ofertas em lotes
+// concorrentes (HOTMART_OFFERS_FETCH_CONCURRENCY), o wall time fica na casa
+// de dezenas de segundos. Deixa explícito o teto da função em vez de depender
+// do default da plataforma, que pode ficar abaixo do timeout do proxy/edge.
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   try {
     const { error } = await validateApiAuth();

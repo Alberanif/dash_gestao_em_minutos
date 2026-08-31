@@ -1,0 +1,569 @@
+import { NextRequest } from "next/server";
+
+jest.mock("@/lib/utils/api-auth", () => ({
+  requireRole: jest.fn().mockResolvedValue({ error: null, userId: "test-user", role: "gestor" }),
+}));
+
+const mockFrom = jest.fn();
+const mockRpc = jest.fn();
+jest.mock("@/lib/supabase/server", () => ({
+  createSupabaseServiceClient: jest.fn(() => ({ from: mockFrom, rpc: mockRpc })),
+}));
+
+// ── Mutable test state (reset per test) ───────────────────────────────────────
+let cycleRow: Record<string, unknown> | null;
+let cycleSelectError: { code?: string; message?: string } | null;
+let lockCount: number; // nº de linhas afetadas pelo UPDATE de aquisição (0 = perdeu, 1 = venceu)
+let lockError: { message: string } | null;
+let releaseError: { message: string } | null;
+let accountRow: Record<string, unknown> | null;
+let upsertError: { message: string } | null;
+// Captura as chamadas de RPC (a sincronização de buyers do modo Apenas Compras).
+let rpcCalls: Array<{ fn: string; args: unknown }>;
+let syncError: { message: string } | null;
+let cycleProductRows: Array<{ product_id: string }>;
+let cycleProductsError: { message: string } | null;
+
+// Captura os payloads passados para cycles.update (lock e finally).
+let cycleUpdatePayloads: Array<Record<string, unknown>>;
+// Captura o 2º argumento (options) de cada cycles.update — para afirmar que o
+// acquire pede { count: "exact" } em vez de depender de .select().
+let cycleUpdateOptions: Array<unknown>;
+// Captura o filtro do release condicional no finally: update().eq("id").eq(<aqui>).
+let releaseFilter: { col: unknown; val: unknown } | null;
+// Ordem em que os upserts de offers/sales aconteceram (verifica o pré-upsert de FK).
+let upsertOrder: string[];
+
+// Builder thenable que tolera .abortSignal() encadeado antes do await — espelha
+// o PostgrestFilterBuilder real, onde .abortSignal(signal) devolve o próprio
+// builder aguardável.
+function thenableResult(result: { error: { message: string } | null; args: unknown[] }) {
+  const builder = {
+    abortSignal: () => builder,
+    then: (resolve: (v: typeof result) => void) => resolve(result),
+  };
+  return builder;
+}
+const productsUpsert = jest.fn((...args: unknown[]) => {
+  upsertOrder.push("products");
+  return thenableResult({ error: null, args });
+});
+const offersUpsert = jest.fn((...args: unknown[]) => {
+  upsertOrder.push("offers");
+  return thenableResult({ error: null, args });
+});
+const salesUpsert = jest.fn((...args: unknown[]) => {
+  upsertOrder.push("sales");
+  return thenableResult({ error: upsertError, args });
+});
+
+function makeRequest(): NextRequest {
+  return new NextRequest("http://localhost/api/vendas/cycles/cycle-1/refresh", {
+    method: "POST",
+  });
+}
+
+function callRoute() {
+  return import("../route").then(({ POST }) =>
+    POST(makeRequest(), { params: Promise.resolve({ id: "cycle-1" }) })
+  );
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  jest.resetModules();
+
+  cycleRow = null;
+  cycleSelectError = null;
+  lockCount = 0;
+  lockError = null;
+  releaseError = null;
+  accountRow = { id: "acc-1", credentials: { client_id: "cid", client_secret: "csecret" } };
+  upsertError = null;
+  cycleProductRows = [{ product_id: "prod-99" }];
+  cycleProductsError = null;
+  cycleUpdatePayloads = [];
+  cycleUpdateOptions = [];
+  releaseFilter = null;
+  upsertOrder = [];
+  rpcCalls = [];
+  syncError = null;
+
+  mockRpc.mockImplementation((fn: string, args: unknown) => {
+    rpcCalls.push({ fn, args });
+    const builder = {
+      abortSignal: () => builder,
+      then: (resolve: (v: { data: unknown; error: { message: string } | null }) => void) =>
+        resolve({ data: 0, error: syncError }),
+    };
+    return builder;
+  });
+
+  (global.fetch as jest.Mock) = jest.fn();
+
+  mockFrom.mockImplementation((table: string) => {
+    if (table === "dash_gestao_vendas_cycles") {
+      return {
+        select: () => ({
+          eq: () => ({
+            single: () => Promise.resolve({ data: cycleRow, error: cycleSelectError }),
+          }),
+        }),
+        update: (payload: Record<string, unknown>, options?: unknown) => {
+          cycleUpdatePayloads.push(payload);
+          cycleUpdateOptions.push(options);
+          const afterFirstEq = {
+            // Aquisição de lock: update(payload, { count }).eq("id").or() — aguardado
+            // direto, retorna { count }. NÃO usa .select() (o RETURNING reavaliaria o
+            // filtro sobre a linha já atualizada e voltaria []). count = linhas afetadas.
+            or: () => Promise.resolve({ count: lockCount, error: lockError }),
+            // finally: update().eq("id").eq("refresh_started_at", val) aguardado direto
+            eq: (col: unknown, val: unknown) => {
+              releaseFilter = { col, val };
+              return {
+                then: (resolve: (v: { error: { message: string } | null }) => void) =>
+                  resolve({ error: releaseError }),
+              };
+            },
+          };
+          return { eq: () => afterFirstEq };
+        },
+      };
+    }
+    if (table === "dash_gestao_accounts") {
+      return {
+        select: () => ({
+          // .eq("id").abortSignal(deadline).single()
+          eq: () => {
+            const afterEq = {
+              single: () => Promise.resolve({ data: accountRow, error: null }),
+              abortSignal: () => afterEq,
+            };
+            return afterEq;
+          },
+        }),
+      };
+    }
+    if (table === "dash_gestao_hotmart_products") {
+      return { upsert: productsUpsert };
+    }
+    if (table === "dash_gestao_hotmart_offers") {
+      return { upsert: offersUpsert };
+    }
+    if (table === "dash_gestao_hotmart_sales") {
+      return { upsert: salesUpsert };
+    }
+    if (table === "dash_gestao_vendas_cycle_products") {
+      return {
+        // .select("product_id").eq("cycle_id", id).order("product_id").abortSignal(deadline)
+        select: () => ({
+          eq: () => {
+            const afterEq = {
+              order: () => afterEq,
+              abortSignal: () => afterEq,
+              then: (resolve: (v: { data: unknown; error: unknown }) => void) =>
+                resolve({ data: cycleProductRows, error: cycleProductsError }),
+            };
+            return afterEq;
+          },
+        }),
+      };
+    }
+    return {};
+  });
+});
+
+function activeCycle(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "cycle-1",
+    account_id: "acc-1",
+    status: "ativo",
+    created_at: "2026-01-01T00:00:00.000Z",
+    last_refresh_at: null,
+    purchases_only: false,
+    ...overrides,
+  };
+}
+
+function mockTokenAndSales(items: unknown[]) {
+  (global.fetch as jest.Mock)
+    .mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ access_token: "tok-abc" }),
+      text: () => Promise.resolve(""),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ items, page_info: {} }),
+      text: () => Promise.resolve(""),
+    });
+}
+
+function saleItem(offer?: { code: string; name?: string }) {
+  return {
+    product: { id: 99, name: "Produto Ultimate" },
+    buyer: { email: "buyer@example.com" },
+    purchase: {
+      transaction: "HP-TX-1",
+      order_date: 1735689600000,
+      status: "APPROVED",
+      price: { value: 497, currency_code: "BRL" },
+      hotmart_fee: { base: 497, total: 50, fixed: 1 },
+      ...(offer ? { offer } : {}),
+    },
+  };
+}
+
+describe("POST /api/vendas/cycles/[id]/refresh", () => {
+  it("returns 404 when cycle does not exist", async () => {
+    cycleRow = null;
+    cycleSelectError = { code: "PGRST116" };
+
+    const res = await callRoute();
+    expect(res.status).toBe(404);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 when cycle is encerrado", async () => {
+    cycleRow = activeCycle({ status: "encerrado" });
+
+    const res = await callRoute();
+    expect(res.status).toBe(409);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("returns 429 with retryAfterSeconds when last_refresh_at is within throttle window", async () => {
+    cycleRow = activeCycle({ last_refresh_at: new Date(Date.now() - 10_000).toISOString() });
+
+    const res = await callRoute();
+    expect(res.status).toBe(429);
+    const body = await res.json();
+    expect(body.retryAfterSeconds).toBeGreaterThan(0);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 without calling Hotmart when lock is lost (empty update result)", async () => {
+    cycleRow = activeCycle();
+    lockCount = 0; // perdedor da corrida
+
+    const res = await callRoute();
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toBe("refresh em andamento");
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("acquire usa { count: 'exact' } e NÃO .select() (RETURNING reavaliaria o filtro e voltaria vazio → 409 + lock órfão)", async () => {
+    cycleRow = activeCycle();
+    lockCount = 1; // vencedor (count = 1)
+    mockTokenAndSales([saleItem()]);
+
+    await callRoute();
+
+    // O 1º update (aquisição) precisa pedir contagem exata das linhas AFETADAS —
+    // não pode depender das linhas devolvidas por .select(), que o PostgREST filtra
+    // pelo valor JÁ atualizado (não-nulo) e devolve []. Regressão do 409 permanente.
+    expect(cycleUpdateOptions[0]).toEqual({ count: "exact" });
+  });
+
+  it("winner fetches product-scoped sales, upserts, returns 200 and clears lock", async () => {
+    cycleRow = activeCycle();
+    lockCount = 1; // vencedor
+    mockTokenAndSales([saleItem()]);
+
+    const res = await callRoute();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.upserted).toBe(1);
+    expect(body.lastRefreshAt).toEqual(expect.any(String));
+
+    // Hotmart foi chamada (token + sales)
+    expect((global.fetch as jest.Mock).mock.calls.length).toBe(2);
+    // A URL de sales carrega o product_id do ciclo
+    const salesUrl = String((global.fetch as jest.Mock).mock.calls[1][0]);
+    expect(salesUrl).toContain("product_id=prod-99");
+
+    // Upsert com onConflict: transaction_code
+    expect(salesUpsert).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ transaction_code: "HP-TX-1" })]),
+      expect.objectContaining({ onConflict: "transaction_code" })
+    );
+
+    // finally limpou o lock e gravou last_refresh_at
+    const clearing = cycleUpdatePayloads.find((p) => p.refresh_started_at === null);
+    expect(clearing).toBeDefined();
+    expect(clearing?.last_refresh_at).toEqual(expect.any(String));
+  });
+
+  it("pre-upserts placeholder offers before the sales upsert when a sale has an offer_code", async () => {
+    cycleRow = activeCycle();
+    lockCount = 1;
+    mockTokenAndSales([saleItem({ code: "OFF-NEW", name: "Oferta Nova" })]);
+
+    const res = await callRoute();
+    expect(res.status).toBe(200);
+
+    // products, depois offers, depois sales — cada FK satisfeita antes da
+    // próxima tabela que depende dela.
+    expect(upsertOrder).toEqual(["products", "offers", "sales"]);
+
+    expect(productsUpsert).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ product_id: "99", product_name: "Produto Ultimate" }),
+      ]),
+      expect.objectContaining({ onConflict: "product_id", ignoreDuplicates: true })
+    );
+
+    expect(offersUpsert).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ offer_code: "OFF-NEW", product_id: "99" }),
+      ]),
+      expect.objectContaining({ onConflict: "offer_code", ignoreDuplicates: true })
+    );
+  });
+
+  it("skips offers upsert but still pre-upserts the placeholder product when no sale has an offer_code", async () => {
+    cycleRow = activeCycle();
+    lockCount = 1;
+    mockTokenAndSales([saleItem()]);
+
+    const res = await callRoute();
+    expect(res.status).toBe(200);
+    expect(offersUpsert).not.toHaveBeenCalled();
+    // dash_gestao_hotmart_sales.product_id tem FK própria (migration 038),
+    // independente de offer_code — o placeholder de produto roda de qualquer jeito.
+    expect(upsertOrder).toEqual(["products", "sales"]);
+  });
+
+  it("clears the lock even when Hotmart fetch fails (502)", async () => {
+    cycleRow = activeCycle();
+    lockCount = 1;
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({}),
+      text: () => Promise.resolve("boom"),
+    });
+
+    const res = await callRoute();
+    expect(res.status).toBe(502);
+
+    const clearing = cycleUpdatePayloads.find((p) => p.refresh_started_at === null);
+    expect(clearing).toBeDefined();
+  });
+
+  it("passes an abort signal to every Hotmart fetch (bounds the call)", async () => {
+    cycleRow = activeCycle();
+    lockCount = 1;
+    mockTokenAndSales([saleItem()]);
+
+    await callRoute();
+
+    const calls = (global.fetch as jest.Mock).mock.calls;
+    expect(calls.length).toBe(2); // token + sales
+    for (const [, options] of calls) {
+      expect(options.signal).toBeInstanceOf(AbortSignal);
+    }
+  });
+
+  it("returns 502 and clears the lock when a Hotmart fetch aborts (timeout)", async () => {
+    cycleRow = activeCycle();
+    lockCount = 1;
+    // Sem timeout, este fetch pendurado travaria o handler e vazaria o lock — a
+    // causa raiz do 409 "refresh em andamento". Agora vira 502 e libera o lock.
+    (global.fetch as jest.Mock).mockRejectedValueOnce(
+      Object.assign(new Error("The operation was aborted"), { name: "TimeoutError" })
+    );
+
+    const res = await callRoute();
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.error).toContain("demorou demais");
+
+    const clearing = cycleUpdatePayloads.find((p) => p.refresh_started_at === null);
+    expect(clearing).toBeDefined();
+  });
+
+  it("release do lock no finally é condicional ao timestamp adquirido (não apaga lock alheio)", async () => {
+    cycleRow = activeCycle();
+    lockCount = 1;
+    mockTokenAndSales([saleItem()]);
+
+    await callRoute();
+
+    // O UPDATE de aquisição gravou refresh_started_at = <lockedAtIso>; o release
+    // no finally precisa filtrar exatamente por esse mesmo valor, senão apagaria
+    // um lock que outra invocação tenha roubado após o TTL.
+    const acquire = cycleUpdatePayloads.find(
+      (p) => typeof p.refresh_started_at === "string"
+    );
+    expect(acquire?.refresh_started_at).toEqual(expect.any(String));
+    expect(releaseFilter).toEqual({
+      col: "refresh_started_at",
+      val: acquire?.refresh_started_at,
+    });
+  });
+
+  it("returns 502 and clears the lock when a DB upsert aborts (deadline)", async () => {
+    cycleRow = activeCycle();
+    lockCount = 1;
+    // Token + sales ok, mas a escrita no banco estoura o orçamento: antes ficava
+    // pendurada sem timeout; agora o deadline aborta o upsert -> 502 + libera lock.
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ access_token: "tok-abc" }),
+        text: () => Promise.resolve(""),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ items: [saleItem()], page_info: {} }),
+        text: () => Promise.resolve(""),
+      });
+    (salesUpsert as jest.Mock).mockImplementationOnce(() => {
+      upsertOrder.push("sales");
+      const builder = {
+        abortSignal: () => builder,
+        then: (_res: unknown, reject: (e: Error) => void) =>
+          reject(Object.assign(new Error("aborted"), { name: "AbortError" })),
+      };
+      return builder;
+    });
+
+    const res = await callRoute();
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.error).toContain("demorou demais");
+
+    const clearing = cycleUpdatePayloads.find((p) => p.refresh_started_at === null);
+    expect(clearing).toBeDefined();
+  });
+
+  // ── Apenas Compras: materialização de buyers a partir das vendas ────────────
+  it("materializa buyers via RPC insert-only quando o ciclo é purchases_only", async () => {
+    cycleRow = activeCycle({ purchases_only: true });
+    lockCount = 1;
+    mockTokenAndSales([saleItem()]);
+
+    const res = await callRoute();
+    expect(res.status).toBe(200);
+
+    // A sincronização roda com o id do ciclo, DEPOIS do upsert de vendas.
+    expect(rpcCalls).toEqual([
+      { fn: "dash_gestao_vendas_sync_buyers_from_sales", args: { p_cycle_id: "cycle-1" } },
+    ]);
+  });
+
+  it("NÃO chama a sincronização em ciclo de renovação (purchases_only false)", async () => {
+    cycleRow = activeCycle({ purchases_only: false });
+    lockCount = 1;
+    mockTokenAndSales([saleItem()]);
+
+    const res = await callRoute();
+    expect(res.status).toBe(200);
+    expect(rpcCalls).toEqual([]);
+  });
+
+  it("retorna 502 e libera o lock quando a sincronização de buyers falha", async () => {
+    cycleRow = activeCycle({ purchases_only: true });
+    lockCount = 1;
+    mockTokenAndSales([saleItem()]);
+    syncError = { message: "boom sync" };
+
+    const res = await callRoute();
+    expect(res.status).toBe(502);
+
+    const clearing = cycleUpdatePayloads.find((p) => p.refresh_started_at === null);
+    expect(clearing).toBeDefined();
+  });
+
+  // ── Multi-produto: uma paginação por produto do ciclo ───────────────────────
+  it("pagina uma vez por produto do ciclo e soma o upserted", async () => {
+    cycleRow = activeCycle();
+    lockCount = 1;
+    cycleProductRows = [{ product_id: "prod-a" }, { product_id: "prod-b" }];
+
+    // 1 chamada de token + 1 página por produto, cada uma com 1 item e sem
+    // next_page_token — o total upsertado tem que ser 2.
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ access_token: "tok-abc" }),
+        text: () => Promise.resolve(""),
+      })
+      .mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({ items: [saleItem()], page_info: { next_page_token: undefined } }),
+        text: () => Promise.resolve(""),
+      });
+
+    const res = await callRoute();
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+
+    const salesUrls = (global.fetch as jest.Mock).mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.includes("product_id="));
+
+    expect(salesUrls.some((url) => url.includes("product_id=prod-a"))).toBe(true);
+    expect(salesUrls.some((url) => url.includes("product_id=prod-b"))).toBe(true);
+    expect(body.upserted).toBe(2);
+  });
+
+  it("falha parcial no 2º produto não descarta o upsert já feito do 1º (persistência por produto)", async () => {
+    cycleRow = activeCycle();
+    lockCount = 1;
+    cycleProductRows = [{ product_id: "prod-a" }, { product_id: "prod-b" }];
+
+    // token ok -> página de prod-a ok (1 item, sem next_page_token) -> página
+    // de prod-b falha (resposta não-2xx da Hotmart). Se o upsert só acontecesse
+    // depois do laço inteiro, a venda de prod-a nunca chegaria a ser gravada.
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ access_token: "tok-abc" }),
+        text: () => Promise.resolve(""),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ items: [saleItem()], page_info: {} }),
+        text: () => Promise.resolve(""),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve("boom"),
+      });
+
+    const res = await callRoute();
+    expect(res.status).toBe(502);
+
+    // A venda de prod-a foi upsertada ANTES da falha em prod-b — persistência
+    // por produto, não acumulada em memória até o fim do laço.
+    expect(salesUpsert).toHaveBeenCalledTimes(1);
+    expect(salesUpsert).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ transaction_code: "HP-TX-1" })]),
+      expect.objectContaining({ onConflict: "transaction_code" })
+    );
+
+    // finally libera o lock e grava last_refresh_at mesmo com a falha parcial —
+    // o throttle passa a valer a partir desta tentativa (comportamento inalterado).
+    const clearing = cycleUpdatePayloads.find((p) => p.refresh_started_at === null);
+    expect(clearing).toBeDefined();
+  });
+
+  it("falha com mensagem clara quando o ciclo não tem produtos", async () => {
+    cycleRow = activeCycle();
+    lockCount = 1;
+    cycleProductRows = [];
+    mockTokenAndSales([]);
+
+    const res = await callRoute();
+
+    expect(res.status).toBe(502);
+    expect((await res.json()).error).toMatch(/sem produtos/i);
+  });
+});

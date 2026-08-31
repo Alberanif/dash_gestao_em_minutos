@@ -110,28 +110,40 @@ export function mapHotmartSaleItem(
   };
 }
 
-// Garante que todos os offer_codes referenciados por um conjunto de linhas de
-// venda existam em dash_gestao_hotmart_offers ANTES do upsert das vendas — a
-// FK offer_code -> dash_gestao_hotmart_offers rejeitaria vendas com ofertas
-// ainda não sincronizadas (ex.: oferta nova criada entre dois syncs). Idempotente
-// (ignoreDuplicates preserva ofertas já sincronizadas com preço/nome reais).
-// Compartilhada por collectHotmart e pela busca escopada "Atualizar agora" (#120).
+// Garante que todos os product_ids e offer_codes referenciados por um conjunto
+// de linhas de venda existam em dash_gestao_hotmart_products/_offers ANTES do
+// upsert das vendas — a FK offer_code -> dash_gestao_hotmart_offers rejeitaria
+// vendas com ofertas ainda não sincronizadas, e a FK product_id (da própria
+// tabela de ofertas) rejeitaria a oferta placeholder de um produto criado na
+// Hotmart depois do último "Sincronizar Produtos" manual (não há cron
+// automático disso hoje — só o botão em Ajustes > Dados). Idempotente em ambos
+// os níveis (ignoreDuplicates preserva produtos/ofertas já sincronizados com
+// nome/preço reais). Compartilhada por collectHotmart e pela busca escopada
+// "Atualizar agora" (#120).
 export async function upsertPlaceholderOffers(
   supabase: ReturnType<typeof createSupabaseServiceClient>,
   rows: Array<{
     account_id: string;
     product_id: string;
+    product_name: string;
     offer_code: string | null;
     offer_name: string | null;
   }>,
   updatedAt: string,
   signal?: AbortSignal
 ): Promise<void> {
+  const productMap = new Map<string, { account_id: string; product_name: string }>();
   const offerMap = new Map<
     string,
     { account_id: string; product_id: string; offer_name: string }
   >();
   for (const row of rows) {
+    if (!productMap.has(row.product_id)) {
+      productMap.set(row.product_id, {
+        account_id: row.account_id,
+        product_name: row.product_name,
+      });
+    }
     const code = row.offer_code;
     if (code && !offerMap.has(code)) {
       offerMap.set(code, {
@@ -141,6 +153,27 @@ export async function upsertPlaceholderOffers(
       });
     }
   }
+
+  if (productMap.size === 0) return;
+
+  // Roda mesmo sem nenhum offer_code no lote: dash_gestao_hotmart_sales.product_id
+  // tem FK própria para dash_gestao_hotmart_products (migration 038), independente
+  // de offer_code (nullable) — o upsert de vendas quebraria de qualquer jeito.
+  const placeholderProducts = Array.from(productMap.entries()).map(([productId, meta]) => ({
+    account_id: meta.account_id,
+    product_id: productId,
+    product_name: meta.product_name,
+    updated_at: updatedAt,
+  }));
+
+  const productsQuery = supabase
+    .from("dash_gestao_hotmart_products")
+    .upsert(placeholderProducts, { onConflict: "product_id", ignoreDuplicates: true });
+  const { error: productsErr } = await (signal
+    ? productsQuery.abortSignal(signal)
+    : productsQuery);
+
+  if (productsErr) throw new Error(`Hotmart products pre-upsert error: ${productsErr.message}`);
 
   if (offerMap.size === 0) return;
 
@@ -244,6 +277,12 @@ interface HotmartOffersApiResponse {
   items: HotmartOfferApiItem[];
 }
 
+// Quantas chamadas /products/{ucode}/offers rodam em paralelo. Alto o
+// suficiente pra manter o wall-time longe do timeout do proxy/edge (uma
+// conta real passa de 400 produtos), baixo o suficiente pra não provocar
+// rate limit na API da Hotmart.
+export const HOTMART_OFFERS_FETCH_CONCURRENCY = 8;
+
 export async function syncHotmartProducts(
   account: Account
 ): Promise<{ productsRecords: number; offersRecords: number }> {
@@ -299,34 +338,47 @@ export async function syncHotmartProducts(
     if (productsError) throw new Error(`Hotmart products upsert error: ${productsError.message}`);
   }
 
-  // 3. Fetch and upsert offers for each product
+  // 3. Fetch and upsert offers for each product — em lotes concorrentes, não
+  // um fetch por vez. Uma conta real chega a ter centenas de produtos e a
+  // Hotmart leva ~600ms por chamada de ofertas; sequencial estoura os ~100s
+  // do proxy/edge na frente da função (524 Gateway Timeout, sem nem chegar no
+  // try/catch da rota — ver /api/hotmart/sync-products). Concorrência
+  // limitada mantém o wall time dentro do orçamento sem martelar a API.
   let totalOffersRecords = 0;
 
-  for (const item of allProducts) {
-    const offersUrl = `${HOTMART_PRODUCTS_URL}/${item.ucode}/offers`;
-    const offersRes = await fetch(offersUrl, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+  for (let i = 0; i < allProducts.length; i += HOTMART_OFFERS_FETCH_CONCURRENCY) {
+    const chunk = allProducts.slice(i, i + HOTMART_OFFERS_FETCH_CONCURRENCY);
 
-    if (!offersRes.ok) {
-      throw new Error(`Hotmart offers API error: ${offersRes.status} ${await offersRes.text()}`);
-    }
+    const chunkOfferRows = await Promise.all(
+      chunk.map(async (item) => {
+        const offersUrl = `${HOTMART_PRODUCTS_URL}/${item.ucode}/offers`;
+        const offersRes = await fetch(offersUrl, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
 
-    const offersData: HotmartOffersApiResponse = await offersRes.json();
-    const offerItems = offersData.items ?? [];
+        if (!offersRes.ok) {
+          throw new Error(`Hotmart offers API error: ${offersRes.status} ${await offersRes.text()}`);
+        }
 
-    if (offerItems.length > 0) {
-      const offerRows = offerItems.map((offer) => ({
-        account_id: account.id,
-        product_id: String(item.id),
-        offer_code: offer.code,
-        offer_name: offer.name,
-        price: offer.price?.value ?? null,
-        currency: offer.price?.currency_code ?? null,
-        is_main_offer: offer.is_main_offer ?? false,
-        updated_at: now,
-      }));
+        const offersData: HotmartOffersApiResponse = await offersRes.json();
+        const offerItems = offersData.items ?? [];
 
+        return offerItems.map((offer) => ({
+          account_id: account.id,
+          product_id: String(item.id),
+          offer_code: offer.code,
+          offer_name: offer.name,
+          price: offer.price?.value ?? null,
+          currency: offer.price?.currency_code ?? null,
+          is_main_offer: offer.is_main_offer ?? false,
+          updated_at: now,
+        }));
+      })
+    );
+
+    const offerRows = chunkOfferRows.flat();
+
+    if (offerRows.length > 0) {
       const { error: offersError } = await supabase
         .from("dash_gestao_hotmart_offers")
         .upsert(offerRows, { onConflict: "offer_code" });

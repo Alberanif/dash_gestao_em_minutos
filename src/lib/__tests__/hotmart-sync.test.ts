@@ -1,4 +1,8 @@
-import { syncHotmartProducts } from "@/lib/services/hotmart";
+import {
+  syncHotmartProducts,
+  upsertPlaceholderOffers,
+  HOTMART_OFFERS_FETCH_CONCURRENCY,
+} from "@/lib/services/hotmart";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import type { Account } from "@/types/accounts";
 
@@ -27,23 +31,24 @@ function makeTokenFetch() {
   });
 }
 
-function makeProductsFetch(items: { product: { id: number; name: string } }[], nextPageToken?: string) {
+function makeProductsFetch(items: { id: number; name: string; ucode: string }[], nextPageToken?: string) {
+  const body = {
+    items,
+    page_info: nextPageToken ? { next_page_token: nextPageToken } : {},
+  };
   return Promise.resolve({
     ok: true,
-    json: () =>
-      Promise.resolve({
-        items,
-        page_info: nextPageToken ? { next_page_token: nextPageToken } : {},
-      }),
-    text: () => Promise.resolve(""),
+    json: () => Promise.resolve(body),
+    text: () => Promise.resolve(JSON.stringify(body)),
   });
 }
 
 function makeOffersFetch(items: unknown[]) {
+  const body = { items };
   return Promise.resolve({
     ok: true,
-    json: () => Promise.resolve({ items }),
-    text: () => Promise.resolve(""),
+    json: () => Promise.resolve(body),
+    text: () => Promise.resolve(JSON.stringify(body)),
   });
 }
 
@@ -103,8 +108,8 @@ describe("syncHotmartProducts()", () => {
       .mockResolvedValueOnce(makeTokenFetch()) // OAuth token
       .mockResolvedValueOnce(
         makeProductsFetch([
-          { product: { id: 1, name: "Product A" } },
-          { product: { id: 2, name: "Product B" } },
+          { id: 1, name: "Product A", ucode: "uc-1" },
+          { id: 2, name: "Product B", ucode: "uc-2" },
         ])
       ) // products page
       .mockResolvedValueOnce(makeOffersFetch([])) // offers for product 1
@@ -129,8 +134,8 @@ describe("syncHotmartProducts()", () => {
       .mockResolvedValueOnce(makeTokenFetch()) // OAuth token
       .mockResolvedValueOnce(
         makeProductsFetch([
-          { product: { id: 10, name: "Prod X" } },
-          { product: { id: 20, name: "Prod Y" } },
+          { id: 10, name: "Prod X", ucode: "uc-10" },
+          { id: 20, name: "Prod Y", ucode: "uc-20" },
         ])
       )
       .mockResolvedValueOnce(
@@ -162,8 +167,8 @@ describe("syncHotmartProducts()", () => {
       .mockResolvedValueOnce(makeTokenFetch())
       .mockResolvedValueOnce(
         makeProductsFetch([
-          { product: { id: 1, name: "Prod A" } },
-          { product: { id: 2, name: "Prod B" } },
+          { id: 1, name: "Prod A", ucode: "uc-1" },
+          { id: 2, name: "Prod B", ucode: "uc-2" },
         ])
       )
       .mockResolvedValueOnce(makeOffersFetch([]))
@@ -181,7 +186,7 @@ describe("syncHotmartProducts()", () => {
 
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce(makeTokenFetch())
-      .mockResolvedValueOnce(makeProductsFetch([{ product: { id: 5, name: "Solo Prod" } }]))
+      .mockResolvedValueOnce(makeProductsFetch([{ id: 5, name: "Solo Prod", ucode: "uc-5" }]))
       .mockResolvedValueOnce(makeOffersFetch([])); // empty offers
 
     const result = await syncHotmartProducts(mockAccount);
@@ -196,10 +201,10 @@ describe("syncHotmartProducts()", () => {
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce(makeTokenFetch())
       .mockResolvedValueOnce(
-        makeProductsFetch([{ product: { id: 100, name: "Prod Page1" } }], "token-page2")
+        makeProductsFetch([{ id: 100, name: "Prod Page1", ucode: "uc-100" }], "token-page2")
       ) // page 1 with next token
       .mockResolvedValueOnce(
-        makeProductsFetch([{ product: { id: 101, name: "Prod Page2" } }]) // page 2, no next token
+        makeProductsFetch([{ id: 101, name: "Prod Page2", ucode: "uc-101" }]) // page 2, no next token
       )
       .mockResolvedValueOnce(makeOffersFetch([])) // offers for 100
       .mockResolvedValueOnce(makeOffersFetch([])); // offers for 101
@@ -214,5 +219,128 @@ describe("syncHotmartProducts()", () => {
     );
     // 2 pages of products fetched
     expect(productListingCalls.length).toBe(2);
+  });
+
+  // Conta real tem 439 produtos ativos; a Hotmart leva ~600ms por chamada de
+  // ofertas. Sequencial (1 por vez) estoura os ~100s do proxy/edge em frente à
+  // função (524 Gateway Timeout — nunca chega a rodar o try/catch da rota).
+  // Concorrência limitada é o que mantém o wall time da sincronização dentro
+  // do orçamento sem estourar rate limit da API.
+  it("fetches offers with bounded concurrency instead of one at a time", async () => {
+    buildMockSupabase([]);
+
+    const PRODUCT_COUNT = 30;
+    const products = Array.from({ length: PRODUCT_COUNT }, (_, i) => ({
+      id: i + 1,
+      name: `Prod ${i + 1}`,
+      ucode: `uc-${i + 1}`,
+    }));
+
+    let inFlight = 0;
+    let peakInFlight = 0;
+
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes("oauth/token")) return makeTokenFetch();
+      if (/\/products\?/.test(url)) return makeProductsFetch(products);
+      if (/\/offers$/.test(url)) {
+        inFlight++;
+        peakInFlight = Math.max(peakInFlight, inFlight);
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            inFlight--;
+            resolve({
+              ok: true,
+              json: () => Promise.resolve({ items: [] }),
+              text: () => Promise.resolve(JSON.stringify({ items: [] })),
+            });
+          }, 5);
+        });
+      }
+      throw new Error(`unexpected fetch url in test: ${url}`);
+    });
+
+    const result = await syncHotmartProducts(mockAccount);
+
+    expect(result.productsRecords).toBe(PRODUCT_COUNT);
+    // Prova que roda em paralelo (não 1 por vez)...
+    expect(peakInFlight).toBeGreaterThan(1);
+    // ...mas com um teto, não os 30 de uma vez (rate limit da Hotmart).
+    expect(peakInFlight).toBeLessThanOrEqual(HOTMART_OFFERS_FETCH_CONCURRENCY);
+  });
+});
+
+describe("upsertPlaceholderOffers()", () => {
+  function buildOrderTrackingSupabase() {
+    const callOrder: string[] = [];
+    const upsertMock = jest.fn().mockImplementation((_rows, opts) => {
+      callOrder.push(opts.onConflict);
+      return Promise.resolve({ error: null });
+    });
+    const fromMock = jest.fn().mockImplementation(() => ({ upsert: upsertMock }));
+    return { from: fromMock, upsertMock, callOrder } as unknown as ReturnType<
+      typeof createSupabaseServiceClient
+    > & { upsertMock: jest.Mock; callOrder: string[] };
+  }
+
+  // dash_gestao_hotmart_sales.product_id tem FK própria para
+  // dash_gestao_hotmart_products (migration 038), independente de offer_code
+  // ser nulo. Sem o placeholder de produto, um lote sem nenhum offer_code
+  // (offerMap vazio) pularia direto pro upsert de vendas e quebraria a FK caso
+  // o produto ainda não estivesse sincronizado.
+  it("upserts a placeholder product even when no row has an offer_code", async () => {
+    const supabase = buildOrderTrackingSupabase();
+
+    await upsertPlaceholderOffers(
+      supabase,
+      [
+        {
+          account_id: "acc-1",
+          product_id: "999",
+          product_name: "Produto Novo",
+          offer_code: null,
+          offer_name: null,
+        },
+      ],
+      "2026-08-24T00:00:00.000Z"
+    );
+
+    expect(supabase.upsertMock).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          account_id: "acc-1",
+          product_id: "999",
+          product_name: "Produto Novo",
+        }),
+      ],
+      expect.objectContaining({ onConflict: "product_id", ignoreDuplicates: true })
+    );
+  });
+
+  it("upserts the placeholder product before the placeholder offer", async () => {
+    const supabase = buildOrderTrackingSupabase();
+
+    await upsertPlaceholderOffers(
+      supabase,
+      [
+        {
+          account_id: "acc-1",
+          product_id: "999",
+          product_name: "Produto Novo",
+          offer_code: "off-novo",
+          offer_name: "Oferta Nova",
+        },
+      ],
+      "2026-08-24T00:00:00.000Z"
+    );
+
+    expect(supabase.callOrder).toEqual(["product_id", "offer_code"]);
+  });
+
+  it("does nothing when there are no rows", async () => {
+    const supabase = buildOrderTrackingSupabase();
+
+    await upsertPlaceholderOffers(supabase, [], "2026-08-24T00:00:00.000Z");
+
+    expect(supabase.upsertMock).not.toHaveBeenCalled();
   });
 });
