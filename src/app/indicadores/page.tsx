@@ -298,8 +298,10 @@ export default function IndicadoresPage() {
     rawView === "planilha" ? "planilha" : rawView === "debriefing" ? "debriefing" : "dashboard";
   const [view, setView] = useState<ViewKey>(urlView);
   useEffect(() => {
-    setView(urlView);
-  }, [urlView]);
+    if (view !== urlView) {
+      setView(urlView);
+    }
+  }, [urlView, view]);
 
   function handleViewChange(next: ViewKey) {
     if (next === view) return;
