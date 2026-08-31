@@ -31,7 +31,15 @@ export async function POST(request: NextRequest) {
   if (error) return error;
 
   const body = await request.json();
-  const { account_id, name, hotmart_products = [], meta_ads_terms = [], captacao_leads_eventos = [] } = body ?? {};
+  const {
+    account_id,
+    name,
+    hotmart_products = [],
+    main_hotmart_product = null,
+    debriefing_offer_codes = null,
+    meta_ads_terms = [],
+    captacao_leads_eventos = [],
+  } = body ?? {};
 
   if (!name) {
     return NextResponse.json({ error: "name is required" }, { status: 400 });
@@ -46,7 +54,16 @@ export async function POST(request: NextRequest) {
   const supabase = createSupabaseServiceClient();
   const { data, error: dbError } = await supabase
     .from("dash_gestao_filters")
-    .insert({ account_id, name, hotmart_products, meta_ads_terms, captacao_leads_eventos, status: "ativo" })
+    .insert({
+      account_id,
+      name,
+      hotmart_products,
+      main_hotmart_product,
+      debriefing_offer_codes,
+      meta_ads_terms,
+      captacao_leads_eventos,
+      status: "ativo",
+    })
     .select()
     .single();
 

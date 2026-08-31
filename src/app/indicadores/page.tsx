@@ -24,6 +24,7 @@ import type {
 import { expandFilter, toSearchParams } from "@/lib/indicadores/filter-expansion";
 import { partitionWeeks } from "@/lib/indicadores/week-partition";
 import { PlanilhaView } from "@/components/indicadores/planilha-view";
+import { DebriefingView } from "@/components/indicadores/debriefing-view";
 import { HeroKpiCard } from "@/components/indicadores/hero-kpi-card";
 import { HorizontalFunnelFlow } from "@/components/indicadores/horizontal-funnel-flow";
 import { PlatformsCard } from "@/components/indicadores/platforms-card";
@@ -214,13 +215,14 @@ function PeriodControls({ startDate, endDate, activePreset, onPreset, onStartDat
   );
 }
 
-// ── View tabs (Dashboard | Planilha) ──────────────────────────────────────────
+// ── View tabs (Dashboard | Planilha | Debriefing) ──────────────────────────────
 
-type ViewKey = "dashboard" | "planilha";
+type ViewKey = "dashboard" | "planilha" | "debriefing";
 
 const VIEWS: { key: ViewKey; label: string }[] = [
   { key: "dashboard", label: "Dashboard" },
   { key: "planilha", label: "Planilha" },
+  { key: "debriefing", label: "Debriefing" },
 ];
 
 function ViewTabs({ view, onView }: { view: ViewKey; onView: (v: ViewKey) => void }) {
@@ -291,7 +293,9 @@ export default function IndicadoresPage() {
   // ausente ou inválido cai no Dashboard. Evento e período NÃO vivem aqui —
   // trocar de aba não os reseta.
   const searchParams = useSearchParams();
-  const urlView: ViewKey = searchParams.get("view") === "planilha" ? "planilha" : "dashboard";
+  const rawView = searchParams.get("view");
+  const urlView: ViewKey =
+    rawView === "planilha" ? "planilha" : rawView === "debriefing" ? "debriefing" : "dashboard";
   const [view, setView] = useState<ViewKey>(urlView);
   useEffect(() => {
     setView(urlView);
@@ -301,8 +305,8 @@ export default function IndicadoresPage() {
     if (next === view) return;
     setView(next);
     const params = new URLSearchParams(window.location.search);
-    if (next === "planilha") params.set("view", "planilha");
-    else params.delete("view");
+    if (next === "dashboard") params.delete("view");
+    else params.set("view", next);
     const qs = params.toString();
     window.history.pushState(null, "", qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
   }
@@ -730,6 +734,17 @@ export default function IndicadoresPage() {
             hasLeadsFilter={hasLeadsFilter}
           />
         </div>
+      ) : view === "debriefing" ? (
+        <DebriefingView
+          filter={activeFilter}
+          startDate={startDate}
+          endDate={endDate}
+          onEditFilter={() => {
+            setFilterEditTarget(activeFilter);
+            setFilterModalOpen(true);
+          }}
+          onFilterUpdated={handleFilterSaved}
+        />
       ) : (
         <div className="z-layout">
 
