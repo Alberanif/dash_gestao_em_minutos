@@ -108,3 +108,31 @@ export interface DailyPoint {
   hotmart_sales: number;
   lead_captacoes: number;
 }
+
+/** Bloco de KPIs derivado de um PeriodSummary. null = indisponível, nunca zero. */
+export interface AiReportKpiBlock {
+  roas: number | null;
+  revenueBrl: number | null;
+  leads: number | null;
+  cpl: number | null;
+  spend: number | null;
+  sales: number | null;
+  startDate: string;
+  endDate: string;
+}
+
+export interface AiReportKpiSnapshot {
+  lifetime: AiReportKpiBlock;
+  last7d: AiReportKpiBlock;
+}
+
+export interface AiReportRecord {
+  id: string;
+  filter_id: string;
+  report_text: string | null;
+  kpi_snapshot: AiReportKpiSnapshot | null;
+  generated_at: string | null;
+  generating_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
