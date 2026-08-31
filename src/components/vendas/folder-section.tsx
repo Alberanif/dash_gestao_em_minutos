@@ -235,7 +235,7 @@ export function FolderSection({
       {group.isExpanded && (
         <div style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           {cycleCount === 0 ? (
-            <span style={{ fontSize: 12, color: "var(--text-muted, #71717a)", italic: "true" }}>
+            <span style={{ fontSize: 12, color: "var(--text-muted, #71717a)", fontStyle: "italic" }}>
               Nenhum ciclo nesta pasta
             </span>
           ) : (

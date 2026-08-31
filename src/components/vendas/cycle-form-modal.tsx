@@ -8,6 +8,7 @@ import type {
   UltimatesCycleProductSelection,
   UltimatesOfferOption,
   UltimatesOfferlessOption,
+  VendasFolderRecord,
 } from "@/types/vendas";
 import {
   OFFERLESS_LABEL,
