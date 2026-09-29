@@ -5,6 +5,9 @@ import { extractPurchases, extractCheckout } from "@/lib/utils/meta-ads-events";
 const META_API_BASE = "https://graph.facebook.com/v21.0";
 const META_API_CAMPAIGNS_LIMIT = "100";
 const META_API_PAGE_LIMIT = "500"; // Max rows/page permitido pela Insights API
+// Insights por campanha com actions/action_values/outbound_clicks é pesado: páginas de 100+ linhas
+// estouram o timeout da Meta (500, code 1 / subcode 99). Validado em 2026-09: 25 pagina sem erro.
+const META_API_CAMPAIGN_INSIGHTS_PAGE_LIMIT = "25";
 const INITIAL_FETCH_DAYS = 14; // Janela inicial conservadora (era 30)
 const PAGE_DELAY_MS = 500; // Delay entre requests paginados
 const RETRY_DELAYS_MS = [30_000, 60_000, 120_000]; // Backoff: 30s, 60s, 120s
@@ -70,11 +73,12 @@ async function metaGet(endpoint: string, params: Record<string, string>, accessT
 async function metaGetAllPages<T>(
   endpoint: string,
   params: Record<string, string>,
-  accessToken: string
+  accessToken: string,
+  pageLimit: string = META_API_PAGE_LIMIT
 ): Promise<T[]> {
   const all: T[] = [];
 
-  const first = await metaGet(endpoint, { ...params, limit: META_API_PAGE_LIMIT }, accessToken);
+  const first = await metaGet(endpoint, { ...params, limit: pageLimit }, accessToken);
   all.push(...(first.data ?? []));
   let nextUrl: string | null = first.paging?.next ?? null;
 
@@ -131,7 +135,8 @@ function yesterday(): string {
 export async function collectMetaAds(
   account: Account,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  options: { includeToday?: boolean } = {}
 ): Promise<{ dailyRecords: number; campaignDailyRecords: number }> {
   const { access_token, ad_account_id } = account.credentials as MetaAdsCredentials;
   const supabase = createSupabaseServiceClient();
@@ -147,7 +152,8 @@ export async function collectMetaAds(
     since = startDate;
     until = endDate;
     campaignSince = startDate;
-    campaignUntil = endDate < yesterdayStr ? endDate : yesterdayStr;
+    // Coleta complementar do dia corrente (dado parcial): o upsert é sobrescrito na próxima coleta
+    campaignUntil = options.includeToday || endDate < yesterdayStr ? endDate : yesterdayStr;
   } else {
     // Account-level daily: incremental from last collected date
     const { data: lastDailyRow } = await supabase
@@ -251,7 +257,8 @@ export async function collectMetaAds(
       time_increment: "1",
       time_range: JSON.stringify({ since: campaignSince, until: campaignUntil }),
     },
-    access_token
+    access_token,
+    META_API_CAMPAIGN_INSIGHTS_PAGE_LIMIT
   );
 
   const campaignDailyRows = campaignsData.map((row) => {
