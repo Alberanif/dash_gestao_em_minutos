@@ -17,7 +17,7 @@ import type {
 const RAW = readFileSync(
   join(process.cwd(), "supabase/migrations/070_vendas_views.sql"),
   "utf8",
-);
+).replace(/\r\n/g, "\n"); // checkout com autocrlf (Windows) deixa \r e `.` não o casa
 
 /** Remove comentários `--` (a prosa cita `at time zone`). */
 function stripComments(sql: string): string {

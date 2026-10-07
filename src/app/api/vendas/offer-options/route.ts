@@ -32,6 +32,27 @@ export async function GET(request: NextRequest) {
   const { error } = await requireRole(["gestor", "analista"]);
   if (error) return error;
 
+  // Visualizações (PRD #185): ?product_id=X devolve só as ofertas desse produto,
+  // no formato { offers: [{ offer_code, offer_name, sales_count }] }. Reusa a
+  // mesma RPC; o contrato multi-produto (productIds) abaixo segue intacto até a
+  // remoção do modelo de ciclos (fatia 4).
+  const singleProduct = request.nextUrl.searchParams.get("product_id")?.trim();
+  if (singleProduct) {
+    const supabase = createSupabaseServiceClient();
+    const { data, error: rpcError } = await supabase.rpc("dash_gestao_vendas_offer_options", {
+      p_product_ids: [singleProduct],
+    });
+    if (rpcError) {
+      return NextResponse.json({ error: rpcError.message }, { status: 500 });
+    }
+    const offers = ((data as RawOfferOption[]) ?? []).map((row) => ({
+      offer_code: row.offer_code,
+      offer_name: row.offer_name,
+      sales_count: Number(row.sales_count ?? 0),
+    }));
+    return NextResponse.json({ offers });
+  }
+
   // productIds=a,b,c — lista na query string, e não no corpo, porque isto é
   // leitura pura e o modal a refaz a cada produto marcado.
   const productIds = Array.from(
