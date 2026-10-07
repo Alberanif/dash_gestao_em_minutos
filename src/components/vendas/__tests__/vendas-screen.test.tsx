@@ -113,8 +113,8 @@ describe("VendasScreen — estado vazio e papéis", () => {
     const { unmount } = render(<VendasScreen role="gestor" products={PRODUCTS} />);
     await screen.findByTestId("view-dashboard");
     expect(screen.getByTestId("vendas-new-view-btn")).toBeInTheDocument();
-    expect(screen.getByTestId("ultimates-edit-cycle-btn")).toBeInTheDocument();
-    expect(screen.getByTestId("ultimates-date-apply")).toBeInTheDocument();
+    expect(screen.getByTestId("vendas-edit-view-btn")).toBeInTheDocument();
+    expect(screen.getByTestId("vendas-date-apply")).toBeInTheDocument();
     unmount();
 
     installFetch({ views: [makeView({ view_start_date: "2026-08-01", view_end_date: "2026-08-10" })], folders: [FOLDER] });
@@ -122,10 +122,10 @@ describe("VendasScreen — estado vazio e papéis", () => {
     await screen.findByTestId("view-dashboard");
     expect(screen.queryByTestId("vendas-new-view-btn")).not.toBeInTheDocument();
     expect(screen.queryByTestId("vendas-new-folder-btn")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("ultimates-edit-cycle-btn")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("ultimates-date-apply")).not.toBeInTheDocument();
-    expect(screen.getByTestId("ultimates-date-readonly")).toBeInTheDocument();
-    expect(screen.getByTestId("ultimates-refresh-btn")).toBeInTheDocument();
+    expect(screen.queryByTestId("vendas-edit-view-btn")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("vendas-date-apply")).not.toBeInTheDocument();
+    expect(screen.getByTestId("vendas-date-readonly")).toBeInTheDocument();
+    expect(screen.getByTestId("vendas-refresh-btn")).toBeInTheDocument();
   });
 
   it("abre a visualização mais recente por created_at", async () => {
@@ -215,9 +215,9 @@ describe("VendasScreen — números do dashboard", () => {
     });
     render(<VendasScreen role="gestor" products={PRODUCTS} />);
     await screen.findByTestId("view-kpi-sales");
-    fireEvent.change(screen.getByTestId("ultimates-date-start"), { target: { value: "2026-08-01" } });
-    fireEvent.change(screen.getByTestId("ultimates-date-end"), { target: { value: "2026-08-05" } });
-    fireEvent.click(screen.getByTestId("ultimates-date-apply"));
+    fireEvent.change(screen.getByTestId("vendas-date-start"), { target: { value: "2026-08-01" } });
+    fireEvent.change(screen.getByTestId("vendas-date-end"), { target: { value: "2026-08-05" } });
+    fireEvent.click(screen.getByTestId("vendas-date-apply"));
     await waitFor(() =>
       expect(calls.find((c) => c.method === "PATCH")?.body).toEqual({ view_start_date: "2026-08-01", view_end_date: "2026-08-05" })
     );
@@ -293,7 +293,7 @@ describe("VendasScreen — estados do backfill", () => {
 
 describe("VendasScreen — exclusão com diálogo próprio", () => {
   async function openEditAndDelete() {
-    fireEvent.click(await screen.findByTestId("ultimates-edit-cycle-btn"));
+    fireEvent.click(await screen.findByTestId("vendas-edit-view-btn"));
     fireEvent.click(await screen.findByTestId("view-form-delete-open"));
   }
 

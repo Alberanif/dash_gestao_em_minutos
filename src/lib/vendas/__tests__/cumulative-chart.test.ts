@@ -1,8 +1,8 @@
 import { buildCumulativeSeries, buildHourlyCumulativeSeries } from "../cumulative-chart";
 import type { CumulativeDailyRow, CumulativeHourlyRow } from "@/lib/vendas/cumulative-chart";
 
-function day(day: string, renewals: number, new_buyers = 0): CumulativeDailyRow {
-  return { day, renewals, new_buyers };
+function day(day: string, sales: number): CumulativeDailyRow {
+  return { day, sales };
 }
 
 describe("buildCumulativeSeries", () => {
@@ -41,69 +41,37 @@ describe("buildCumulativeSeries", () => {
     expect(days).toEqual(copy);
   });
 
-  it("acumula new_buyers quando a série pedida é 'novos'", () => {
-    const days: CumulativeDailyRow[] = [
-      day("2026-07-01", 3, 1),
-      day("2026-07-02", 5, 0),
-      day("2026-07-03", 0, 4),
-    ];
-    expect(buildCumulativeSeries(days, "novos")).toEqual([
-      { key: "2026-07-01", cumulative: 1 },
-      { key: "2026-07-02", cumulative: 1 },
-      { key: "2026-07-03", cumulative: 5 },
-    ]);
-  });
-
-  it("mantém o mesmo eixo de dias nas duas séries (dia sem a métrica vira patamar plano)", () => {
-    const days: CumulativeDailyRow[] = [
-      day("2026-07-01", 2, 0),
-      day("2026-07-02", 0, 3), // só novos compradores neste dia
-      day("2026-07-03", 1, 1),
-    ];
-    const renovacoes = buildCumulativeSeries(days, "renovacoes");
-    const novos = buildCumulativeSeries(days, "novos");
-
-    expect(renovacoes.map((p) => p.key)).toEqual(novos.map((p) => p.key));
-    expect(renovacoes.map((p) => p.cumulative)).toEqual([2, 2, 3]);
-    expect(novos.map((p) => p.cumulative)).toEqual([0, 3, 4]);
-  });
-
   // Guarda de runtime: se alguma linha chegar sem a contagem, o acúmulo não
   // pode virar NaN — um único NaN apaga o eixo Y do gráfico inteiro.
   it("trata a contagem ausente como zero, sem virar NaN", () => {
     const days = [
-      { day: "2026-07-01", renewals: 2 },
-      { day: "2026-07-02", renewals: 1 },
+      { day: "2026-07-01" },
+      { day: "2026-07-02" },
     ] as unknown as CumulativeDailyRow[];
 
-    expect(buildCumulativeSeries(days, "novos")).toEqual([
+    expect(buildCumulativeSeries(days)).toEqual([
       { key: "2026-07-01", cumulative: 0 },
       { key: "2026-07-02", cumulative: 0 },
     ]);
   });
 
-  // Gêmeo do teste homônimo da série horária: as duas curvas dividem o mesmo
-  // card e o mesmo modo de falhar. Number(...) em daily/route.ts vira NaN para
+  // Gêmeo do teste homônimo da série horária: mesmo modo de falhar. Number(...) em daily/route.ts vira NaN para
   // valor não-numérico, e `?? 0` deixa passar porque NaN não é null/undefined.
   it("trata NaN na contagem como zero, sem propagar para cumulative", () => {
     const days = [
-      { day: "2026-07-01", renewals: NaN, new_buyers: 1 },
-      { day: "2026-07-02", renewals: 2, new_buyers: NaN },
+      { day: "2026-07-01", sales: NaN },
+      { day: "2026-07-02", sales: 2 },
     ] as unknown as CumulativeDailyRow[];
 
-    expect(buildCumulativeSeries(days, "renovacoes")).toEqual([
+    expect(buildCumulativeSeries(days)).toEqual([
       { key: "2026-07-01", cumulative: 0 },
       { key: "2026-07-02", cumulative: 2 },
-    ]);
-    expect(buildCumulativeSeries(days, "novos")).toEqual([
-      { key: "2026-07-01", cumulative: 1 },
-      { key: "2026-07-02", cumulative: 1 },
     ]);
   });
 });
 
-function hour(hour: string, renewals: number, new_buyers = 0): CumulativeHourlyRow {
-  return { hour, renewals, new_buyers };
+function hour(hour: string, sales: number): CumulativeHourlyRow {
+  return { hour, sales };
 }
 
 describe("buildHourlyCumulativeSeries", () => {
@@ -165,24 +133,14 @@ describe("buildHourlyCumulativeSeries", () => {
     expect(hours).toEqual(copy);
   });
 
-  it("acumula new_buyers quando a série pedida é 'novos', sobre o mesmo eixo de horas", () => {
-    const hours = [hour("2026-07-01T10", 2, 1), hour("2026-07-01T12", 0, 3)];
-    const renovacoes = buildHourlyCumulativeSeries(hours, "renovacoes");
-    const novos = buildHourlyCumulativeSeries(hours, "novos");
-
-    expect(renovacoes.map((p) => p.key)).toEqual(novos.map((p) => p.key));
-    expect(renovacoes.map((p) => p.cumulative)).toEqual([2, 2, 2]);
-    expect(novos.map((p) => p.cumulative)).toEqual([1, 1, 4]);
-  });
-
   // Guarda de runtime: um único NaN apaga o eixo Y do gráfico inteiro.
   it("trata a contagem ausente como zero, sem virar NaN", () => {
     const hours = [
-      { hour: "2026-07-01T10", renewals: 2 },
-      { hour: "2026-07-01T11", renewals: 1 },
+      { hour: "2026-07-01T10" },
+      { hour: "2026-07-01T11" },
     ] as unknown as CumulativeHourlyRow[];
 
-    expect(buildHourlyCumulativeSeries(hours, "novos")).toEqual([
+    expect(buildHourlyCumulativeSeries(hours)).toEqual([
       { key: "2026-07-01T10", cumulative: 0 },
       { key: "2026-07-01T11", cumulative: 0 },
     ]);
@@ -220,7 +178,7 @@ describe("buildHourlyCumulativeSeries", () => {
 
   // Mesmo teto, do outro lado: vão de exatamente 8760 horas (índice
   // 0..8759, de 2026-07-01T00 a 2027-06-30T23) ainda preenche normalmente —
-  // o teto não pode disparar cedo demais, e precisa cobrir com folga o ciclo
+  // o teto não pode disparar cedo demais, e precisa cobrir com folga o período
   // de 6 meses (~4300 pontos horários) que o spec (Risco #1) já dá como
   // pesado, mas não recusa.
   it("no teto exato de 8760 horas, ainda preenche normalmente", () => {
@@ -240,17 +198,13 @@ describe("buildHourlyCumulativeSeries", () => {
   // o eixo Y inteiro no Recharts.
   it("trata NaN na contagem como zero, sem propagar para cumulative", () => {
     const hours = [
-      { hour: "2026-07-01T10", renewals: NaN, new_buyers: 1 },
-      { hour: "2026-07-01T11", renewals: 2, new_buyers: NaN },
+      { hour: "2026-07-01T10", sales: NaN },
+      { hour: "2026-07-01T11", sales: 2 },
     ] as unknown as CumulativeHourlyRow[];
 
-    expect(buildHourlyCumulativeSeries(hours, "renovacoes")).toEqual([
+    expect(buildHourlyCumulativeSeries(hours)).toEqual([
       { key: "2026-07-01T10", cumulative: 0 },
       { key: "2026-07-01T11", cumulative: 2 },
-    ]);
-    expect(buildHourlyCumulativeSeries(hours, "novos")).toEqual([
-      { key: "2026-07-01T10", cumulative: 1 },
-      { key: "2026-07-01T11", cumulative: 1 },
     ]);
   });
 
@@ -275,7 +229,7 @@ describe("buildHourlyCumulativeSeries", () => {
   // to_char da migration 054 derivar do formato combinado — aqui, hora sem
   // zero à esquerda —, as duas pontas ainda parseiam, o vão sai válido, e todo
   // lookup do preenchimento erra em silêncio: a curva inteira vira zero e o
-  // card anuncia "Sem renovações registradas no ciclo ainda.". Uma falha de
+  // card anuncia "Sem vendas registradas ainda.". Uma falha de
   // encanamento vestida de resposta de negócio. A guarda de round-trip
   // (`contagens.has(msParaHora(inicio))`) derruba o preenchimento para o
   // fallback honesto, que preserva as contagens recebidas.
@@ -317,20 +271,20 @@ describe("buildHourlyCumulativeSeries", () => {
 
 describe("recorte por intervalo de datas", () => {
   const DIAS: CumulativeDailyRow[] = [
-    day("2026-07-08", 5, 1),
-    day("2026-07-10", 2, 3),
-    day("2026-07-15", 4, 0),
-    day("2026-07-25", 9, 9),
+    day("2026-07-08", 5),
+    day("2026-07-10", 2),
+    day("2026-07-15", 4),
+    day("2026-07-25", 9),
   ];
 
   it("range null mantém o comportamento de hoje", () => {
-    expect(buildCumulativeSeries(DIAS, "renovacoes", null)).toEqual(
-      buildCumulativeSeries(DIAS, "renovacoes")
+    expect(buildCumulativeSeries(DIAS, null)).toEqual(
+      buildCumulativeSeries(DIAS)
     );
   });
 
   it("acumula do zero dentro do intervalo, ignorando o que veio antes", () => {
-    const pontos = buildCumulativeSeries(DIAS, "renovacoes", {
+    const pontos = buildCumulativeSeries(DIAS, {
       start: "2026-07-10",
       end: "2026-07-20",
     });
@@ -343,27 +297,25 @@ describe("recorte por intervalo de datas", () => {
   });
 
   it("inclui as duas pontas do intervalo", () => {
-    const pontos = buildCumulativeSeries(DIAS, "novos", {
+    const pontos = buildCumulativeSeries(DIAS, {
       start: "2026-07-08",
       end: "2026-07-10",
     });
     expect(pontos.map((p) => p.key)).toEqual(["2026-07-08", "2026-07-10"]);
-    expect(pontos[1].cumulative).toBe(4);
+    expect(pontos[1].cumulative).toBe(7);
   });
 
   it("intervalo sem nenhum dia devolve lista vazia", () => {
-    expect(
-      buildCumulativeSeries(DIAS, "renovacoes", { start: "2026-06-01", end: "2026-06-30" })
-    ).toEqual([]);
+    expect(buildCumulativeSeries(DIAS, { start: "2026-06-01", end: "2026-06-30" })).toEqual([]);
   });
 
   it("recorta a série horária pela parte de data da chave", () => {
     const horas: CumulativeHourlyRow[] = [
-      { hour: "2026-07-09T23", renewals: 7, new_buyers: 0 },
-      { hour: "2026-07-10T00", renewals: 1, new_buyers: 0 },
-      { hour: "2026-07-10T02", renewals: 2, new_buyers: 0 },
+      { hour: "2026-07-09T23", sales: 7 },
+      { hour: "2026-07-10T00", sales: 1 },
+      { hour: "2026-07-10T02", sales: 2 },
     ];
-    const pontos = buildHourlyCumulativeSeries(horas, "renovacoes", {
+    const pontos = buildHourlyCumulativeSeries(horas, {
       start: "2026-07-10",
       end: "2026-07-10",
     });
@@ -377,9 +329,9 @@ describe("recorte por intervalo de datas", () => {
   });
 
   it("intervalo sem nenhuma hora devolve lista vazia", () => {
-    const horas: CumulativeHourlyRow[] = [{ hour: "2026-07-09T23", renewals: 7, new_buyers: 0 }];
+    const horas: CumulativeHourlyRow[] = [{ hour: "2026-07-09T23", sales: 7 }];
     expect(
-      buildHourlyCumulativeSeries(horas, "renovacoes", { start: "2026-07-10", end: "2026-07-10" })
+      buildHourlyCumulativeSeries(horas, { start: "2026-07-10", end: "2026-07-10" })
     ).toEqual([]);
   });
 });

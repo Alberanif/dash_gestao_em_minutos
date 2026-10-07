@@ -28,14 +28,14 @@ describe("parseDateRange", () => {
 });
 
 describe("viewRangeFrom", () => {
-  it("lê a janela salva no ciclo", () => {
+  it("lê a janela salva na visualização", () => {
     expect(viewRangeFrom("2026-07-10", "2026-07-20")).toEqual({
       start: "2026-07-10",
       end: "2026-07-20",
     });
   });
 
-  it("ciclo sem janela: null nas duas pontas", () => {
+  it("visualização sem janela: null nas duas pontas", () => {
     expect(viewRangeFrom(null, null)).toBeNull();
   });
 
@@ -43,7 +43,7 @@ describe("viewRangeFrom", () => {
     expect(viewRangeFrom(undefined, undefined)).toBeNull();
   });
 
-  it("meia janela degrada para ciclo inteiro, nunca para meio recorte", () => {
+  it("meia janela degrada para sem recorte, nunca para meio recorte", () => {
     expect(viewRangeFrom("2026-07-10", null)).toBeNull();
     expect(viewRangeFrom(null, "2026-07-20")).toBeNull();
   });

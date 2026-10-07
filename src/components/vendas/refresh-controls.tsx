@@ -49,12 +49,12 @@ export function RefreshControls({ viewId, refreshUrl, lastRefreshAt, onRefreshed
 
   return (
     <div
-      data-testid="ultimates-refresh-controls"
+      data-testid="vendas-refresh-controls"
       style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {label && (
-          <span data-testid="ultimates-refresh-label" style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+          <span data-testid="vendas-refresh-label" style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
             {label}
           </span>
         )}
@@ -63,7 +63,7 @@ export function RefreshControls({ viewId, refreshUrl, lastRefreshAt, onRefreshed
           onClick={handleClick}
           disabled={refreshing}
           className="btn-secondary"
-          data-testid="ultimates-refresh-btn"
+          data-testid="vendas-refresh-btn"
         >
           {refreshing ? "Atualizando..." : "Atualizar agora"}
         </button>
@@ -71,7 +71,7 @@ export function RefreshControls({ viewId, refreshUrl, lastRefreshAt, onRefreshed
       {feedback && feedback.kind !== "success" && (
         <span
           role="status"
-          data-testid="ultimates-refresh-feedback"
+          data-testid="vendas-refresh-feedback"
           style={{
             fontSize: 12,
             color: feedback.kind === "throttled" ? "var(--color-warning)" : "var(--color-danger)",

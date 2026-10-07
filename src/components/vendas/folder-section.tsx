@@ -251,7 +251,7 @@ export function FolderSection<T extends FolderSectionItem>({
         </div>
       </div>
 
-      {/* Conteúdo expandido: Pills dos ciclos */}
+      {/* Conteúdo expandido: Pills das visualizações */}
       {group.isExpanded && (
         <div style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           {itemCount === 0 ? (
@@ -267,7 +267,7 @@ export function FolderSection<T extends FolderSectionItem>({
                     type="button"
                     aria-pressed={selected}
                     onClick={() => onSelect(item.id)}
-                    data-testid={`ultimates-cycle-option-${item.id}`}
+                    data-testid={`vendas-view-option-${item.id}`}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -291,7 +291,7 @@ export function FolderSection<T extends FolderSectionItem>({
                     <button
                       type="button"
                       onClick={() => onEdit(item)}
-                      data-testid="ultimates-edit-cycle-btn"
+                      data-testid="vendas-edit-view-btn"
                       title={`Editar ${itemNoun}`}
                       aria-label={`Editar ${itemNoun}`}
                       style={{

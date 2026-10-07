@@ -17,7 +17,7 @@ const VIEWS_TABLE = "dash_gestao_vendas_views";
 /**
  * Visualizações do Relatório de Vendas (PRD #185, fatia 2/4).
  * GET: gestor e analista. POST: só gestor. O escopo de leitura é o mesmo de
- * GET /api/vendas/cycles (todas as visualizações; o app tem uma única conta).
+ * a rota antiga de listagem (todas as visualizações; o app tem uma única conta).
  */
 export async function GET() {
   const { error, role } = await requireRole(["gestor", "analista"]);

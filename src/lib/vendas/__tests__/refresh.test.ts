@@ -47,9 +47,9 @@ describe("interpretRefreshResponse", () => {
     expect(outcome).toEqual({ kind: "conflict", message: "refresh em andamento" });
   });
 
-  it("409 com ciclo encerrado repassa a mensagem específica do servidor", () => {
-    const outcome = interpretRefreshResponse(409, { error: "Ciclo encerrado não pode ser atualizado" });
-    expect(outcome).toEqual({ kind: "conflict", message: "Ciclo encerrado não pode ser atualizado" });
+  it("409 repassa a mensagem específica do servidor", () => {
+    const outcome = interpretRefreshResponse(409, { error: "Atualização já em andamento" });
+    expect(outcome).toEqual({ kind: "conflict", message: "Atualização já em andamento" });
   });
 
   it("409 sem corpo de erro usa fallback amigável", () => {

@@ -1,6 +1,5 @@
-// Relatório de Vendas (PRD #185): pastas e visualizações. O modelo de ciclos
-// (compradores, vínculos, roster, aliases Ultimates*) foi removido na fatia 4/4
-// (#190); as tabelas/RPCs antigas só caem na #186.
+// Relatório de Vendas (PRD #185): pastas e visualizações. O modelo antigo foi
+// removido na fatia 4/4 (#190); as tabelas/RPCs antigas só caem na #186.
 
 export interface VendasFolderRecord {
   id: string;

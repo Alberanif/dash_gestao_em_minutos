@@ -9,7 +9,7 @@ import type { FolderSectionGroup } from "../folder-section";
 import type { VendasFolderRecord } from "@/types/vendas";
 
 type Item = { id: string; name: string };
-function mockCycle(id: string, name: string): Item {
+function mockView(id: string, name: string): Item {
   return { id, name };
 }
 
@@ -30,7 +30,7 @@ describe("FolderSection", () => {
       name: "Pasta Teste",
       isUnfolder: false,
       folder: mockFolder("f1", "Pasta Teste"),
-      items: [mockCycle("c1", "Ciclo 1")],
+      items: [mockView("c1", "Visualização 1")],
       isExpanded: false,
     };
 
@@ -55,7 +55,7 @@ describe("FolderSection", () => {
       name: "Pasta Teste",
       isUnfolder: false,
       folder: mockFolder("f1", "Pasta Teste"),
-      items: [mockCycle("c1", "Ciclo 1")],
+      items: [mockView("c1", "Visualização 1")],
       isExpanded: true,
     };
 
@@ -69,7 +69,7 @@ describe("FolderSection", () => {
       />
     );
 
-    const pill = screen.getByTestId("ultimates-cycle-option-c1");
+    const pill = screen.getByTestId("vendas-view-option-c1");
     expect(pill).toBeInTheDocument();
 
     fireEvent.click(pill);

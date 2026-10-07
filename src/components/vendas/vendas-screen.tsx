@@ -31,7 +31,7 @@ type DeleteTarget =
   | { kind: "folder"; folder: VendasFolderRecord };
 
 // Tela do Relatório de Vendas (PRD #185): lista de Visualizações por pasta e o
-// dashboard enxuto da selecionada. Não depende mais do modelo de ciclos.
+// dashboard enxuto da selecionada. Só vendas dos produtos Hotmart.
 export function VendasScreen({ role, products }: VendasScreenProps) {
   const isGestor = role === "gestor";
 
@@ -216,8 +216,8 @@ export function VendasScreen({ role, products }: VendasScreenProps) {
     products.find((p) => p.product_id === view.product_id)?.product_name ?? view.product_id;
 
   return (
-    <div className="dash-dark ult-container">
-      <header className="ult-header">
+    <div className="dash-dark vendas-container">
+      <header className="vendas-header">
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <Link
             href="/"

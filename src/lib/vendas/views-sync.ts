@@ -10,10 +10,7 @@ import type { HotmartCredentials } from "@/types/accounts";
 
 // Sincronização de vendas das Visualizações (PRD #185, fatia 2/4): o "Atualizar
 // agora" e o backfill compartilham a MESMA busca/gravação, para que a invariante
-// "só vendas do produto, gravadas em hotmart_sales, sem materializar compradores"
-// exista em um lugar só. Esta camada NUNCA chama
-// dash_gestao_vendas_sync_buyers_from_sales — visualização conta vendas, não
-// compradores.
+// "só vendas do produto, gravadas em hotmart_sales" exista em um lugar só.
 
 type Supabase = ReturnType<typeof createSupabaseServiceClient>;
 

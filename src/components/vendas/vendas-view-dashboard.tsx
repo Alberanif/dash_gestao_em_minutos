@@ -169,7 +169,7 @@ export function VendasViewDashboard({ view, productName, role, onRangeChange, on
 
   return (
     <div data-testid="view-dashboard" style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      <div className="ult-cycle-head">
+      <div className="vendas-view-head">
         <div style={{ minWidth: 0 }}>
           <h2 data-testid="view-selected-name" style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--text-strong)", margin: 0, overflowWrap: "anywhere" }}>
             {view.name}
@@ -178,7 +178,7 @@ export function VendasViewDashboard({ view, productName, role, onRangeChange, on
             {productName} · {view.offer_codes.length} {view.offer_codes.length === 1 ? "oferta" : "ofertas"}
           </p>
         </div>
-        <div className="ult-cycle-actions">
+        <div className="vendas-view-actions">
           <RefreshControls
             viewId={view.id}
             refreshUrl={`/api/vendas/views/${view.id}/refresh`}
@@ -235,7 +235,7 @@ export function VendasViewDashboard({ view, productName, role, onRangeChange, on
             </div>
           )}
 
-          <div className="ult-kpi-grid">
+          <div className="vendas-kpi-grid">
             <KpiTile
               testId="view-kpi-sales"
               label="Vendas"

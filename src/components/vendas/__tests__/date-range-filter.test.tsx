@@ -8,9 +8,9 @@ const JANELA = { start: "2026-07-10", end: "2026-07-20" };
 
 function inputs() {
   return {
-    start: screen.getByTestId("ultimates-date-start") as HTMLInputElement,
-    end: screen.getByTestId("ultimates-date-end") as HTMLInputElement,
-    apply: screen.getByTestId("ultimates-date-apply"),
+    start: screen.getByTestId("vendas-date-start") as HTMLInputElement,
+    end: screen.getByTestId("vendas-date-end") as HTMLInputElement,
+    apply: screen.getByTestId("vendas-date-apply"),
   };
 }
 
@@ -35,7 +35,7 @@ describe("DateRangeFilter — gestor", () => {
     fireEvent.change(start, { target: { value: "2026-07-10" } });
     fireEvent.click(apply);
 
-    expect(screen.getByTestId("ultimates-date-error")).toHaveTextContent(
+    expect(screen.getByTestId("vendas-date-error")).toHaveTextContent(
       "Preencha as duas datas"
     );
     expect(onSave).not.toHaveBeenCalled();
@@ -50,7 +50,7 @@ describe("DateRangeFilter — gestor", () => {
     fireEvent.change(end, { target: { value: "2026-07-10" } });
     fireEvent.click(apply);
 
-    expect(screen.getByTestId("ultimates-date-error")).toHaveTextContent(
+    expect(screen.getByTestId("vendas-date-error")).toHaveTextContent(
       "A data final não pode ser anterior à inicial"
     );
     expect(onSave).not.toHaveBeenCalled();
@@ -60,30 +60,30 @@ describe("DateRangeFilter — gestor", () => {
     const onSave = jest.fn().mockResolvedValue(true);
     render(<DateRangeFilter value={JANELA} canEdit onSave={onSave} />);
 
-    fireEvent.click(screen.getByTestId("ultimates-date-clear"));
+    fireEvent.click(screen.getByTestId("vendas-date-clear"));
 
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(null));
-    expect((screen.getByTestId("ultimates-date-start") as HTMLInputElement).value).toBe("");
+    expect((screen.getByTestId("vendas-date-start") as HTMLInputElement).value).toBe("");
   });
 
   it("sem janela salva, não oferece Limpar", () => {
     render(<DateRangeFilter value={null} canEdit onSave={jest.fn().mockResolvedValue(true)} />);
-    expect(screen.queryByTestId("ultimates-date-clear")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("vendas-date-clear")).not.toBeInTheDocument();
   });
 
   it("preenche os campos a partir da janela salva", () => {
     render(<DateRangeFilter value={JANELA} canEdit onSave={jest.fn().mockResolvedValue(true)} />);
-    expect((screen.getByTestId("ultimates-date-start") as HTMLInputElement).value).toBe(
+    expect((screen.getByTestId("vendas-date-start") as HTMLInputElement).value).toBe(
       "2026-07-10"
     );
-    expect((screen.getByTestId("ultimates-date-end") as HTMLInputElement).value).toBe(
+    expect((screen.getByTestId("vendas-date-end") as HTMLInputElement).value).toBe(
       "2026-07-20"
     );
   });
 
   it("diz que o período vale para todo mundo — não é filtro pessoal", () => {
     render(<DateRangeFilter value={null} canEdit onSave={jest.fn().mockResolvedValue(true)} />);
-    expect(screen.getByTestId("ultimates-date-scope")).toHaveTextContent(
+    expect(screen.getByTestId("vendas-date-scope")).toHaveTextContent(
       "Vale para todos os usuários"
     );
   });
@@ -97,11 +97,11 @@ describe("DateRangeFilter — gestor", () => {
     fireEvent.change(end, { target: { value: "2026-07-20" } });
     fireEvent.click(apply);
 
-    expect(await screen.findByTestId("ultimates-date-error")).toHaveTextContent(
+    expect(await screen.findByTestId("vendas-date-error")).toHaveTextContent(
       "Não foi possível salvar o período"
     );
     // Quem escolheu duas datas e esbarrou na rede não deve reescolhê-las.
-    expect((screen.getByTestId("ultimates-date-start") as HTMLInputElement).value).toBe(
+    expect((screen.getByTestId("vendas-date-start") as HTMLInputElement).value).toBe(
       "2026-07-10"
     );
   });
@@ -127,8 +127,8 @@ describe("DateRangeFilter — gestor", () => {
     render(
       <DateRangeFilter value={JANELA} canEdit onSave={jest.fn().mockResolvedValue(true)} unavailable />
     );
-    expect(screen.getByTestId("ultimates-date-unavailable")).toHaveTextContent(
-      "os números abaixo são do ciclo inteiro"
+    expect(screen.getByTestId("vendas-date-unavailable")).toHaveTextContent(
+      "os números abaixo são do período inteiro"
     );
   });
 });
@@ -139,13 +139,13 @@ describe("DateRangeFilter — quem não edita", () => {
       <DateRangeFilter value={JANELA} canEdit={false} onSave={jest.fn().mockResolvedValue(true)} />
     );
 
-    expect(screen.getByTestId("ultimates-date-readonly")).toHaveTextContent(
+    expect(screen.getByTestId("vendas-date-readonly")).toHaveTextContent(
       "Período: 10/07/2026 – 20/07/2026"
     );
     expect(screen.getByText("definido pelo gestor")).toBeInTheDocument();
-    expect(screen.queryByTestId("ultimates-date-start")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("ultimates-date-apply")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("ultimates-date-clear")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("vendas-date-start")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("vendas-date-apply")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("vendas-date-clear")).not.toBeInTheDocument();
   });
 
   it("sem janela definida, a barra inteira some", () => {
@@ -164,6 +164,6 @@ describe("DateRangeFilter — quem não edita", () => {
         unavailable
       />
     );
-    expect(screen.getByTestId("ultimates-date-unavailable")).toBeInTheDocument();
+    expect(screen.getByTestId("vendas-date-unavailable")).toBeInTheDocument();
   });
 });

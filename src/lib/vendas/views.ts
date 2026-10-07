@@ -120,13 +120,13 @@ export function totalsMismatch(
 // ── Acumulado (reaproveita as séries do cumulative-chart) ───────────────────
 
 export function buildViewDailyCumulative(rows: VendasViewDailyRow[]): CumulativePoint[] {
-  const adapted: CumulativeDailyRow[] = rows.map((r) => ({ day: r.day, renewals: r.sales, new_buyers: 0 }));
-  return buildCumulativeSeries(adapted, "renovacoes", null);
+  const adapted: CumulativeDailyRow[] = rows.map((r) => ({ day: r.day, sales: r.sales }));
+  return buildCumulativeSeries(adapted, null);
 }
 
 export function buildViewHourlyCumulative(rows: VendasViewHourlyRow[]): CumulativePoint[] {
-  const adapted: CumulativeHourlyRow[] = rows.map((r) => ({ hour: r.hour, renewals: r.sales, new_buyers: 0 }));
-  return buildHourlyCumulativeSeries(adapted, "renovacoes", null);
+  const adapted: CumulativeHourlyRow[] = rows.map((r) => ({ hour: r.hour, sales: r.sales }));
+  return buildHourlyCumulativeSeries(adapted, null);
 }
 
 // ── Backfill ────────────────────────────────────────────────────────────────

@@ -15,10 +15,8 @@ import type { VendasViewRecord } from "@/types/vendas";
 
 /**
  * "Atualizar agora" de uma Visualização (PRD #185, fatia 2/4). Derivada de
- * /cycles/[id]/refresh, MAIS ENXUTA: busca só as vendas do produto da
- * visualização e grava em hotmart_sales. Não materializa compradores
- * (dash_gestao_vendas_sync_buyers_from_sales NÃO é chamada — visualização conta
- * vendas, não compradores).
+ * rota de refresh anterior, MAIS ENXUTA: busca só as vendas do produto da
+ * visualização e grava em hotmart_sales (a visualização só conta vendas).
  *
  * Mantém o contrato de segurança do refresh antigo:
  *  - Throttle de 60s (429 com retryAfterSeconds).

@@ -4,8 +4,8 @@
 //
 // NÃO HÁ MAIS PERSISTÊNCIA NO NAVEGADOR (migration 063). O intervalo era estado
 // de quem olhava, guardado em localStorage sob uma chave global; agora é
-// propriedade do ciclo, guardada em cycles.view_start_date/view_end_date e
-// aplicada igualmente a todo mundo. Quem escreve é o PATCH do ciclo, não este
+// propriedade da visualização (view_start_date/view_end_date), aplicada
+// igualmente a todo mundo. Quem escreve é o PATCH da visualização, não este
 // módulo — se você procura readStoredRange/writeStoredRange, elas foram
 // removidas, não movidas.
 //
@@ -31,20 +31,20 @@ const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 // Única porta de entrada de um DateRange. Devolve null para QUALQUER entrada
 // que não seja um intervalo completo e ordenado — nunca meio intervalo, nunca
 // exceção: os dois chamadores (formulário e localStorage) tratam "não deu" da
-// mesma forma, mostrando o dash do ciclo inteiro.
+// mesma forma, mostrando o dash sem recorte.
 export function parseDateRange(start: string, end: string): DateRange | null {
   if (!ISO_DAY.test(start) || !ISO_DAY.test(end)) return null;
   if (end < start) return null;
   return { start, end };
 }
 
-// Lê a janela que veio do ciclo (cycles.view_start_date/view_end_date). Aceita
+// Lê a janela que veio da visualização (view_start_date/view_end_date). Aceita
 // `unknown` porque isto é a fronteira com o banco: a resposta do PostgREST não
 // é validada em lugar nenhum, e sem a migration 063 aplicada as duas chaves nem
 // existem no objeto.
 //
 // TUDO que não for um par completo e ordenado de "YYYY-MM-DD" vira `null` = sem
-// janela = ciclo inteiro. Isso inclui o caso que o CHECK do banco deveria tornar
+// janela = sem recorte. Isso inclui o caso que o CHECK do banco deveria tornar
 // impossível (uma ponta só): a constraint protege escritas futuras, mas um
 // UPDATE manual no painel do Supabase pode ter precedido a 063, e degradar para
 // "sem janela" é o único desfecho que não inventa uma fronteira.
@@ -59,7 +59,7 @@ export function viewRangeFrom(start: unknown, end: unknown): DateRange | null {
 // formato ISO tem ordem lexicográfica == ordem cronológica — a mesma premissa
 // que buildCumulativeSeries já usa para ordenar.
 //
-// Sem intervalo, TUDO passa: `null` é "ciclo inteiro", não "nada".
+// Sem intervalo, TUDO passa: `null` é "sem recorte", não "nada".
 export function keyInRange(key: string, range: DateRange | null): boolean {
   if (range === null) return true;
   const day = key.slice(0, 10);
