@@ -13,6 +13,15 @@ describe("interpretRefreshResponse", () => {
     expect(outcome).toEqual({ kind: "success", upserted: 12, lastRefreshAt: "2026-07-19T10:00:00Z" });
   });
 
+  it("200 de recuperação de backfill (upserted 0, backfill partial) é success e usa lastRefreshAt", () => {
+    const outcome = interpretRefreshResponse(200, { upserted: 0, backfill: "partial", lastRefreshAt: "2026-07-19T10:00:00Z", view: { last_refresh_at: "x" } });
+    expect(outcome).toEqual({ kind: "success", upserted: 0, lastRefreshAt: "2026-07-19T10:00:00Z" });
+  });
+
+  it("502 de backfill que falhou repassa o erro do servidor", () => {
+    expect(messageOf(interpretRefreshResponse(502, { error: "Hotmart sales API error: 500" }))).toBe("Hotmart sales API error: 500");
+  });
+
   it("200 sem upserted no corpo -> upserted 0", () => {
     const outcome = interpretRefreshResponse(200, {});
     expect(outcome).toEqual({ kind: "success", upserted: 0, lastRefreshAt: null });
