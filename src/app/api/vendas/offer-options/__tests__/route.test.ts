@@ -156,3 +156,26 @@ describe("GET /api/vendas/offer-options", () => {
     expect((await GET(makeRequest("?productIds=p1"))).status).toBe(500);
   });
 });
+
+describe("GET /api/vendas/offer-options?product_id= (Visualizações)", () => {
+  it("devolve só { offers } de UM produto, com sales_count numérico", async () => {
+    mockRpcByName(
+      [{ offer_code: "A", offer_name: "Oferta A", product_id: "p1", product_name: "P", sales_count: "7" }],
+      [{ product_id: "p1", sales_count: 3 }]
+    );
+    const { GET } = await import("../route");
+    const res = await GET(makeRequest("?product_id=p1"));
+
+    expect(await res.json()).toEqual({
+      offers: [{ offer_code: "A", offer_name: "Oferta A", sales_count: 7 }],
+    });
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+    expect(mockRpc).toHaveBeenCalledWith("dash_gestao_vendas_offer_options", { p_product_ids: ["p1"] });
+  });
+
+  it("erro da RPC => 500", async () => {
+    mockRpcByName(null, [], { offers: { message: "boom" } });
+    const { GET } = await import("../route");
+    expect((await GET(makeRequest("?product_id=p1"))).status).toBe(500);
+  });
+});
