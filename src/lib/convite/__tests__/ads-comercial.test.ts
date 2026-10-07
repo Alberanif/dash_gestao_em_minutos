@@ -5,18 +5,18 @@ const mockRpc = jest.fn();
 const mockFrom = jest.fn();
 
 function makeSupabase() {
-  return { rpc: mockRpc, from: mockFrom } as ReturnType<
+  return { rpc: mockRpc, from: mockFrom } as unknown as ReturnType<
     typeof import("@/lib/supabase/server").createSupabaseServiceClient
   >;
 }
 
-const baseConfig: ConviteAdsComercialConfig = {
+const baseConfig = {
   hotmart_account_id: "acc-1",
   hotmart_product_ids: ["prod-1"],
   meta_ads_account_ids: ["meta-1"],
   campaign_terms: ["term1"],
   organic_lead_events: ["Inscricao Webinar"],
-};
+} as ConviteAdsComercialConfig;
 
 const baseProject = {
   id: "proj-1",

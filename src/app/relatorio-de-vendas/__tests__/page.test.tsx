@@ -1,4 +1,4 @@
-import type { UltimatesScreen } from "@/components/vendas/relatorio-de-vendas-screen";
+import type { VendasScreen } from "@/components/vendas/vendas-screen";
 
 // UltimatesPage é Server Component assíncrono: não passa por render() do
 // Testing Library (que não resolve Server Components), então chamamos a
@@ -55,7 +55,7 @@ describe("UltimatesPage — query de produtos alimenta a trava de conta", () => 
 
     // E precisa mesmo chegar até a tela, não só na query.
     const screenElement = element as unknown as {
-      type: typeof UltimatesScreen;
+      type: typeof VendasScreen;
       props: { products: { product_id: string; account_id: string }[] };
     };
     expect(screenElement.props.products).toEqual(

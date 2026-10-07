@@ -26,8 +26,8 @@ const mockFrom = jest.fn();
 
 function makeSupabase() {
   mockInsert.mockResolvedValue({ error: null });
-  mockEq.mockReturnValue({ eq: mockEq2 });
   const mockEq2 = jest.fn().mockResolvedValue({ data: [], error: null });
+  mockEq.mockReturnValue({ eq: mockEq2 });
   mockSelect.mockReturnValue({ eq: mockEq });
   mockFrom.mockImplementation((table: string) => {
     if (table === "dash_gestao_cron_logs") {
