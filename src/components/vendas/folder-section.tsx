@@ -1,31 +1,54 @@
 "use client";
 
 import { useState } from "react";
-import type { CycleGroup } from "@/lib/vendas/group-cycles";
-import type { CycleWithProducts } from "./types";
 import type { VendasFolderRecord } from "@/types/vendas";
 
-interface FolderSectionProps {
-  group: CycleGroup;
+// Item mínimo que a seção sabe desenhar. Serve ao modelo antigo (ciclos, com
+// `status`) e às Visualizações (sem status), por isso o genérico.
+export interface FolderSectionItem {
+  id: string;
+  name: string;
+  status?: string;
+}
+
+export interface FolderSectionGroup<T extends FolderSectionItem> {
+  id: string;
+  name: string;
+  isUnfolder: boolean;
+  folder?: VendasFolderRecord;
+  // Nome herdado do CycleGroup; guarda as visualizações no modelo novo.
+  cycles: T[];
+  isExpanded: boolean;
+}
+
+interface FolderSectionProps<T extends FolderSectionItem> {
+  group: FolderSectionGroup<T>;
   selectedCycleId: string | null;
   isGestor: boolean;
+  // Substantivo do item, no singular. Padrão "ciclo" (modelo antigo).
+  itemNoun?: string;
   onSelectCycle: (cycleId: string) => void;
-  onEditCycle?: (cycle: CycleWithProducts) => void;
+  onEditCycle?: (cycle: T) => void;
   onToggleExpand: (groupId: string) => void;
   onRenameFolder?: (folder: VendasFolderRecord) => void;
   onDeleteFolder?: (folder: VendasFolderRecord) => void;
 }
 
-export function FolderSection({
+function pluralize(noun: string): string {
+  return noun.endsWith("ão") ? `${noun.slice(0, -2)}ões` : `${noun}s`;
+}
+
+export function FolderSection<T extends FolderSectionItem>({
   group,
   selectedCycleId,
   isGestor,
+  itemNoun = "ciclo",
   onSelectCycle,
   onEditCycle,
   onToggleExpand,
   onRenameFolder,
   onDeleteFolder,
-}: FolderSectionProps) {
+}: FolderSectionProps<T>) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const cycleCount = group.cycles.length;
@@ -97,7 +120,7 @@ export function FolderSection({
               color: "var(--text-muted, #a1a1aa)",
             }}
           >
-            {cycleCount} {cycleCount === 1 ? "ciclo" : "ciclos"}
+            {cycleCount} {cycleCount === 1 ? itemNoun : pluralize(itemNoun)}
           </span>
         </div>
 
@@ -236,7 +259,7 @@ export function FolderSection({
         <div style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           {cycleCount === 0 ? (
             <span style={{ fontSize: 12, color: "var(--text-muted, #71717a)", fontStyle: "italic" }}>
-              Nenhum ciclo nesta pasta
+              Nenhum{itemNoun === "ciclo" ? "" : "a"} {itemNoun} nesta pasta
             </span>
           ) : (
             group.cycles.map((cycle) => {
@@ -286,8 +309,8 @@ export function FolderSection({
                       type="button"
                       onClick={() => onEditCycle(cycle)}
                       data-testid="ultimates-edit-cycle-btn"
-                      title="Editar ciclo"
-                      aria-label="Editar ciclo"
+                      title={`Editar ${itemNoun}`}
+                      aria-label={`Editar ${itemNoun}`}
                       style={{
                         display: "flex",
                         alignItems: "center",

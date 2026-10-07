@@ -9,6 +9,7 @@ import {
   THROTTLE_MS,
   LOCK_TTL_MS,
   REFRESH_LOOKBACK_DAYS,
+  runBackfill,
 } from "@/lib/vendas/views-sync";
 import type { VendasViewRecord } from "@/types/vendas";
 
@@ -29,6 +30,13 @@ import type { VendasViewRecord } from "@/types/vendas";
  *
  * Janela: últimos REFRESH_LOOKBACK_DAYS dias (respeitando view_start_date se for
  * mais recente). O histórico anterior é do backfill.
+ *
+ * RECUPERAÇÃO DE BACKFILL: o refresh incremental não cobre o histórico, então se
+ * backfill_status for failed/pending/partial — ou running ÓRFÃO (updated_at mais
+ * velho que LOCK_TTL_MS: o processo que o iniciou morreu) — o "Atualizar agora"
+ * roda o backfill COMPLETO (runBackfill, todas as ofertas) no lugar do
+ * incremental, sob o mesmo throttle/lock/orçamento. É o que dá sentido ao botão
+ * "Tentar novamente" da UI. Um running NÃO órfão devolve 409 (há um backfill vivo).
  */
 export const maxDuration = 60;
 
@@ -46,7 +54,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<P
 
   const { data: found, error: viewErr } = await supabase
     .from(VIEWS_TABLE)
-    .select("id, account_id, product_id, view_start_date, last_refresh_at")
+    .select(
+      "id, account_id, product_id, offer_codes, view_start_date, last_refresh_at, backfill_status, updated_at"
+    )
     .eq("id", id)
     .single();
 
@@ -55,10 +65,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<P
   }
   const view = found as Pick<
     VendasViewRecord,
-    "id" | "account_id" | "product_id" | "view_start_date" | "last_refresh_at"
+    | "id"
+    | "account_id"
+    | "product_id"
+    | "offer_codes"
+    | "view_start_date"
+    | "last_refresh_at"
+    | "backfill_status"
+    | "updated_at"
   >;
 
   const now = new Date();
+
+  const runningAlive =
+    view.backfill_status === "running" &&
+    now.getTime() - new Date(view.updated_at).getTime() < LOCK_TTL_MS;
+  if (runningAlive) {
+    return NextResponse.json({ error: "backfill em andamento" }, { status: 409 });
+  }
+  // failed | pending | partial | running órfão => refaz o backfill completo.
+  const needsBackfill = view.backfill_status !== "done";
 
   if (view.last_refresh_at) {
     const elapsedMs = now.getTime() - new Date(view.last_refresh_at).getTime();
@@ -89,6 +115,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<P
   }
 
   try {
+    if (needsBackfill) {
+      const outcome = await runBackfill({
+        supabase,
+        view,
+        offerCodes: view.offer_codes,
+        now,
+        budgetMs: REFRESH_BUDGET_MS,
+        signal: request.signal,
+      });
+      if (outcome.status === "failed") {
+        return NextResponse.json(
+          { error: outcome.error ?? "Falha ao refazer o histórico da visualização" },
+          { status: 502 }
+        );
+      }
+      const lastRefreshAt = new Date().toISOString();
+      return NextResponse.json({
+        upserted: 0,
+        backfill: outcome.status,
+        lastRefreshAt,
+        view: await readView(supabase, id, lastRefreshAt),
+      });
+    }
+
     const deadline = AbortSignal.any([request.signal, AbortSignal.timeout(REFRESH_BUDGET_MS)]);
 
     const accessToken = await getHotmartAccessToken(supabase, view.account_id, deadline);

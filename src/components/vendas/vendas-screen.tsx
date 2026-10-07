@@ -1,58 +1,70 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { UserRole } from "@/types/auth";
-import { selectInitialCycleId } from "@/lib/vendas/select-initial-cycle";
-import { groupCyclesByFolder } from "@/lib/vendas/group-cycles";
+import type { VendasFolderRecord, VendasViewRecord } from "@/types/vendas";
+import type { DateRange } from "@/lib/vendas/date-range";
+import { groupViewsByFolder, selectInitialViewId } from "@/lib/vendas/views";
 import { FolderSection } from "./folder-section";
 import { FolderFormModal } from "./folder-form-modal";
-import { VendasDashboard } from "./vendas-dashboard";
-import { CycleFormModal } from "./cycle-form-modal";
-import type { SetProductsResult, VendasFolderRecord } from "@/types/vendas";
-import type { DateRange } from "@/lib/vendas/date-range";
-import type { CycleWithProducts, HotmartProductOption } from "./types";
+import { ConfirmDialog } from "./confirm-dialog";
+import { ViewFormModal } from "./view-form-modal";
+import { VendasViewDashboard } from "./vendas-view-dashboard";
+import type { HotmartProductOption } from "./types";
 
 interface VendasScreenProps {
   role: UserRole;
   products: HotmartProductOption[];
 }
 
+interface UnmigratedCycle {
+  id: string;
+  name: string;
+}
+
+// Enquanto o histórico é coletado a tela relê a visualização neste intervalo.
+const BACKFILL_POLL_MS = 5000;
+
+type DeleteTarget =
+  | { kind: "view"; view: VendasViewRecord }
+  | { kind: "folder"; folder: VendasFolderRecord };
+
+// Tela do Relatório de Vendas (PRD #185): lista de Visualizações por pasta e o
+// dashboard enxuto da selecionada. Não depende mais do modelo de ciclos.
 export function VendasScreen({ role, products }: VendasScreenProps) {
   const isGestor = role === "gestor";
 
-  const [cycles, setCycles] = useState<CycleWithProducts[] | null>(null);
+  const [views, setViews] = useState<VendasViewRecord[] | null>(null);
+  const [unmigrated, setUnmigrated] = useState<UnmigratedCycle[]>([]);
   const [folders, setFolders] = useState<VendasFolderRecord[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<CycleWithProducts | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
-  // Estados de gestão de pasta
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<VendasViewRecord | null>(null);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [editFolderTarget, setEditFolderTarget] = useState<VendasFolderRecord | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [expandedOverride, setExpandedOverride] = useState<Record<string, boolean>>({});
-
-  const [productsNotice, setProductsNotice] = useState<SetProductsResult | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoadError(false);
       try {
-        const [cyclesRes, foldersRes] = await Promise.all([
-          fetch("/api/vendas/cycles"),
+        const [viewsRes, foldersRes] = await Promise.all([
+          fetch("/api/vendas/views"),
           fetch("/api/vendas/folders").catch(() => null),
         ]);
-
-        if (!cyclesRes.ok) {
+        if (!viewsRes.ok) {
           if (!cancelled) setLoadError(true);
           return;
         }
-
-        const cyclesData = await cyclesRes.json();
-        const list: CycleWithProducts[] = Array.isArray(cyclesData?.cycles) ? cyclesData.cycles : [];
+        const viewsData = await viewsRes.json();
+        const list: VendasViewRecord[] = Array.isArray(viewsData?.views) ? viewsData.views : [];
+        const pending: UnmigratedCycle[] = Array.isArray(viewsData?.unmigrated_cycles) ? viewsData.unmigrated_cycles : [];
 
         let fetchedFolders: VendasFolderRecord[] = [];
         if (foldersRes && foldersRes.ok) {
@@ -61,9 +73,10 @@ export function VendasScreen({ role, products }: VendasScreenProps) {
         }
 
         if (cancelled) return;
-        setCycles(list);
+        setViews(list);
+        setUnmigrated(pending);
         setFolders(fetchedFolders);
-        setSelectedId((prev) => (prev && list.some((c) => c.id === prev) ? prev : selectInitialCycleId(list)));
+        setSelectedId((prev) => (prev && list.some((v) => v.id === prev) ? prev : selectInitialViewId(list)));
       } catch {
         if (!cancelled) setLoadError(true);
       }
@@ -74,145 +87,133 @@ export function VendasScreen({ role, products }: VendasScreenProps) {
     };
   }, [reloadToken]);
 
-  async function handleCreated(created: CycleWithProducts) {
-    setCycles((prev) => [created, ...(prev ?? [])]);
-    setSelectedId(created.id);
-    setCreateOpen(false);
+  const selectedView =
+    views && views.length > 0 ? views.find((v) => v.id === selectedId) ?? views[0] : null;
+
+  const replaceView = useCallback((updated: VendasViewRecord) => {
+    setViews((prev) => (prev ?? []).map((v) => (v.id === updated.id ? updated : v)));
+  }, []);
+
+  // Relê só a visualização selecionada (estado de backfill, last_refresh_at).
+  const refetchView = useCallback(
+    async (id: string) => {
+      try {
+        const res = await fetch(`/api/vendas/views/${id}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data?.view) replaceView(data.view as VendasViewRecord);
+      } catch {
+        // Silencioso: a próxima leitura (poll ou ação do usuário) tenta de novo.
+      }
+    },
+    [replaceView]
+  );
+
+  const backfillActive = selectedView?.backfill_status === "pending" || selectedView?.backfill_status === "running";
+  const selectedViewId = selectedView?.id ?? null;
+  useEffect(() => {
+    if (!backfillActive || !selectedViewId) return;
+    const timer = setInterval(() => {
+      void refetchView(selectedViewId);
+    }, BACKFILL_POLL_MS);
+    return () => clearInterval(timer);
+  }, [backfillActive, selectedViewId, refetchView]);
+
+  function handleSaved(view: VendasViewRecord, mode: "created" | "edited") {
+    if (mode === "created") {
+      setViews((prev) => [view, ...(prev ?? [])]);
+      setSelectedId(view.id);
+      setCreateOpen(false);
+    } else {
+      replaceView(view);
+      setEditTarget(null);
+    }
   }
 
-  async function handleEdited(updated: CycleWithProducts, notice?: SetProductsResult | null) {
-    setCycles((prev) => (prev ?? []).map((c) => (c.id === updated.id ? updated : c)));
-    setEditTarget(null);
-    if (notice) setProductsNotice(notice);
-    if (notice) setReloadToken((t) => t + 1);
+  async function handleRangeChange(range: DateRange | null): Promise<boolean> {
+    if (!selectedView) return false;
+    try {
+      const res = await fetch(`/api/vendas/views/${selectedView.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          view_start_date: range?.start ?? null,
+          view_end_date: range?.end ?? null,
+        }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (!data?.view) return false;
+      replaceView(data.view as VendasViewRecord);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
-  async function handleDeleted(deletedId: string) {
-    const next = (cycles ?? []).filter((c) => c.id !== deletedId);
-    setCycles(next);
-    setSelectedId((current) =>
-      current && next.some((c) => c.id === current) ? current : selectInitialCycleId(next)
-    );
-    setEditTarget(null);
-  }
-
-  // Handlers do CRUD de Pastas
   async function handleCreateFolder(name: string) {
     const res = await fetch("/api/vendas/folders", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name }),
     });
-
     const data = await res.json().catch(() => null);
-    if (!res.ok) {
-      throw new Error(data?.error ?? "Erro ao criar pasta");
-    }
-
-    const created: VendasFolderRecord = data.folder;
-    setFolders((prev) => [...prev, created]);
+    if (!res.ok) throw new Error(data?.error ?? "Erro ao criar pasta");
+    setFolders((prev) => [...prev, data.folder as VendasFolderRecord]);
     setCreateFolderOpen(false);
   }
 
   async function handleRenameFolder(name: string) {
     if (!editFolderTarget) return;
-
     const res = await fetch(`/api/vendas/folders/${editFolderTarget.id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name }),
     });
-
     const data = await res.json().catch(() => null);
-    if (!res.ok) {
-      throw new Error(data?.error ?? "Erro ao renomear pasta");
-    }
-
+    if (!res.ok) throw new Error(data?.error ?? "Erro ao renomear pasta");
     const updated: VendasFolderRecord = data.folder;
     setFolders((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
     setEditFolderTarget(null);
   }
 
-  async function handleDeleteFolder(folder: VendasFolderRecord) {
-    if (!confirm(`Deseja realmente deletar a pasta "${folder.name}"? Os ciclos desta pasta retornarão para "Sem pasta".`)) {
-      return;
-    }
+  // Exclusão confirmada no diálogo próprio. Lança Error para o diálogo exibir
+  // a mensagem da API e permanecer aberto.
+  async function confirmDelete() {
+    if (!deleteTarget) return;
 
-    const res = await fetch(`/api/vendas/folders/${folder.id}`, { method: "DELETE" });
-    if (!res.ok) {
-      const data = await res.json().catch(() => null);
-      alert(data?.error ?? "Erro ao deletar pasta");
-      return;
+    if (deleteTarget.kind === "view") {
+      const { view } = deleteTarget;
+      const res = await fetch(`/api/vendas/views/${view.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? "Erro ao excluir a visualização");
+      }
+      const next = (views ?? []).filter((v) => v.id !== view.id);
+      setViews(next);
+      setSelectedId((cur) => (cur && next.some((v) => v.id === cur) ? cur : selectInitialViewId(next)));
+      setEditTarget(null);
+    } else {
+      const { folder } = deleteTarget;
+      const res = await fetch(`/api/vendas/folders/${folder.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? "Erro ao deletar pasta");
+      }
+      setFolders((prev) => prev.filter((f) => f.id !== folder.id));
+      setViews((prev) => (prev ?? []).map((v) => (v.folder_id === folder.id ? { ...v, folder_id: null } : v)));
     }
-
-    setFolders((prev) => prev.filter((f) => f.id !== folder.id));
-    setCycles((prev) =>
-      (prev ?? []).map((c) => (c.folder_id === folder.id ? { ...c, folder_id: null } : c))
-    );
+    setDeleteTarget(null);
   }
 
-  async function handleCountsNewBuyersChange(cycleId: string, value: boolean): Promise<boolean> {
-    const previous = (cycles ?? []).find((c) => c.id === cycleId)?.counts_new_buyers ?? true;
-
-    setCycles((prev) =>
-      (prev ?? []).map((c) => (c.id === cycleId ? { ...c, counts_new_buyers: value } : c))
-    );
-
-    try {
-      const res = await fetch(`/api/vendas/cycles/${cycleId}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ countsNewBuyers: value }),
-      });
-      if (!res.ok) throw new Error("patch falhou");
-      return true;
-    } catch {
-      setCycles((prev) =>
-        (prev ?? []).map((c) => (c.id === cycleId ? { ...c, counts_new_buyers: previous } : c))
-      );
-      return false;
-    }
-  }
-
-  async function handleViewRangeChange(
-    cycleId: string,
-    range: DateRange | null
-  ): Promise<boolean> {
-    try {
-      const res = await fetch(`/api/vendas/cycles/${cycleId}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          viewStartDate: range?.start ?? null,
-          viewEndDate: range?.end ?? null,
-        }),
-      });
-      if (!res.ok) return false;
-      const data = await res.json();
-      const updated = data?.cycle as CycleWithProducts | undefined;
-      if (!updated) return false;
-      setCycles((prev) =>
-        (prev ?? []).map((c) =>
-          c.id === cycleId ? { ...updated, products: c.products } : c
-        )
-      );
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  const selectedCycle =
-    cycles && cycles.length > 0
-      ? cycles.find((c) => c.id === selectedId) ?? cycles[0]
-      : null;
-
-  // Calcula os grupos de ciclo por pasta
-  const rawGroups = groupCyclesByFolder(cycles ?? [], folders, selectedCycle?.id ?? null);
-  const groups = rawGroups.map((g) => ({
+  const groups = groupViewsByFolder(views ?? [], folders, selectedView?.id ?? null).map((g) => ({
     ...g,
     isExpanded: expandedOverride[g.id] ?? g.isExpanded,
   }));
+
+  const hasViews = Boolean(views && views.length > 0);
+  const productName = (view: VendasViewRecord) =>
+    products.find((p) => p.product_id === view.product_id)?.product_name ?? view.product_id;
 
   return (
     <div className="dash-dark ult-container">
@@ -234,171 +235,107 @@ export function VendasScreen({ role, products }: VendasScreenProps) {
         </div>
 
         {isGestor && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button
-              onClick={() => setCreateFolderOpen(true)}
-              data-testid="vendas-new-folder-btn"
-              style={{
-                padding: "8px 14px",
-                fontSize: 13,
-                fontWeight: 500,
-                borderRadius: "var(--radius-sm, 6px)",
-                border: "1px solid var(--border-vis, rgba(255,255,255,0.15))",
-                background: "var(--surface, rgba(255,255,255,0.05))",
-                color: "var(--text-strong, #fff)",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" className="btn-secondary" onClick={() => setCreateFolderOpen(true)} data-testid="vendas-new-folder-btn">
               + Nova pasta
             </button>
-
-            {cycles && cycles.length > 0 && (
-              <button
-                onClick={() => setCreateOpen(true)}
-                className="btn-primary"
-                data-testid="ultimates-new-cycle-btn"
-              >
-                + Novo ciclo
-              </button>
-            )}
+            <button type="button" className="btn-primary" onClick={() => setCreateOpen(true)} data-testid="vendas-new-view-btn">
+              + Nova visualização
+            </button>
           </div>
         )}
       </header>
 
-      {/* Modais de ciclo e pasta */}
       {createOpen && isGestor && (
-        <CycleFormModal
-          products={products}
-          folders={folders}
-          onSave={handleCreated}
-          onCancel={() => setCreateOpen(false)}
-        />
+        <ViewFormModal products={products} folders={folders} onSaved={handleSaved} onCancel={() => setCreateOpen(false)} />
       )}
 
       {editTarget && isGestor && (
-        <CycleFormModal
+        <ViewFormModal
           products={products}
           folders={folders}
           editTarget={editTarget}
-          onSave={handleEdited}
+          onSaved={handleSaved}
           onCancel={() => setEditTarget(null)}
-          onDelete={handleDeleted}
+          onRequestDelete={(view) => setDeleteTarget({ kind: "view", view })}
         />
       )}
 
       {createFolderOpen && isGestor && (
-        <FolderFormModal
-          onSave={handleCreateFolder}
-          onCancel={() => setCreateFolderOpen(false)}
-        />
+        <FolderFormModal onSave={handleCreateFolder} onCancel={() => setCreateFolderOpen(false)} />
       )}
 
       {editFolderTarget && isGestor && (
-        <FolderFormModal
-          folderTarget={editFolderTarget}
-          onSave={handleRenameFolder}
-          onCancel={() => setEditFolderTarget(null)}
+        <FolderFormModal folderTarget={editFolderTarget} onSave={handleRenameFolder} onCancel={() => setEditFolderTarget(null)} />
+      )}
+
+      {deleteTarget && isGestor && (
+        <ConfirmDialog
+          title={deleteTarget.kind === "view" ? "Excluir visualização" : "Deletar pasta"}
+          message={
+            deleteTarget.kind === "view"
+              ? `Excluir a visualização "${deleteTarget.view.name}"? As vendas coletadas da Hotmart não são apagadas, mas esta configuração será removida e não pode ser desfeita.`
+              : `Deletar a pasta "${deleteTarget.folder.name}"? As visualizações desta pasta voltarão para "Sem pasta".`
+          }
+          confirmLabel={deleteTarget.kind === "view" ? "Excluir" : "Deletar"}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTarget(null)}
         />
       )}
 
-      {/* Notice de alteração de produtos */}
-      {productsNotice && (
+      {isGestor && unmigrated.length > 0 && (
         <div
           role="status"
-          data-testid="ultimates-products-notice"
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            gap: 12,
-            fontSize: 12,
-            color: "var(--text-muted)",
-            margin: "0 0 16px",
-            padding: "10px 12px",
-            borderRadius: "var(--radius-sm)",
-            border: "1px solid var(--border-vis)",
-            background: "var(--surface)",
-            lineHeight: 1.5,
-          }}
+          data-testid="vendas-unmigrated-notice"
+          title={unmigrated.map((c) => c.name).join(", ")}
+          style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 16px", padding: "10px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-vis)", background: "var(--surface)", lineHeight: 1.5 }}
         >
-          <span>
-            Produtos do ciclo atualizados: {productsNotice.products_added} adicionado(s),{" "}
-            {productsNotice.products_removed} removido(s).
-            {productsNotice.buyers_removed > 0 &&
-              ` ${productsNotice.buyers_removed} comprador(es) saíram do roster por não terem mais compra nos produtos do ciclo.`}
-            {productsNotice.buyers_materialized > 0 &&
-              ` ${productsNotice.buyers_materialized} comprador(es) entraram a partir das compras já coletadas.`}
-            {productsNotice.products_added > 0 &&
-              " Compras ainda não coletadas entram no próximo Atualizar agora."}
-          </span>
-          <button
-            type="button"
-            data-testid="ultimates-products-notice-dismiss"
-            onClick={() => setProductsNotice(null)}
-            style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", fontSize: 13 }}
-          >
-            ✕
-          </button>
+          {unmigrated.length} {unmigrated.length === 1 ? "ciclo antigo não foi migrado" : "ciclos antigos não foram migrados"} por falta de ofertas configuradas.
         </div>
       )}
 
-      {/* Conteúdo de Erro ou Vazio */}
       {loadError && (
         <div style={{ textAlign: "center", padding: 48, color: "#ef4444" }}>
           <p style={{ margin: 0, fontSize: 14 }}>Falha ao carregar os dados.</p>
-          <button
-            onClick={() => setReloadToken((t) => t + 1)}
-            style={{ marginTop: 12, padding: "6px 14px", fontSize: 12, cursor: "pointer" }}
-          >
+          <button type="button" className="btn-secondary" onClick={() => setReloadToken((t) => t + 1)} style={{ marginTop: 12 }}>
             Tentar novamente
           </button>
         </div>
       )}
 
-      {cycles && cycles.length === 0 && !loadError && (
+      {views && !hasViews && !loadError && (
         <div
-          data-testid="ultimates-empty-state"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "72px 24px",
-            gap: 16,
-            textAlign: "center",
-          }}
+          data-testid="vendas-empty-state"
+          style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "72px 24px", gap: 16, textAlign: "center" }}
         >
           <p style={{ fontSize: 15, fontWeight: 600, color: "var(--text-strong)", margin: 0 }}>
-            Nenhum ciclo criado ainda
+            Nenhuma visualização criada ainda
           </p>
           <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0, maxWidth: 380, lineHeight: 1.6 }}>
             {isGestor
-              ? "Crie o primeiro ciclo de renovação para acompanhar recompra, receita e roster de compradores."
-              : "Assim que um gestor criar o primeiro ciclo de renovação, ele aparecerá aqui."}
+              ? "Crie a primeira visualização para acompanhar a quantidade de vendas de um produto e de suas ofertas."
+              : "Assim que um gestor criar a primeira visualização, ela aparecerá aqui."}
           </p>
           {isGestor && (
-            <button onClick={() => setCreateOpen(true)} className="btn-primary" data-testid="ultimates-create-cta">
-              Criar ciclo
+            <button type="button" onClick={() => setCreateOpen(true)} className="btn-primary" data-testid="vendas-create-cta">
+              Criar visualização
             </button>
           )}
         </div>
       )}
 
-      {/* Lista de seções por pasta com a fileira de ciclo */}
-      {cycles && cycles.length > 0 && (
+      {hasViews && (
         <>
-          <div data-testid="ultimates-cycle-selector" style={{ marginBottom: 24 }}>
+          <div data-testid="vendas-view-selector" style={{ marginBottom: 24 }}>
             {groups.map((group) => (
               <FolderSection
                 key={group.id}
                 group={group}
-                selectedCycleId={selectedCycle?.id ?? null}
+                itemNoun="visualização"
+                selectedCycleId={selectedView?.id ?? null}
                 isGestor={isGestor}
-                onSelectCycle={(cycleId) => setSelectedId(cycleId)}
-                onEditCycle={(cycle) => setEditTarget(cycle)}
+                onSelectCycle={(id) => setSelectedId(id)}
+                onEditCycle={(view) => setEditTarget(view)}
                 onToggleExpand={(groupId) =>
                   setExpandedOverride((prev) => ({
                     ...prev,
@@ -406,18 +343,19 @@ export function VendasScreen({ role, products }: VendasScreenProps) {
                   }))
                 }
                 onRenameFolder={(folder) => setEditFolderTarget(folder)}
-                onDeleteFolder={handleDeleteFolder}
+                onDeleteFolder={(folder) => setDeleteTarget({ kind: "folder", folder })}
               />
             ))}
           </div>
 
-          {selectedCycle && (
-            <VendasDashboard
-              cycle={selectedCycle}
+          {selectedView && (
+            <VendasViewDashboard
+              key={selectedView.id}
+              view={selectedView}
+              productName={productName(selectedView)}
               role={role}
-              onCountsNewBuyersChange={handleCountsNewBuyersChange}
-              onViewRangeChange={handleViewRangeChange}
-              onConfigureOffers={isGestor ? () => setEditTarget(selectedCycle) : undefined}
+              onRangeChange={handleRangeChange}
+              onViewChanged={() => void refetchView(selectedView.id)}
             />
           )}
         </>
@@ -425,5 +363,3 @@ export function VendasScreen({ role, products }: VendasScreenProps) {
     </div>
   );
 }
-
-export { VendasScreen as UltimatesScreen };

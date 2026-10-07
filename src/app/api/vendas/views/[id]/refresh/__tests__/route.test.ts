@@ -21,7 +21,8 @@ let upsertError: { message: string } | null;
 
 const VIEW = {
   id: "view-1", account_id: "acc-1", product_id: "prod-99", view_start_date: null,
-  last_refresh_at: null, name: "V", offer_codes: ["A"],
+  last_refresh_at: null, name: "V", offer_codes: ["A", "B"],
+  backfill_status: "done", updated_at: "2020-01-01T00:00:00.000Z",
 };
 
 beforeEach(() => {
@@ -160,5 +161,63 @@ describe("POST /views/[id]/refresh", () => {
     const res = await call();
     expect(res.status).toBe(502);
     expect(viewUpdates().at(-1)!.payload).toMatchObject({ refresh_started_at: null });
+  });
+
+  describe("recuperação de backfill", () => {
+    const salesCalls = () => (global.fetch as jest.Mock).mock.calls.slice(1);
+    const backfillStatusWrites = () =>
+      viewUpdates().filter((c) => c.payload && "backfill_status" in (c.payload as object));
+
+    it.each(["failed", "pending", "partial"])("%s => refaz o backfill completo (todas as ofertas, histórico todo)", async (st) => {
+      viewRow = { ...VIEW, backfill_status: st, view_start_date: new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10) };
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: "tok" }), text: async () => "" })
+        .mockResolvedValue({ ok: true, json: async () => ({ items: [], page_info: {} }), text: async () => "" });
+      const res = await call();
+      expect(res.status).toBe(200);
+      const offers = salesCalls().map(([u]) => new URL(String(u)).searchParams.get("offer_code"));
+      expect(offers).toEqual(["A", "B"]); // allowlist inteira, não só a janela de 30 dias
+      expect(backfillStatusWrites().map((c) => (c.payload as { backfill_status: string }).backfill_status)).toEqual(["running", "done"]);
+      expect(viewUpdates().at(-1)!.payload).toMatchObject({ refresh_started_at: null });
+    });
+
+    it("running órfão (updated_at antigo) é recuperado", async () => {
+      viewRow = { ...VIEW, backfill_status: "running", updated_at: new Date(Date.now() - 10 * 60_000).toISOString() };
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: "tok" }), text: async () => "" })
+        .mockResolvedValue({ ok: true, json: async () => ({ items: [], page_info: {} }), text: async () => "" });
+      expect((await call()).status).toBe(200);
+      expect(backfillStatusWrites().length).toBeGreaterThan(0);
+    });
+
+    it("running vivo => 409 sem lock nem Hotmart", async () => {
+      viewRow = { ...VIEW, backfill_status: "running", updated_at: new Date(Date.now() - 5_000).toISOString() };
+      expect((await call()).status).toBe(409);
+      expect(viewUpdates()).toHaveLength(0);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it("done continua no incremental (sem escrita de backfill_status)", async () => {
+      mockHotmart();
+      await call();
+      expect(backfillStatusWrites()).toHaveLength(0);
+    });
+
+    it("backfill que falha => 502 e lock liberado", async () => {
+      viewRow = { ...VIEW, backfill_status: "failed" };
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: "tok" }), text: async () => "" })
+        .mockResolvedValue({ ok: false, status: 500, text: async () => "boom" });
+      const res = await call();
+      expect(res.status).toBe(502);
+      expect(viewUpdates().at(-1)!.payload).toMatchObject({ refresh_started_at: null });
+    });
+
+    it("respeita o lock: 409 quando perde, sem backfill", async () => {
+      viewRow = { ...VIEW, backfill_status: "failed" };
+      lockCount = 0;
+      expect((await call()).status).toBe(409);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
   });
 });

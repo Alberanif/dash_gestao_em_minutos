@@ -6,7 +6,10 @@ import { interpretRefreshResponse, formatRefreshedAgo, type RefreshOutcome } fro
 
 interface RefreshControlsProps {
   cycleId: string;
-  cycleStatus: UltimatesCycleStatus;
+  // Ausente nas Visualizações (não têm status e nunca encerram).
+  cycleStatus?: UltimatesCycleStatus;
+  // Padrão: rota do ciclo. Visualizações passam /api/vendas/views/[id]/refresh.
+  refreshUrl?: string;
   lastRefreshAt: string | null;
   // Sucesso ⇒ o pai recarrega roster/daily (a fonte de KPIs/gráfico/tabela).
   onRefreshed: () => void;
@@ -16,7 +19,7 @@ interface RefreshControlsProps {
 // POST /api/vendas/cycles/[id]/refresh — a interpretação da resposta
 // (throttle/lock/sucesso) fica em src/lib/ultimates/refresh.ts, testável
 // sem DOM; este componente só orquestra fetch + estado de UI.
-export function RefreshControls({ cycleId, cycleStatus, lastRefreshAt, onRefreshed }: RefreshControlsProps) {
+export function RefreshControls({ cycleId, cycleStatus, refreshUrl, lastRefreshAt, onRefreshed }: RefreshControlsProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [feedback, setFeedback] = useState<RefreshOutcome | null>(null);
   const [localLastRefreshAt, setLocalLastRefreshAt] = useState(lastRefreshAt);
@@ -34,7 +37,7 @@ export function RefreshControls({ cycleId, cycleStatus, lastRefreshAt, onRefresh
     setRefreshing(true);
     setFeedback(null);
     try {
-      const res = await fetch(`/api/vendas/cycles/${cycleId}/refresh`, { method: "POST" });
+      const res = await fetch(refreshUrl ?? `/api/vendas/cycles/${cycleId}/refresh`, { method: "POST" });
       const body = await res.json().catch(() => ({}));
       const outcome = interpretRefreshResponse(res.status, body);
       setFeedback(outcome);
