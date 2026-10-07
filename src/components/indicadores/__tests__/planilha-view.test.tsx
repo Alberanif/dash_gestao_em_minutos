@@ -135,16 +135,16 @@ describe("PlanilhaView — valores e formatação", () => {
     expect(within(roas).getAllByText("2.00×")).toHaveLength(4);
 
     const receita = rowByName(/Receita BRL/);
-    expect(within(receita).getByText("R$ 1.200")).toBeInTheDocument();
-    expect(within(receita).getByText("R$ 600")).toBeInTheDocument();
+    expect(within(receita).getByText("R$ 1.200,00")).toBeInTheDocument();
+    expect(within(receita).getByText("R$ 600,00")).toBeInTheDocument();
   });
 
   it("mostra os 8 KPIs do Meta Ads com valores por semana", () => {
     renderView();
 
     const investimento = rowByName(/Investimento/);
-    expect(within(investimento).getByText("R$ 600")).toBeInTheDocument();
-    expect(within(investimento).getByText("R$ 100")).toBeInTheDocument();
+    expect(within(investimento).getByText("R$ 600,00")).toBeInTheDocument();
+    expect(within(investimento).getByText("R$ 100,00")).toBeInTheDocument();
 
     const ctr = rowByName(/CTR/);
     expect(within(ctr).getByText("3.00%")).toBeInTheDocument();
@@ -206,7 +206,7 @@ describe("PlanilhaView — estados", () => {
 
     expect(screen.getByText(/Erro ao carregar dados do Meta Ads/)).toBeInTheDocument();
     // os demais blocos seguem renderizando valores
-    expect(within(rowByName(/Receita BRL/)).getByText("R$ 1.200")).toBeInTheDocument();
+    expect(within(rowByName(/Receita BRL/)).getByText("R$ 1.200,00")).toBeInTheDocument();
   });
 
   it("fonte não configurada mostra o aviso e mantém o bloco com valores zerados/—", () => {

@@ -40,17 +40,10 @@ describe("DashboardSidebar", () => {
     expect(html).toContain("alguem@igt.com");
   });
 
-  it("renderiza link Trocar módulo apontando para /dashboard", () => {
+  it("renderiza o botão de perfil do usuário", () => {
     const html = render(<DashboardSidebar userEmail="x@x.com" role="gestor" />);
-    expect(html).toContain('href="/dashboard"');
-    expect(html).toContain("Trocar módulo");
-  });
-
-  it("renderiza form de logout com action /api/auth/signout method post", () => {
-    const html = render(<DashboardSidebar userEmail="x@x.com" role="gestor" />);
-    expect(html).toContain('action="/api/auth/signout"');
-    expect(html).toContain('method="post"');
-    expect(html).toContain("icon-btn");
+    expect(html).toContain("sb-profile-trigger");
+    expect(html).toContain("x@x.com");
   });
 
   it("não tem botão de toggle/collapse", () => {

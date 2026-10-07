@@ -108,3 +108,20 @@ export interface DailyPoint {
   hotmart_sales: number;
   lead_captacoes: number;
 }
+
+/** Uma campanha Meta Ads no escopo de período + termo, somada no período. */
+export interface MetaCampaignRow extends GlobalMetrics {
+  campaign_id: string;
+  campaign_name: string;
+}
+
+/**
+ * Resposta de GET /api/indicadores/campaigns. `campaigns` já vem ordenada por
+ * gasto desc e sem campanhas de gasto zero (contadas em `hidden_zero_spend`);
+ * `total` cobre TODAS as linhas casadas, inclusive as ocultas.
+ */
+export interface MetaCampaignsResponse {
+  campaigns: MetaCampaignRow[];
+  hidden_zero_spend: number;
+  total: GlobalMetrics;
+}

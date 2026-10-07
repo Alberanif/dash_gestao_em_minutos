@@ -31,7 +31,7 @@ export interface PlanilhaViewProps {
 
 function fmtBRL(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
-  return Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(n);
+  return Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 }
 
 function fmtNum(n: number | null | undefined): string {

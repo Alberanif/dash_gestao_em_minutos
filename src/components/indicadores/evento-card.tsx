@@ -7,7 +7,7 @@ import type { EventoMetrics } from "@/lib/indicadores/service/eventos-metrics";
 import type { StatusAccent } from "./evento-folder";
 
 const fmtBRL = (v: number) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(v);
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 const fmtNum = (v: number) => new Intl.NumberFormat("pt-BR").format(v);
 
 interface EventoCardMetricsProps {

@@ -59,7 +59,8 @@ function fmtBRL(n: number): string {
   return Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(n);
 }
 
@@ -597,6 +598,13 @@ export default function IndicadoresPage() {
     leads: hasLeadsFilter,
   } = expandFilter(activeFilter).sources;
 
+  // Mesma query string que fetchAll manda às rotas de métricas; a lista de
+  // campanhas do PlatformsCard a reusa e recarrega quando ela muda.
+  const campaignsParams = `?${toSearchParams(
+    expandFilter(activeFilter, activeOfferCode),
+    { startDate, endDate },
+  )}`;
+
   // ── Derived data for Z-1 and Z-2 ──────────────────────────────────────────
 
   const metaData = metaState.data;
@@ -809,6 +817,7 @@ export default function IndicadoresPage() {
                 onOfferCodeChange={handleOfferCodeChange}
                 hasMetaFilter={hasMetaFilter}
                 hasHotmartFilter={hasHotmartFilter}
+                campaignsParams={campaignsParams}
               />
             </div>
             {hasHotmartFilter && (
