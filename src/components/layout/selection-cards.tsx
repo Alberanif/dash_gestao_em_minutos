@@ -64,7 +64,7 @@ const MODULES = [
   {
     href: "/relatorio-de-vendas",
     label: "Relatório de Vendas",
-    description: "Ciclos de renovação e monitoramento de recompra Hotmart",
+    description: "Visualizações de vendas por produto e oferta da Hotmart",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 12a9 9 0 1 1-2.64-6.36" />

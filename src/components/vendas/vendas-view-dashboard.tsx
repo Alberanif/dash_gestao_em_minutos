@@ -9,7 +9,7 @@ import type {
   VendasViewRecord,
 } from "@/types/vendas";
 import type { UserRole } from "@/types/auth";
-import type { UltimatesGranularity } from "@/lib/vendas/cumulative-chart";
+import type { ChartGranularity } from "@/lib/vendas/cumulative-chart";
 import { viewRangeFrom, type DateRange } from "@/lib/vendas/date-range";
 import { interpretRefreshResponse } from "@/lib/vendas/refresh";
 import {
@@ -99,7 +99,7 @@ export function VendasViewDashboard({ view, productName, role, onRangeChange, on
   const [data, setData] = useState<ViewData | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
-  const [granularity, setGranularity] = useState<UltimatesGranularity>("dia");
+  const [granularity, setGranularity] = useState<ChartGranularity>("dia");
   const [helpOpen, setHelpOpen] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
@@ -169,7 +169,7 @@ export function VendasViewDashboard({ view, productName, role, onRangeChange, on
 
   return (
     <div data-testid="view-dashboard" style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      <div className="ult-cycle-head">
+      <div className="vendas-view-head">
         <div style={{ minWidth: 0 }}>
           <h2 data-testid="view-selected-name" style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--text-strong)", margin: 0, overflowWrap: "anywhere" }}>
             {view.name}
@@ -178,9 +178,9 @@ export function VendasViewDashboard({ view, productName, role, onRangeChange, on
             {productName} · {view.offer_codes.length} {view.offer_codes.length === 1 ? "oferta" : "ofertas"}
           </p>
         </div>
-        <div className="ult-cycle-actions">
+        <div className="vendas-view-actions">
           <RefreshControls
-            cycleId={view.id}
+            viewId={view.id}
             refreshUrl={`/api/vendas/views/${view.id}/refresh`}
             lastRefreshAt={view.last_refresh_at}
             onRefreshed={() => {
@@ -235,7 +235,7 @@ export function VendasViewDashboard({ view, productName, role, onRangeChange, on
             </div>
           )}
 
-          <div className="ult-kpi-grid">
+          <div className="vendas-kpi-grid">
             <KpiTile
               testId="view-kpi-sales"
               label="Vendas"

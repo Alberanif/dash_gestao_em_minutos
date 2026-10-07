@@ -1,10 +1,10 @@
-// Interpretação da resposta de POST /api/vendas/cycles/[id]/refresh e
+// Interpretação da resposta de POST /api/vendas/views/[id]/refresh e
 // rótulo de "última atualização" (PRD issue #114, seção 3.6, RF-7, critério
 // 8). Extraído para fora do componente do botão para ser testável sem DOM —
-// a rota real (src/app/api/vendas/cycles/[id]/refresh/route.ts) devolve:
+// a rota real (src/app/api/vendas/views/[id]/refresh/route.ts) devolve:
 //   200 { upserted, lastRefreshAt }
 //   429 { error, retryAfterSeconds }
-//   409 { error }               (lock perdido OU ciclo encerrado)
+//   409 { error }               (lock perdido)
 //   5xx { error }
 
 export type RefreshOutcome =
@@ -27,7 +27,7 @@ export function interpretRefreshResponse(status: number, body: unknown): Refresh
   const b = (body ?? {}) as Record<string, unknown>;
 
   if (status === 200) {
-    // Rota de visualização devolve `{ view }`; a de ciclo, `{ lastRefreshAt }`.
+    // A rota devolve `{ view }`; `lastRefreshAt` solto é aceito por compatibilidade.
     const view = (b.view ?? null) as Record<string, unknown> | null;
     return {
       kind: "success",

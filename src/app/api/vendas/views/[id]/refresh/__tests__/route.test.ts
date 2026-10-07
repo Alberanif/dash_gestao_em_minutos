@@ -121,11 +121,11 @@ describe("POST /views/[id]/refresh", () => {
     expect(release.filters.filter(([n]) => n === "eq")[1][1][0]).toBe("refresh_started_at");
   });
 
-  it("NÃO materializa compradores (nenhuma RPC sync_buyers_from_sales, nenhuma tabela de buyers)", async () => {
+  it("só grava vendas (nenhuma RPC e nenhuma tabela além de views, contas e hotmart_*)", async () => {
     mockHotmart();
     await call();
     expect(fake.calls.filter((c) => c.op === "rpc")).toHaveLength(0);
-    expect(fake.calls.some((c) => /buyers|cycle/.test(c.table ?? ""))).toBe(false);
+    expect(fake.calls.some((c) => !/^dash_gestao_(vendas_views|accounts|hotmart_\w+)$/.test(c.table ?? ""))).toBe(false);
   });
 
   it("respeita view_start_date mais recente que a janela padrão", async () => {

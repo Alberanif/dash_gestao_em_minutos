@@ -54,7 +54,7 @@ describe("groupViewsByFolder", () => {
     ];
     const groups = groupViewsByFolder(views, folders, "b1");
     expect(groups.map((g) => g.name)).toEqual(["Alfa", "Beta", "Sem pasta"]);
-    expect(groups[0].cycles.map((v) => v.id)).toEqual(["a-nova", "a-velha"]);
+    expect(groups[0].items.map((v) => v.id)).toEqual(["a-nova", "a-velha"]);
     expect(groups.filter((g) => g.isExpanded).map((g) => g.id)).toEqual(["fb"]);
   });
 });

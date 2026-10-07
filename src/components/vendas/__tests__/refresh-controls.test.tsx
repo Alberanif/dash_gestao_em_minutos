@@ -25,12 +25,12 @@ describe("RefreshControls — botão Atualizar agora (critério 8)", () => {
 
     const onRefreshed = jest.fn();
     render(
-      <RefreshControls cycleId="c1" cycleStatus="ativo" lastRefreshAt={null} onRefreshed={onRefreshed} />
+      <RefreshControls viewId="c1" refreshUrl="/api/vendas/views/c1/refresh" lastRefreshAt={null} onRefreshed={onRefreshed} />
     );
 
-    fireEvent.click(screen.getByTestId("ultimates-refresh-btn"));
+    fireEvent.click(screen.getByTestId("vendas-refresh-btn"));
     expect(await screen.findByText("Atualizando...")).toBeInTheDocument();
-    expect(screen.getByTestId("ultimates-refresh-btn")).toBeDisabled();
+    expect(screen.getByTestId("vendas-refresh-btn")).toBeDisabled();
 
     resolveFetch({ ok: true, status: 200, json: async () => ({ upserted: 3, lastRefreshAt: "2026-07-19T10:00:00Z" }) });
     await waitFor(() => expect(onRefreshed).toHaveBeenCalledTimes(1));
@@ -40,11 +40,11 @@ describe("RefreshControls — botão Atualizar agora (critério 8)", () => {
     mockFetchOnce(429, { error: "Atualização muito recente.", retryAfterSeconds: 37 });
     const onRefreshed = jest.fn();
     render(
-      <RefreshControls cycleId="c1" cycleStatus="ativo" lastRefreshAt={null} onRefreshed={onRefreshed} />
+      <RefreshControls viewId="c1" refreshUrl="/api/vendas/views/c1/refresh" lastRefreshAt={null} onRefreshed={onRefreshed} />
     );
 
-    fireEvent.click(screen.getByTestId("ultimates-refresh-btn"));
-    const feedback = await screen.findByTestId("ultimates-refresh-feedback");
+    fireEvent.click(screen.getByTestId("vendas-refresh-btn"));
+    const feedback = await screen.findByTestId("vendas-refresh-feedback");
     expect(feedback).toHaveTextContent("37");
     expect(onRefreshed).not.toHaveBeenCalled();
   });
@@ -53,11 +53,11 @@ describe("RefreshControls — botão Atualizar agora (critério 8)", () => {
     mockFetchOnce(409, { error: "refresh em andamento" });
     const onRefreshed = jest.fn();
     render(
-      <RefreshControls cycleId="c1" cycleStatus="ativo" lastRefreshAt={null} onRefreshed={onRefreshed} />
+      <RefreshControls viewId="c1" refreshUrl="/api/vendas/views/c1/refresh" lastRefreshAt={null} onRefreshed={onRefreshed} />
     );
 
-    fireEvent.click(screen.getByTestId("ultimates-refresh-btn"));
-    const feedback = await screen.findByTestId("ultimates-refresh-feedback");
+    fireEvent.click(screen.getByTestId("vendas-refresh-btn"));
+    const feedback = await screen.findByTestId("vendas-refresh-feedback");
     expect(feedback).toHaveTextContent("refresh em andamento");
     expect(onRefreshed).not.toHaveBeenCalled();
   });
@@ -66,23 +66,16 @@ describe("RefreshControls — botão Atualizar agora (critério 8)", () => {
     mockFetchOnce(200, { upserted: 5, lastRefreshAt: "2026-07-19T10:00:00Z" });
     const onRefreshed = jest.fn();
     render(
-      <RefreshControls cycleId="c1" cycleStatus="ativo" lastRefreshAt={null} onRefreshed={onRefreshed} />
+      <RefreshControls viewId="c1" refreshUrl="/api/vendas/views/c1/refresh" lastRefreshAt={null} onRefreshed={onRefreshed} />
     );
 
-    fireEvent.click(screen.getByTestId("ultimates-refresh-btn"));
+    fireEvent.click(screen.getByTestId("vendas-refresh-btn"));
     await waitFor(() => expect(onRefreshed).toHaveBeenCalledTimes(1));
-    expect(screen.getByTestId("ultimates-refresh-label")).toBeInTheDocument();
+    expect(screen.getByTestId("vendas-refresh-label")).toBeInTheDocument();
   });
 
   it("oculta o rótulo 'Vendas atualizadas' quando não há last_refresh_at disponível", () => {
-    render(<RefreshControls cycleId="c1" cycleStatus="ativo" lastRefreshAt={null} onRefreshed={jest.fn()} />);
-    expect(screen.queryByTestId("ultimates-refresh-label")).not.toBeInTheDocument();
-  });
-
-  it("desabilita o botão quando o ciclo está encerrado", () => {
-    render(
-      <RefreshControls cycleId="c1" cycleStatus="encerrado" lastRefreshAt={null} onRefreshed={jest.fn()} />
-    );
-    expect(screen.getByTestId("ultimates-refresh-btn")).toBeDisabled();
+    render(<RefreshControls viewId="c1" refreshUrl="/api/vendas/views/c1/refresh" lastRefreshAt={null} onRefreshed={jest.fn()} />);
+    expect(screen.queryByTestId("vendas-refresh-label")).not.toBeInTheDocument();
   });
 });

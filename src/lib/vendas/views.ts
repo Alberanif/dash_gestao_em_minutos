@@ -9,24 +9,23 @@ import type {
   VendasViewOfferRow,
   VendasViewRecord,
 } from "@/types/vendas";
-import type { UltimatesDailyRow, UltimatesHourlyRow } from "@/types/vendas";
 import {
   buildCumulativeSeries,
   buildHourlyCumulativeSeries,
+  type CumulativeDailyRow,
+  type CumulativeHourlyRow,
   type CumulativePoint,
 } from "./cumulative-chart";
 import { fmtDateFull } from "./format";
 
 // ── Agrupamento por pasta ───────────────────────────────────────────────────
 
-// Mesmo formato de CycleGroup (a chave `cycles` é mantida de propósito: o
-// FolderSection é compartilhado com o modelo antigo e lê esse nome).
 export interface ViewGroup {
   id: string;
   name: string;
   isUnfolder: boolean;
   folder?: VendasFolderRecord;
-  cycles: VendasViewRecord[];
+  items: VendasViewRecord[];
   isExpanded: boolean;
 }
 
@@ -70,17 +69,17 @@ export function groupViewsByFolder(
       name: folder.name,
       isUnfolder: false,
       folder,
-      cycles: byFolder.get(folder.id) ?? [],
+      items: byFolder.get(folder.id) ?? [],
       isExpanded: false,
     }));
 
   if (loose.length > 0 || groups.length === 0) {
-    groups.push({ id: "unfoldered", name: "Sem pasta", isUnfolder: true, cycles: loose, isExpanded: false });
+    groups.push({ id: "unfoldered", name: "Sem pasta", isUnfolder: true, items: loose, isExpanded: false });
   }
 
   const expandedId =
-    groups.find((g) => selectedViewId && g.cycles.some((v) => v.id === selectedViewId))?.id ??
-    groups.find((g) => g.cycles.length > 0)?.id ??
+    groups.find((g) => selectedViewId && g.items.some((v) => v.id === selectedViewId))?.id ??
+    groups.find((g) => g.items.length > 0)?.id ??
     groups[0]?.id ??
     null;
 
@@ -121,13 +120,13 @@ export function totalsMismatch(
 // ── Acumulado (reaproveita as séries do cumulative-chart) ───────────────────
 
 export function buildViewDailyCumulative(rows: VendasViewDailyRow[]): CumulativePoint[] {
-  const adapted: UltimatesDailyRow[] = rows.map((r) => ({ day: r.day, renewals: r.sales, new_buyers: 0 }));
-  return buildCumulativeSeries(adapted, "renovacoes", null);
+  const adapted: CumulativeDailyRow[] = rows.map((r) => ({ day: r.day, sales: r.sales }));
+  return buildCumulativeSeries(adapted, null);
 }
 
 export function buildViewHourlyCumulative(rows: VendasViewHourlyRow[]): CumulativePoint[] {
-  const adapted: UltimatesHourlyRow[] = rows.map((r) => ({ hour: r.hour, renewals: r.sales, new_buyers: 0 }));
-  return buildHourlyCumulativeSeries(adapted, "renovacoes", null);
+  const adapted: CumulativeHourlyRow[] = rows.map((r) => ({ hour: r.hour, sales: r.sales }));
+  return buildHourlyCumulativeSeries(adapted, null);
 }
 
 // ── Backfill ────────────────────────────────────────────────────────────────

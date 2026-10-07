@@ -191,13 +191,13 @@ export function ViewFormModal({ products, folders, editTarget, onSaved, onCancel
       role="dialog"
       aria-modal="true"
       aria-label={isEdit ? "Editar visualização" : "Nova visualização"}
-      className="ult-modal-overlay"
+      className="vendas-modal-overlay"
       data-testid="view-form-modal"
       onClick={(e) => {
         if (e.target === e.currentTarget && !saving) onCancel();
       }}
     >
-      <div className="ult-modal-panel" style={{ maxWidth: 480 }}>
+      <div className="vendas-modal-panel" style={{ maxWidth: 480 }}>
         <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-strong)", margin: 0 }}>
           {isEdit ? "Editar visualização" : "Nova visualização"}
         </h3>
@@ -362,7 +362,7 @@ export function ViewFormModal({ products, folders, editTarget, onSaved, onCancel
           </p>
         )}
 
-        <div className="ult-modal-actions">
+        <div className="vendas-modal-actions">
           <button type="button" className="btn-secondary" onClick={onCancel} disabled={saving} data-testid="view-form-cancel">
             Cancelar
           </button>

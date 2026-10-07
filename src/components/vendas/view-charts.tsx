@@ -13,10 +13,9 @@ import {
   YAxis,
 } from "recharts";
 import type { VendasViewDailyRow, VendasViewHourlyRow } from "@/types/vendas";
-import type { UltimatesGranularity } from "@/lib/vendas/cumulative-chart";
+import type { ChartGranularity, CumulativePoint } from "@/lib/vendas/cumulative-chart";
 import { fmtDateShort, fmtHourLong, fmtHourShort } from "@/lib/vendas/format";
 import { buildViewDailyCumulative, buildViewHourlyCumulative } from "@/lib/vendas/views";
-import { buildChartRows } from "./cumulative-chart";
 
 const TICK = { fontSize: 10, fill: "var(--text-3)" };
 const TOOLTIP_STYLE = {
@@ -26,10 +25,36 @@ const TOOLTIP_STYLE = {
   fontSize: 12,
   color: "var(--text)",
 };
-const GRANULARITIES: { value: UltimatesGranularity; label: string }[] = [
+const GRANULARITIES: { value: ChartGranularity; label: string }[] = [
   { value: "dia", label: "Dia" },
   { value: "hora", label: "Hora" },
 ];
+
+// Uma linha do dataset do gráfico acumulado. `x` é o rótulo do eixo, `tooltip`
+// o do balão — separados porque o eixo precisa ser curto e o balão pode ser
+// lido por extenso.
+export interface CumulativeChartRow {
+  x: string;
+  tooltip: string;
+  cumulative: number;
+}
+
+// Traduz os pontos acumulados (chave temporal crua) para rótulos pt-BR.
+// Pura e exportada de propósito: sob o jsdom o ResponsiveContainer tem tamanho
+// zero e o Recharts não desenha eixo nem tooltip, então esta escolha de
+// formatador só é observável testando a função direto. A chave crua nunca
+// vira Date: já é hora de parede em Brasília.
+export function buildChartRows(
+  data: CumulativePoint[],
+  granularity: ChartGranularity
+): CumulativeChartRow[] {
+  const porHora = granularity === "hora";
+  return data.map((d) => ({
+    x: porHora ? fmtHourShort(d.key) : fmtDateShort(d.key),
+    tooltip: porHora ? fmtHourLong(d.key) : fmtDateShort(d.key),
+    cumulative: d.cumulative,
+  }));
+}
 
 // Linha do gráfico de barras: rótulo curto do eixo, rótulo longo do balão.
 export interface SalesBarRow {
@@ -44,7 +69,7 @@ export interface SalesBarRow {
 export function buildSalesBarRows(
   daily: VendasViewDailyRow[],
   hourly: VendasViewHourlyRow[],
-  granularity: UltimatesGranularity
+  granularity: ChartGranularity
 ): SalesBarRow[] {
   if (granularity === "hora") {
     return [...hourly]
@@ -62,8 +87,8 @@ export function GranularitySwitch({
   onChange,
 }: {
   testId: string;
-  active: UltimatesGranularity;
-  onChange: (g: UltimatesGranularity) => void;
+  active: ChartGranularity;
+  onChange: (g: ChartGranularity) => void;
 }) {
   return (
     <div data-testid={testId} role="group" aria-label="Granularidade" style={{ display: "flex", gap: 6 }}>
@@ -128,8 +153,8 @@ interface ChartProps {
   daily: VendasViewDailyRow[];
   // null = a série horária não chegou: o switch some em vez de levar a um gráfico vazio.
   hourly: VendasViewHourlyRow[] | null;
-  granularity: UltimatesGranularity;
-  onGranularityChange: (g: UltimatesGranularity) => void;
+  granularity: ChartGranularity;
+  onGranularityChange: (g: ChartGranularity) => void;
 }
 
 export function SalesBarChart({ daily, hourly, granularity, onGranularityChange }: ChartProps) {
@@ -150,7 +175,7 @@ export function SalesBarChart({ daily, hourly, granularity, onGranularityChange 
       {empty ? (
         <Empty testId="view-daily-chart-empty" />
       ) : (
-        <div className="ult-chart-body">
+        <div className="vendas-chart-body">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={rows} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid stroke="var(--border)" vertical={false} />
@@ -191,7 +216,7 @@ export function ViewCumulativeChart({ daily, hourly, granularity, onGranularityC
       {empty ? (
         <Empty testId="view-cumulative-chart-empty" />
       ) : (
-        <div className="ult-chart-body">
+        <div className="vendas-chart-body">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={rows} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
               <defs>

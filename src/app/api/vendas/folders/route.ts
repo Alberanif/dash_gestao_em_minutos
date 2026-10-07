@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     if (account?.id) {
       accountId = account.id;
     } else {
-      // Se não tem conta no DB ainda, busca de cycles/products
+      // Se não tem conta no DB ainda, busca de products
       const { data: product } = await supabase
         .from("dash_gestao_hotmart_products")
         .select("account_id")
