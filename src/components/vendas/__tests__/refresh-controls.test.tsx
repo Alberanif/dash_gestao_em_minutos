@@ -25,7 +25,7 @@ describe("RefreshControls — botão Atualizar agora (critério 8)", () => {
 
     const onRefreshed = jest.fn();
     render(
-      <RefreshControls cycleId="c1" cycleStatus="ativo" lastRefreshAt={null} onRefreshed={onRefreshed} />
+      <RefreshControls viewId="c1" refreshUrl="/api/vendas/views/c1/refresh" lastRefreshAt={null} onRefreshed={onRefreshed} />
     );
 
     fireEvent.click(screen.getByTestId("ultimates-refresh-btn"));
@@ -40,7 +40,7 @@ describe("RefreshControls — botão Atualizar agora (critério 8)", () => {
     mockFetchOnce(429, { error: "Atualização muito recente.", retryAfterSeconds: 37 });
     const onRefreshed = jest.fn();
     render(
-      <RefreshControls cycleId="c1" cycleStatus="ativo" lastRefreshAt={null} onRefreshed={onRefreshed} />
+      <RefreshControls viewId="c1" refreshUrl="/api/vendas/views/c1/refresh" lastRefreshAt={null} onRefreshed={onRefreshed} />
     );
 
     fireEvent.click(screen.getByTestId("ultimates-refresh-btn"));
@@ -53,7 +53,7 @@ describe("RefreshControls — botão Atualizar agora (critério 8)", () => {
     mockFetchOnce(409, { error: "refresh em andamento" });
     const onRefreshed = jest.fn();
     render(
-      <RefreshControls cycleId="c1" cycleStatus="ativo" lastRefreshAt={null} onRefreshed={onRefreshed} />
+      <RefreshControls viewId="c1" refreshUrl="/api/vendas/views/c1/refresh" lastRefreshAt={null} onRefreshed={onRefreshed} />
     );
 
     fireEvent.click(screen.getByTestId("ultimates-refresh-btn"));
@@ -66,7 +66,7 @@ describe("RefreshControls — botão Atualizar agora (critério 8)", () => {
     mockFetchOnce(200, { upserted: 5, lastRefreshAt: "2026-07-19T10:00:00Z" });
     const onRefreshed = jest.fn();
     render(
-      <RefreshControls cycleId="c1" cycleStatus="ativo" lastRefreshAt={null} onRefreshed={onRefreshed} />
+      <RefreshControls viewId="c1" refreshUrl="/api/vendas/views/c1/refresh" lastRefreshAt={null} onRefreshed={onRefreshed} />
     );
 
     fireEvent.click(screen.getByTestId("ultimates-refresh-btn"));
@@ -75,14 +75,7 @@ describe("RefreshControls — botão Atualizar agora (critério 8)", () => {
   });
 
   it("oculta o rótulo 'Vendas atualizadas' quando não há last_refresh_at disponível", () => {
-    render(<RefreshControls cycleId="c1" cycleStatus="ativo" lastRefreshAt={null} onRefreshed={jest.fn()} />);
+    render(<RefreshControls viewId="c1" refreshUrl="/api/vendas/views/c1/refresh" lastRefreshAt={null} onRefreshed={jest.fn()} />);
     expect(screen.queryByTestId("ultimates-refresh-label")).not.toBeInTheDocument();
-  });
-
-  it("desabilita o botão quando o ciclo está encerrado", () => {
-    render(
-      <RefreshControls cycleId="c1" cycleStatus="encerrado" lastRefreshAt={null} onRefreshed={jest.fn()} />
-    );
-    expect(screen.getByTestId("ultimates-refresh-btn")).toBeDisabled();
   });
 });

@@ -1,4 +1,4 @@
-// Intervalo de datas do dash Ultimates: validação, leitura do que veio do banco
+// Intervalo de datas das visualizações do Relatório de Vendas: validação, leitura do que veio do banco
 // e o predicado de recorte do gráfico. Tudo que dá para decidir sem React mora
 // aqui — o componente da barra só cuida do formulário.
 //

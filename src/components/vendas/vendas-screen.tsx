@@ -331,11 +331,10 @@ export function VendasScreen({ role, products }: VendasScreenProps) {
               <FolderSection
                 key={group.id}
                 group={group}
-                itemNoun="visualização"
-                selectedCycleId={selectedView?.id ?? null}
+                selectedId={selectedView?.id ?? null}
                 isGestor={isGestor}
-                onSelectCycle={(id) => setSelectedId(id)}
-                onEditCycle={(view) => setEditTarget(view)}
+                onSelect={(id) => setSelectedId(id)}
+                onEdit={(view) => setEditTarget(view)}
                 onToggleExpand={(groupId) =>
                   setExpandedOverride((prev) => ({
                     ...prev,

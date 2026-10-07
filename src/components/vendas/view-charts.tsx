@@ -13,7 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import type { VendasViewDailyRow, VendasViewHourlyRow } from "@/types/vendas";
-import type { UltimatesGranularity } from "@/lib/vendas/cumulative-chart";
+import type { ChartGranularity } from "@/lib/vendas/cumulative-chart";
 import { fmtDateShort, fmtHourLong, fmtHourShort } from "@/lib/vendas/format";
 import { buildViewDailyCumulative, buildViewHourlyCumulative } from "@/lib/vendas/views";
 import { buildChartRows } from "./cumulative-chart";
@@ -26,7 +26,7 @@ const TOOLTIP_STYLE = {
   fontSize: 12,
   color: "var(--text)",
 };
-const GRANULARITIES: { value: UltimatesGranularity; label: string }[] = [
+const GRANULARITIES: { value: ChartGranularity; label: string }[] = [
   { value: "dia", label: "Dia" },
   { value: "hora", label: "Hora" },
 ];
@@ -44,7 +44,7 @@ export interface SalesBarRow {
 export function buildSalesBarRows(
   daily: VendasViewDailyRow[],
   hourly: VendasViewHourlyRow[],
-  granularity: UltimatesGranularity
+  granularity: ChartGranularity
 ): SalesBarRow[] {
   if (granularity === "hora") {
     return [...hourly]
@@ -62,8 +62,8 @@ export function GranularitySwitch({
   onChange,
 }: {
   testId: string;
-  active: UltimatesGranularity;
-  onChange: (g: UltimatesGranularity) => void;
+  active: ChartGranularity;
+  onChange: (g: ChartGranularity) => void;
 }) {
   return (
     <div data-testid={testId} role="group" aria-label="Granularidade" style={{ display: "flex", gap: 6 }}>
@@ -128,8 +128,8 @@ interface ChartProps {
   daily: VendasViewDailyRow[];
   // null = a série horária não chegou: o switch some em vez de levar a um gráfico vazio.
   hourly: VendasViewHourlyRow[] | null;
-  granularity: UltimatesGranularity;
-  onGranularityChange: (g: UltimatesGranularity) => void;
+  granularity: ChartGranularity;
+  onGranularityChange: (g: ChartGranularity) => void;
 }
 
 export function SalesBarChart({ daily, hourly, granularity, onGranularityChange }: ChartProps) {

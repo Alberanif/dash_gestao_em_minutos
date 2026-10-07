@@ -1,7 +1,7 @@
 import { buildCumulativeSeries, buildHourlyCumulativeSeries } from "../cumulative-chart";
-import type { UltimatesDailyRow, UltimatesHourlyRow } from "@/types/vendas";
+import type { CumulativeDailyRow, CumulativeHourlyRow } from "@/lib/vendas/cumulative-chart";
 
-function day(day: string, renewals: number, new_buyers = 0): UltimatesDailyRow {
+function day(day: string, renewals: number, new_buyers = 0): CumulativeDailyRow {
   return { day, renewals, new_buyers };
 }
 
@@ -11,7 +11,7 @@ describe("buildCumulativeSeries", () => {
   });
 
   it("acumula a soma corrente por dia", () => {
-    const days: UltimatesDailyRow[] = [
+    const days: CumulativeDailyRow[] = [
       day("2026-07-01", 3),
       day("2026-07-02", 5),
       day("2026-07-03", 0),
@@ -26,7 +26,7 @@ describe("buildCumulativeSeries", () => {
   });
 
   it("ordena por dia (string ISO) antes de acumular, mesmo se a entrada vier fora de ordem", () => {
-    const days: UltimatesDailyRow[] = [day("2026-07-03", 1), day("2026-07-01", 4), day("2026-07-02", 2)];
+    const days: CumulativeDailyRow[] = [day("2026-07-03", 1), day("2026-07-01", 4), day("2026-07-02", 2)];
     expect(buildCumulativeSeries(days)).toEqual([
       { key: "2026-07-01", cumulative: 4 },
       { key: "2026-07-02", cumulative: 6 },
@@ -35,14 +35,14 @@ describe("buildCumulativeSeries", () => {
   });
 
   it("não muta o array de entrada", () => {
-    const days: UltimatesDailyRow[] = [day("2026-07-02", 1), day("2026-07-01", 1)];
+    const days: CumulativeDailyRow[] = [day("2026-07-02", 1), day("2026-07-01", 1)];
     const copy = [...days];
     buildCumulativeSeries(days);
     expect(days).toEqual(copy);
   });
 
   it("acumula new_buyers quando a série pedida é 'novos'", () => {
-    const days: UltimatesDailyRow[] = [
+    const days: CumulativeDailyRow[] = [
       day("2026-07-01", 3, 1),
       day("2026-07-02", 5, 0),
       day("2026-07-03", 0, 4),
@@ -55,7 +55,7 @@ describe("buildCumulativeSeries", () => {
   });
 
   it("mantém o mesmo eixo de dias nas duas séries (dia sem a métrica vira patamar plano)", () => {
-    const days: UltimatesDailyRow[] = [
+    const days: CumulativeDailyRow[] = [
       day("2026-07-01", 2, 0),
       day("2026-07-02", 0, 3), // só novos compradores neste dia
       day("2026-07-03", 1, 1),
@@ -74,7 +74,7 @@ describe("buildCumulativeSeries", () => {
     const days = [
       { day: "2026-07-01", renewals: 2 },
       { day: "2026-07-02", renewals: 1 },
-    ] as unknown as UltimatesDailyRow[];
+    ] as unknown as CumulativeDailyRow[];
 
     expect(buildCumulativeSeries(days, "novos")).toEqual([
       { key: "2026-07-01", cumulative: 0 },
@@ -89,7 +89,7 @@ describe("buildCumulativeSeries", () => {
     const days = [
       { day: "2026-07-01", renewals: NaN, new_buyers: 1 },
       { day: "2026-07-02", renewals: 2, new_buyers: NaN },
-    ] as unknown as UltimatesDailyRow[];
+    ] as unknown as CumulativeDailyRow[];
 
     expect(buildCumulativeSeries(days, "renovacoes")).toEqual([
       { key: "2026-07-01", cumulative: 0 },
@@ -102,7 +102,7 @@ describe("buildCumulativeSeries", () => {
   });
 });
 
-function hour(hour: string, renewals: number, new_buyers = 0): UltimatesHourlyRow {
+function hour(hour: string, renewals: number, new_buyers = 0): CumulativeHourlyRow {
   return { hour, renewals, new_buyers };
 }
 
@@ -180,7 +180,7 @@ describe("buildHourlyCumulativeSeries", () => {
     const hours = [
       { hour: "2026-07-01T10", renewals: 2 },
       { hour: "2026-07-01T11", renewals: 1 },
-    ] as unknown as UltimatesHourlyRow[];
+    ] as unknown as CumulativeHourlyRow[];
 
     expect(buildHourlyCumulativeSeries(hours, "novos")).toEqual([
       { key: "2026-07-01T10", cumulative: 0 },
@@ -242,7 +242,7 @@ describe("buildHourlyCumulativeSeries", () => {
     const hours = [
       { hour: "2026-07-01T10", renewals: NaN, new_buyers: 1 },
       { hour: "2026-07-01T11", renewals: 2, new_buyers: NaN },
-    ] as unknown as UltimatesHourlyRow[];
+    ] as unknown as CumulativeHourlyRow[];
 
     expect(buildHourlyCumulativeSeries(hours, "renovacoes")).toEqual([
       { key: "2026-07-01T10", cumulative: 0 },
@@ -316,7 +316,7 @@ describe("buildHourlyCumulativeSeries", () => {
 });
 
 describe("recorte por intervalo de datas", () => {
-  const DIAS: UltimatesDailyRow[] = [
+  const DIAS: CumulativeDailyRow[] = [
     day("2026-07-08", 5, 1),
     day("2026-07-10", 2, 3),
     day("2026-07-15", 4, 0),
@@ -358,7 +358,7 @@ describe("recorte por intervalo de datas", () => {
   });
 
   it("recorta a série horária pela parte de data da chave", () => {
-    const horas: UltimatesHourlyRow[] = [
+    const horas: CumulativeHourlyRow[] = [
       { hour: "2026-07-09T23", renewals: 7, new_buyers: 0 },
       { hour: "2026-07-10T00", renewals: 1, new_buyers: 0 },
       { hour: "2026-07-10T02", renewals: 2, new_buyers: 0 },
@@ -377,7 +377,7 @@ describe("recorte por intervalo de datas", () => {
   });
 
   it("intervalo sem nenhuma hora devolve lista vazia", () => {
-    const horas: UltimatesHourlyRow[] = [{ hour: "2026-07-09T23", renewals: 7, new_buyers: 0 }];
+    const horas: CumulativeHourlyRow[] = [{ hour: "2026-07-09T23", renewals: 7, new_buyers: 0 }];
     expect(
       buildHourlyCumulativeSeries(horas, "renovacoes", { start: "2026-07-10", end: "2026-07-10" })
     ).toEqual([]);

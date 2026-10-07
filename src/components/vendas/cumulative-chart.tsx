@@ -12,22 +12,22 @@ import {
 } from "recharts";
 import type {
   CumulativePoint,
-  UltimatesGranularity,
-  UltimatesSeries,
+  ChartGranularity,
+  ChartSeries,
 } from "@/lib/vendas/cumulative-chart";
 import { fmtDateShort, fmtHourLong, fmtHourShort } from "@/lib/vendas/format";
 
 interface CumulativeChartProps {
   data: CumulativePoint[];
-  series: UltimatesSeries;
-  onSeriesChange: (series: UltimatesSeries) => void;
+  series: ChartSeries;
+  onSeriesChange: (series: ChartSeries) => void;
   // Política do ciclo (migration 053). Com ela false só existe uma métrica —
   // as vendas sem vínculo já vieram somadas em `data` por
   // applyNewPurchasesModeToCounts —, então o switch de séries não tem o que
   // alternar e é escondido em vez de mostrar uma curva zerada.
   countsNewBuyers: boolean;
-  granularity: UltimatesGranularity;
-  onGranularityChange: (granularity: UltimatesGranularity) => void;
+  granularity: ChartGranularity;
+  onGranularityChange: (granularity: ChartGranularity) => void;
   // Se a série horária chegou. Prop explícita, e não inferida de `data` vazio:
   // lista vazia também é "ciclo sem venda ainda", um estado legítimo que não
   // deve esconder o switch. Com ela false o grupo de granularidade some — o
@@ -67,7 +67,7 @@ export interface CumulativeChartRow {
 // A chave crua nunca vira Date: ela já é hora de parede em Brasília.
 export function buildChartRows(
   data: CumulativePoint[],
-  granularity: UltimatesGranularity
+  granularity: ChartGranularity
 ): CumulativeChartRow[] {
   const porHora = granularity === "hora";
   return data.map((d) => ({
@@ -82,7 +82,7 @@ export function buildChartRows(
 // kpi-row.tsx), para o vínculo entre card 1 e card 2 ser óbvio; renovações
 // mantém o violeta que já estava em produção.
 const SERIES_CONFIG: Record<
-  UltimatesSeries,
+  ChartSeries,
   {
     button: string;
     title: string;
@@ -119,9 +119,9 @@ const SERIES_CONFIG: Record<
   },
 };
 
-const SERIES_ORDER: UltimatesSeries[] = ["renovacoes", "novos"];
-const GRANULARITY_ORDER: UltimatesGranularity[] = ["dia", "hora"];
-const GRANULARITY_LABELS: Record<UltimatesGranularity, string> = { dia: "Dia", hora: "Hora" };
+const SERIES_ORDER: ChartSeries[] = ["renovacoes", "novos"];
+const GRANULARITY_ORDER: ChartGranularity[] = ["dia", "hora"];
+const GRANULARITY_LABELS: Record<ChartGranularity, string> = { dia: "Dia", hora: "Hora" };
 
 // Acento do grupo de granularidade. Deliberadamente neutro: violeta e laranja
 // significam MÉTRICA neste card (o laranja amarra a curva ao KPI "Novos

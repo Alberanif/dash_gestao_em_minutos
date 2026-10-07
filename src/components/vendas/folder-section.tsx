@@ -3,12 +3,10 @@
 import { useState } from "react";
 import type { VendasFolderRecord } from "@/types/vendas";
 
-// Item mínimo que a seção sabe desenhar. Serve ao modelo antigo (ciclos, com
-// `status`) e às Visualizações (sem status), por isso o genérico.
+// Item mínimo que a seção sabe desenhar (uma Visualização).
 export interface FolderSectionItem {
   id: string;
   name: string;
-  status?: string;
 }
 
 export interface FolderSectionGroup<T extends FolderSectionItem> {
@@ -16,19 +14,18 @@ export interface FolderSectionGroup<T extends FolderSectionItem> {
   name: string;
   isUnfolder: boolean;
   folder?: VendasFolderRecord;
-  // Nome herdado do CycleGroup; guarda as visualizações no modelo novo.
-  cycles: T[];
+  items: T[];
   isExpanded: boolean;
 }
 
 interface FolderSectionProps<T extends FolderSectionItem> {
   group: FolderSectionGroup<T>;
-  selectedCycleId: string | null;
+  selectedId: string | null;
   isGestor: boolean;
-  // Substantivo do item, no singular. Padrão "ciclo" (modelo antigo).
+  // Substantivo do item, no singular.
   itemNoun?: string;
-  onSelectCycle: (cycleId: string) => void;
-  onEditCycle?: (cycle: T) => void;
+  onSelect: (itemId: string) => void;
+  onEdit?: (item: T) => void;
   onToggleExpand: (groupId: string) => void;
   onRenameFolder?: (folder: VendasFolderRecord) => void;
   onDeleteFolder?: (folder: VendasFolderRecord) => void;
@@ -40,18 +37,18 @@ function pluralize(noun: string): string {
 
 export function FolderSection<T extends FolderSectionItem>({
   group,
-  selectedCycleId,
+  selectedId,
   isGestor,
-  itemNoun = "ciclo",
-  onSelectCycle,
-  onEditCycle,
+  itemNoun = "visualização",
+  onSelect,
+  onEdit,
   onToggleExpand,
   onRenameFolder,
   onDeleteFolder,
 }: FolderSectionProps<T>) {
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const cycleCount = group.cycles.length;
+  const itemCount = group.items.length;
 
   return (
     <div
@@ -120,7 +117,7 @@ export function FolderSection<T extends FolderSectionItem>({
               color: "var(--text-muted, #a1a1aa)",
             }}
           >
-            {cycleCount} {cycleCount === 1 ? itemNoun : pluralize(itemNoun)}
+            {itemCount} {itemCount === 1 ? itemNoun : pluralize(itemNoun)}
           </span>
         </div>
 
@@ -257,20 +254,20 @@ export function FolderSection<T extends FolderSectionItem>({
       {/* Conteúdo expandido: Pills dos ciclos */}
       {group.isExpanded && (
         <div style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          {cycleCount === 0 ? (
+          {itemCount === 0 ? (
             <span style={{ fontSize: 12, color: "var(--text-muted, #71717a)", fontStyle: "italic" }}>
-              Nenhum{itemNoun === "ciclo" ? "" : "a"} {itemNoun} nesta pasta
+              Nenhuma {itemNoun} nesta pasta
             </span>
           ) : (
-            group.cycles.map((cycle) => {
-              const selected = cycle.id === selectedCycleId;
+            group.items.map((item) => {
+              const selected = item.id === selectedId;
               return (
-                <div key={cycle.id} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <button
                     type="button"
                     aria-pressed={selected}
-                    onClick={() => onSelectCycle(cycle.id)}
-                    data-testid={`ultimates-cycle-option-${cycle.id}`}
+                    onClick={() => onSelect(item.id)}
+                    data-testid={`ultimates-cycle-option-${item.id}`}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -287,27 +284,13 @@ export function FolderSection<T extends FolderSectionItem>({
                       transition: "background 150ms ease, color 150ms ease, border-color 150ms ease",
                     }}
                   >
-                    {cycle.name}
-                    {cycle.status === "encerrado" && (
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 600,
-                          padding: "1px 6px",
-                          borderRadius: 10,
-                          background: "var(--surface-2)",
-                          color: "var(--text-3)",
-                        }}
-                      >
-                        Encerrado
-                      </span>
-                    )}
+                    {item.name}
                   </button>
 
-                  {isGestor && selected && onEditCycle && (
+                  {isGestor && selected && onEdit && (
                     <button
                       type="button"
-                      onClick={() => onEditCycle(cycle)}
+                      onClick={() => onEdit(item)}
                       data-testid="ultimates-edit-cycle-btn"
                       title={`Editar ${itemNoun}`}
                       aria-label={`Editar ${itemNoun}`}

@@ -5,27 +5,12 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { FolderSection } from "../folder-section";
-import type { CycleGroup } from "@/lib/vendas/group-cycles";
-import type { CycleWithProducts } from "../types";
+import type { FolderSectionGroup } from "../folder-section";
 import type { VendasFolderRecord } from "@/types/vendas";
 
-function mockCycle(id: string, name: string): CycleWithProducts {
-  return {
-    id,
-    name,
-    account_id: "acc-1",
-    goal_percent: 80,
-    status: "ativo",
-    counts_new_buyers: true,
-    purchases_only: false,
-    folder_id: "f1",
-    refresh_started_at: null,
-    last_refresh_at: null,
-    created_by: "user-1",
-    created_at: "2026-08-01T10:00:00Z",
-    updated_at: "2026-08-01T10:00:00Z",
-    products: [],
-  };
+type Item = { id: string; name: string };
+function mockCycle(id: string, name: string): Item {
+  return { id, name };
 }
 
 function mockFolder(id: string, name: string): VendasFolderRecord {
@@ -39,47 +24,47 @@ function mockFolder(id: string, name: string): VendasFolderRecord {
 }
 
 describe("FolderSection", () => {
-  it("renderiza o nome da pasta e contador de ciclos", () => {
-    const group: CycleGroup = {
+  it("renderiza o nome da pasta e contador de itens", () => {
+    const group: FolderSectionGroup<Item> = {
       id: "f1",
       name: "Pasta Teste",
       isUnfolder: false,
       folder: mockFolder("f1", "Pasta Teste"),
-      cycles: [mockCycle("c1", "Ciclo 1")],
+      items: [mockCycle("c1", "Ciclo 1")],
       isExpanded: false,
     };
 
     render(
       <FolderSection
         group={group}
-        selectedCycleId={null}
+        selectedId={null}
         isGestor={true}
-        onSelectCycle={jest.fn()}
+        onSelect={jest.fn()}
         onToggleExpand={jest.fn()}
       />
     );
 
     expect(screen.getByText("Pasta Teste")).toBeInTheDocument();
-    expect(screen.getByText("1 ciclo")).toBeInTheDocument();
+    expect(screen.getByText("1 visualização")).toBeInTheDocument();
   });
 
-  it("renderiza pills quando está expandido e permite selecionar ciclo", () => {
-    const onSelectCycle = jest.fn();
-    const group: CycleGroup = {
+  it("renderiza pills quando está expandido e permite selecionar item", () => {
+    const onSelect = jest.fn();
+    const group: FolderSectionGroup<Item> = {
       id: "f1",
       name: "Pasta Teste",
       isUnfolder: false,
       folder: mockFolder("f1", "Pasta Teste"),
-      cycles: [mockCycle("c1", "Ciclo 1")],
+      items: [mockCycle("c1", "Ciclo 1")],
       isExpanded: true,
     };
 
     render(
       <FolderSection
         group={group}
-        selectedCycleId="c1"
+        selectedId="c1"
         isGestor={true}
-        onSelectCycle={onSelectCycle}
+        onSelect={onSelect}
         onToggleExpand={jest.fn()}
       />
     );
@@ -88,26 +73,26 @@ describe("FolderSection", () => {
     expect(pill).toBeInTheDocument();
 
     fireEvent.click(pill);
-    expect(onSelectCycle).toHaveBeenCalledWith("c1");
+    expect(onSelect).toHaveBeenCalledWith("c1");
   });
 
   it("chama onToggleExpand ao clicar no header ou chevron", () => {
     const onToggleExpand = jest.fn();
-    const group: CycleGroup = {
+    const group: FolderSectionGroup<Item> = {
       id: "f1",
       name: "Pasta Teste",
       isUnfolder: false,
       folder: mockFolder("f1", "Pasta Teste"),
-      cycles: [],
+      items: [],
       isExpanded: false,
     };
 
     render(
       <FolderSection
         group={group}
-        selectedCycleId={null}
+        selectedId={null}
         isGestor={true}
-        onSelectCycle={jest.fn()}
+        onSelect={jest.fn()}
         onToggleExpand={onToggleExpand}
       />
     );

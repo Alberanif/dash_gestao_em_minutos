@@ -1,14 +1,26 @@
 // Acúmulo no cliente das contagens da RPC (PRD issue #114, seção 3.3) —
-// GET /api/vendas/cycles/[id]/{daily,hourly} devolvem valores por bucket,
+// GET /api/vendas/views/[id]/{daily,hourly} devolvem valores por bucket,
 // não acumulados; o gráfico precisa da soma corrente.
-import type { UltimatesDailyRow, UltimatesHourlyRow } from "@/types/vendas";
 import { keyInRange, type DateRange } from "./date-range";
 
+// Linhas de entrada do acúmulo. As visualizações mapeiam `sales` para
+// `renewals` (views.ts); `new_buyers` fica 0.
+export interface CumulativeDailyRow {
+  day: string;
+  renewals: number;
+  new_buyers: number;
+}
+export interface CumulativeHourlyRow {
+  hour: string;
+  renewals: number;
+  new_buyers: number;
+}
+
 // Séries alternáveis pelo switch do card "Evolução".
-export type UltimatesSeries = "renovacoes" | "novos";
+export type ChartSeries = "renovacoes" | "novos";
 
 // Granularidade do eixo temporal do mesmo card.
-export type UltimatesGranularity = "dia" | "hora";
+export type ChartGranularity = "dia" | "hora";
 
 // `key` é a chave temporal do bucket, no formato em que a RPC a devolveu:
 // "YYYY-MM-DD" na visão dia, "YYYY-MM-DDTHH" na visão hora. Quem desenha
@@ -24,8 +36,8 @@ export interface CumulativePoint {
 // nada continuam presentes como patamar plano. É isso que faz os dois
 // gráficos serem comparáveis ponto a ponto ao alternar o switch.
 export function buildCumulativeSeries(
-  days: UltimatesDailyRow[],
-  series: UltimatesSeries = "renovacoes",
+  days: CumulativeDailyRow[],
+  series: ChartSeries = "renovacoes",
   // Recorte do filtro De/Até, aplicado ANTES do acúmulo: a curva começa do zero
   // no primeiro bucket do intervalo e responde "quanto entrou no período" em
   // vez de exibir uma fatia deslocada da curva do ciclo. `null` = ciclo inteiro.
@@ -116,8 +128,8 @@ function semPreencher(contagens: Map<string, number>): CumulativePoint[] {
 // a mesma largura de uma hora cheia). A RPC devolve só horas com venda
 // justamente porque a expansão é barata aqui e cara no payload.
 export function buildHourlyCumulativeSeries(
-  hours: UltimatesHourlyRow[],
-  series: UltimatesSeries = "renovacoes",
+  hours: CumulativeHourlyRow[],
+  series: ChartSeries = "renovacoes",
   range: DateRange | null = null
 ): CumulativePoint[] {
   // O recorte vem ANTES do guarda de vazio para que um intervalo sem nenhuma

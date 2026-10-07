@@ -1,7 +1,6 @@
-// Formatters pt-BR do Dash Ultimates (PRD issue #114). Assinatura seguindo o
+// Formatters pt-BR do Relatório de Vendas. Assinatura seguindo o
 // padrão do repo (conventions.md seção 9: Intl.NumberFormat("pt-BR", ...),
 // "—" como placeholder de valor ausente — nunca "-", "N/A" ou vazio).
-import type { UltimatesCategory, UltimatesCycleProductRef } from "@/types/vendas";
 
 export function fmtBRL(n: number): string {
   return Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
@@ -57,27 +56,4 @@ export function fmtHourShort(hourKey: string): string {
 export function fmtHourLong(hourKey: string): string {
   const { dia, mes, hora } = partesDaHora(hourKey);
   return `${dia}/${mes} às ${hora}h`;
-}
-
-const CATEGORY_LABELS: Record<UltimatesCategory, string> = {
-  renovado: "Renovado",
-  nao_renovado: "Não renovado",
-  renovacao_reembolsada: "Renovação reembolsada",
-  novo_comprador: "Novo Comprador",
-  novo_reembolsado: "Novo — reembolsado",
-  renovacao_sem_vinculo: "Renovação sem vínculo",
-  renovacao_sem_vinculo_reembolsada: "Renovação sem vínculo — reembolsada",
-};
-
-export function categoryLabel(category: UltimatesCategory): string {
-  return CATEGORY_LABELS[category];
-}
-
-// Rótulo dos produtos de um ciclo para o header do dashboard. A partir de 4 o
-// nome completo estouraria a linha, então vira contagem — quem quiser a lista
-// tem o title do elemento (ver ultimates-dashboard.tsx).
-export function formatCycleProducts(products: UltimatesCycleProductRef[]): string {
-  if (products.length === 0) return "Produto não identificado";
-  if (products.length > 3) return `${products.length} produtos`;
-  return products.map((p) => p.product_name ?? p.product_id).join(" · ");
 }

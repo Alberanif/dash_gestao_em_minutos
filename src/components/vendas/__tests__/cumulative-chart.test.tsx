@@ -6,18 +6,18 @@ import { CumulativeChart, buildChartRows } from "../cumulative-chart";
 import {
   buildCumulativeSeries,
   buildHourlyCumulativeSeries,
-  type UltimatesGranularity,
-  type UltimatesSeries,
+  type ChartGranularity,
+  type ChartSeries,
 } from "@/lib/vendas/cumulative-chart";
-import type { UltimatesDailyRow, UltimatesHourlyRow } from "@/types/vendas";
+import type { CumulativeDailyRow, CumulativeHourlyRow } from "@/lib/vendas/cumulative-chart";
 
-const DAYS: UltimatesDailyRow[] = [
+const DAYS: CumulativeDailyRow[] = [
   { day: "2026-07-01", renewals: 2, new_buyers: 0 },
   { day: "2026-07-02", renewals: 0, new_buyers: 3 },
   { day: "2026-07-03", renewals: 1, new_buyers: 1 },
 ];
 
-const HOURS: UltimatesHourlyRow[] = [
+const HOURS: CumulativeHourlyRow[] = [
   { hour: "2026-07-01T20", renewals: 2, new_buyers: 0 },
   { hour: "2026-07-01T22", renewals: 1, new_buyers: 3 },
 ];
@@ -31,13 +31,13 @@ function Harness({
   countsNewBuyers = true,
   granularityAvailable = true,
 }: {
-  days?: UltimatesDailyRow[];
-  hours?: UltimatesHourlyRow[];
+  days?: CumulativeDailyRow[];
+  hours?: CumulativeHourlyRow[];
   countsNewBuyers?: boolean;
   granularityAvailable?: boolean;
 }) {
-  const [series, setSeries] = useState<UltimatesSeries>("renovacoes");
-  const [granularity, setGranularity] = useState<UltimatesGranularity>("dia");
+  const [series, setSeries] = useState<ChartSeries>("renovacoes");
+  const [granularity, setGranularity] = useState<ChartGranularity>("dia");
   const activeSeries = countsNewBuyers ? series : "renovacoes";
   return (
     <CumulativeChart
@@ -131,7 +131,7 @@ describe("CumulativeChart — switch entre renovações e novos compradores", ()
   });
 
   it("mostra vazio por série: sem renovações no ciclo, mas com novos compradores", () => {
-    const onlyNew: UltimatesDailyRow[] = [
+    const onlyNew: CumulativeDailyRow[] = [
       { day: "2026-07-01", renewals: 0, new_buyers: 2 },
       { day: "2026-07-02", renewals: 0, new_buyers: 1 },
     ];
@@ -149,7 +149,7 @@ describe("CumulativeChart — switch entre renovações e novos compradores", ()
   });
 
   it("mostra o vazio de novos compradores quando só houve renovações", () => {
-    const onlyRenewals: UltimatesDailyRow[] = [{ day: "2026-07-01", renewals: 5, new_buyers: 0 }];
+    const onlyRenewals: CumulativeDailyRow[] = [{ day: "2026-07-01", renewals: 5, new_buyers: 0 }];
     render(<Harness days={onlyRenewals} />);
 
     fireEvent.click(screen.getByTestId("ultimates-cumulative-series-novos"));
@@ -268,7 +268,7 @@ describe("CumulativeChart — switch de granularidade", () => {
   });
 
   it("mostra o vazio da série na visão hora quando a métrica ativa soma zero", () => {
-    const semRenovacoes: UltimatesHourlyRow[] = [{ hour: "2026-07-01T20", renewals: 0, new_buyers: 2 }];
+    const semRenovacoes: CumulativeHourlyRow[] = [{ hour: "2026-07-01T20", renewals: 0, new_buyers: 2 }];
     render(<Harness hours={semRenovacoes} />);
 
     fireEvent.click(screen.getByTestId("ultimates-cumulative-granularity-hora"));
