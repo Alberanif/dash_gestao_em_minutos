@@ -27,10 +27,13 @@ export function interpretRefreshResponse(status: number, body: unknown): Refresh
   const b = (body ?? {}) as Record<string, unknown>;
 
   if (status === 200) {
+    // Rota de visualização devolve `{ view }`; a de ciclo, `{ lastRefreshAt }`.
+    const view = (b.view ?? null) as Record<string, unknown> | null;
     return {
       kind: "success",
       upserted: readNumber(b, "upserted") ?? 0,
-      lastRefreshAt: readString(b, "lastRefreshAt"),
+      lastRefreshAt:
+        readString(b, "lastRefreshAt") ?? (view ? readString(view, "last_refresh_at") : null),
     };
   }
 
@@ -49,6 +52,13 @@ export function interpretRefreshResponse(status: number, body: unknown): Refresh
     return {
       kind: "conflict",
       message: readString(b, "error") ?? "Atualização já em andamento.",
+    };
+  }
+
+  if (status === 502) {
+    return {
+      kind: "error",
+      message: readString(b, "error") ?? "A Hotmart demorou demais para responder. Tente novamente.",
     };
   }
 
