@@ -594,6 +594,7 @@ describe("PlatformsCard", () => {
         dailyState={emptyDaily}
         hasMetaFilter={true}
         hasHotmartFilter={true}
+        campaignsParams="?a=1"
       />
     );
     expect(html).toContain("Meta Ads");
@@ -608,6 +609,7 @@ describe("PlatformsCard", () => {
         dailyState={emptyDaily}
         hasMetaFilter={true}
         hasHotmartFilter={true}
+        campaignsParams="?a=1"
       />
     );
     expect(html).toContain('data-chart="meta"');

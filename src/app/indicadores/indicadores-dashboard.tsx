@@ -329,6 +329,7 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
   const [leadsState, setLeadsState] = useState<SectionState<GlobalLeadsMetrics>>(initialSection());
   const [dailyState, setDailyState] = useState<SectionState<DailyPoint[]>>(initialSection());
   const [conversionSourcesState, setConversionSourcesState] = useState<SectionState<ConversionSourceRow[]>>(initialSection());
+  const [campaignsParams, setCampaignsParams] = useState("");
 
   // Estados da Planilha (breakdown semanal) — independentes dos cards para que
   // trocar de aba nunca dispare refetch do Dashboard, e vice-versa.
@@ -475,6 +476,8 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
 
     const period = { startDate: start, endDate: end };
     const params = `?${toSearchParams(expanded, period)}`;
+    // A lista de campanhas do card Meta Ads usa a mesma query string de /metrics.
+    setCampaignsParams(params);
 
     // O endpoint de leads só filtra por evento: mandar produto, termo de Meta
     // ou oferta para ele não restringe nada — é escopo, não ruído.
@@ -917,6 +920,7 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
                 onOfferCodeChange={handleOfferCodeChange}
                 hasMetaFilter={hasMetaFilter}
                 hasHotmartFilter={hasHotmartFilter}
+                campaignsParams={campaignsParams}
               />
             </div>
             {hasHotmartFilter && (
