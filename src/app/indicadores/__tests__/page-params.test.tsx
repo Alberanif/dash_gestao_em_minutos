@@ -18,6 +18,7 @@ jest.mock("@/components/indicadores/trend-charts", () => ({
 // Fora do runtime do Next, useSearchParams lê direto da URL do jsdom.
 jest.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(window.location.search),
+  useRouter: () => ({ replace: jest.fn(), push: jest.fn() }),
 }));
 
 const LS_FILTER_ID = "indicadores_active_filter_id";

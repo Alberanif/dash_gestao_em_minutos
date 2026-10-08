@@ -1,20 +1,20 @@
-/* Regras específicas do módulo Dash Ultimates. Tokens e identidade escura
+/* Regras específicas do Relatório de Vendas. Tokens e identidade escura
    vêm de src/app/dash-theme.css (.dash-dark) — este arquivo só cuida de
    layout e responsividade do módulo. */
 
-.ult-container {
+.vendas-container {
   max-width: 1220px;
   margin: 0 auto;
   padding: 0 28px 64px;
 }
 
 @media (max-width: 640px) {
-  .ult-container {
+  .vendas-container {
     padding: 0 16px 48px;
   }
 }
 
-.ult-header {
+.vendas-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -25,8 +25,8 @@
   margin-bottom: 28px;
 }
 
-/* Sub-header do ciclo (nome/produto à esquerda, ações à direita) */
-.ult-cycle-head {
+/* Sub-header da visualização (nome/produto à esquerda, ações à direita) */
+.vendas-view-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -34,7 +34,7 @@
   gap: 12px;
 }
 
-.ult-cycle-actions {
+.vendas-view-actions {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -42,25 +42,25 @@
 }
 
 @media (max-width: 640px) {
-  .ult-cycle-head {
+  .vendas-view-head {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .ult-cycle-actions {
+  .vendas-view-actions {
     justify-content: flex-start;
   }
 }
 
 /* KPIs — auto-fit no desktop, grade 2×N no celular */
-.ult-kpi-grid {
+.vendas-kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 14px;
 }
 
 @media (max-width: 640px) {
-  .ult-kpi-grid {
+  .vendas-kpi-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
   }
@@ -71,52 +71,30 @@
      não é oportunidade de quebra. Com `minWidth: 0` no tile (kpi-row.tsx) a
      track não estica, então o valor transbordava para fora do card.
 
-     `:nth-child(odd)` e não `:nth-child(3)` de propósito: vale igual para os 3
-     tiles do modo Apenas Compras e para os 5 do modo renovação — amarrar a uma
-     contagem faria a regra deixar de valer em silêncio ao ganhar ou perder um
+     `:nth-child(odd)` e não `:nth-child(3)` de propósito: vale igual para
+     qualquer quantidade de tiles — amarrar a uma contagem faria a regra deixar de valer em silêncio ao ganhar ou perder um
      tile. Como efeito colateral desejado, some o card órfão com buraco ao lado. */
-  .ult-kpi-grid > :last-child:nth-child(odd) {
+  .vendas-kpi-grid > :last-child:nth-child(odd) {
     grid-column: 1 / -1;
   }
 }
 
 /* Corpo do gráfico — altura via CSS para o mobile reduzir sem re-render */
-.ult-chart-body {
+.vendas-chart-body {
   width: 100%;
   height: 220px;
 }
 
 @media (max-width: 640px) {
-  .ult-chart-body {
+  .vendas-chart-body {
     height: 170px;
-  }
-}
-
-/* Toolbar do roster (busca + categoria) */
-.ult-roster-toolbar {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.ult-roster-toolbar .field-control {
-  flex: 1 1 180px;
-}
-
-@media (min-width: 641px) {
-  .ult-roster-toolbar .ult-roster-search {
-    max-width: 280px;
-  }
-
-  .ult-roster-toolbar .ult-roster-category {
-    max-width: 220px;
   }
 }
 
 /* Modais — dialog centralizado; no celular, margem lateral garantida,
    altura limitada pela viewport dinâmica (teclado aberto) e ações em
    coluna com largura total. */
-.ult-modal-overlay {
+.vendas-modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.6);
@@ -127,7 +105,7 @@
   padding: 16px;
 }
 
-.ult-modal-panel {
+.vendas-modal-panel {
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: 14px;
@@ -142,23 +120,23 @@
 }
 
 @media (max-width: 640px) {
-  .ult-modal-panel {
+  .vendas-modal-panel {
     padding: 18px 16px;
   }
 }
 
-.ult-modal-actions {
+.vendas-modal-actions {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
 }
 
 @media (max-width: 520px) {
-  .ult-modal-actions {
+  .vendas-modal-actions {
     flex-direction: column-reverse;
   }
 
-  .ult-modal-actions > button {
+  .vendas-modal-actions > button {
     width: 100%;
   }
 }
@@ -166,7 +144,7 @@
 /* Barra De/Até do recorte por período. Estilo próprio, e não o
    date-range-controls de components/layout: aquele usa tokens do tema claro
    (--color-text-muted) e classes Tailwind que não existem no .dash-dark. */
-.ult-date-filter {
+.vendas-date-filter {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -177,7 +155,7 @@
   border-radius: 11px;
 }
 
-.ult-date-field {
+.vendas-date-field {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -190,7 +168,7 @@
 
 /* color-scheme: dark faz o ícone nativo do calendário do Chrome aparecer claro
    sobre o fundo escuro — sem ele o botão fica preto no preto e some. */
-.ult-date-field input {
+.vendas-date-field input {
   font-size: 13px;
   font-weight: 500;
   letter-spacing: normal;
@@ -203,252 +181,30 @@
   color-scheme: dark;
 }
 
-.ult-date-field input:disabled {
+.vendas-date-field input:disabled {
   opacity: 0.5;
 }
 
-.ult-date-msg {
+.vendas-date-msg {
   font-size: 12px;
   color: var(--text-3);
 }
 
 /* Variante de leitura da barra (quem não é gestor). Peso e cor de rótulo forte
    porque aqui o intervalo é a informação, não a legenda de um controle. */
-.ult-date-readonly {
+.vendas-date-readonly {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-strong);
-}
-
-/* Tabelas de origem das compras (cruzamento com a base de inscritos). Markup
-   próprio em vez do DataTable compartilhado: aquele é ordenável por clique, e
-   aqui a ordem É a informação (conversão desc, "Não encontrados" sempre por
-   último). São 2 a 5 linhas — paginação e ordenação não têm o que servir. */
-.ult-origin-card {
-  padding: 16px 18px;
-  background: var(--surface);
-  border: 1px solid var(--border-vis);
-  border-radius: 11px;
-}
-
-.ult-origin-title {
-  margin: 0 0 12px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-strong);
-}
-
-/* A rolagem é do container, nunca da página: a tabela tem 4 colunas e no
-   celular a de rótulo pode estourar sozinha. */
-.ult-origin-scroll {
-  overflow-x: auto;
-}
-
-.ult-origin-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.ult-origin-table th,
-.ult-origin-table td {
-  padding: 9px 10px;
-  text-align: left;
-  border-bottom: 1px solid var(--border-vis);
-  white-space: nowrap;
-}
-
-.ult-origin-table thead th {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--text-label);
-}
-
-.ult-origin-table tbody tr:last-child th,
-.ult-origin-table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-/* Rótulo da linha é <th scope="row">: leitor de tela anuncia "Presencial" ao
-   ler cada célula da linha, em vez de soltar números sem referência. O reset do
-   peso vem porque th é bold por padrão e aqui o destaque é a conversão. */
-.ult-origin-label {
-  font-weight: 500;
-  color: var(--text-2);
-}
-
-.ult-origin-num {
-  text-align: right;
-  color: var(--text-2);
-  font-variant-numeric: tabular-nums;
-}
-
-.ult-origin-table thead th.ult-origin-num {
-  text-align: right;
-}
-
-.ult-origin-strong {
-  font-weight: 600;
-  color: var(--text-strong);
-}
-
-.ult-origin-empty {
-  color: var(--text-3);
-  text-align: center;
-  padding: 24px 10px;
-}
-
-/* Resumo da seleção do ciclo (produto + ofertas escolhidas dele), no modal de
-   criação/edição. Mora aqui, e não em style inline como o resto do modal,
-   porque o botão × precisa de :hover/:focus-visible — o alvo tem 20px e some
-   no meio da lista sem a confirmação visual de que está sob o cursor. Todas as
-   cores vêm dos tokens do .dash-dark; nenhuma é própria daqui. */
-.ult-selection {
-  border: 1px solid var(--border-vis);
-  border-radius: 11px;
-  background: var(--surface-2);
-  overflow: hidden;
-}
-
-.ult-selection-head {
-  margin: 0;
-  padding: 7px 12px;
-  border-bottom: 1px solid var(--border-vis);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-label);
-}
-
-.ult-selection-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.ult-selection-item {
-  padding: 9px 12px;
-}
-
-.ult-selection-item + .ult-selection-item {
-  border-top: 1px solid var(--border);
-}
-
-.ult-selection-product {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-width: 0;
-}
-
-label.ult-selection-product {
-  cursor: pointer;
-}
-
-.ult-selection-product input {
-  accent-color: var(--color-primary);
-  flex-shrink: 0;
-}
-
-.ult-selection-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-strong);
-}
-
-.ult-selection-id {
-  flex-shrink: 0;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-3);
-}
-
-/* Indentação alinhada ao NOME do produto, não à checkbox: é o que faz a oferta
-   ser lida como filha daquele produto e não como um item de mesmo nível. */
-.ult-selection-offers {
-  list-style: none;
-  margin: 6px 0 0;
-  padding: 0 0 0 25px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.ult-selection-offer {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  font-size: 12px;
-  color: var(--text-2);
-}
-
-.ult-selection-offer-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ult-selection-offer-count {
-  flex-shrink: 0;
-  font-size: 11px;
-  color: var(--text-3);
-  font-variant-numeric: tabular-nums;
-}
-
-.ult-selection-remove {
-  flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: none;
-  color: var(--text-3);
-  font-family: inherit;
-  font-size: 15px;
-  line-height: 1;
-  cursor: pointer;
-  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
-}
-
-.ult-selection-remove:hover,
-.ult-selection-remove:focus-visible {
-  color: var(--badge-red-fg);
-  background: var(--badge-red-bg);
-  border-color: color-mix(in srgb, var(--color-danger) 35%, transparent);
-}
-
-.ult-selection-empty {
-  margin: 6px 0 0 25px;
-  font-size: 11px;
-  color: var(--color-danger);
 }
 
 @media (max-width: 640px) {
-  .ult-date-filter {
+  .vendas-date-filter {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .ult-date-field input {
+  .vendas-date-field input {
     flex: 1;
-  }
-
-  /* O ID vira ruído antes do nome no celular: o nome é o que identifica. */
-  .ult-selection-id {
-    display: none;
   }
 }

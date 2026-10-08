@@ -1,14 +1,20 @@
 // Acúmulo no cliente das contagens da RPC (PRD issue #114, seção 3.3) —
-// GET /api/vendas/cycles/[id]/{daily,hourly} devolvem valores por bucket,
+// GET /api/vendas/views/[id]/{daily,hourly} devolvem valores por bucket,
 // não acumulados; o gráfico precisa da soma corrente.
-import type { UltimatesDailyRow, UltimatesHourlyRow } from "@/types/vendas";
 import { keyInRange, type DateRange } from "./date-range";
 
-// Séries alternáveis pelo switch do card "Evolução".
-export type UltimatesSeries = "renovacoes" | "novos";
+// Linhas de entrada do acúmulo: contagem de vendas por bucket.
+export interface CumulativeDailyRow {
+  day: string;
+  sales: number;
+}
+export interface CumulativeHourlyRow {
+  hour: string;
+  sales: number;
+}
 
-// Granularidade do eixo temporal do mesmo card.
-export type UltimatesGranularity = "dia" | "hora";
+// Granularidade do eixo temporal do gráfico.
+export type ChartGranularity = "dia" | "hora";
 
 // `key` é a chave temporal do bucket, no formato em que a RPC a devolveu:
 // "YYYY-MM-DD" na visão dia, "YYYY-MM-DDTHH" na visão hora. Quem desenha
@@ -19,16 +25,12 @@ export interface CumulativePoint {
   cumulative: number;
 }
 
-// Uma série por chamada, sobre o MESMO conjunto de dias: a RPC (migration 051)
-// agrega as duas contagens juntas, então dias em que a série pedida não teve
-// nada continuam presentes como patamar plano. É isso que faz os dois
-// gráficos serem comparáveis ponto a ponto ao alternar o switch.
+// Dias sem venda continuam presentes como patamar plano.
 export function buildCumulativeSeries(
-  days: UltimatesDailyRow[],
-  series: UltimatesSeries = "renovacoes",
+  days: CumulativeDailyRow[],
   // Recorte do filtro De/Até, aplicado ANTES do acúmulo: a curva começa do zero
-  // no primeiro bucket do intervalo e responde "quanto entrou no período" em
-  // vez de exibir uma fatia deslocada da curva do ciclo. `null` = ciclo inteiro.
+  // no primeiro bucket do intervalo e responde "quantas vendas entraram no
+  // período" em vez de exibir uma fatia deslocada da curva. `null` = tudo.
   range: DateRange | null = null
 ): CumulativePoint[] {
   const recortados = days.filter((d) => keyInRange(d.day, range));
@@ -40,10 +42,10 @@ export function buildCumulativeSeries(
   // palavra, porque é o mesmo modo de falha: daily/route.ts passa a contagem
   // por Number(...), então um valor não-numérico chega aqui como NaN, não como
   // null/undefined, e `??` não intercepta NaN. Um único NaN acumulado apaga o
-  // eixo Y inteiro no Recharts — e as duas curvas dividem o mesmo card.
+  // eixo Y inteiro no Recharts.
   let running = 0;
   return sorted.map((d) => {
-    const bruto = series === "novos" ? d.new_buyers : d.renewals;
+    const bruto = d.sales;
     running += Number.isFinite(bruto) ? bruto : 0;
     return { key: d.day, cumulative: running };
   });
@@ -76,14 +78,12 @@ function msParaHora(ms: number): string {
   return `${y}-${m}-${day}T${h}`;
 }
 
-// Teto de horas que o preenchimento tem permissão de materializar. O ciclo
-// (dash_gestao_vendas_cycles) não tem colunas de início/fim, e a RPC
-// (migration 054) filtra só por produto + status — ela devolve toda hora com
-// venda no histórico INTEIRO do produto, não só do ciclo corrente. O spec
-// (Risco #1) estima um ciclo de 6 meses em ~4300 pontos horários e já diz que
-// "fica pesado" — pesado, não impossível, e o teto não é o lugar de recusá-lo,
-// então ele precisa folgar acima disso: 8760h (1 ano) cobre os 6 meses e
-// ainda rejeita os casos realmente patológicos — produto com dois anos de
+// Teto de horas que o preenchimento tem permissão de materializar. A RPC
+// filtra só por produto + status — ela devolve toda hora com venda no
+// histórico INTEIRO do produto. O spec (Risco #1) estima 6 meses em ~4300
+// pontos horários e já diz que "fica pesado" — pesado, não impossível, e o
+// teto não é o lugar de recusá-lo, então ele precisa folgar acima disso:
+// 8760h (1 ano) cobre os 6 meses e ainda rejeita os casos realmente patológicos — produto com dois anos de
 // vendas (~17.500h de vão) e approved_date corrompida (ano 2999, por
 // exemplo, gerando um vão de milhões de horas que travaria a aba).
 const TETO_HORAS_PREENCHIDAS = 8760;
@@ -116,12 +116,11 @@ function semPreencher(contagens: Map<string, number>): CumulativePoint[] {
 // a mesma largura de uma hora cheia). A RPC devolve só horas com venda
 // justamente porque a expansão é barata aqui e cara no payload.
 export function buildHourlyCumulativeSeries(
-  hours: UltimatesHourlyRow[],
-  series: UltimatesSeries = "renovacoes",
+  hours: CumulativeHourlyRow[],
   range: DateRange | null = null
 ): CumulativePoint[] {
   // O recorte vem ANTES do guarda de vazio para que um intervalo sem nenhuma
-  // hora saia por [] pelo mesmo caminho de "ciclo sem venda". O intervalo é
+  // hora saia por [] pelo mesmo caminho de "sem venda". O intervalo é
   // comparado só pela parte de data da chave (keyInRange), então a hora do
   // bucket não participa — as pontas são dias inteiros.
   const recortados = hours.filter((h) => keyInRange(h.hour, range));
@@ -137,8 +136,7 @@ export function buildHourlyCumulativeSeries(
   // o eixo Y inteiro no Recharts.
   const contagens = new Map<string, number>();
   for (const h of sorted) {
-    const bruto = series === "novos" ? h.new_buyers : h.renewals;
-    const valor = Number.isFinite(bruto) ? bruto : 0;
+    const valor = Number.isFinite(h.sales) ? h.sales : 0;
     contagens.set(h.hour, (contagens.get(h.hour) ?? 0) + valor);
   }
 
@@ -172,8 +170,8 @@ export function buildHourlyCumulativeSeries(
   // REGERADA (`msParaHora`, abaixo). As duas só coincidem enquanto o to_char da
   // migration 054 emitir exatamente "YYYY-MM-DDTHH". Se ele derivar, todo
   // lookup erra, o acumulado nunca sai de zero e a guarda de vazio do
-  // CumulativeChart (último cumulative === 0) anuncia "Sem renovações
-  // registradas no ciclo ainda." — uma falha de encanamento vestida de
+  // CumulativeChart (último cumulative === 0) anuncia "Sem vendas
+  // registradas ainda." — uma falha de encanamento vestida de
   // resposta de negócio, o pior desfecho possível para um dashboard. Então a
   // premissa se verifica sozinha: se a volta não reproduz uma chave que
   // chegou de verdade, o preenchimento é abortado e os dados recebidos saem

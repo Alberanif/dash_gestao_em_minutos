@@ -1,13 +1,14 @@
 import type { VendasScreen } from "@/components/vendas/vendas-screen";
 
-// UltimatesPage é Server Component assíncrono: não passa por render() do
-// Testing Library (que não resolve Server Components), então chamamos a
-// função diretamente e inspecionamos o elemento JSX que ela devolve.
+// VendasPage é Server Component assíncrono: não passa por render() do
+// Testing Library, então chamamos a função diretamente e inspecionamos o
+// elemento JSX que ela devolve.
 
 const mockGetUser = jest.fn();
 const mockEq = jest.fn();
 const mockSelect = jest.fn();
 const mockFrom = jest.fn();
+const mockRedirect = jest.fn();
 
 jest.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: jest.fn(async () => ({
@@ -16,11 +17,8 @@ jest.mock("@/lib/supabase/server", () => ({
   })),
 }));
 
-// next/navigation.redirect lança de verdade em runtime (interrompe o RSC).
-// Aqui role é sempre "gestor", então nenhum caminho do teste deveria chamá-lo
-// — mas deixamos mockado (sem lançar) para não quebrar caso algo mude.
 jest.mock("next/navigation", () => ({
-  redirect: jest.fn(),
+  redirect: (...args: unknown[]) => mockRedirect(...args),
 }));
 
 beforeEach(() => {
@@ -41,28 +39,37 @@ beforeEach(() => {
   mockFrom.mockReturnValue({ select: mockSelect });
 });
 
-describe("UltimatesPage — query de produtos alimenta a trava de conta", () => {
-  it("pede account_id ao Supabase e repassa o campo para UltimatesScreen", async () => {
-    const UltimatesPage = (await import("../page")).default;
+describe("VendasPage — query de produtos alimenta a tela", () => {
+  it("pede account_id ao Supabase e repassa produtos e papel para VendasScreen", async () => {
+    const VendasPage = (await import("../page")).default;
 
-    const element = await UltimatesPage();
+    const element = await VendasPage();
 
-    // O modal "Novo ciclo" só trava a seleção numa única conta Hotmart porque
-    // account_id chega na query. Tirar o campo da string do .select() não
-    // quebra tipo nenhum (client Supabase é destipado) — só este teste pega.
+    // O client Supabase é destipado: tirar account_id da string do .select()
+    // não quebra tipo nenhum — só este teste pega.
     expect(mockFrom).toHaveBeenCalledWith("dash_gestao_hotmart_products");
     expect(mockSelect).toHaveBeenCalledWith(expect.stringContaining("account_id"));
 
-    // E precisa mesmo chegar até a tela, não só na query.
     const screenElement = element as unknown as {
       type: typeof VendasScreen;
-      props: { products: { product_id: string; account_id: string }[] };
+      props: { role: string; products: { product_id: string; account_id: string }[] };
     };
+    expect(screenElement.props.role).toBe("gestor");
     expect(screenElement.props.products).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ product_id: "p1", account_id: "acc-1" }),
         expect.objectContaining({ product_id: "p2", account_id: "acc-1" }),
       ])
     );
+  });
+
+  it("sem sessão redireciona para /login", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+    mockRedirect.mockImplementation(() => {
+      throw new Error("NEXT_REDIRECT");
+    });
+    const VendasPage = (await import("../page")).default;
+    await expect(VendasPage()).rejects.toThrow("NEXT_REDIRECT");
+    expect(mockRedirect).toHaveBeenCalledWith("/login");
   });
 });

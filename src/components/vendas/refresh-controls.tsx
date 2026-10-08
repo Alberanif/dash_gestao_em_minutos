@@ -1,40 +1,38 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { UltimatesCycleStatus } from "@/types/vendas";
 import { interpretRefreshResponse, formatRefreshedAgo, type RefreshOutcome } from "@/lib/vendas/refresh";
 
 interface RefreshControlsProps {
-  cycleId: string;
-  cycleStatus: UltimatesCycleStatus;
+  viewId: string;
+  // POST /api/vendas/views/[id]/refresh
+  refreshUrl: string;
   lastRefreshAt: string | null;
-  // Sucesso ⇒ o pai recarrega roster/daily (a fonte de KPIs/gráfico/tabela).
+  // Sucesso ⇒ o pai recarrega os números da visualização.
   onRefreshed: () => void;
 }
 
-// Botão "Atualizar agora" (PRD issue #114, seção 3.6, RF-7, critério 8).
-// POST /api/vendas/cycles/[id]/refresh — a interpretação da resposta
-// (throttle/lock/sucesso) fica em src/lib/ultimates/refresh.ts, testável
+// Botão "Atualizar agora". A interpretação da resposta
+// (throttle/lock/sucesso) fica em src/lib/vendas/refresh.ts, testável
 // sem DOM; este componente só orquestra fetch + estado de UI.
-export function RefreshControls({ cycleId, cycleStatus, lastRefreshAt, onRefreshed }: RefreshControlsProps) {
+export function RefreshControls({ viewId, refreshUrl, lastRefreshAt, onRefreshed }: RefreshControlsProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [feedback, setFeedback] = useState<RefreshOutcome | null>(null);
   const [localLastRefreshAt, setLocalLastRefreshAt] = useState(lastRefreshAt);
 
-  // cycle prop pode trocar (seletor de ciclo) — resincroniza o rótulo local.
+  // a visualização selecionada pode trocar — resincroniza o rótulo local.
   useEffect(() => {
     setLocalLastRefreshAt(lastRefreshAt);
     setFeedback(null);
-  }, [cycleId, lastRefreshAt]);
+  }, [viewId, lastRefreshAt]);
 
-  const isClosed = cycleStatus === "encerrado";
   const label = formatRefreshedAgo(localLastRefreshAt);
 
   async function handleClick() {
     setRefreshing(true);
     setFeedback(null);
     try {
-      const res = await fetch(`/api/vendas/cycles/${cycleId}/refresh`, { method: "POST" });
+      const res = await fetch(refreshUrl, { method: "POST" });
       const body = await res.json().catch(() => ({}));
       const outcome = interpretRefreshResponse(res.status, body);
       setFeedback(outcome);
@@ -51,22 +49,21 @@ export function RefreshControls({ cycleId, cycleStatus, lastRefreshAt, onRefresh
 
   return (
     <div
-      data-testid="ultimates-refresh-controls"
+      data-testid="vendas-refresh-controls"
       style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {label && (
-          <span data-testid="ultimates-refresh-label" style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+          <span data-testid="vendas-refresh-label" style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
             {label}
           </span>
         )}
         <button
           type="button"
           onClick={handleClick}
-          disabled={refreshing || isClosed}
+          disabled={refreshing}
           className="btn-secondary"
-          data-testid="ultimates-refresh-btn"
-          title={isClosed ? "Ciclo encerrado não pode ser atualizado" : undefined}
+          data-testid="vendas-refresh-btn"
         >
           {refreshing ? "Atualizando..." : "Atualizar agora"}
         </button>
@@ -74,7 +71,7 @@ export function RefreshControls({ cycleId, cycleStatus, lastRefreshAt, onRefresh
       {feedback && feedback.kind !== "success" && (
         <span
           role="status"
-          data-testid="ultimates-refresh-feedback"
+          data-testid="vendas-refresh-feedback"
           style={{
             fontSize: 12,
             color: feedback.kind === "throttled" ? "var(--color-warning)" : "var(--color-danger)",

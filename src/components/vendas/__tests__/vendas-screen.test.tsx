@@ -1,429 +1,350 @@
 /** @jest-environment jsdom */
 import React from "react";
-import { render, screen, within, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import { UltimatesScreen } from "../vendas-screen";
-import type { CycleWithProducts, HotmartProductOption } from "../types";
+import { VendasScreen } from "../vendas-screen";
+import type { HotmartProductOption } from "../types";
+import type { VendasFolderRecord, VendasViewRecord } from "@/types/vendas";
 
 const PRODUCTS: HotmartProductOption[] = [{ product_id: "p1", product_name: "Produto Um", account_id: "acc-1" }];
 
-function makeCycle(overrides: Partial<CycleWithProducts> = {}): CycleWithProducts {
+function makeView(overrides: Partial<VendasViewRecord> = {}): VendasViewRecord {
   return {
-    id: "c1",
-    name: "Ciclo 1",
+    id: "v1",
+    name: "Visão 1",
     account_id: "acc-1",
-    // Produto CONFIGURADO (migration 065): sem oferta escolhida o dashboard
-    // troca todos os números pelo bloco "Ofertas não configuradas".
-    products: [
-      {
-        product_id: "p1",
-        product_name: "Produto Um",
-        offer_codes: ["OF-1"],
-        rejected_offer_codes: [],
-        include_offerless: false,
-      },
-    ],
-    goal_percent: 50,
-    status: "ativo",
+    product_id: "p1",
+    offer_codes: ["OF-1", "OF-2"],
+    folder_id: null,
+    view_start_date: null,
+    view_end_date: null,
     refresh_started_at: null,
     last_refresh_at: null,
-    created_by: "user-1",
-    created_at: "2026-07-19T00:00:00Z",
-    updated_at: "2026-07-19T00:00:00Z",
-    counts_new_buyers: true,
-    purchases_only: false,
+    backfill_status: "done",
+    backfill_from: null,
+    migrated_from_cycle_id: null,
+    created_by: "u1",
+    created_at: "2026-08-01T00:00:00Z",
+    updated_at: "2026-08-01T00:00:00Z",
     ...overrides,
   };
 }
 
-function mockCyclesFetch(cycles: CycleWithProducts[]) {
-  global.fetch = jest.fn().mockResolvedValue({
-    ok: true,
-    json: async () => ({ cycles }),
-  }) as unknown as typeof global.fetch;
+const FOLDER = {
+  id: "f1",
+  name: "Lançamentos",
+  created_by: "u1",
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
+} as unknown as VendasFolderRecord;
+
+interface Mock {
+  views: VendasViewRecord[];
+  unmigrated?: { id: string; name: string }[];
+  folders?: VendasFolderRecord[];
+  kpis?: { sales: number; refunded: number };
+  daily?: { day: string; sales: number }[];
+  offers?: { offer_code: string; offer_name: string | null; sales: number; refunded: number }[];
+  // Sobrescritas por rota: "METHOD url" → resposta.
+  overrides?: Record<string, { status?: number; body: unknown }>;
 }
 
-afterEach(() => {
-  jest.restoreAllMocks();
-});
-
-describe("UltimatesScreen — estado vazio", () => {
-  it("gestor vê CTA para criar o primeiro ciclo", async () => {
-    mockCyclesFetch([]);
-    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
-
-    expect(await screen.findByTestId("ultimates-empty-state")).toBeInTheDocument();
-    expect(screen.getByTestId("ultimates-create-cta")).toBeInTheDocument();
-  });
-
-  it("analista vê mensagem informativa, sem CTA de criação", async () => {
-    mockCyclesFetch([]);
-    render(<UltimatesScreen role="analista" products={PRODUCTS} />);
-
-    expect(await screen.findByTestId("ultimates-empty-state")).toBeInTheDocument();
-    expect(screen.queryByTestId("ultimates-create-cta")).not.toBeInTheDocument();
-  });
-});
-
-describe("UltimatesScreen — gates de papel com ciclos existentes", () => {
-  it("gestor vê botão Novo ciclo e botão de editar o ciclo selecionado", async () => {
-    mockCyclesFetch([makeCycle()]);
-    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
-
-    expect(await screen.findByTestId("ultimates-new-cycle-btn")).toBeInTheDocument();
-    expect(screen.getByTestId("ultimates-edit-cycle-btn")).toBeInTheDocument();
-  });
-
-  it("analista não vê botão Novo ciclo nem botão de editar", async () => {
-    mockCyclesFetch([makeCycle()]);
-    render(<UltimatesScreen role="analista" products={PRODUCTS} />);
-
-    expect(await screen.findByTestId("ultimates-dashboard-slot")).toBeInTheDocument();
-    expect(screen.queryByTestId("ultimates-new-cycle-btn")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("ultimates-edit-cycle-btn")).not.toBeInTheDocument();
-  });
-});
-
-describe("UltimatesScreen — seletor de ciclo", () => {
-  it("abre no ciclo ativo mais recente, mesmo quando não é o primeiro/mais recente da lista", async () => {
-    // Ordenado created_at desc, como o contrato de GET /api/vendas/cycles: o
-    // primeiro (mais recente) está encerrado; o ativo mais recente vem depois.
-    const cycles = [
-      makeCycle({ id: "c3", name: "Ciclo Mais Recente (encerrado)", status: "encerrado", created_at: "2026-07-19T00:00:00Z" }),
-      makeCycle({ id: "c2", name: "Ciclo Ativo Recente", status: "ativo", created_at: "2026-07-18T00:00:00Z" }),
-      makeCycle({ id: "c1", name: "Ciclo Ativo Antigo", status: "ativo", created_at: "2026-07-01T00:00:00Z" }),
-    ];
-    mockCyclesFetch(cycles);
-    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
-
-    expect(await screen.findByTestId("ultimates-selected-cycle")).toHaveTextContent("Ciclo Ativo Recente");
-  });
-
-  it("cai no ciclo mais recente (mesmo encerrado) quando não há nenhum ativo", async () => {
-    const cycles = [
-      makeCycle({ id: "c2", name: "Encerrado Recente", status: "encerrado", created_at: "2026-07-19T00:00:00Z" }),
-      makeCycle({ id: "c1", name: "Encerrado Antigo", status: "encerrado", created_at: "2026-07-01T00:00:00Z" }),
-    ];
-    mockCyclesFetch(cycles);
-    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
-
-    expect(await screen.findByTestId("ultimates-selected-cycle")).toHaveTextContent("Encerrado Recente");
-  });
-
-  it("ciclo encerrado exibe badge 'Encerrado' no seletor; ciclo ativo convive com ele e ambos ficam disponíveis", async () => {
-    const cycles = [
-      makeCycle({ id: "c2", name: "Ciclo Encerrado", status: "encerrado", created_at: "2026-07-19T00:00:00Z" }),
-      makeCycle({ id: "c1", name: "Ciclo Ativo", status: "ativo", created_at: "2026-07-18T00:00:00Z" }),
-    ];
-    mockCyclesFetch(cycles);
-    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
-
-    await screen.findByTestId("ultimates-dashboard-slot");
-
-    const selector = screen.getByTestId("ultimates-cycle-selector");
-    const encerradoOption = within(selector).getByTestId("ultimates-cycle-option-c2");
-    expect(within(encerradoOption).getByText("Encerrado")).toBeInTheDocument();
-    expect(within(selector).getByTestId("ultimates-cycle-option-c1")).toBeInTheDocument();
-  });
-});
-
-describe("UltimatesScreen — exclusão de ciclo", () => {
-  function mockCyclesAndDelete(cycles: CycleWithProducts[], deleteOk = true) {
-    const fetchMock = jest.fn((url: string, init?: RequestInit) => {
-      if (init?.method === "DELETE") {
-        return Promise.resolve({ ok: deleteOk, status: deleteOk ? 200 : 500, json: async () => ({}) });
-      }
-      // Rotas do dashboard (roster / daily / excluded-offers) — vazias bastam.
-      if (url.includes("/api/vendas/cycles/")) {
-        return Promise.resolve({ ok: true, json: async () => ({ rows: [], days: [], offers: [] }) });
-      }
-      return Promise.resolve({ ok: true, json: async () => ({ cycles }) });
-    });
-    global.fetch = fetchMock as unknown as typeof global.fetch;
-    return fetchMock;
-  }
-
-  async function deleteSelectedCycle(name: string) {
-    fireEvent.click(screen.getByTestId("ultimates-edit-cycle-btn"));
-    fireEvent.click(await screen.findByTestId("cycle-form-delete-open"));
-    fireEvent.change(screen.getByTestId("cycle-form-delete-confirm-input"), {
-      target: { value: name },
-    });
-    fireEvent.click(screen.getByTestId("cycle-form-delete-confirm"));
-  }
-
-  // A reseleção usa selectInitialCycleId, não "o primeiro da lista": com um
-  // encerrado mais recente sobrando, cair no primeiro abriria o encerrado.
-  it("remove o ciclo excluído do seletor e reseleciona o ativo mais recente restante", async () => {
-    const cycles = [
-      makeCycle({ id: "c3", name: "Encerrado Recente", status: "encerrado", created_at: "2026-07-19T00:00:00Z" }),
-      makeCycle({ id: "c2", name: "Ativo Recente", status: "ativo", created_at: "2026-07-18T00:00:00Z" }),
-      makeCycle({ id: "c1", name: "Ativo Antigo", status: "ativo", created_at: "2026-07-01T00:00:00Z" }),
-    ];
-    const fetchMock = mockCyclesAndDelete(cycles);
-    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
-
-    expect(await screen.findByTestId("ultimates-selected-cycle")).toHaveTextContent("Ativo Recente");
-
-    await deleteSelectedCycle("Ativo Recente");
-
-    await waitFor(() =>
-      expect(screen.queryByTestId("ultimates-cycle-option-c2")).not.toBeInTheDocument()
-    );
-    expect(fetchMock).toHaveBeenCalledWith("/api/vendas/cycles/c2", { method: "DELETE" });
-    expect(screen.getByTestId("ultimates-selected-cycle")).toHaveTextContent("Ativo Antigo");
-    expect(screen.getByTestId("ultimates-cycle-option-c3")).toBeInTheDocument();
-    expect(screen.getByTestId("ultimates-cycle-option-c1")).toBeInTheDocument();
-  });
-
-  it("excluir o último ciclo cai no estado vazio, sem seleção pendurada", async () => {
-    mockCyclesAndDelete([makeCycle({ id: "c1", name: "Único Ciclo" })]);
-    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
-
-    await screen.findByTestId("ultimates-dashboard-slot");
-    await deleteSelectedCycle("Único Ciclo");
-
-    expect(await screen.findByTestId("ultimates-empty-state")).toBeInTheDocument();
-    expect(screen.queryByTestId("ultimates-cycle-selector")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("ultimates-dashboard-slot")).not.toBeInTheDocument();
-  });
-
-  it("fecha o modal ao concluir a exclusão", async () => {
-    mockCyclesAndDelete([
-      makeCycle({ id: "c2", name: "Ciclo Alvo", created_at: "2026-07-19T00:00:00Z" }),
-      makeCycle({ id: "c1", name: "Ciclo Restante", created_at: "2026-07-01T00:00:00Z" }),
-    ]);
-    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
-
-    await screen.findByTestId("ultimates-dashboard-slot");
-    await deleteSelectedCycle("Ciclo Alvo");
-
-    await waitFor(() => expect(screen.queryByTestId("cycle-form-save")).not.toBeInTheDocument());
-    expect(screen.getByTestId("ultimates-selected-cycle")).toHaveTextContent("Ciclo Restante");
-  });
-
-  it("falha na exclusão mantém o ciclo na lista e o modal aberto", async () => {
-    mockCyclesAndDelete([makeCycle({ id: "c1", name: "Único Ciclo" })], false);
-    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
-
-    await screen.findByTestId("ultimates-dashboard-slot");
-    await deleteSelectedCycle("Único Ciclo");
-
-    expect(await screen.findByTestId("cycle-form-delete-error")).toBeInTheDocument();
-    expect(screen.getByTestId("ultimates-cycle-option-c1")).toBeInTheDocument();
-    expect(screen.queryByTestId("ultimates-empty-state")).not.toBeInTheDocument();
-  });
-
-  it("analista não alcança a exclusão: sem botão de editar, sem modal", async () => {
-    mockCyclesAndDelete([makeCycle({ id: "c1", name: "Único Ciclo" })]);
-    render(<UltimatesScreen role="analista" products={PRODUCTS} />);
-
-    await screen.findByTestId("ultimates-dashboard-slot");
-    expect(screen.queryByTestId("ultimates-edit-cycle-btn")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("cycle-form-delete-open")).not.toBeInTheDocument();
-  });
-});
-
-describe("UltimatesScreen — persistência do switch Novas Compras", () => {
-  function mockCyclesAndPatch(patchOk: boolean, initialCountsNewBuyers = true) {
-    const fetchMock = jest.fn((url: string, init?: RequestInit) => {
-      if (init?.method === "PATCH") {
-        return Promise.resolve({ ok: patchOk, json: async () => ({}) });
-      }
-      // Rotas do dashboard (roster / daily / excluded-offers) — vazias bastam.
-      if (url.includes("/api/vendas/cycles/")) {
-        return Promise.resolve({ ok: true, json: async () => ({ rows: [], days: [], offers: [] }) });
-      }
-      return Promise.resolve({
-        ok: true,
-        json: async () => ({ cycles: [makeCycle({ counts_new_buyers: initialCountsNewBuyers })] }),
+function installFetch(m: Mock) {
+  const calls: { method: string; url: string; body?: unknown }[] = [];
+  global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    calls.push({ method, url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    const over = m.overrides?.[`${method} ${url}`];
+    const respond = (body: unknown, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
+    if (over) return respond(over.body, over.status ?? 200);
+    const path = url.split("?")[0];
+    if (path === "/api/vendas/views" && method === "GET") return respond({ views: m.views, unmigrated_cycles: m.unmigrated ?? [] });
+    if (path === "/api/vendas/folders" && method === "GET") return respond({ folders: m.folders ?? [] });
+    if (/\/kpis$/.test(path)) return respond(m.kpis ?? { sales: 7, refunded: 2 });
+    if (/\/daily$/.test(path)) return respond({ rows: m.daily ?? [{ day: "2026-08-01", sales: 3 }, { day: "2026-08-02", sales: 4 }] });
+    if (/\/hourly$/.test(path)) return respond({ rows: [{ hour: "2026-08-01T10", sales: 7 }] });
+    if (/\/offers$/.test(path))
+      return respond({
+        rows: m.offers ?? [
+          { offer_code: "OF-1", offer_name: "Oferta Um", sales: 7, refunded: 2 },
+          { offer_code: "OF-2", offer_name: null, sales: 0, refunded: 0 },
+        ],
       });
+    if (/offer-options/.test(path)) return respond({ offers: [{ offer_code: "OF-1", offer_name: "Oferta Um", sales_count: 7 }] });
+    return respond({ error: "sem mock" }, 404);
+  }) as unknown as typeof global.fetch;
+  return calls;
+}
+
+let confirmSpy: jest.SpyInstance;
+let alertSpy: jest.SpyInstance;
+
+beforeEach(() => {
+  confirmSpy = jest.spyOn(window, "confirm").mockImplementation(() => true);
+  alertSpy = jest.spyOn(window, "alert").mockImplementation(() => {});
+});
+
+afterEach(() => {
+  // Nenhum fluxo da tela pode recorrer aos diálogos nativos.
+  expect(confirmSpy).not.toHaveBeenCalled();
+  expect(alertSpy).not.toHaveBeenCalled();
+  jest.restoreAllMocks();
+  jest.useRealTimers();
+});
+
+describe("VendasScreen — estado vazio e papéis", () => {
+  it("gestor sem visualizações vê o CTA de criar", async () => {
+    installFetch({ views: [] });
+    render(<VendasScreen role="gestor" products={PRODUCTS} />);
+    expect(await screen.findByText("Nenhuma visualização criada ainda")).toBeInTheDocument();
+    expect(screen.getByTestId("vendas-create-cta")).toBeInTheDocument();
+  });
+
+  it("analista sem visualizações vê texto informativo, sem CTA nem botão de criar", async () => {
+    installFetch({ views: [] });
+    render(<VendasScreen role="analista" products={PRODUCTS} />);
+    expect(await screen.findByText("Nenhuma visualização criada ainda")).toBeInTheDocument();
+    expect(screen.queryByTestId("vendas-create-cta")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("vendas-new-view-btn")).not.toBeInTheDocument();
+  });
+
+  it("gestor vê criar, editar e editar período; analista não vê nenhum deles (mas vê Atualizar agora)", async () => {
+    installFetch({ views: [makeView()], folders: [FOLDER] });
+    const { unmount } = render(<VendasScreen role="gestor" products={PRODUCTS} />);
+    await screen.findByTestId("view-dashboard");
+    expect(screen.getByTestId("vendas-new-view-btn")).toBeInTheDocument();
+    expect(screen.getByTestId("vendas-edit-view-btn")).toBeInTheDocument();
+    expect(screen.getByTestId("vendas-date-apply")).toBeInTheDocument();
+    unmount();
+
+    installFetch({ views: [makeView({ view_start_date: "2026-08-01", view_end_date: "2026-08-10" })], folders: [FOLDER] });
+    render(<VendasScreen role="analista" products={PRODUCTS} />);
+    await screen.findByTestId("view-dashboard");
+    expect(screen.queryByTestId("vendas-new-view-btn")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("vendas-new-folder-btn")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("vendas-edit-view-btn")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("vendas-date-apply")).not.toBeInTheDocument();
+    expect(screen.getByTestId("vendas-date-readonly")).toBeInTheDocument();
+    expect(screen.getByTestId("vendas-refresh-btn")).toBeInTheDocument();
+  });
+
+  it("abre a visualização mais recente por created_at", async () => {
+    installFetch({
+      views: [
+        makeView({ id: "velha", name: "Velha", created_at: "2026-01-01T00:00:00Z" }),
+        makeView({ id: "nova", name: "Nova", created_at: "2026-08-05T00:00:00Z" }),
+      ],
     });
-    global.fetch = fetchMock as unknown as typeof global.fetch;
-    return fetchMock;
-  }
-
-  it("faz PATCH com countsNewBuyers ao alternar", async () => {
-    const fetchMock = mockCyclesAndPatch(true);
-    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
-
-    fireEvent.click(await screen.findByTestId("ultimates-new-purchases-toggle"));
-
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/vendas/cycles/c1",
-        expect.objectContaining({
-          method: "PATCH",
-          body: JSON.stringify({ countsNewBuyers: false }),
-        })
-      )
-    );
+    render(<VendasScreen role="gestor" products={PRODUCTS} />);
+    expect(await screen.findByTestId("view-selected-name")).toHaveTextContent("Nova");
   });
 
-  it("aplica de forma otimista antes da resposta", async () => {
-    mockCyclesAndPatch(true);
-    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
-
-    const toggle = await screen.findByTestId("ultimates-new-purchases-toggle");
-    expect(toggle).toHaveAttribute("aria-checked", "true");
-
-    fireEvent.click(toggle);
-
-    await waitFor(() =>
-      expect(screen.getByTestId("ultimates-new-purchases-toggle")).toHaveAttribute(
-        "aria-checked",
-        "false"
-      )
+  it("aviso de ciclos antigos não migrados aparece só para o gestor", async () => {
+    const mock = { views: [makeView()], unmigrated: [{ id: "c1", name: "Ciclo A" }, { id: "c2", name: "Ciclo B" }] };
+    installFetch(mock);
+    const { unmount } = render(<VendasScreen role="gestor" products={PRODUCTS} />);
+    expect(await screen.findByTestId("vendas-unmigrated-notice")).toHaveTextContent(
+      "2 ciclos antigos não foram migrados por falta de ofertas configuradas."
     );
-  });
+    unmount();
 
-  it("reverte o switch e mostra o erro quando o PATCH falha", async () => {
-    mockCyclesAndPatch(false);
-    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
-
-    const toggle = await screen.findByTestId("ultimates-new-purchases-toggle");
-    fireEvent.click(toggle);
-
-    expect(await screen.findByTestId("ultimates-new-purchases-feedback")).toHaveTextContent(
-      "Não foi possível salvar a configuração."
-    );
-    expect(screen.getByTestId("ultimates-new-purchases-toggle")).toHaveAttribute(
-      "aria-checked",
-      "true"
-    );
-  });
-
-  it("reverte o switch para 'false' quando o PATCH falha partindo de counts_new_buyers = false", async () => {
-    // Simétrico ao teste acima, mas partindo do estado oposto: a fixture do
-    // describe é counts_new_buyers = true, então o teste anterior só percorre
-    // true → false → true. Uma implementação que troque `previous` por um
-    // literal `true` hardcoded passaria idêntico nele. Partindo de false, o
-    // rollback correto é false → true → false; um literal `true` faria o
-    // switch terminar em "true" e este teste capturaria o erro.
-    mockCyclesAndPatch(false, false);
-    render(<UltimatesScreen role="gestor" products={PRODUCTS} />);
-
-    const toggle = await screen.findByTestId("ultimates-new-purchases-toggle");
-    expect(toggle).toHaveAttribute("aria-checked", "false");
-
-    fireEvent.click(toggle);
-
-    expect(await screen.findByTestId("ultimates-new-purchases-feedback")).toHaveTextContent(
-      "Não foi possível salvar a configuração."
-    );
-    expect(screen.getByTestId("ultimates-new-purchases-toggle")).toHaveAttribute(
-      "aria-checked",
-      "false"
-    );
-  });
-
-  it("o switch fica travado para analista", async () => {
-    mockCyclesAndPatch(true);
-    render(<UltimatesScreen role="analista" products={PRODUCTS} />);
-
-    expect(await screen.findByTestId("ultimates-new-purchases-toggle")).toBeDisabled();
+    installFetch(mock);
+    render(<VendasScreen role="analista" products={PRODUCTS} />);
+    await screen.findByTestId("view-dashboard");
+    expect(screen.queryByTestId("vendas-unmigrated-notice")).not.toBeInTheDocument();
   });
 });
 
-// O recibo da troca de produtos vive na TELA, não no modal: quando a contagem
-// existe, o modal já fechou. Se ele sumir, a única evidência de que N linhas de
-// roster foram apagadas some com ele.
-describe("UltimatesScreen — recibo da troca de produtos", () => {
-  const PRODUCTS_2: HotmartProductOption[] = [
-    { product_id: "p1", product_name: "Produto Um", account_id: "acc-1" },
-    { product_id: "p2", product_name: "Produto Dois", account_id: "acc-1" },
-  ];
-
-  // Uma oferta por produto (migration 065). Sem isto o form não deixa salvar:
-  // produto sem oferta escolhida não configura o ciclo.
-  const OFFER_OPTIONS = [
-    { offer_code: "OF-1", offer_name: "Oferta Um", product_id: "p1", product_name: "Produto Um", sales_count: 10 },
-    { offer_code: "OF-2", offer_name: "Oferta Dois", product_id: "p2", product_name: "Produto Dois", sales_count: 5 },
-  ];
-
-  function mockCyclesAndPatch(products: unknown) {
-    const fetchMock = jest.fn((url: string, init?: RequestInit) => {
-      if (init?.method === "PATCH") {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ cycle: makeCycle(), products }),
-        });
-      }
-      if (url.includes("/api/vendas/offer-options")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ offers: OFFER_OPTIONS, offerless: [] }),
-        });
-      }
-      if (url.includes("/api/vendas/cycles/")) {
-        return Promise.resolve({ ok: true, json: async () => ({ rows: [], days: [], offers: [] }) });
-      }
-      return Promise.resolve({ ok: true, json: async () => ({ cycles: [makeCycle()] }) });
-    });
-    global.fetch = fetchMock as unknown as typeof global.fetch;
-    return fetchMock;
-  }
-
-  async function trocarProdutos() {
-    fireEvent.click(screen.getByTestId("ultimates-edit-cycle-btn"));
-    fireEvent.click(await screen.findByTestId("cycle-form-product-option-p2"));
-    // p2 entra com oferta escolhida; sem ela o salvar para na validação.
-    fireEvent.click(await screen.findByTestId("cycle-form-offers-toggle-p2"));
-    fireEvent.click(screen.getByTestId("cycle-form-offer-p2-OF-2"));
-    fireEvent.click(screen.getByTestId("cycle-form-product-option-p1"));
-    fireEvent.click(screen.getByTestId("cycle-form-save"));
-    // Segundo clique: p1 sai do ciclo.
-    fireEvent.click(screen.getByTestId("cycle-form-save"));
-  }
-
-  it("mostra quantos compradores saíram do roster", async () => {
-    mockCyclesAndPatch({
-      products_added: 1,
-      products_removed: 1,
-      buyers_removed: 12,
-      buyers_materialized: 4,
-    });
-    render(<UltimatesScreen role="gestor" products={PRODUCTS_2} />);
-    await screen.findByTestId("ultimates-dashboard-slot");
-
-    await trocarProdutos();
-
-    const aviso = await screen.findByTestId("ultimates-products-notice");
-    expect(aviso).toHaveTextContent("1 adicionado(s)");
-    expect(aviso).toHaveTextContent("1 removido(s)");
-    expect(aviso).toHaveTextContent("12 comprador(es) saíram do roster");
-    expect(aviso).toHaveTextContent("4 comprador(es) entraram");
+describe("VendasScreen — números do dashboard", () => {
+  it("KPI, soma do gráfico por dia e soma da quebra por oferta mostram o mesmo total, sem alerta de divergência", async () => {
+    installFetch({ views: [makeView()] });
+    render(<VendasScreen role="gestor" products={PRODUCTS} />);
+    await screen.findByTestId("view-kpi-sales");
+    expect(screen.getByTestId("view-kpi-sales-value")).toHaveTextContent("7");
+    expect(screen.getByText("Total no gráfico: 7")).toBeInTheDocument();
+    expect(screen.getByText("Total nas ofertas: 7")).toBeInTheDocument();
+    expect(screen.getByTestId("view-kpi-refunded-value")).toHaveTextContent("2");
+    expect(screen.queryByTestId("view-totals-mismatch")).not.toBeInTheDocument();
   });
 
-  it("o recibo é dispensável e some no clique", async () => {
-    mockCyclesAndPatch({
-      products_added: 0,
-      products_removed: 1,
-      buyers_removed: 2,
-      buyers_materialized: 0,
-    });
-    render(<UltimatesScreen role="gestor" products={PRODUCTS_2} />);
-    await screen.findByTestId("ultimates-dashboard-slot");
-
-    await trocarProdutos();
-    await screen.findByTestId("ultimates-products-notice");
-
-    fireEvent.click(screen.getByTestId("ultimates-products-notice-dismiss"));
-    expect(screen.queryByTestId("ultimates-products-notice")).not.toBeInTheDocument();
+  it("avisa quando KPI, dia e oferta divergem", async () => {
+    installFetch({ views: [makeView()], kpis: { sales: 9, refunded: 0 } });
+    render(<VendasScreen role="gestor" products={PRODUCTS} />);
+    expect(await screen.findByTestId("view-totals-mismatch")).toHaveTextContent("KPI 9");
   });
 
-  it("edição sem troca de produtos não mostra recibo nenhum", async () => {
-    mockCyclesAndPatch(null);
-    render(<UltimatesScreen role="gestor" products={PRODUCTS_2} />);
-    await screen.findByTestId("ultimates-dashboard-slot");
+  it("oferta sem venda coletada aparece com 0 e a marca '0 vendas coletadas'; oferta com venda não tem a marca", async () => {
+    installFetch({ views: [makeView()] });
+    render(<VendasScreen role="gestor" products={PRODUCTS} />);
+    await screen.findByTestId("view-offers-list");
+    expect(screen.getByTestId("view-offer-OF-2-sales")).toHaveTextContent("0");
+    expect(screen.getByTestId("view-offer-OF-2-empty")).toHaveTextContent("0 vendas coletadas");
+    expect(screen.queryByTestId("view-offer-OF-1-empty")).not.toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByTestId("ultimates-edit-cycle-btn"));
-    fireEvent.change(await screen.findByTestId("cycle-form-name"), {
-      target: { value: "Outro nome" },
+  it("indicador de reembolsadas explica o reembolso retroativo", async () => {
+    installFetch({ views: [makeView()] });
+    render(<VendasScreen role="gestor" products={PRODUCTS} />);
+    await screen.findByTestId("view-kpi-refunded");
+    expect(screen.queryByTestId("view-refunded-help")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("view-refunded-help-btn"));
+    expect(screen.getByTestId("view-refunded-help")).toHaveTextContent("retroativo");
+  });
+
+  it("alternar para Hora troca o título do gráfico por dia", async () => {
+    installFetch({ views: [makeView()] });
+    render(<VendasScreen role="gestor" products={PRODUCTS} />);
+    await screen.findByTestId("view-daily-chart");
+    expect(screen.getByTestId("view-daily-chart")).toHaveTextContent("Vendas por dia");
+    fireEvent.click(screen.getByTestId("view-daily-granularity-hora"));
+    expect(screen.getByTestId("view-daily-chart")).toHaveTextContent("Vendas por hora");
+  });
+
+  it("período salvo vai nas rotas de dados como start/end", async () => {
+    const calls = installFetch({ views: [makeView({ view_start_date: "2026-08-01", view_end_date: "2026-08-10" })] });
+    render(<VendasScreen role="analista" products={PRODUCTS} />);
+    await screen.findByTestId("view-kpi-sales");
+    expect(calls.some((c) => c.url === "/api/vendas/views/v1/kpis?start=2026-08-01&end=2026-08-10")).toBe(true);
+  });
+
+  it("gestor salva o período por PATCH da visualização e os números são relidos com ele", async () => {
+    const updated = makeView({ view_start_date: "2026-08-01", view_end_date: "2026-08-05" });
+    const calls = installFetch({
+      views: [makeView()],
+      overrides: { "PATCH /api/vendas/views/v1": { body: { view: updated } } },
     });
-    fireEvent.click(screen.getByTestId("cycle-form-save"));
+    render(<VendasScreen role="gestor" products={PRODUCTS} />);
+    await screen.findByTestId("view-kpi-sales");
+    fireEvent.change(screen.getByTestId("vendas-date-start"), { target: { value: "2026-08-01" } });
+    fireEvent.change(screen.getByTestId("vendas-date-end"), { target: { value: "2026-08-05" } });
+    fireEvent.click(screen.getByTestId("vendas-date-apply"));
+    await waitFor(() =>
+      expect(calls.find((c) => c.method === "PATCH")?.body).toEqual({ view_start_date: "2026-08-01", view_end_date: "2026-08-05" })
+    );
+    await waitFor(() => expect(calls.some((c) => c.url.includes("kpis?start=2026-08-01&end=2026-08-05"))).toBe(true));
+  });
+});
 
-    await waitFor(() => expect(screen.queryByTestId("cycle-form-save")).not.toBeInTheDocument());
-    expect(screen.queryByTestId("ultimates-products-notice")).not.toBeInTheDocument();
+describe("VendasScreen — estados do backfill", () => {
+  it("done: histórico completo, sem selo de incompleto", async () => {
+    installFetch({ views: [makeView({ backfill_status: "done" })] });
+    render(<VendasScreen role="gestor" products={PRODUCTS} />);
+    const notice = await screen.findByTestId("view-backfill-notice");
+    expect(notice).toHaveAttribute("data-backfill-status", "done");
+    await screen.findByTestId("view-kpi-sales");
+    expect(screen.getByTestId("view-kpi-sales")).not.toHaveTextContent(/parcial|Coletando|falhou/);
+  });
+
+  it("running: 'Coletando histórico…' e o KPI não se apresenta como completo", async () => {
+    installFetch({ views: [makeView({ backfill_status: "running" })] });
+    render(<VendasScreen role="gestor" products={PRODUCTS} />);
+    expect(await screen.findByTestId("view-backfill-notice")).toHaveTextContent("Coletando histórico…");
+    await screen.findByTestId("view-kpi-sales");
+    expect(screen.getByTestId("view-kpi-sales")).toHaveTextContent("Coletando histórico…");
+  });
+
+  it("partial: mostra a data inicial e marca o KPI como parcial", async () => {
+    installFetch({ views: [makeView({ backfill_status: "partial", backfill_from: "2026-07-01" })] });
+    render(<VendasScreen role="analista" products={PRODUCTS} />);
+    expect(await screen.findByTestId("view-backfill-notice")).toHaveTextContent("a partir de 01/07/2026");
+    await screen.findByTestId("view-kpi-sales");
+    expect(screen.getByTestId("view-kpi-sales")).toHaveTextContent("Histórico parcial");
+  });
+
+  it("failed: mensagem de falha, KPI marcado e 'Tentar novamente' dispara o refresh da visualização", async () => {
+    const calls = installFetch({
+      views: [makeView({ backfill_status: "failed" })],
+      overrides: { "POST /api/vendas/views/v1/refresh": { body: { view: makeView({ backfill_status: "running" }) } } },
+    });
+    render(<VendasScreen role="analista" products={PRODUCTS} />);
+    const notice = await screen.findByTestId("view-backfill-notice");
+    expect(notice).toHaveTextContent("Não foi possível coletar o histórico");
+    await screen.findByTestId("view-kpi-sales");
+    expect(screen.getByTestId("view-kpi-sales")).toHaveTextContent("Coleta falhou");
+    fireEvent.click(screen.getByTestId("view-backfill-retry"));
+    await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.url === "/api/vendas/views/v1/refresh")).toBe(true));
+  });
+
+  it("falha do retry (409) mostra o erro do servidor", async () => {
+    installFetch({
+      views: [makeView({ backfill_status: "failed" })],
+      overrides: { "POST /api/vendas/views/v1/refresh": { status: 409, body: { error: "Atualização já em andamento." } } },
+    });
+    render(<VendasScreen role="gestor" products={PRODUCTS} />);
+    fireEvent.click(await screen.findByTestId("view-backfill-retry"));
+    expect(await screen.findByTestId("view-backfill-retry-error")).toHaveTextContent("Atualização já em andamento.");
+  });
+
+  it("running faz poll da visualização até concluir", async () => {
+    jest.useFakeTimers({ doNotFake: ["nextTick", "queueMicrotask"] });
+    const calls = installFetch({
+      views: [makeView({ backfill_status: "running" })],
+      overrides: { "GET /api/vendas/views/v1": { body: { view: makeView({ backfill_status: "done" }) } } },
+    });
+    render(<VendasScreen role="gestor" products={PRODUCTS} />);
+    await screen.findByTestId("view-backfill-notice");
+    await React.act(async () => {
+      jest.advanceTimersByTime(5100);
+    });
+    await waitFor(() => expect(screen.getByTestId("view-backfill-notice")).toHaveAttribute("data-backfill-status", "done"));
+    expect(calls.some((c) => c.method === "GET" && c.url === "/api/vendas/views/v1")).toBe(true);
+  });
+});
+
+describe("VendasScreen — exclusão com diálogo próprio", () => {
+  async function openEditAndDelete() {
+    fireEvent.click(await screen.findByTestId("vendas-edit-view-btn"));
+    fireEvent.click(await screen.findByTestId("view-form-delete-open"));
+  }
+
+  it("excluir visualização: cancelar não chama a API, confirmar faz DELETE e remove da lista", async () => {
+    const calls = installFetch({
+      views: [
+        makeView({ id: "v1", name: "Visão 1", created_at: "2026-08-02T00:00:00Z" }),
+        makeView({ id: "v2", name: "Visão 2", created_at: "2026-08-01T00:00:00Z" }),
+      ],
+      overrides: { "DELETE /api/vendas/views/v1": { body: { ok: true } } },
+    });
+    render(<VendasScreen role="gestor" products={PRODUCTS} />);
+    await openEditAndDelete();
+
+    expect(screen.getByTestId("confirm-dialog")).toHaveAttribute("role", "alertdialog");
+    fireEvent.click(screen.getByTestId("confirm-dialog-cancel"));
+    expect(calls.some((c) => c.method === "DELETE")).toBe(false);
+
+    fireEvent.click(screen.getByTestId("view-form-delete-open"));
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+    await waitFor(() => expect(calls.some((c) => c.method === "DELETE" && c.url === "/api/vendas/views/v1")).toBe(true));
+    await waitFor(() => expect(screen.queryByTestId("confirm-dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId("view-selected-name")).toHaveTextContent("Visão 2"));
+  });
+
+  it("erro da API fica no diálogo, que permanece aberto (sem alert)", async () => {
+    installFetch({
+      views: [makeView()],
+      overrides: { "DELETE /api/vendas/views/v1": { status: 500, body: { error: "Falha no banco" } } },
+    });
+    render(<VendasScreen role="gestor" products={PRODUCTS} />);
+    await openEditAndDelete();
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+    expect(await screen.findByTestId("confirm-dialog-error")).toHaveTextContent("Falha no banco");
+    expect(screen.getByTestId("confirm-dialog")).toBeInTheDocument();
+  });
+
+  it("excluir pasta usa o mesmo diálogo (sem confirm nativo) e solta as visualizações para 'Sem pasta'", async () => {
+    const calls = installFetch({
+      views: [makeView({ folder_id: "f1" })],
+      folders: [FOLDER],
+      overrides: { "DELETE /api/vendas/folders/f1": { body: { ok: true } } },
+    });
+    render(<VendasScreen role="gestor" products={PRODUCTS} />);
+    fireEvent.click(await screen.findByTestId("folder-menu-btn-f1"));
+    fireEvent.click(screen.getByTestId("folder-delete-btn-f1"));
+    expect(screen.getByTestId("confirm-dialog")).toHaveTextContent("Lançamentos");
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+    await waitFor(() => expect(calls.some((c) => c.method === "DELETE" && c.url === "/api/vendas/folders/f1")).toBe(true));
+    await waitFor(() => expect(screen.queryByTestId("confirm-dialog")).not.toBeInTheDocument());
+    expect(screen.queryByTestId("folder-section-f1")).not.toBeInTheDocument();
+    expect(screen.getByTestId("folder-section-unfoldered")).toBeInTheDocument();
   });
 });

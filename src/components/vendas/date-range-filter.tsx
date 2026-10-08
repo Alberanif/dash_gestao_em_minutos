@@ -5,30 +5,28 @@ import { parseDateRange, type DateRange } from "@/lib/vendas/date-range";
 import { fmtDateFull } from "@/lib/vendas/format";
 
 export interface DateRangeFilterProps {
-  // Janela SALVA no ciclo. `null` = ciclo inteiro.
+  // Janela SALVA na visualização. `null` = sem recorte (todo o período).
   value: DateRange | null;
   // Só gestor define a janela (migration 063). Para os demais esta barra é
   // informativa: eles precisam saber que os números passaram por um recorte,
   // mas não escolhem qual.
   canEdit: boolean;
-  // Persiste no ciclo e devolve se deu certo. Async de propósito: diferente do
+  // Persiste na visualização e devolve se deu certo. Async de propósito: diferente do
   // filtro local que isto substituiu, aqui aplicar é gravar, e a barra tem de
   // mostrar que está gravando e que falhou.
   onSave: (range: DateRange | null) => Promise<boolean>;
-  // A janela do ciclo existe mas NÃO pôde ser aplicada (a rota do roster
-  // recortado falhou). Não é "o controle não funciona" como na versão anterior
-  // desta prop — é "os números abaixo não são os que a janela define", que é
-  // pior e por isso aparece em vermelho.
+  // A janela da visualização existe mas NÃO pôde ser aplicada (a busca dos
+  // números recortados falhou). É "os números abaixo não são os que a janela
+  // define", e por isso aparece em vermelho.
   unavailable?: boolean;
 }
 
-// Janela de visualização do ciclo (migration 063). Substituiu o filtro De/Até
-// que era preferência de quem olhava: agora a barra EDITA uma propriedade do
-// ciclo, e todo mundo que o abre vê o mesmo recorte.
+// Janela de período da visualização. A barra EDITA uma propriedade da
+// visualização, e todo mundo que a abre vê o mesmo recorte.
 //
 // O componente só cuida do formulário — validar formato e ordem é de
 // parseDateRange, persistir é de quem passa `onSave`, e o que a janela SIGNIFICA
-// para KPIs, curva e tabela é do dashboard.
+// para KPIs e gráficos é do dashboard.
 export function DateRangeFilter({
   value,
   canEdit,
@@ -36,7 +34,7 @@ export function DateRangeFilter({
   unavailable = false,
 }: DateRangeFilterProps) {
   // Rascunho local: quem está digitando "De" ainda não salvou nada, e o
-  // dashboard não deve refazer a chamada do roster a cada tecla. O commit é no
+  // dashboard não deve refazer a busca dos números a cada tecla. O commit é no
   // "Salvar".
   const [start, setStart] = useState(value?.start ?? "");
   const [end, setEnd] = useState(value?.end ?? "");
@@ -44,13 +42,13 @@ export function DateRangeFilter({
   const [salvando, setSalvando] = useState(false);
   const [salvo, setSalvo] = useState(value);
 
-  // Sincroniza o rascunho quando a janela salva muda POR FORA — troca de ciclo
-  // (o dashboard é renderizado sem key, então este componente não remonta) e
-  // chegada do GET dos ciclos depois do primeiro render.
+  // Sincroniza o rascunho quando a janela salva muda POR FORA — troca de
+  // visualização (o dashboard é renderizado sem key, então este componente não
+  // remonta) e chegada do GET das visualizações depois do primeiro render.
   //
   // Ajuste durante o render, e não em useEffect: é o padrão que o React
   // recomenda para estado derivado de prop. O efeito faria o componente
-  // renderizar uma vez com os campos do ciclo anterior antes de corrigi-los, e
+  // renderizar uma vez com os campos da visualização anterior antes de corrigi-los, e
   // cairia na regra react-hooks/set-state-in-effect. Aqui o React descarta o
   // render em curso e refaz com os valores novos, sem pintar o intermediário.
   if (value !== salvo) {
@@ -65,26 +63,26 @@ export function DateRangeFilter({
   // não tem outra forma de descobrir que o recorte não pegou.
   const avisoIndisponivel = unavailable ? (
     <span
-      data-testid="ultimates-date-unavailable"
-      className="ult-date-msg"
+      data-testid="vendas-date-unavailable"
+      className="vendas-date-msg"
       style={{ color: "var(--red)" }}
     >
-      Período não pôde ser aplicado — os números abaixo são do ciclo inteiro
+      Período não pôde ser aplicado — os números abaixo são do período inteiro
     </span>
   ) : null;
 
   if (!canEdit) {
-    // Sem janela definida, quem não edita não vê barra nenhuma: o ciclo mostra
+    // Sem janela definida, quem não edita não vê barra nenhuma: a visualização mostra
     // tudo, que é o estado normal, e dois campos de data vazios e desabilitados
     // só ocupariam espaço convidando ao clique.
     if (value === null) return null;
 
     return (
-      <div data-testid="ultimates-date-filter" className="ult-date-filter">
-        <span data-testid="ultimates-date-readonly" className="ult-date-readonly">
+      <div data-testid="vendas-date-filter" className="vendas-date-filter">
+        <span data-testid="vendas-date-readonly" className="vendas-date-readonly">
           Período: {fmtDateFull(value.start)} – {fmtDateFull(value.end)}
         </span>
-        <span className="ult-date-msg">definido pelo gestor</span>
+        <span className="vendas-date-msg">definido pelo gestor</span>
         {avisoIndisponivel}
       </div>
     );
@@ -126,11 +124,11 @@ export function DateRangeFilter({
   }
 
   return (
-    <div data-testid="ultimates-date-filter" className="ult-date-filter">
-      <label className="ult-date-field">
+    <div data-testid="vendas-date-filter" className="vendas-date-filter">
+      <label className="vendas-date-field">
         <span>De</span>
         <input
-          data-testid="ultimates-date-start"
+          data-testid="vendas-date-start"
           type="date"
           value={start}
           onChange={(e) => setStart(e.target.value)}
@@ -138,10 +136,10 @@ export function DateRangeFilter({
         />
       </label>
 
-      <label className="ult-date-field">
+      <label className="vendas-date-field">
         <span>Até</span>
         <input
-          data-testid="ultimates-date-end"
+          data-testid="vendas-date-end"
           type="date"
           value={end}
           onChange={(e) => setEnd(e.target.value)}
@@ -151,7 +149,7 @@ export function DateRangeFilter({
 
       <button
         type="button"
-        data-testid="ultimates-date-apply"
+        data-testid="vendas-date-apply"
         className="btn-secondary"
         onClick={handleSave}
         disabled={salvando}
@@ -162,7 +160,7 @@ export function DateRangeFilter({
       {value !== null && (
         <button
           type="button"
-          data-testid="ultimates-date-clear"
+          data-testid="vendas-date-clear"
           className="btn-secondary"
           onClick={handleClear}
           disabled={salvando}
@@ -173,14 +171,14 @@ export function DateRangeFilter({
 
       {/* Presente SEMPRE que o gestor edita, com ou sem janela salva: é a única
           coisa na barra que diz que este controle não é um filtro pessoal. */}
-      <span data-testid="ultimates-date-scope" className="ult-date-msg">
+      <span data-testid="vendas-date-scope" className="vendas-date-msg">
         Vale para todos os usuários
       </span>
 
       {erro && (
         <span
-          data-testid="ultimates-date-error"
-          className="ult-date-msg"
+          data-testid="vendas-date-error"
+          className="vendas-date-msg"
           style={{ color: "var(--red)" }}
         >
           {erro}

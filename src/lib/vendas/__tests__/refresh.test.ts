@@ -13,6 +13,15 @@ describe("interpretRefreshResponse", () => {
     expect(outcome).toEqual({ kind: "success", upserted: 12, lastRefreshAt: "2026-07-19T10:00:00Z" });
   });
 
+  it("200 de recuperação de backfill (upserted 0, backfill partial) é success e usa lastRefreshAt", () => {
+    const outcome = interpretRefreshResponse(200, { upserted: 0, backfill: "partial", lastRefreshAt: "2026-07-19T10:00:00Z", view: { last_refresh_at: "x" } });
+    expect(outcome).toEqual({ kind: "success", upserted: 0, lastRefreshAt: "2026-07-19T10:00:00Z" });
+  });
+
+  it("502 de backfill que falhou repassa o erro do servidor", () => {
+    expect(messageOf(interpretRefreshResponse(502, { error: "Hotmart sales API error: 500" }))).toBe("Hotmart sales API error: 500");
+  });
+
   it("200 sem upserted no corpo -> upserted 0", () => {
     const outcome = interpretRefreshResponse(200, {});
     expect(outcome).toEqual({ kind: "success", upserted: 0, lastRefreshAt: null });
@@ -38,9 +47,9 @@ describe("interpretRefreshResponse", () => {
     expect(outcome).toEqual({ kind: "conflict", message: "refresh em andamento" });
   });
 
-  it("409 com ciclo encerrado repassa a mensagem específica do servidor", () => {
-    const outcome = interpretRefreshResponse(409, { error: "Ciclo encerrado não pode ser atualizado" });
-    expect(outcome).toEqual({ kind: "conflict", message: "Ciclo encerrado não pode ser atualizado" });
+  it("409 repassa a mensagem específica do servidor", () => {
+    const outcome = interpretRefreshResponse(409, { error: "Atualização já em andamento" });
+    expect(outcome).toEqual({ kind: "conflict", message: "Atualização já em andamento" });
   });
 
   it("409 sem corpo de erro usa fallback amigável", () => {

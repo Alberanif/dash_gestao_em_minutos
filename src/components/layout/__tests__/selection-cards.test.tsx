@@ -128,7 +128,7 @@ describe("SelectionCards — role: comum", () => {
   });
 
   it("módulos restritos exibem badge Restrito", () => {
-    // Gestão à Vista, Indicadores, Ajustes e Dash Ultimates são restritos — badge aparece pelo menos 4 vezes
+    // Gestão à Vista, Indicadores, Ajustes e Relatório de Vendas são restritos — badge aparece pelo menos 4 vezes
     const matches = html.match(/Restrito/g) ?? [];
     expect(matches.length).toBeGreaterThanOrEqual(4);
   });
