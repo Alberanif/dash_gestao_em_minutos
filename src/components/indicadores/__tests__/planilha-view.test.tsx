@@ -132,7 +132,7 @@ describe("PlanilhaView — valores e formatação", () => {
 
     // ROAS por coluna a partir dos brutos da coluna: 1200/600, 200/100, 400/200, 600/300
     const roas = rowByName(/ROAS/);
-    expect(within(roas).getAllByText("2.00×")).toHaveLength(4);
+    expect(within(roas).getAllByText("2,00×")).toHaveLength(4);
 
     const receita = rowByName(/Receita BRL/);
     expect(within(receita).getByText("R$ 1.200,00")).toBeInTheDocument();
@@ -147,8 +147,8 @@ describe("PlanilhaView — valores e formatação", () => {
     expect(within(investimento).getByText("R$ 100,00")).toBeInTheDocument();
 
     const ctr = rowByName(/CTR/);
-    expect(within(ctr).getByText("3.00%")).toBeInTheDocument();
-    expect(within(ctr).getByText("3.75%")).toBeInTheDocument();
+    expect(within(ctr).getByText("3,00%")).toBeInTheDocument();
+    expect(within(ctr).getByText("3,75%")).toBeInTheDocument();
 
     for (const label of ["Investimento", "Leads Gerados", "CPM", "CTR", "CPL Tráfego", "Connect Rate", "Conv. LP", "Checkout"]) {
       expect(screen.getByRole("row", { name: new RegExp(label) })).toBeInTheDocument();

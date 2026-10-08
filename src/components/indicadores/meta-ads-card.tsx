@@ -26,7 +26,7 @@ function fmtBRL(n: number | null | undefined): string {
 
 function fmtPct(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
-  return `${n.toFixed(2)}%`;
+  return `${n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 }
 
 function fmtNum(n: number | null | undefined): string {
