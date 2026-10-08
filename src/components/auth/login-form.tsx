@@ -4,7 +4,8 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { sanitizeNext } from "@/lib/utils/safe-next";
 
 function MailIcon() {
   return (
@@ -72,6 +73,7 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createSupabaseBrowserClient();
 
   async function handleSubmit(e: React.FormEvent) {
@@ -87,7 +89,7 @@ export function LoginForm() {
       return;
     }
 
-    router.push("/");
+    router.push(sanitizeNext(searchParams.get("next")));
     router.refresh();
   }
 
