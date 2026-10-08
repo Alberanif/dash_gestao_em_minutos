@@ -11,6 +11,7 @@ jest.mock("@/lib/supabase/client", () => ({
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn(), refresh: jest.fn() }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 import { LoginForm } from "@/components/auth/login-form";

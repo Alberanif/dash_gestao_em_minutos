@@ -49,6 +49,9 @@ export async function updateSession(request: NextRequest) {
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    // Guarda o destino (caminho + query) para o login voltar a ele.
+    url.search = "";
+    url.searchParams.set("next", pathname + request.nextUrl.search);
     return NextResponse.redirect(url);
   }
 
