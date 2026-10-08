@@ -178,6 +178,21 @@ describe("IndicadoresPage — parâmetros enviados aos endpoints", () => {
     expect(paramsSentTo(LEADS)).toEqual([]);
   });
 
+  it("a lista de campanhas (Ver Mais) recebe o período e o filtro, como o /metrics", async () => {
+    await renderWithActiveFilter(FULL_FILTER);
+    await waitFor(() => expect(paramsSentTo(METRICS).length).toBeGreaterThan(0));
+    const { startDate, endDate } = calcPresetDates("28d", new Date().toISOString().slice(0, 10));
+
+    fireEvent.click(await screen.findByText("Ver Mais"));
+
+    const CAMPAIGNS = "/api/indicadores/campaigns";
+    await waitFor(() => expect(paramsSentTo(CAMPAIGNS).length).toBeGreaterThan(0));
+    const params = lastParamsSentTo(CAMPAIGNS);
+    expect(params.get("start_date")).toBe(startDate);
+    expect(params.get("end_date")).toBe(endDate);
+    expect(params.getAll("meta_terms[]")).toEqual(["PC Ao Vivo", "Ingresso"]);
+  });
+
   it("propaga a oferta selecionada aos endpoints de escopo completo, mas nunca ao de leads", async () => {
     await renderWithActiveFilter(FULL_FILTER);
 

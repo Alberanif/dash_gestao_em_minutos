@@ -24,7 +24,7 @@ interface PlatformsCardProps {
   hasMetaFilter?: boolean;
   hasHotmartFilter?: boolean;
   /** Query string (com "?") do período/filtro atual, usada pela lista de campanhas. */
-  campaignsParams?: string;
+  campaignsParams: string;
 }
 
 interface TabProps {
@@ -92,7 +92,7 @@ export function PlatformsCard({
   onOfferCodeChange,
   hasMetaFilter = true,
   hasHotmartFilter = true,
-  campaignsParams = "",
+  campaignsParams,
 }: PlatformsCardProps) {
   const [activePlatform, setActivePlatform] = useState<Platform>("meta");
   // Local de propósito: trocar de aba ou recarregar volta ao resumo.
