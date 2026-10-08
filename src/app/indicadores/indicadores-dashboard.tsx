@@ -408,8 +408,8 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
   }, [malformedEventId]);
 
   // Resolve o evento ativo. Com ID na URL, a URL manda e atualiza o
-  // localStorage. Sem ID, restaura do localStorage uma única vez (a
-  // sincronização com a URL fica para a issue seguinte).
+  // localStorage. Sem ID, restaura do localStorage uma única vez e faz replace
+  // para /indicadores/<id>.
   useEffect(() => {
     if (!filtersLoaded) return;
     if (eventId !== undefined) {
@@ -433,10 +433,16 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
     const savedId = localStorage.getItem(LS_FILTER_ID);
     if (savedId) {
       const match = filters.find((f) => f.id === savedId);
-      if (match) setActiveFilter(match);
-      else localStorage.removeItem(LS_FILTER_ID); // deleted by another user
+      if (match) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setActiveFilter(match);
+        // A barra de endereço passa a ter sempre um link compartilhável.
+        router.replace(`/indicadores/${match.id}${window.location.search}`);
+      } else {
+        localStorage.removeItem(LS_FILTER_ID); // deleted by another user: sem redirect, sem loop
+      }
     }
-  }, [filtersLoaded, filters, eventId, malformedEventId, rejectEventId]);
+  }, [filtersLoaded, filters, eventId, malformedEventId, rejectEventId, router]);
 
   // Sequência da última fetchAll disparada. Sem isso, uma resposta de um
   // período antigo que demore mais para responder do que a do período atual
@@ -603,10 +609,19 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
     fetchPlanilha(startDate, endDate, activeFilter, activeOfferCode);
   }, [view, startDate, endDate, activeFilter, activeOfferCode, fetchPlanilha]);
 
+  // Trocar de evento vai para a URL dele (push: o voltar navega entre eventos);
+  // sair do evento ativo (null) volta para /indicadores sem deixar entrada
+  // apontando para o evento removido. `?view=` é preservado nos dois casos.
   function handleSelectFilter(filter: FilterRecord | null) {
+    const search = window.location.search;
     setActiveFilter(filter);
-    if (filter) localStorage.setItem(LS_FILTER_ID, filter.id);
-    else localStorage.removeItem(LS_FILTER_ID);
+    if (filter) {
+      localStorage.setItem(LS_FILTER_ID, filter.id);
+      if (filter.id !== activeFilter?.id) router.push(`/indicadores/${filter.id}${search}`);
+    } else {
+      localStorage.removeItem(LS_FILTER_ID);
+      router.replace(`/indicadores${search}`);
+    }
   }
 
   function handleFilterSaved(saved: FilterRecord) {
@@ -614,6 +629,8 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
       const idx = prev.findIndex((f) => f.id === saved.id);
       return idx >= 0 ? prev.map((f) => (f.id === saved.id ? saved : f)) : [...prev, saved];
     });
+    // Editar o evento ativo (inclusive renomear) mantém a URL; criar, ou editar
+    // outro evento, ativa o salvo e leva à URL dele.
     handleSelectFilter(saved);
     setFilterModalOpen(false);
     setFilterEditTarget(null);

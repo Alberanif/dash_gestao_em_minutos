@@ -140,13 +140,13 @@ describe("/indicadores/[id] — evento ativo definido pela URL", () => {
 });
 
 describe("compatibilidade das rotas", () => {
-  it("/indicadores sem ID continua restaurando do localStorage, sem redirecionar", async () => {
+  it("/indicadores sem ID continua restaurando do localStorage (e faz replace para o ID)", async () => {
     localStorage.setItem(LS_FILTER_ID, ID_B);
     installFetch([makeFilter(ID_A, "Evento A"), makeFilter(ID_B, "Evento B")]);
     render(<IndicadoresPage />);
 
     await waitFor(() => expect(hits("/api/indicadores/daily").length).toBeGreaterThan(0));
-    expect(replace).not.toHaveBeenCalled();
+    expect(replace).toHaveBeenCalledWith(`/indicadores/${ID_B}`);
     expect(localStorage.getItem(LS_FILTER_ID)).toBe(ID_B);
   });
 
