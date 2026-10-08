@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MetaAdsPanel } from "./meta-ads-card";
 import { HotmartPanel } from "./hotmart-card";
+import { MetaCampaignsList } from "./meta-campaigns-list";
 import type { GlobalMetrics, GlobalHotmartMetrics, DailyPoint } from "@/types/indicadores";
 
 interface SectionState<T> {
@@ -22,6 +23,8 @@ interface PlatformsCardProps {
   onOfferCodeChange?: (offerCode: string | null, productId: string | null) => void;
   hasMetaFilter?: boolean;
   hasHotmartFilter?: boolean;
+  /** Query string (com "?") do período/filtro atual, usada pela lista de campanhas. */
+  campaignsParams?: string;
 }
 
 interface TabProps {
@@ -89,8 +92,16 @@ export function PlatformsCard({
   onOfferCodeChange,
   hasMetaFilter = true,
   hasHotmartFilter = true,
+  campaignsParams = "",
 }: PlatformsCardProps) {
   const [activePlatform, setActivePlatform] = useState<Platform>("meta");
+  // Local de propósito: trocar de aba ou recarregar volta ao resumo.
+  const [campaignsOpen, setCampaignsOpen] = useState(false);
+
+  function selectPlatform(p: Platform) {
+    setActivePlatform(p);
+    setCampaignsOpen(false);
+  }
 
   return (
     <div
@@ -105,7 +116,7 @@ export function PlatformsCard({
       <div role="tablist" style={{ display: "flex", gap: 2, padding: "12px 16px 0" }}>
         <Tab
           active={activePlatform === "meta"}
-          onClick={() => setActivePlatform("meta")}
+          onClick={() => selectPlatform("meta")}
           icon="M"
           iconColor="var(--link)"
           iconBg="rgba(76,141,255,0.12)"
@@ -114,7 +125,7 @@ export function PlatformsCard({
         />
         <Tab
           active={activePlatform === "hotmart"}
-          onClick={() => setActivePlatform("hotmart")}
+          onClick={() => selectPlatform("hotmart")}
           icon="H"
           iconColor="var(--orange)"
           iconBg="rgba(232,133,63,0.12)"
@@ -124,7 +135,16 @@ export function PlatformsCard({
       </div>
       <div style={{ borderTop: "1px solid var(--border-vis)" }}>
         {activePlatform === "meta" ? (
-          <MetaAdsPanel metaState={metaState} dailyState={dailyState} hasMetaFilter={hasMetaFilter} />
+          campaignsOpen && hasMetaFilter ? (
+            <MetaCampaignsList params={campaignsParams} onBack={() => setCampaignsOpen(false)} />
+          ) : (
+            <MetaAdsPanel
+              metaState={metaState}
+              dailyState={dailyState}
+              hasMetaFilter={hasMetaFilter}
+              onSeeMore={() => setCampaignsOpen(true)}
+            />
+          )
         ) : (
           <HotmartPanel
             hotmartState={hotmartState}

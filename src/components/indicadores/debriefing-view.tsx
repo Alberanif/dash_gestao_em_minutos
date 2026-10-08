@@ -26,8 +26,14 @@ function fmtBRL(n: number): string {
   return Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(n);
+}
+
+// Rótulo de escala do eixo: marca de escala, não dado — fica inteiro.
+function fmtBRLAxis(n: number): string {
+  return Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(n);
 }
 
 function fmtNum(n: number): string {
@@ -610,7 +616,7 @@ export function DebriefingView({ filter, startDate, endDate, onEditFilter, onFil
                     tick={TICK}
                     axisLine={false}
                     tickLine={false}
-                    tickFormatter={(v) => fmtBRL(v)}
+                    tickFormatter={(v) => fmtBRLAxis(v)}
                     width={76}
                   />
                   <Tooltip

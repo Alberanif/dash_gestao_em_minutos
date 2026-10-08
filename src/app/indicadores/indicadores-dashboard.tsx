@@ -65,7 +65,8 @@ function fmtBRL(n: number): string {
   return Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(n);
 }
 
@@ -75,7 +76,7 @@ function fmtNum(n: number): string {
 
 function fmtDecimal(n: number | null, digits = 2): string {
   if (n === null || n === undefined) return "—";
-  return n.toFixed(digits);
+  return n.toLocaleString("pt-BR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
 // ── Section state ─────────────────────────────────────────────────────────────

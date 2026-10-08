@@ -71,6 +71,21 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 export function PositioningMiniChart({ data, color, seriesLabel }: PositioningMiniChartProps) {
+  const dataLength = data.length;
+  const maxValue = dataLength > 0 ? Math.max(...data.map((d) => d.value)) : 0;
+
+  // Intervalo do eixo X para no máximo 6 ticks (evita sobreposição)
+  const xInterval = useMemo(() => {
+    if (dataLength <= 6) return 0;
+    return Math.ceil(dataLength / 6) - 1;
+  }, [dataLength]);
+
+  // Largura do eixo Y baseada no maior valor (para não cortar labels)
+  const yAxisWidth = useMemo(() => {
+    const maxLabel = formatCompact(maxValue);
+    return Math.max(36, maxLabel.length * 7 + 8);
+  }, [maxValue]);
+
   if (data.length < 2) {
     return (
       <div
@@ -91,18 +106,6 @@ export function PositioningMiniChart({ data, color, seriesLabel }: PositioningMi
   const padding = Math.max(range * 0.15, Math.abs(maxVal) * 0.03, 1);
   const yMin = Math.floor(minVal - padding);
   const yMax = Math.ceil(maxVal + padding);
-
-  // Intervalo do eixo X para no máximo 6 ticks (evita sobreposição)
-  const xInterval = useMemo(() => {
-    if (data.length <= 6) return 0;
-    return Math.ceil(data.length / 6) - 1;
-  }, [data.length]);
-
-  // Largura do eixo Y baseada no maior valor (para não cortar labels)
-  const yAxisWidth = useMemo(() => {
-    const maxLabel = formatCompact(maxVal);
-    return Math.max(36, maxLabel.length * 7 + 8);
-  }, [maxVal]);
 
   const gradientId = `pos-grad-${color.replace(/[^a-zA-Z0-9]/g, "")}`;
 

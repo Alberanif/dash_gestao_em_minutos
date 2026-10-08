@@ -14,12 +14,12 @@ interface HorizontalFunnelFlowProps {
 
 function fmtBRL(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
-  return Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(n);
+  return Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 }
 
 function fmtPct(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
-  return `${n.toFixed(2)}%`;
+  return `${n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 }
 
 function fmtNum(n: number | null | undefined): string {

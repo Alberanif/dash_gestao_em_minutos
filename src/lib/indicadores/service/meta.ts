@@ -25,7 +25,7 @@ export interface MetaQuery {
   filter: ExpandedFilter;
 }
 
-interface CampaignRow {
+export interface CampaignRow {
   spend: number | null;
   impressions: number | null;
   link_clicks: number | null;
@@ -107,7 +107,7 @@ export async function fetchMetaMetricsUnscoped(
   return aggregate(await paginate(() => baseQuery(period, supabase)));
 }
 
-interface AwaitableQuery {
+export interface AwaitableQuery {
   or(expr: string): AwaitableQuery;
   range(from: number, to: number): PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>;
 }
@@ -124,7 +124,7 @@ function baseQuery(period: Period, supabase: SupabaseLike): AwaitableQuery {
  * O PostgREST trunca em 1000 linhas sem erro. Um período vitalício (tela
  * Eventos) passa disso fácil; sem paginar, o investimento sai subestimado.
  */
-async function paginate(buildQuery: () => AwaitableQuery): Promise<CampaignRow[]> {
+export async function paginate(buildQuery: () => AwaitableQuery): Promise<CampaignRow[]> {
   const all: CampaignRow[] = [];
   let from = 0;
   for (;;) {
@@ -138,7 +138,7 @@ async function paginate(buildQuery: () => AwaitableQuery): Promise<CampaignRow[]
   return all;
 }
 
-function aggregate(rows: CampaignRow[]): GlobalMetrics {
+export function aggregate(rows: CampaignRow[]): GlobalMetrics {
   const sum = (pick: (row: CampaignRow) => number | null) =>
     rows.reduce((total, row) => total + (pick(row) ?? 0), 0);
 

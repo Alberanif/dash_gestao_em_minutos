@@ -22,6 +22,16 @@ function fmtBRL(n: number) {
   return Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n);
+}
+
+// Rótulo de escala do eixo: marca de escala, não dado — fica inteiro.
+function fmtBRLAxis(n: number) {
+  return Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
     maximumFractionDigits: 0,
   }).format(n);
 }
@@ -139,7 +149,7 @@ export function MetaAdsInvestimentoLeadsChart({
             tick={TICK}
             axisLine={false}
             tickLine={false}
-            tickFormatter={(v) => fmtBRL(v)}
+            tickFormatter={(v) => fmtBRLAxis(v)}
             width={72}
           />
           <YAxis
@@ -204,7 +214,7 @@ export function MetaAdsCplChart({
             tick={TICK}
             axisLine={false}
             tickLine={false}
-            tickFormatter={(v) => fmtBRL(v)}
+            tickFormatter={(v) => fmtBRLAxis(v)}
             width={72}
           />
           <Tooltip

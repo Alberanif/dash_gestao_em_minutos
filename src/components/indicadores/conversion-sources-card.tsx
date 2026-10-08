@@ -26,8 +26,8 @@ function fmtNum(n: number): string {
 }
 
 function fmtPct(n: number, total: number): string {
-  if (total === 0) return "0%";
-  return `${((n / total) * 100).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+  if (total === 0) return "0,00%";
+  return `${((n / total) * 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 }
 
 function Header() {

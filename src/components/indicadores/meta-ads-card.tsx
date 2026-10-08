@@ -15,16 +15,18 @@ interface MetaAdsPanelProps {
   metaState: SectionState<GlobalMetrics>;
   dailyState: SectionState<DailyPoint[]>;
   hasMetaFilter?: boolean;
+  /** Abre a lista de campanhas; o botão só aparece com filtro Meta. */
+  onSeeMore?: () => void;
 }
 
 function fmtBRL(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
-  return Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(n);
+  return Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 }
 
 function fmtPct(n: number | null | undefined): string {
   if (n === null || n === undefined) return "—";
-  return `${n.toFixed(2)}%`;
+  return `${n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 }
 
 function fmtNum(n: number | null | undefined): string {
@@ -32,7 +34,7 @@ function fmtNum(n: number | null | undefined): string {
   return Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(n);
 }
 
-export function MetaAdsPanel({ metaState, dailyState, hasMetaFilter = true }: MetaAdsPanelProps) {
+export function MetaAdsPanel({ metaState, dailyState, hasMetaFilter = true, onSeeMore }: MetaAdsPanelProps) {
   if (metaState.loading) {
     return (
       <div style={{ padding: 22 }}>
@@ -96,6 +98,28 @@ export function MetaAdsPanel({ metaState, dailyState, hasMetaFilter = true }: Me
           <KpiCell label="Conv. LP" value={fmtPct(d.meta_lp_conversion)} />
           <KpiCell label="Checkout" value={fmtNum(d.meta_checkout)} />
         </div>
+
+        {hasMetaFilter && onSeeMore && (
+          <div style={{ marginBottom: 20 }}>
+            <button
+              type="button"
+              onClick={onSeeMore}
+              style={{
+                border: "1px solid var(--border-vis)",
+                background: "var(--surface-2)",
+                color: "var(--text-strong)",
+                borderRadius: 6,
+                padding: "6px 14px",
+                fontFamily: "inherit",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Ver Mais
+            </button>
+          </div>
+        )}
 
         {hasMetaFilter && (
           <MetaAdsInvestimentoLeadsChart
