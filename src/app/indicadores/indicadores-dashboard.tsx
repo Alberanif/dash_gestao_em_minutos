@@ -434,7 +434,6 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
     if (savedId) {
       const match = filters.find((f) => f.id === savedId);
       if (match) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setActiveFilter(match);
         // A barra de endereço passa a ter sempre um link compartilhável.
         router.replace(`/indicadores/${match.id}${window.location.search}`);
