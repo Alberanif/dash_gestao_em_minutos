@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateApiAuth } from "@/lib/utils/api-auth";
 import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server";
 import type { FilterRecord } from "@/types/indicadores";
+import { validateDebriefingProducts } from "@/lib/indicadores/debriefing-products";
 
 export async function GET(request: NextRequest) {
   const { error } = await validateApiAuth();
@@ -37,12 +38,17 @@ export async function POST(request: NextRequest) {
     hotmart_products = [],
     main_hotmart_product = null,
     debriefing_offer_codes = null,
+    debriefing_products,
     meta_ads_terms = [],
     captacao_leads_eventos = [],
   } = body ?? {};
 
   if (!name) {
     return NextResponse.json({ error: "name is required" }, { status: 400 });
+  }
+  const debriefing = validateDebriefingProducts(debriefing_products === undefined ? null : debriefing_products);
+  if (!debriefing.ok) {
+    return NextResponse.json({ error: debriefing.error }, { status: 400 });
   }
   if (hotmart_products.length === 0 && meta_ads_terms.length === 0 && captacao_leads_eventos.length === 0) {
     return NextResponse.json(
@@ -60,6 +66,7 @@ export async function POST(request: NextRequest) {
       hotmart_products,
       main_hotmart_product,
       debriefing_offer_codes,
+      ...(debriefing_products !== undefined ? { debriefing_products: debriefing.value } : {}),
       meta_ads_terms,
       captacao_leads_eventos,
       status: "ativo",
