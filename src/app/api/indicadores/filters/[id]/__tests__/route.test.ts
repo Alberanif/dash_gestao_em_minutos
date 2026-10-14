@@ -166,6 +166,62 @@ describe("PUT /api/indicadores/filters/[id]", () => {
     const res = await PUT(req, { params: Promise.resolve(params) });
     expect(res.status).toBe(404);
   });
+
+  describe("debriefing_products", () => {
+    const url = "http://localhost/api/indicadores/filters/filter-uuid";
+
+    it.each([
+      ["não-array", "x"],
+      ["product_id vazio", [{ product_id: "", product_name: "A" }]],
+      ["product_name vazio", [{ product_id: "1", product_name: "" }]],
+      ["offer_codes inválido", [{ product_id: "1", product_name: "A", offer_codes: "a" }]],
+      [
+        "product_id repetido",
+        [
+          { product_id: "1", product_name: "A" },
+          { product_id: "1", product_name: "B" },
+        ],
+      ],
+    ])("retorna 400 para %s", async (_n, debriefing_products) => {
+      const { PUT } = await import("../route");
+      const res = await PUT(makeRequest("PUT", url, { debriefing_products }), {
+        params: Promise.resolve(params),
+      });
+      const body = await res.json();
+      expect(res.status).toBe(400);
+      expect(body.error).toMatch(/debriefing_products/);
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it("grava normalizado e aceita null para limpar", async () => {
+      mockSingle.mockResolvedValue({ data: { id: "filter-uuid" }, error: null });
+      const { PUT } = await import("../route");
+
+      await PUT(
+        makeRequest("PUT", url, { debriefing_products: [{ product_id: "1", product_name: "A" }] }),
+        { params: Promise.resolve(params) }
+      );
+      expect(mockUpdate).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          debriefing_products: [{ product_id: "1", product_name: "A", offer_codes: [] }],
+        })
+      );
+
+      await PUT(makeRequest("PUT", url, { debriefing_products: null }), {
+        params: Promise.resolve(params),
+      });
+      expect(mockUpdate).toHaveBeenLastCalledWith(
+        expect.objectContaining({ debriefing_products: null })
+      );
+    });
+
+    it("sem o campo, não toca em debriefing_products", async () => {
+      mockSingle.mockResolvedValue({ data: { id: "filter-uuid" }, error: null });
+      const { PUT } = await import("../route");
+      await PUT(makeRequest("PUT", url, { name: "X" }), { params: Promise.resolve(params) });
+      expect(mockUpdate.mock.calls[0][0]).not.toHaveProperty("debriefing_products");
+    });
+  });
 });
 
 // ─── DELETE ──────────────────────────────────────────────────────────────────

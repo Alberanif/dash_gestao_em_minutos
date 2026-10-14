@@ -79,6 +79,13 @@ export interface ConversionSourcesWithWeeks {
 export const FILTER_STATUSES = ["ativo", "finalizado", "cancelado"] as const;
 export type FilterStatus = (typeof FILTER_STATUSES)[number];
 
+export interface DebriefingProduct {
+  product_id: string;
+  product_name: string;
+  /** Vazio = todas as ofertas do produto. "Sem Oferta" marca vendas sem offer_code. */
+  offer_codes: string[];
+}
+
 export interface FilterRecord {
   id: string;
   account_id: string;
@@ -86,6 +93,7 @@ export interface FilterRecord {
   hotmart_products: Array<{ product_id: string; product_name: string }>;
   main_hotmart_product?: { product_id: string; product_name: string } | null;
   debriefing_offer_codes?: string[] | null;
+  debriefing_products?: DebriefingProduct[] | null;
   meta_ads_terms: string[];
   captacao_leads_eventos: string[];
   status: FilterStatus;
