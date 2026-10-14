@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { OffersDrawer, type HotmartOffer } from "./offers-drawer";
 import type { DebriefingProduct, FilterRecord, FilterStatus } from "@/types/indicadores";
 import { resolveDebriefingProducts } from "@/lib/indicadores/debriefing-products";
 
@@ -75,6 +76,9 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
   const [error, setError] = useState("");
   const [partialWarning, setPartialWarning] = useState("");
   const [partialWarningShown, setPartialWarningShown] = useState(false);
+  const [drawerProductId, setDrawerProductId] = useState<string | null>(null);
+  const [offersCache, setOffersCache] = useState<Record<string, HotmartOffer[]>>({});
+  const closeDrawer = useCallback(() => setDrawerProductId(null), []);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -112,11 +116,12 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onCancel();
+      // Com o drawer aberto, quem trata o Esc é o drawer.
+      if (e.key === "Escape" && drawerProductId === null) onCancel();
     }
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [onCancel]);
+  }, [onCancel, drawerProductId]);
 
   // Reset the "already warned" flag whenever the user edits any source,
   // so the two-step save protection fires correctly after subsequent changes.
@@ -129,6 +134,8 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
   const filteredOptions = productOptions.filter((p) => !selectedIds.has(p.product_id));
   const debriefingIds = new Set(debriefingProducts.map((p) => p.product_id));
   const debriefingOptions = productOptions.filter((p) => !debriefingIds.has(p.product_id));
+
+  const drawerProduct = debriefingProducts.find((p) => p.product_id === drawerProductId) ?? null;
 
   function toggleProduct(p: HotmartProduct) {
     setHotmartProducts((prev) =>
@@ -483,7 +490,23 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
                   >
                     {offersBadgeLabel(p.offer_codes)}
                   </span>
-                  {/* Ponto de encaixe: seta do drawer de ofertas (issue #209) */}
+                  <button
+                    type="button"
+                    data-testid={`offers-arrow-${p.product_id}`}
+                    aria-label={`Ofertas de ${p.product_name}`}
+                    onClick={() => setDrawerProductId(p.product_id)}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "var(--text-2)",
+                      padding: 0,
+                      fontSize: 13,
+                      lineHeight: 1,
+                    }}
+                  >
+                    ›
+                  </button>
                   <button
                     type="button"
                     aria-label={`Remover ${p.product_name}`}
@@ -713,6 +736,23 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
           </button>
         </div>
       </div>
+      {drawerProduct && (
+        <OffersDrawer
+          key={drawerProduct.product_id}
+          accountId={accountId}
+          productId={drawerProduct.product_id}
+          productName={drawerProduct.product_name}
+          selected={drawerProduct.offer_codes}
+          cachedOffers={offersCache[drawerProduct.product_id]}
+          onOffersLoaded={(pid, offers) => setOffersCache((prev) => ({ ...prev, [pid]: offers }))}
+          onChange={(codes) =>
+            setDebriefingProducts((prev) =>
+              prev.map((x) => (x.product_id === drawerProduct.product_id ? { ...x, offer_codes: codes } : x))
+            )
+          }
+          onClose={closeDrawer}
+        />
+      )}
     </div>
   );
 }
