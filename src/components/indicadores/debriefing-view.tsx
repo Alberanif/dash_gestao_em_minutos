@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import type { FilterRecord } from "@/types/indicadores";
+import { resolveDebriefingProducts } from "@/lib/indicadores/debriefing-products";
 import type { DebriefingMetrics } from "@/lib/indicadores/service/debriefing";
 import {
   ComposedChart,
@@ -19,7 +20,6 @@ interface DebriefingViewProps {
   startDate: string;
   endDate: string;
   onEditFilter?: () => void;
-  onFilterUpdated?: (updatedFilter: FilterRecord) => void;
 }
 
 function fmtBRL(n: number): string {
@@ -55,51 +55,16 @@ const TOOLTIP_STYLE: React.CSSProperties = {
   boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
 };
 
-// Ajuste mínimo (issue #207): a API agora devolve N produtos; esta view ainda mostra um só.
-// A view multi-produto vem em outra issue; até lá adaptamos a resposta ao formato antigo.
-type ViewMetrics = DebriefingMetrics["totals"] & {
-  product_name: string | null;
-  daily_series: DebriefingMetrics["daily_series"];
-  offers_breakdown: DebriefingMetrics["products"][number]["offers_breakdown"];
-  available_offers: Array<{ offer_code: string; offer_name: string; sales_count: number }>;
-};
-
-function toViewMetrics(data: DebriefingMetrics): ViewMetrics {
-  const first = data.products[0];
-  const offers = first?.offers_breakdown ?? [];
-  return {
-    ...data.totals,
-    product_name: first?.product_name ?? null,
-    daily_series: data.daily_series,
-    offers_breakdown: offers,
-    available_offers: offers.map(({ offer_code, offer_name, sales_count }) => ({ offer_code, offer_name, sales_count })),
-  };
-}
-
-export function DebriefingView({ filter, startDate, endDate, onEditFilter, onFilterUpdated }: DebriefingViewProps) {
-  const [metrics, setMetrics] = useState<ViewMetrics | null>(null);
+export function DebriefingView({ filter, startDate, endDate, onEditFilter }: DebriefingViewProps) {
+  const [metrics, setMetrics] = useState<DebriefingMetrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Selected offer codes persisted in DB
-  const [selectedOfferCodes, setSelectedOfferCodes] = useState<string[]>(
-    filter?.debriefing_offer_codes ?? []
-  );
-  const [savingFilter, setSavingFilter] = useState(false);
-  const [offerSearchTerm, setOfferSearchTerm] = useState("");
-  const [offerDropOpen, setOfferDropOpen] = useState(false);
-
-  const offerCodesPropStr = (filter?.debriefing_offer_codes ?? []).join(",");
-
-  useEffect(() => {
-    setSelectedOfferCodes(filter?.debriefing_offer_codes ?? []);
-  }, [filter?.id, offerCodesPropStr]);
-
-  const mainProduct = filter?.main_hotmart_product ?? null;
-  const selectedCodesStr = selectedOfferCodes.join(",");
+  const products = useMemo(() => (filter ? resolveDebriefingProducts(filter) : []), [filter]);
+  const productsKey = JSON.stringify(products);
 
   const loadDebriefingData = useCallback(async () => {
-    if (!mainProduct?.product_id || !startDate || !endDate) {
+    if (products.length === 0 || !startDate || !endDate) {
       setMetrics(null);
       return;
     }
@@ -108,7 +73,7 @@ export function DebriefingView({ filter, startDate, endDate, onEditFilter, onFil
     setError(null);
     try {
       const params = new URLSearchParams({
-        products: JSON.stringify([{ product_id: mainProduct.product_id, offer_codes: selectedOfferCodes }]),
+        products: JSON.stringify(products),
         start_date: startDate,
         end_date: endDate,
       });
@@ -119,76 +84,18 @@ export function DebriefingView({ filter, startDate, endDate, onEditFilter, onFil
         throw new Error(d.error ?? "Erro ao carregar dados de Debriefing");
       }
       const data: DebriefingMetrics = await res.json();
-      setMetrics(toViewMetrics(data));
+      setMetrics(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar dados");
     } finally {
       setLoading(false);
     }
-  }, [mainProduct?.product_id, startDate, endDate, selectedCodesStr]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productsKey, startDate, endDate]);
 
   useEffect(() => {
     loadDebriefingData();
   }, [loadDebriefingData]);
-
-  // Persist selected offer codes to DB on toggle
-  const handleToggleOfferCode = async (code: string) => {
-    if (!filter) return;
-
-    let nextCodes: string[];
-    if (selectedOfferCodes.includes(code)) {
-      nextCodes = selectedOfferCodes.filter((c) => c !== code);
-    } else {
-      nextCodes = [...selectedOfferCodes, code];
-    }
-
-    setSelectedOfferCodes(nextCodes);
-    setSavingFilter(true);
-
-    try {
-      const res = await fetch(`/api/indicadores/filters/${filter.id}`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          debriefing_offer_codes: nextCodes,
-        }),
-      });
-
-      if (res.ok) {
-        const updated: FilterRecord = await res.json();
-        onFilterUpdated?.(updated);
-      }
-    } catch {
-      // silently handle or fallback
-    } finally {
-      setSavingFilter(false);
-    }
-  };
-
-  const handleClearOfferFilter = async () => {
-    if (!filter) return;
-    setSelectedOfferCodes([]);
-    setSavingFilter(true);
-
-    try {
-      const res = await fetch(`/api/indicadores/filters/${filter.id}`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          debriefing_offer_codes: [],
-        }),
-      });
-
-      if (res.ok) {
-        const updated: FilterRecord = await res.json();
-        onFilterUpdated?.(updated);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setSavingFilter(false);
-    }
-  };
 
   if (!filter) {
     return (
@@ -198,7 +105,7 @@ export function DebriefingView({ filter, startDate, endDate, onEditFilter, onFil
     );
   }
 
-  if (!mainProduct) {
+  if (products.length === 0) {
     return (
       <div
         data-testid="debriefing-empty-state"
@@ -261,8 +168,10 @@ export function DebriefingView({ filter, startDate, endDate, onEditFilter, onFil
     );
   }
 
-  const productName = metrics?.product_name || mainProduct.product_name;
-  const availableOffers = metrics?.available_offers ?? [];
+  const single = products.length === 1 ? products[0] : null;
+  const headerTitle = single
+    ? metrics?.products[0]?.product_name || single.product_name
+    : products.map((p) => p.product_name).join(", ");
 
   return (
     <div data-testid="debriefing-view" style={{ display: "flex", flexDirection: "column", gap: 20, margin: "16px 0" }}>
@@ -282,10 +191,10 @@ export function DebriefingView({ filter, startDate, endDate, onEditFilter, onFil
       >
         <div>
           <div style={{ fontSize: 11, fontWeight: 600, color: "var(--violet)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            Debriefing de Vendas do Produto Principal
+            {single ? "Debriefing de Vendas do Produto Principal" : `Debriefing de Vendas de ${products.length} Produtos Principais`}
           </div>
           <h2 style={{ margin: "4px 0 0", fontSize: 18, fontWeight: 700, color: "var(--text)" }}>
-            {productName}
+            {headerTitle}
           </h2>
         </div>
         <div
@@ -299,214 +208,9 @@ export function DebriefingView({ filter, startDate, endDate, onEditFilter, onFil
             color: "var(--text-2)",
           }}
         >
-          ID Hotmart: #{mainProduct.product_id}
+          {single ? `ID Hotmart: #${single.product_id}` : `${products.length} produtos`}
         </div>
       </div>
-
-      {/* Offer Filter Control Bar */}
-      {availableOffers.length > 0 && (
-        <div
-          style={{
-            padding: "16px 20px",
-            borderRadius: 12,
-            border: "1px solid var(--border-vis)",
-            background: "var(--surface)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-2)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                Filtro de Ofertas
-              </span>
-              {selectedOfferCodes.length > 0 ? (
-                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--violet)", background: "color-mix(in srgb, var(--violet) 12%, transparent)", padding: "2px 8px", borderRadius: 12 }}>
-                  {selectedOfferCodes.length} {selectedOfferCodes.length === 1 ? "oferta selecionada" : "ofertas selecionadas"}
-                </span>
-              ) : (
-                <span style={{ fontSize: 11, color: "var(--text-3)" }}>
-                  (Exibindo todas as ofertas)
-                </span>
-              )}
-            </div>
-            {selectedOfferCodes.length > 0 && (
-              <button
-                type="button"
-                onClick={handleClearOfferFilter}
-                disabled={savingFilter}
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: "var(--text-muted)",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: 0,
-                }}
-              >
-                Limpar filtro (Exibir todas)
-              </button>
-            )}
-          </div>
-
-          {/* Search Input with Dropdown */}
-          <div style={{ position: "relative", width: "100%" }}>
-            <input
-              type="text"
-              value={offerSearchTerm}
-              onChange={(e) => setOfferSearchTerm(e.target.value)}
-              onFocus={() => setOfferDropOpen(true)}
-              onBlur={() => setTimeout(() => setOfferDropOpen(false), 200)}
-              placeholder="Digite o código ou nome da oferta..."
-              style={{
-                width: "100%",
-                padding: "9px 14px",
-                fontSize: 13,
-                borderRadius: 8,
-                border: "1px solid var(--border-vis)",
-                background: "var(--surface-2)",
-                color: "var(--text)",
-                outline: "none",
-                boxSizing: "border-box",
-              }}
-            />
-
-            {offerDropOpen && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "calc(100% + 4px)",
-                  left: 0,
-                  right: 0,
-                  background: "var(--surface)",
-                  border: "1px solid var(--border-vis)",
-                  borderRadius: 8,
-                  maxHeight: 220,
-                  overflowY: "auto",
-                  zIndex: 300,
-                  boxShadow: "0 12px 32px rgba(0,0,0,0.5)",
-                }}
-              >
-                {(() => {
-                  const term = offerSearchTerm.trim().toLowerCase();
-                  const filtered = availableOffers.filter(
-                    (off) =>
-                      !term ||
-                      off.offer_code.toLowerCase().includes(term) ||
-                      off.offer_name.toLowerCase().includes(term)
-                  );
-
-                  if (filtered.length === 0) {
-                    return (
-                      <div style={{ padding: "12px", fontSize: 12, color: "var(--text-3)", textAlign: "center" }}>
-                        Nenhuma oferta encontrada para "{offerSearchTerm}".
-                      </div>
-                    );
-                  }
-
-                  return filtered.map((off) => {
-                    const isSelected = selectedOfferCodes.includes(off.offer_code);
-                    return (
-                      <button
-                        key={off.offer_code}
-                        type="button"
-                        onMouseDown={() => handleToggleOfferCode(off.offer_code)}
-                        style={{
-                          width: "100%",
-                          textAlign: "left",
-                          padding: "9px 14px",
-                          fontSize: 12,
-                          color: "var(--text)",
-                          background: isSelected
-                            ? "color-mix(in srgb, var(--violet) 12%, transparent)"
-                            : "transparent",
-                          border: "none",
-                          borderBottom: "1px solid var(--border)",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: 8,
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => {}}
-                            style={{ accentColor: "var(--violet)", pointerEvents: "none" }}
-                          />
-                          <span>
-                            <strong>{off.offer_name}</strong>{" "}
-                            <span style={{ fontSize: 11, color: "var(--text-3)" }}>
-                              ({off.offer_code})
-                            </span>
-                          </span>
-                        </div>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-3)" }}>
-                          {off.sales_count} {off.sales_count === 1 ? "venda" : "vendas"}
-                        </span>
-                      </button>
-                    );
-                  });
-                })()}
-              </div>
-            )}
-          </div>
-
-          {/* Active Offer Filter Tags */}
-          {selectedOfferCodes.length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
-              {selectedOfferCodes.map((code) => {
-                const found = availableOffers.find((o) => o.offer_code === code);
-                const label = found ? found.offer_name : code;
-                return (
-                  <span
-                    key={code}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                      padding: "4px 10px",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      borderRadius: 16,
-                      border: "1px solid color-mix(in srgb, var(--violet) 40%, transparent)",
-                      background: "color-mix(in srgb, var(--violet) 12%, transparent)",
-                      color: "var(--violet)",
-                    }}
-                  >
-                    {label} {found && found.offer_code !== label && `(${found.offer_code})`}
-                    <button
-                      type="button"
-                      onClick={() => handleToggleOfferCode(code)}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        cursor: "pointer",
-                        color: "var(--violet)",
-                        padding: 0,
-                        fontSize: 12,
-                        lineHeight: 1,
-                      }}
-                    >
-                      ×
-                    </button>
-                  </span>
-                );
-              })}
-            </div>
-          )}
-
-          {savingFilter && (
-            <span style={{ fontSize: 11, color: "var(--text-3)", fontStyle: "italic" }}>
-              Salvando preferências no banco...
-            </span>
-          )}
-        </div>
-      )}
 
       {loading ? (
         <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-3)", fontSize: 13 }}>
@@ -542,10 +246,10 @@ export function DebriefingView({ filter, startDate, endDate, onEditFilter, onFil
                 Total de Vendas
               </span>
               <span style={{ fontSize: 28, fontWeight: 800, color: "var(--text)" }}>
-                {fmtNum(metrics.total_sales)}
+                {fmtNum(metrics.totals.total_sales)}
               </span>
               <span style={{ fontSize: 12, color: "var(--text-3)" }}>
-                {metrics.total_sales_brl} vendas em BRL | {metrics.total_sales_foreign} em moeda estrangeira
+                {metrics.totals.total_sales_brl} vendas em BRL | {metrics.totals.total_sales_foreign} em moeda estrangeira
               </span>
             </div>
 
@@ -565,7 +269,7 @@ export function DebriefingView({ filter, startDate, endDate, onEditFilter, onFil
                 Faturamento Total (R$)
               </span>
               <span style={{ fontSize: 28, fontWeight: 800, color: "var(--green)" }}>
-                {fmtBRL(metrics.total_revenue_brl)}
+                {fmtBRL(metrics.totals.total_revenue_brl)}
               </span>
               <span style={{ fontSize: 12, color: "var(--text-3)" }}>
                 Receita confirmada em reais (BRL)
@@ -588,7 +292,7 @@ export function DebriefingView({ filter, startDate, endDate, onEditFilter, onFil
                 Vendas Moeda Estrangeira
               </span>
               <span style={{ fontSize: 28, fontWeight: 800, color: "var(--blue)" }}>
-                {fmtNum(metrics.total_sales_foreign)}
+                {fmtNum(metrics.totals.total_sales_foreign)}
               </span>
               <span style={{ fontSize: 12, color: "var(--text-3)" }}>
                 Vendas em EUR/USD ou outras moedas
@@ -666,7 +370,7 @@ export function DebriefingView({ filter, startDate, endDate, onEditFilter, onFil
             <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-2)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
               Desdobramento por Ofertas / Origens
             </div>
-            {metrics.offers_breakdown.length === 0 ? (
+            {metrics.products.every((p) => p.offers_breakdown.length === 0) ? (
               <div style={{ padding: "20px 0", textAlign: "center", color: "var(--text-3)", fontSize: 13 }}>
                 Nenhuma oferta/origem registrada no período.
               </div>
@@ -694,32 +398,55 @@ export function DebriefingView({ filter, startDate, endDate, onEditFilter, onFil
                       <th style={{ padding: "8px 12px", textAlign: "right" }}>Faturamento (R$)</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {metrics.offers_breakdown.map((row) => (
+                  {metrics.products.map((product) => (
+                    <tbody key={product.product_id} data-testid={`debriefing-group-${product.product_id}`}>
                       <tr
-                        key={row.offer_code}
+                        data-testid={`debriefing-subtotal-${product.product_id}`}
                         style={{
-                          borderBottom: "1px solid var(--border)",
+                          borderBottom: "1px solid var(--border-vis)",
+                          background: "var(--surface-2)",
                           color: "var(--text)",
                         }}
                       >
-                        <td style={{ padding: "10px 12px" }}>
-                          <span style={{ fontWeight: 600 }}>{row.offer_name}</span>
-                          {row.offer_code !== row.offer_name && (
-                            <span style={{ marginLeft: 6, fontSize: 11, color: "var(--text-3)" }}>
-                              ({row.offer_code})
-                            </span>
-                          )}
+                        <td style={{ padding: "10px 12px", fontWeight: 700 }}>
+                          {product.product_name}
+                          <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 400, color: "var(--text-3)" }}>
+                            (#{product.product_id})
+                          </span>
                         </td>
-                        <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600 }}>
-                          {fmtNum(row.sales_count)}
+                        <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700 }}>
+                          {fmtNum(product.total_sales)}
                         </td>
-                        <td style={{ padding: "10px 12px", textAlign: "right", color: "var(--green)", fontWeight: 600 }}>
-                          {fmtBRL(row.revenue)}
+                        <td style={{ padding: "10px 12px", textAlign: "right", color: "var(--green)", fontWeight: 700 }}>
+                          {fmtBRL(product.total_revenue_brl)}
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
+                      {product.offers_breakdown.map((row) => (
+                        <tr
+                          key={row.offer_code}
+                          style={{
+                            borderBottom: "1px solid var(--border)",
+                            color: "var(--text)",
+                          }}
+                        >
+                          <td style={{ padding: "10px 12px 10px 28px" }}>
+                            <span style={{ fontWeight: 600 }}>{row.offer_name}</span>
+                            {row.offer_code !== row.offer_name && (
+                              <span style={{ marginLeft: 6, fontSize: 11, color: "var(--text-3)" }}>
+                                ({row.offer_code})
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600 }}>
+                            {fmtNum(row.sales_count)}
+                          </td>
+                          <td style={{ padding: "10px 12px", textAlign: "right", color: "var(--green)", fontWeight: 600 }}>
+                            {fmtBRL(row.revenue)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  ))}
                 </table>
               </div>
             )}

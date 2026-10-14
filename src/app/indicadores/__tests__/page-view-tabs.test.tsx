@@ -63,14 +63,19 @@ function installFetch(filters: FilterRecord[]) {
     if (url.startsWith("/api/indicadores/conversion-sources")) return jsonOk([]);
     if (url.startsWith("/api/indicadores/debriefing"))
       return jsonOk({
-        product_id: "999",
-        product_name: "Produto Principal Teste",
-        total_sales: 10,
-        total_sales_brl: 10,
-        total_sales_foreign: 0,
-        total_revenue_brl: 5000,
+        totals: { total_sales: 10, total_sales_brl: 10, total_sales_foreign: 0, total_revenue_brl: 5000 },
         daily_series: [],
-        offers_breakdown: [],
+        products: [
+          {
+            product_id: "999",
+            product_name: "Produto Principal Teste",
+            total_sales: 10,
+            total_sales_brl: 10,
+            total_sales_foreign: 0,
+            total_revenue_brl: 5000,
+            offers_breakdown: [],
+          },
+        ],
       });
     return jsonOk(null);
   }) as unknown as typeof fetch;
@@ -116,7 +121,7 @@ describe("IndicadoresPage — abas Dashboard | Planilha | Debriefing", () => {
   it("abre direto no Debriefing com ?view=debriefing", async () => {
     const filterWithMainProduct: FilterRecord = {
       ...FULL_FILTER,
-      main_hotmart_product: { product_id: "999", product_name: "Produto Principal Teste" },
+      debriefing_products: [{ product_id: "999", product_name: "Produto Principal Teste", offer_codes: [] }],
     };
     await renderAt("/indicadores?view=debriefing", filterWithMainProduct);
 
