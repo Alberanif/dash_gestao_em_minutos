@@ -18,13 +18,30 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createSupabaseServerClient();
 
-  const { data, error: dbError } = await supabase
+  const includeInactive =
+    request.nextUrl.searchParams.get("include_inactive") === "true";
+
+  let query = supabase
     .from("dash_gestao_hotmart_offers")
-    .select("offer_code, offer_name, price, currency, is_main_offer")
+    .select(
+      includeInactive
+        ? "offer_code, offer_name, price, currency, is_main_offer, is_active"
+        : "offer_code, offer_name, price, currency, is_main_offer"
+    )
     .eq("account_id", accountId)
-    .eq("product_id", productId)
-    .eq("is_active", true)
-    .order("is_main_offer", { ascending: false });
+    .eq("product_id", productId);
+
+  if (includeInactive) {
+    query = query
+      .order("is_active", { ascending: false })
+      .order("is_main_offer", { ascending: false });
+  } else {
+    query = query
+      .eq("is_active", true)
+      .order("is_main_offer", { ascending: false });
+  }
+
+  const { data, error: dbError } = await query;
 
   if (dbError) {
     return NextResponse.json({ error: dbError.message }, { status: 500 });
