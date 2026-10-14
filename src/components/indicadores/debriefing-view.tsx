@@ -55,8 +55,29 @@ const TOOLTIP_STYLE: React.CSSProperties = {
   boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
 };
 
+// Ajuste mínimo (issue #207): a API agora devolve N produtos; esta view ainda mostra um só.
+// A view multi-produto vem em outra issue; até lá adaptamos a resposta ao formato antigo.
+type ViewMetrics = DebriefingMetrics["totals"] & {
+  product_name: string | null;
+  daily_series: DebriefingMetrics["daily_series"];
+  offers_breakdown: DebriefingMetrics["products"][number]["offers_breakdown"];
+  available_offers: Array<{ offer_code: string; offer_name: string; sales_count: number }>;
+};
+
+function toViewMetrics(data: DebriefingMetrics): ViewMetrics {
+  const first = data.products[0];
+  const offers = first?.offers_breakdown ?? [];
+  return {
+    ...data.totals,
+    product_name: first?.product_name ?? null,
+    daily_series: data.daily_series,
+    offers_breakdown: offers,
+    available_offers: offers.map(({ offer_code, offer_name, sales_count }) => ({ offer_code, offer_name, sales_count })),
+  };
+}
+
 export function DebriefingView({ filter, startDate, endDate, onEditFilter, onFilterUpdated }: DebriefingViewProps) {
-  const [metrics, setMetrics] = useState<DebriefingMetrics | null>(null);
+  const [metrics, setMetrics] = useState<ViewMetrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,13 +108,10 @@ export function DebriefingView({ filter, startDate, endDate, onEditFilter, onFil
     setError(null);
     try {
       const params = new URLSearchParams({
-        product_id: mainProduct.product_id,
+        products: JSON.stringify([{ product_id: mainProduct.product_id, offer_codes: selectedOfferCodes }]),
         start_date: startDate,
         end_date: endDate,
       });
-      if (selectedOfferCodes.length > 0) {
-        params.set("offer_codes", selectedOfferCodes.join(","));
-      }
 
       const res = await fetch(`/api/indicadores/debriefing?${params.toString()}`);
       if (!res.ok) {
@@ -101,7 +119,7 @@ export function DebriefingView({ filter, startDate, endDate, onEditFilter, onFil
         throw new Error(d.error ?? "Erro ao carregar dados de Debriefing");
       }
       const data: DebriefingMetrics = await res.json();
-      setMetrics(data);
+      setMetrics(toViewMetrics(data));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar dados");
     } finally {

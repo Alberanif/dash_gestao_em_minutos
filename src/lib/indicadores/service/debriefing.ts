@@ -4,38 +4,54 @@ import type { SupabaseLike } from "./types";
 const STATUS_APPROVED = ["COMPLETE", "APPROVED"];
 const PAGE_SIZE = 1000;
 
-export interface DebriefingMetrics {
-  product_id: string;
-  product_name: string | null;
+export interface DebriefingTotals {
   total_sales: number;
   total_sales_brl: number;
   total_sales_foreign: number;
   total_revenue_brl: number;
-  available_offers: Array<{
-    offer_code: string;
-    offer_name: string;
-    sales_count: number;
-  }>;
-  daily_series: Array<{
-    date: string;
-    sales_count: number;
-    sales_brl: number;
-    sales_foreign: number;
-    revenue: number;
-  }>;
-  offers_breakdown: Array<{
-    offer_code: string;
-    offer_name: string;
-    sales_count: number;
-    revenue: number;
-  }>;
+}
+
+export interface DebriefingDailyPoint {
+  date: string;
+  sales_count: number;
+  sales_brl: number;
+  sales_foreign: number;
+  revenue: number;
+}
+
+export interface DebriefingOfferBreakdown {
+  offer_code: string;
+  offer_name: string;
+  sales_count: number;
+  revenue: number;
+}
+
+export interface DebriefingProductMetrics extends DebriefingTotals {
+  product_id: string;
+  product_name: string;
+  offers_breakdown: DebriefingOfferBreakdown[];
+}
+
+export interface DebriefingMetrics {
+  totals: DebriefingTotals;
+  /** Consolidada: soma dos produtos. */
+  daily_series: DebriefingDailyPoint[];
+  /** Na ordem recebida. */
+  products: DebriefingProductMetrics[];
+}
+
+export interface DebriefingQueryProduct {
+  product_id: string;
+  /** Nome de reserva para produto sem vendas no período. */
+  product_name?: string;
+  /** Vazio/ausente = todas as ofertas. "Sem Oferta" marca vendas sem offer_code. */
+  offer_codes?: string[];
 }
 
 export interface DebriefingQuery {
   startDate: string;
   endDate: string;
-  productId: string;
-  offerCodes?: string[];
+  products: DebriefingQueryProduct[];
 }
 
 type HotmartSaleRow = {
@@ -48,13 +64,12 @@ type HotmartSaleRow = {
   offer_name: string | null;
 };
 
-export async function fetchDebriefingMetrics(
-  { startDate, endDate, productId, offerCodes = [] }: DebriefingQuery,
+async function fetchProductSales(
+  productId: string,
+  startUtc: string,
+  endUtc: string,
   supabase: SupabaseLike
-): Promise<DebriefingMetrics> {
-  const startUtc = brtToUtc(startDate, false);
-  const endUtc = brtToUtc(endDate, true);
-
+): Promise<HotmartSaleRow[]> {
   const buildQuery = () =>
     supabase
       .from("dash_gestao_hotmart_sales")
@@ -74,110 +89,113 @@ export async function fetchDebriefingMetrics(
     if (data.length < PAGE_SIZE) break;
     from += PAGE_SIZE;
   }
+  return sales;
+}
 
-  // 1. Calculate available offers (all offers for this product in period)
-  const availableOffersMap = new Map<string, { offer_code: string; offer_name: string; sales_count: number }>();
-  let productName: string | null = null;
+export async function fetchDebriefingMetrics(
+  { startDate, endDate, products }: DebriefingQuery,
+  supabase: SupabaseLike
+): Promise<DebriefingMetrics> {
+  const startUtc = brtToUtc(startDate, false);
+  const endUtc = brtToUtc(endDate, true);
 
-  for (const sale of sales) {
-    if (!productName && sale.product_name) {
-      productName = sale.product_name;
-    }
-    const offerKey = sale.offer_code || "Sem Oferta";
-    const offerName = sale.offer_name || sale.offer_code || "Sem Oferta";
-    const existing = availableOffersMap.get(offerKey);
-    if (existing) {
-      existing.sales_count += 1;
-    } else {
-      availableOffersMap.set(offerKey, {
-        offer_code: offerKey,
-        offer_name: offerName,
-        sales_count: 1,
-      });
-    }
-  }
+  const salesByProduct = await Promise.all(
+    products.map((p) => fetchProductSales(p.product_id, startUtc, endUtc, supabase))
+  );
 
-  const available_offers = Array.from(availableOffersMap.values()).sort((a, b) => b.sales_count - a.sales_count);
+  const totals: DebriefingTotals = {
+    total_sales: 0,
+    total_sales_brl: 0,
+    total_sales_foreign: 0,
+    total_revenue_brl: 0,
+  };
 
-  // 2. Filter sales if offerCodes filter is provided
-  const filterSet = offerCodes.length > 0 ? new Set(offerCodes) : null;
-  const filteredSales = filterSet
-    ? sales.filter((s) => filterSet.has(s.offer_code || "Sem Oferta"))
-    : sales;
-
-  let totalSalesBrl = 0;
-  let totalSalesForeign = 0;
-  let totalRevenueBrl = 0;
-
-  const dailyMap = new Map<
-    string,
-    { sales_count: number; sales_brl: number; sales_foreign: number; revenue: number }
-  >();
-  const offersMap = new Map<string, { offer_code: string; offer_name: string; sales_count: number; revenue: number }>();
-
-  // Build daily series date template between startDate and endDate
+  const dailyMap = new Map<string, Omit<DebriefingDailyPoint, "date">>();
   const current = new Date(`${startDate}T00:00:00-03:00`);
   const end = new Date(`${endDate}T00:00:00-03:00`);
   while (current <= end) {
-    const dStr = current.toISOString().slice(0, 10);
-    dailyMap.set(dStr, { sales_count: 0, sales_brl: 0, sales_foreign: 0, revenue: 0 });
+    dailyMap.set(current.toISOString().slice(0, 10), {
+      sales_count: 0,
+      sales_brl: 0,
+      sales_foreign: 0,
+      revenue: 0,
+    });
     current.setDate(current.getDate() + 1);
   }
 
-  for (const sale of filteredSales) {
-    const isBrl = sale.currency === "BRL" || !sale.currency;
-    const price = sale.price ?? 0;
+  const productResults: DebriefingProductMetrics[] = products.map((product, idx) => {
+    const sales = salesByProduct[idx];
+    // Regra por produto: sem oferta marcada conta tudo; com ofertas, só as marcadas.
+    const codes = product.offer_codes ?? [];
+    const filterSet = codes.length > 0 ? new Set(codes) : null;
+    const filteredSales = filterSet
+      ? sales.filter((s) => filterSet.has(s.offer_code || "Sem Oferta"))
+      : sales;
 
-    if (isBrl) {
-      totalSalesBrl += 1;
-      totalRevenueBrl += price;
-    } else {
-      totalSalesForeign += 1;
-    }
+    const productName =
+      sales.find((s) => s.product_name)?.product_name || product.product_name || product.product_id;
 
-    const brtDate = utcToBrtDate(sale.purchase_date);
-    const dayEntry = dailyMap.get(brtDate);
-    if (dayEntry) {
-      dayEntry.sales_count += 1;
+    const result: DebriefingProductMetrics = {
+      product_id: product.product_id,
+      product_name: productName,
+      total_sales: 0,
+      total_sales_brl: 0,
+      total_sales_foreign: 0,
+      total_revenue_brl: 0,
+      offers_breakdown: [],
+    };
+    const offersMap = new Map<string, DebriefingOfferBreakdown>();
+
+    for (const sale of filteredSales) {
+      const isBrl = sale.currency === "BRL" || !sale.currency;
+      const price = sale.price ?? 0;
+
       if (isBrl) {
-        dayEntry.sales_brl += 1;
-        dayEntry.revenue += price;
+        result.total_sales_brl += 1;
+        result.total_revenue_brl += price;
       } else {
-        dayEntry.sales_foreign += 1;
+        result.total_sales_foreign += 1;
+      }
+
+      const dayEntry = dailyMap.get(utcToBrtDate(sale.purchase_date));
+      if (dayEntry) {
+        dayEntry.sales_count += 1;
+        if (isBrl) {
+          dayEntry.sales_brl += 1;
+          dayEntry.revenue += price;
+        } else {
+          dayEntry.sales_foreign += 1;
+        }
+      }
+
+      const offerKey = sale.offer_code || "Sem Oferta";
+      const offerEntry = offersMap.get(offerKey);
+      if (offerEntry) {
+        offerEntry.sales_count += 1;
+        if (isBrl) offerEntry.revenue += price;
+      } else {
+        offersMap.set(offerKey, {
+          offer_code: offerKey,
+          offer_name: sale.offer_name || sale.offer_code || "Sem Oferta",
+          sales_count: 1,
+          revenue: isBrl ? price : 0,
+        });
       }
     }
 
-    const offerKey = sale.offer_code || "Sem Oferta";
-    const offerName = sale.offer_name || sale.offer_code || "Sem Oferta";
-    const offerEntry = offersMap.get(offerKey);
-    if (offerEntry) {
-      offerEntry.sales_count += 1;
-      if (isBrl) offerEntry.revenue += price;
-    } else {
-      offersMap.set(offerKey, {
-        offer_code: offerKey,
-        offer_name: offerName,
-        sales_count: 1,
-        revenue: isBrl ? price : 0,
-      });
-    }
-  }
+    result.total_sales = result.total_sales_brl + result.total_sales_foreign;
+    result.offers_breakdown = Array.from(offersMap.values()).sort((a, b) => b.sales_count - a.sales_count);
+
+    totals.total_sales += result.total_sales;
+    totals.total_sales_brl += result.total_sales_brl;
+    totals.total_sales_foreign += result.total_sales_foreign;
+    totals.total_revenue_brl += result.total_revenue_brl;
+    return result;
+  });
 
   const daily_series = Array.from(dailyMap.entries())
     .map(([date, vals]) => ({ date, ...vals }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  const offers_breakdown = Array.from(offersMap.values()).sort((a, b) => b.sales_count - a.sales_count);
-
-  return {
-    product_id: productId,
-    product_name: productName,
-    total_sales: totalSalesBrl + totalSalesForeign,
-    total_sales_brl: totalSalesBrl,
-    total_sales_foreign: totalSalesForeign,
-    total_revenue_brl: totalRevenueBrl,
-    available_offers,
-    daily_series,
-    offers_breakdown,
-  };
+  return { totals, daily_series, products: productResults };
 }
