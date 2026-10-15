@@ -270,6 +270,45 @@ describe("POST /api/vendas/views", () => {
     expect(finalWrite).toEqual({ backfill_status: "partial", backfill_from: "2026-08-08" });
   });
 
+  it("2 produtos: ordem janela -> produto -> oferta (a janela recente fecha para os dois antes da próxima)", async () => {
+    resolver = creationResolver();
+    const res = await call(post(two));
+    expect(res.status).toBe(201);
+    const pairs = salesUrls.map((u) => {
+      const q = new URL(u).searchParams;
+      return `${q.get("product_id")}/${q.get("offer_code")}`;
+    });
+    // 4 janelas x (p1/A, p1/B, p2/C), na ordem de inclusão, sem produto atravessar janela
+    expect(pairs).toEqual(Array(4).fill(["p1/A", "p1/B", "p2/C"]).flat());
+    const windows = salesUrls.map((u) => new URL(u).searchParams.get("end_date"));
+    expect(windows.slice(0, 3).every((w) => w === windows[0])).toBe(true);
+    expect((await res.json()).view.backfill_status).toBe("done");
+  });
+
+  it("2 produtos e orçamento estourado no meio de uma janela => partial; a cauda coberta tem os DOIS produtos", async () => {
+    resolver = creationResolver();
+    // janela 1 = buscas 1-3 (p1/A, p1/B, p2/C); janela 2 estoura em p1/B (busca 5)
+    failSalesFrom = 5;
+    const { view } = await (await call(post(two))).json();
+    expect(view.backfill_status).toBe("partial");
+    // só a janela 1 foi coberta por inteiro (hoje - 30d), mesmo p2 não tendo rodado na janela 2
+    expect(view.backfill_from).toBe("2026-09-07");
+    const w1 = salesUrls.slice(0, 3).map((u) => new URL(u).searchParams.get("product_id"));
+    expect(w1).toEqual(["p1", "p1", "p2"]);
+  });
+
+  it("nenhuma oferta para buscar => failed, sem chamar a Hotmart", async () => {
+    resolver = creationResolver();
+    const { runBackfill } = await import("@/lib/vendas/views-sync");
+    const out = await runBackfill({
+      supabase: fake.client as never,
+      view: { id: "view-1", account_id: "acc-1", view_start_date: null },
+      targets: [{ productId: "p1", offerCodes: [] }],
+    });
+    expect(out.status).toBe("failed");
+    expect(salesFetchCount).toBe(0);
+  });
+
   it("estouro sem nenhuma janela coberta => failed (não há cauda a declarar)", async () => {
     resolver = creationResolver();
     failSalesFrom = 1;
