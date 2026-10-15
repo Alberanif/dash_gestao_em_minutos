@@ -16,6 +16,7 @@ function view(id: string, created_at: string, folder_id: string | null = null): 
     account_id: "a",
     product_id: "p",
     offer_codes: ["o1"],
+    products: [{ product_id: "p", offer_codes: ["o1"] }],
     folder_id,
     view_start_date: null,
     view_end_date: null,
@@ -62,8 +63,8 @@ describe("groupViewsByFolder", () => {
 describe("totalsMismatch", () => {
   const daily = [{ day: "2026-08-01", sales: 3 }, { day: "2026-08-02", sales: 4 }];
   const offers = [
-    { offer_code: "a", offer_name: null, sales: 5, refunded: 0 },
-    { offer_code: "b", offer_name: null, sales: 2, refunded: 1 },
+    { product_id: "p", product_name: "P", offer_code: "a", offer_name: null, sales: 5, refunded: 0 },
+    { product_id: "p", product_name: "P", offer_code: "b", offer_name: null, sales: 2, refunded: 1 },
   ];
   it("KPI = soma do dia = soma das ofertas → sem divergência", () => {
     expect(totalsMismatch(7, daily, offers)).toBeNull();
