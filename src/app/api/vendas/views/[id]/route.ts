@@ -186,7 +186,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     view = { ...view, products: newProducts };
   }
 
-  const targets = newProducts === null ? [] : newBackfillTargets(before.products, newProducts);
+  // Só o que é novo — EXCETO se o histórico anterior não está completo: gravar
+  // "done" depois de buscar só o produto novo declararia coberto o que nunca foi
+  // (backfill_from é único e vale para todos os produtos). Nesse caso refaz tudo.
+  const newOnly = newProducts === null ? [] : newBackfillTargets(before.products, newProducts);
+  const historyIncomplete = before.backfill_status !== "done";
+  const targets =
+    newOnly.length > 0 && historyIncomplete && newProducts !== null
+      ? newProducts.map((p) => ({ productId: p.product_id, offerCodes: p.offer_codes }))
+      : newOnly;
   if (targets.length > 0) {
     const outcome = await runBackfill({
       supabase,

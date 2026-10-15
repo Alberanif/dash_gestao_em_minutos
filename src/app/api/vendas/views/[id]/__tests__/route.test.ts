@@ -215,6 +215,54 @@ describe("PATCH /views/[id]", () => {
     expect(salesUrls.every((u) => u.includes("product_id=p1") && u.includes("offer_code=E"))).toBe(true);
   });
 
+  it.each(["partial", "failed", "pending"])(
+    "adicionar produto com histórico %s: refaz TODOS os produtos (nunca declara done só pelo novo)",
+    async (st) => {
+      resolver = patchResolver((c) =>
+        c.table === "dash_gestao_vendas_views" && c.op === "select" ? { data: { ...VIEW, backfill_status: st } } : undefined
+      );
+      const res = await (await mod()).PATCH(
+        req("PATCH", {
+          products: [
+            { product_id: "p1", offer_codes: ["A", "B"] },
+            { product_id: "p2", offer_codes: ["C"] },
+            { product_id: "p3", offer_codes: ["D"] },
+          ],
+        }),
+        ctx
+      );
+      expect(res.status).toBe(200);
+      const seen = new Set(salesUrls.map((u) => new URL(u).searchParams.get("product_id")));
+      expect([...seen].sort()).toEqual(["p1", "p2", "p3"]);
+    }
+  );
+
+  it("adicionar produto: orçamento estourado => partial com backfill_from da cauda coberta", async () => {
+    resolver = patchResolver();
+    let n = 0;
+    (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
+      if (String(url).includes("oauth/token")) {
+        return { ok: true, json: async () => ({ access_token: "tok" }), text: async (): Promise<string> => "" };
+      }
+      n += 1;
+      if (n >= 2) throw Object.assign(new Error("t"), { name: "TimeoutError" });
+      return { ok: true, json: async () => ({ items: [], page_info: {} }), text: async (): Promise<string> => "" };
+    });
+    const res = await (await mod()).PATCH(
+      req("PATCH", {
+        products: [
+          { product_id: "p1", offer_codes: ["A", "B"] },
+          { product_id: "p2", offer_codes: ["C"] },
+          { product_id: "p3", offer_codes: ["D"] },
+        ],
+      }),
+      ctx
+    );
+    const { view } = await res.json();
+    expect(view.backfill_status).toBe("partial");
+    expect(view.backfill_from).not.toBeNull();
+  });
+
   it("remover produto: apaga só a linha filha dele, sem fetch e sem tocar em hotmart_sales", async () => {
     resolver = patchResolver();
     const res = await (await mod()).PATCH(
