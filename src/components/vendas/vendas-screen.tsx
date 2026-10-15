@@ -213,7 +213,9 @@ export function VendasScreen({ role, products }: VendasScreenProps) {
 
   const hasViews = Boolean(views && views.length > 0);
   const productName = (view: VendasViewRecord) =>
-    products.find((p) => p.product_id === view.product_id)?.product_name ?? view.product_id;
+    view.products
+      .map((vp) => products.find((p) => p.product_id === vp.product_id)?.product_name ?? vp.product_id)
+      .join(", ");
 
   return (
     <div className="dash-dark vendas-container">
