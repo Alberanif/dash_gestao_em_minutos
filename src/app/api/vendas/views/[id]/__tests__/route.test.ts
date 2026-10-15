@@ -17,11 +17,18 @@ jest.mock("@/lib/supabase/server", () => ({
 }));
 
 const VIEW = {
-  id: "view-1", name: "V", account_id: "acc-1", product_id: "p1", offer_codes: ["A", "B"],
+  id: "view-1", name: "V", account_id: "acc-1", product_id: null, offer_codes: null,
+  products: [
+    { product_id: "p1", offer_codes: ["A", "B"], created_at: "2026-01-01" },
+    { product_id: "p2", offer_codes: ["C"], created_at: "2026-01-02" },
+  ],
   folder_id: null, view_start_date: null, view_end_date: null, refresh_started_at: null,
   last_refresh_at: null, backfill_status: "done", backfill_from: "2026-07-09",
   migrated_from_cycle_id: null, created_by: "user-1", created_at: "x", updated_at: "x",
 };
+
+// produto -> conta Hotmart (p4 é de outra conta)
+const CATALOG: Record<string, string> = { p1: "acc-1", p2: "acc-1", p3: "acc-1", p4: "acc-2" };
 
 let salesUrls: string[];
 
@@ -53,6 +60,10 @@ function patchResolver(extra?: (c: FakeCall) => ReturnType<typeof resolver> | un
     const custom = extra?.(c);
     if (custom) return custom;
     if (c.table === "dash_gestao_accounts") return { data: { id: "acc-1", credentials: { client_id: "a", client_secret: "b" } } };
+    if (c.table === "dash_gestao_hotmart_products") {
+      const ids = (filterOf(c, "in")?.[1] ?? []) as string[];
+      return { data: ids.filter((id) => id in CATALOG).map((id) => ({ product_id: id, account_id: CATALOG[id] })) };
+    }
     if (c.table === "dash_gestao_vendas_views" && c.op === "select") return { data: VIEW };
     if (c.table === "dash_gestao_vendas_views" && c.op === "update" && c.single) {
       return { data: { ...VIEW, ...(c.payload as object) } };
@@ -85,17 +96,23 @@ describe("PATCH /views/[id]", () => {
     expect(fake.calls).toHaveLength(0);
   });
 
-  it("product_id no body => 400 e nada é lido nem escrito", async () => {
+  it.each([
+    ["product_id solto", { product_id: "p2", name: "x" }],
+    ["offer_codes solto", { offer_codes: ["A"] }],
+  ])("%s (contrato antigo) => 400 e nada é lido nem escrito", async (_n, body) => {
     resolver = patchResolver();
-    const res = await (await mod()).PATCH(req("PATCH", { product_id: "p2", name: "x" }), ctx);
+    const res = await (await mod()).PATCH(req("PATCH", body), ctx);
     expect(res.status).toBe(400);
     expect(fake.calls).toHaveLength(0);
   });
 
   it.each([
     ["body vazio", {}],
-    ["remover a última oferta", { offer_codes: [] }],
-    ["oferta duplicada", { offer_codes: ["A", "A"] }],
+    ["remover o último produto (lista vazia)", { products: [] }],
+    ["produto sem oferta", { products: [{ product_id: "p1", offer_codes: [] }] }],
+    ["oferta duplicada", { products: [{ product_id: "p1", offer_codes: ["A", "A"] }] }],
+    ["produto duplicado", { products: [{ product_id: "p1", offer_codes: ["A"] }, { product_id: "p1", offer_codes: ["B"] }] }],
+    ["products não é array", { products: "p1" }],
     ["nome vazio", { name: " " }],
     ["período incompleto", { view_end_date: "2026-01-31" }],
     ["período invertido", { view_start_date: "2026-02-01", view_end_date: "2026-01-01" }],
@@ -106,12 +123,40 @@ describe("PATCH /views/[id]", () => {
     expect(writes()).toHaveLength(0);
   });
 
+  it("produto inexistente => 400 sem escrever", async () => {
+    resolver = patchResolver();
+    const res = await (await mod()).PATCH(
+      req("PATCH", { products: [{ product_id: "p1", offer_codes: ["A"] }, { product_id: "nope", offer_codes: ["Z"] }] }),
+      ctx
+    );
+    expect(res.status).toBe(400);
+    expect(writes()).toHaveLength(0);
+  });
+
+  it("produto de outra conta => 400 sem escrever", async () => {
+    resolver = patchResolver();
+    const res = await (await mod()).PATCH(
+      req("PATCH", { products: [{ product_id: "p1", offer_codes: ["A"] }, { product_id: "p4", offer_codes: ["Z"] }] }),
+      ctx
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("mesma conta");
+    expect(writes()).toHaveLength(0);
+  });
+
+  it("produtos todos de outra conta que não a da visualização => 400 sem escrever", async () => {
+    resolver = patchResolver();
+    const res = await (await mod()).PATCH(req("PATCH", { products: [{ product_id: "p4", offer_codes: ["Z"] }] }), ctx);
+    expect(res.status).toBe(400);
+    expect(writes()).toHaveLength(0);
+  });
+
   it("404 quando a view não existe", async () => {
     resolver = () => ({ data: null });
     expect((await (await mod()).PATCH(req("PATCH", { name: "x" }), ctx)).status).toBe(404);
   });
 
-  it("renomear/período não dispara backfill nem fetch", async () => {
+  it("renomear/período não dispara backfill, fetch nem mexe nos produtos", async () => {
     resolver = patchResolver();
     const res = await (await mod()).PATCH(
       req("PATCH", { name: " Novo ", view_start_date: "2026-01-01", view_end_date: "2026-01-31" }),
@@ -121,36 +166,120 @@ describe("PATCH /views/[id]", () => {
     const update = fake.calls.find((c) => c.op === "update")!;
     expect(update.payload).toEqual({ name: "Novo", view_start_date: "2026-01-01", view_end_date: "2026-01-31" });
     expect(global.fetch).not.toHaveBeenCalled();
+    expect(writes().some((c) => c.table === "dash_gestao_vendas_view_products")).toBe(false);
+    expect((await res.json()).view.products).toHaveLength(2);
   });
 
-  it("adicionar oferta dispara backfill SÓ da oferta nova", async () => {
+  it("adicionar produto: grava na filha e faz backfill SÓ do produto novo", async () => {
     resolver = patchResolver();
-    const res = await (await mod()).PATCH(req("PATCH", { offer_codes: ["A", "B", " C "] }), ctx);
+    const res = await (await mod()).PATCH(
+      req("PATCH", {
+        products: [
+          { product_id: "p1", offer_codes: ["A", "B"] },
+          { product_id: "p2", offer_codes: ["C"] },
+          { product_id: "p3", offer_codes: [" D "] },
+        ],
+      }),
+      ctx
+    );
+    expect(res.status).toBe(200);
+    const upsert = fake.calls.find((c) => c.op === "upsert")!;
+    expect(upsert.table).toBe("dash_gestao_vendas_view_products");
+    expect(upsert.payload).toEqual([
+      { view_id: "view-1", product_id: "p1", offer_codes: ["A", "B"] },
+      { view_id: "view-1", product_id: "p2", offer_codes: ["C"] },
+      { view_id: "view-1", product_id: "p3", offer_codes: ["D"] },
+    ]);
+    expect(upsert.options).toEqual({ onConflict: "view_id,product_id" });
+    expect(fake.calls.some((c) => c.op === "delete")).toBe(false);
+    expect(salesUrls.length).toBeGreaterThan(0);
+    expect(salesUrls.every((u) => u.includes("product_id=p3") && u.includes("offer_code=D"))).toBe(true);
+    const { view } = await res.json();
+    expect(view.products).toHaveLength(3);
+    expect(view.backfill_status).toBe("done");
+  });
+
+  it("adicionar oferta a produto existente: backfill SÓ da oferta nova", async () => {
+    resolver = patchResolver();
+    const res = await (await mod()).PATCH(
+      req("PATCH", {
+        products: [
+          { product_id: "p1", offer_codes: ["A", "B", " E "] },
+          { product_id: "p2", offer_codes: ["C"] },
+        ],
+      }),
+      ctx
+    );
     expect(res.status).toBe(200);
     expect(salesUrls.length).toBeGreaterThan(0);
-    expect(salesUrls.every((u) => u.includes("offer_code=C"))).toBe(true);
-    expect(salesUrls.some((u) => u.includes("offer_code=A") || u.includes("offer_code=B"))).toBe(false);
-    expect((await res.json()).view.backfill_status).toBe("done");
+    expect(salesUrls.every((u) => u.includes("product_id=p1") && u.includes("offer_code=E"))).toBe(true);
   });
 
-  it("remover oferta não busca na Hotmart e não apaga vendas", async () => {
+  it("remover produto: apaga só a linha filha dele, sem fetch e sem tocar em hotmart_sales", async () => {
     resolver = patchResolver();
-    const res = await (await mod()).PATCH(req("PATCH", { offer_codes: ["A"] }), ctx);
+    const res = await (await mod()).PATCH(
+      req("PATCH", { products: [{ product_id: "p1", offer_codes: ["A", "B"] }] }),
+      ctx
+    );
     expect(res.status).toBe(200);
+    const del = fake.calls.find((c) => c.op === "delete")!;
+    expect(del.table).toBe("dash_gestao_vendas_view_products");
+    expect(del.filters).toEqual(
+      expect.arrayContaining([
+        ["eq", ["view_id", "view-1"]],
+        ["in", ["product_id", ["p2"]]],
+      ])
+    );
     expect(global.fetch).not.toHaveBeenCalled();
     expect(fake.calls.some((c) => c.table === "dash_gestao_hotmart_sales")).toBe(false);
+    expect((await res.json()).view.products).toEqual([{ product_id: "p1", offer_codes: ["A", "B"] }]);
+  });
+
+  it("substituir o conjunto grava (upsert) ANTES de remover, para nunca ficar sem produto", async () => {
+    resolver = patchResolver();
+    await (await mod()).PATCH(req("PATCH", { products: [{ product_id: "p3", offer_codes: ["D"] }] }), ctx);
+    const ops = writes().map((c) => c.op);
+    expect(ops.indexOf("upsert")).toBeGreaterThanOrEqual(0);
+    expect(ops.indexOf("upsert")).toBeLessThan(ops.indexOf("delete"));
+    const del = fake.calls.find((c) => c.op === "delete")!;
+    expect(filterOf(del, "in")).toEqual(["product_id", ["p1", "p2"]]);
+  });
+
+  it("remover oferta de um produto não busca na Hotmart", async () => {
+    resolver = patchResolver();
+    const res = await (await mod()).PATCH(
+      req("PATCH", { products: [{ product_id: "p1", offer_codes: ["A"] }, { product_id: "p2", offer_codes: ["C"] }] }),
+      ctx
+    );
+    expect(res.status).toBe(200);
+    expect(global.fetch).not.toHaveBeenCalled();
     expect(fake.calls.some((c) => c.op === "delete")).toBe(false);
   });
 
   it("reenviar a mesma allowlist (outra ordem) não é oferta nova", async () => {
     resolver = patchResolver();
-    await (await mod()).PATCH(req("PATCH", { offer_codes: ["B", "A"] }), ctx);
+    await (await mod()).PATCH(
+      req("PATCH", { products: [{ product_id: "p2", offer_codes: ["C"] }, { product_id: "p1", offer_codes: ["B", "A"] }] }),
+      ctx
+    );
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it("CHECK/trigger do banco => 400", async () => {
+  it("erro do banco na filha (CHECK/FK/mínimo de 1) => 400", async () => {
+    for (const code of ["23514", "23503", "UV002"]) {
+      jest.resetModules();
+      fake = createFakeSupabase((c) => patchResolver((x) => (x.op === "upsert" ? { error: { message: "x", code } } : undefined))(c));
+      const res = await (await mod()).PATCH(
+        req("PATCH", { products: [{ product_id: "p1", offer_codes: ["A"] }] }),
+        ctx
+      );
+      expect(res.status).toBe(400);
+    }
+  });
+
+  it("CHECK do banco no período => 400", async () => {
     resolver = patchResolver((c) =>
-      c.op === "update" && c.single ? { error: { message: "x", code: "UV001" } } : undefined
+      c.op === "update" && c.single ? { error: { message: "x", code: "23514" } } : undefined
     );
     expect((await (await mod()).PATCH(req("PATCH", { name: "x" }), ctx)).status).toBe(400);
   });

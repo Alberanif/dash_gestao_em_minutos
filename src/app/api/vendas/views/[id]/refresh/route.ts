@@ -11,6 +11,7 @@ import {
   REFRESH_LOOKBACK_DAYS,
   runBackfill,
 } from "@/lib/vendas/views-sync";
+import { VIEW_PRODUCTS_TABLE, VIEW_WITH_PRODUCTS_SELECT, withProducts } from "@/lib/vendas/view-products";
 import type { VendasViewRecord } from "@/types/vendas";
 
 /**
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<P
   const { data: found, error: viewErr } = await supabase
     .from(VIEWS_TABLE)
     .select(
-      "id, account_id, product_id, offer_codes, view_start_date, last_refresh_at, backfill_status, updated_at"
+      `id, account_id, view_start_date, last_refresh_at, backfill_status, updated_at, products:${VIEW_PRODUCTS_TABLE}(product_id, offer_codes)`
     )
     .eq("id", id)
     .single();
@@ -61,12 +62,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<P
   if (viewErr || !found) {
     return NextResponse.json({ error: "Visualização não encontrada" }, { status: 404 });
   }
-  const view = found as Pick<
+  const view = withProducts(found) as Pick<
     VendasViewRecord,
     | "id"
     | "account_id"
-    | "product_id"
-    | "offer_codes"
+    | "products"
     | "view_start_date"
     | "last_refresh_at"
     | "backfill_status"
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<P
       const outcome = await runBackfill({
         supabase,
         view,
-        offerCodes: view.offer_codes,
+        targets: view.products.map((p) => ({ productId: p.product_id, offerCodes: p.offer_codes })),
         now,
         budgetMs: REFRESH_BUDGET_MS,
         signal: request.signal,
@@ -147,16 +147,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<P
       : 0;
     const startMs = Math.max(lookbackMs, periodStartMs);
 
-    const upserted = await fetchAndStoreProductSales({
-      supabase,
-      accountId: view.account_id,
-      accessToken,
-      productId: view.product_id,
-      startMs,
-      endMs: now.getTime(),
-      collectedAt: now.toISOString(),
-      deadline,
-    });
+    // Sequencial de propósito: não multiplicar a taxa de chamadas à Hotmart.
+    let upserted = 0;
+    for (const product of view.products) {
+      upserted += await fetchAndStoreProductSales({
+        supabase,
+        accountId: view.account_id,
+        accessToken,
+        productId: product.product_id,
+        startMs,
+        endMs: now.getTime(),
+        collectedAt: now.toISOString(),
+        deadline,
+      });
+    }
 
     const lastRefreshAt = new Date().toISOString();
     return NextResponse.json({ upserted, lastRefreshAt, view: await readView(supabase, id, lastRefreshAt) });
@@ -184,7 +188,11 @@ async function readView(
   id: string,
   lastRefreshAt: string
 ): Promise<VendasViewRecord | null> {
-  const { data } = await supabase.from(VIEWS_TABLE).select("*").eq("id", id).maybeSingle();
+  const { data } = await supabase
+    .from(VIEWS_TABLE)
+    .select(VIEW_WITH_PRODUCTS_SELECT)
+    .eq("id", id)
+    .maybeSingle();
   if (!data) return null;
-  return { ...(data as VendasViewRecord), refresh_started_at: null, last_refresh_at: lastRefreshAt };
+  return { ...(withProducts(data) as unknown as VendasViewRecord), refresh_started_at: null, last_refresh_at: lastRefreshAt };
 }
