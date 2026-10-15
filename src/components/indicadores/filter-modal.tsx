@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import type { FilterRecord, FilterStatus } from "@/types/indicadores";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { OffersDrawer, type HotmartOffer } from "./offers-drawer";
+import type { DebriefingProduct, FilterRecord, FilterStatus } from "@/types/indicadores";
+import { resolveDebriefingProducts } from "@/lib/indicadores/debriefing-products";
 
 const STATUS_OPTIONS: Array<{ value: FilterStatus; label: string; accent: string }> = [
   { value: "ativo", label: "Ativo", accent: "var(--green)" },
@@ -12,6 +14,12 @@ const STATUS_OPTIONS: Array<{ value: FilterStatus; label: string; accent: string
 interface HotmartProduct {
   product_id: string;
   product_name: string;
+}
+
+/** Selo do chip: vazio = todas as ofertas; senão "N ofertas" (singular para 1). */
+export function offersBadgeLabel(offerCodes: string[]): string {
+  if (offerCodes.length === 0) return "Todas as ofertas";
+  return offerCodes.length === 1 ? "1 oferta" : `${offerCodes.length} ofertas`;
 }
 
 export function getPartialFilterWarning(
@@ -53,8 +61,8 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
     editTarget?.captacao_leads_eventos ?? []
   );
   const [status, setStatus] = useState<FilterStatus>(editTarget?.status ?? "ativo");
-  const [mainHotmartProduct, setMainHotmartProduct] = useState<HotmartProduct | null>(
-    editTarget?.main_hotmart_product ?? null
+  const [debriefingProducts, setDebriefingProducts] = useState<DebriefingProduct[]>(() =>
+    editTarget ? resolveDebriefingProducts(editTarget) : []
   );
   const [mainProductSearch, setMainProductSearch] = useState("");
   const [mainProductDropOpen, setMainProductDropOpen] = useState(false);
@@ -68,6 +76,9 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
   const [error, setError] = useState("");
   const [partialWarning, setPartialWarning] = useState("");
   const [partialWarningShown, setPartialWarningShown] = useState(false);
+  const [drawerProductId, setDrawerProductId] = useState<string | null>(null);
+  const [offersCache, setOffersCache] = useState<Record<string, HotmartOffer[]>>({});
+  const closeDrawer = useCallback(() => setDrawerProductId(null), []);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -105,11 +116,12 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onCancel();
+      // Com o drawer aberto, quem trata o Esc é o drawer.
+      if (e.key === "Escape" && drawerProductId === null) onCancel();
     }
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [onCancel]);
+  }, [onCancel, drawerProductId]);
 
   // Reset the "already warned" flag whenever the user edits any source,
   // so the two-step save protection fires correctly after subsequent changes.
@@ -120,6 +132,10 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
 
   const selectedIds = new Set(hotmartProducts.map((p) => p.product_id));
   const filteredOptions = productOptions.filter((p) => !selectedIds.has(p.product_id));
+  const debriefingIds = new Set(debriefingProducts.map((p) => p.product_id));
+  const debriefingOptions = productOptions.filter((p) => !debriefingIds.has(p.product_id));
+
+  const drawerProduct = debriefingProducts.find((p) => p.product_id === drawerProductId) ?? null;
 
   function toggleProduct(p: HotmartProduct) {
     setHotmartProducts((prev) =>
@@ -127,6 +143,18 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
         ? prev.filter((x) => x.product_id !== p.product_id)
         : [...prev, p]
     );
+  }
+
+  function addDebriefingProduct(p: HotmartProduct) {
+    setDebriefingProducts((prev) =>
+      prev.some((x) => x.product_id === p.product_id)
+        ? prev
+        : [...prev, { product_id: p.product_id, product_name: p.product_name, offer_codes: [] }]
+    );
+  }
+
+  function removeDebriefingProduct(productId: string) {
+    setDebriefingProducts((prev) => prev.filter((x) => x.product_id !== productId));
   }
 
   function addTerm() {
@@ -172,7 +200,7 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
         ? {
             name: name.trim(),
             hotmart_products: hotmartProducts,
-            main_hotmart_product: mainHotmartProduct,
+            debriefing_products: debriefingProducts,
             meta_ads_terms: cleanTerms,
             captacao_leads_eventos: captacaoLeadsEventos,
             status,
@@ -181,7 +209,7 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
             account_id: accountId,
             name: name.trim(),
             hotmart_products: hotmartProducts,
-            main_hotmart_product: mainHotmartProduct,
+            debriefing_products: debriefingProducts,
             meta_ads_terms: cleanTerms,
             captacao_leads_eventos: captacaoLeadsEventos,
           };
@@ -372,7 +400,7 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
               onChange={(e) => setMainProductSearch(e.target.value)}
               onFocus={() => setMainProductDropOpen(true)}
               onBlur={() => setTimeout(() => setMainProductDropOpen(false), 150)}
-              placeholder={mainHotmartProduct ? "Trocar produto principal..." : "Buscar produto principal..."}
+              placeholder="Adicionar produto principal..."
               style={{
                 padding: "8px 12px",
                 fontSize: 13,
@@ -385,7 +413,7 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
                 boxSizing: "border-box",
               }}
             />
-            {mainProductDropOpen && (searching || productOptions.length > 0 || mainProductSearch.trim().length > 0) && (
+            {mainProductDropOpen && (searching || debriefingOptions.length > 0 || mainProductSearch.trim().length > 0) && (
               <div
                 style={{
                   position: "absolute",
@@ -405,18 +433,17 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
                     Buscando...
                   </div>
                 )}
-                {!searching && productOptions.length === 0 && (
+                {!searching && debriefingOptions.length === 0 && (
                   <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--text-3)" }}>
                     {mainProductSearch.trim() ? "Nenhum produto encontrado." : "Digite para buscar um produto."}
                   </div>
                 )}
-                {!searching && productOptions.map((p) => (
+                {!searching && debriefingOptions.map((p) => (
                   <button
                     key={p.product_id}
                     onMouseDown={() => {
-                      setMainHotmartProduct(p);
+                      addDebriefingProduct(p);
                       setMainProductSearch("");
-                      setMainProductDropOpen(false);
                     }}
                     style={{
                       width: "100%",
@@ -437,39 +464,67 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
               </div>
             )}
           </div>
-          {mainHotmartProduct && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "4px 10px",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  borderRadius: 20,
-                  border: "1px solid color-mix(in srgb, var(--violet) 40%, transparent)",
-                  background: "color-mix(in srgb, var(--violet) 12%, transparent)",
-                  color: "var(--violet)",
-                }}
-              >
-                {mainHotmartProduct.product_name} (#{mainHotmartProduct.product_id})
-                <button
-                  type="button"
-                  onClick={() => setMainHotmartProduct(null)}
+          {debriefingProducts.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+              {debriefingProducts.map((p) => (
+                <span
+                  key={p.product_id}
+                  data-testid={`debriefing-chip-${p.product_id}`}
                   style={{
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--text-3)",
-                    padding: 0,
-                    fontSize: 13,
-                    lineHeight: 1,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "4px 10px",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    borderRadius: 20,
+                    border: "1px solid color-mix(in srgb, var(--violet) 40%, transparent)",
+                    background: "color-mix(in srgb, var(--violet) 12%, transparent)",
+                    color: "var(--violet)",
                   }}
                 >
-                  ×
-                </button>
-              </span>
+                  {p.product_name} (#{p.product_id})
+                  <span
+                    data-testid={`debriefing-badge-${p.product_id}`}
+                    style={{ fontSize: 10, fontWeight: 600, color: "var(--text-2)" }}
+                  >
+                    {offersBadgeLabel(p.offer_codes)}
+                  </span>
+                  <button
+                    type="button"
+                    data-testid={`offers-arrow-${p.product_id}`}
+                    aria-label={`Ofertas de ${p.product_name}`}
+                    onClick={() => setDrawerProductId(p.product_id)}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "var(--text-2)",
+                      padding: 0,
+                      fontSize: 13,
+                      lineHeight: 1,
+                    }}
+                  >
+                    ›
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Remover ${p.product_name}`}
+                    onClick={() => removeDebriefingProduct(p.product_id)}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "var(--text-3)",
+                      padding: 0,
+                      fontSize: 13,
+                      lineHeight: 1,
+                    }}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
             </div>
           )}
         </div>
@@ -681,6 +736,22 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
           </button>
         </div>
       </div>
+      {drawerProduct && (
+        <OffersDrawer
+          key={drawerProduct.product_id}
+          productId={drawerProduct.product_id}
+          productName={drawerProduct.product_name}
+          selected={drawerProduct.offer_codes}
+          cachedOffers={offersCache[drawerProduct.product_id]}
+          onOffersLoaded={(pid, offers) => setOffersCache((prev) => ({ ...prev, [pid]: offers }))}
+          onChange={(codes) =>
+            setDebriefingProducts((prev) =>
+              prev.map((x) => (x.product_id === drawerProduct.product_id ? { ...x, offer_codes: codes } : x))
+            )
+          }
+          onClose={closeDrawer}
+        />
+      )}
     </div>
   );
 }

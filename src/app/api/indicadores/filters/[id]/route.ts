@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiAuth } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import { FILTER_STATUSES, type FilterRecord, type FilterStatus } from "@/types/indicadores";
+import {
+  FILTER_STATUSES,
+  type DebriefingProduct,
+  type FilterRecord,
+  type FilterStatus,
+} from "@/types/indicadores";
+import { validateDebriefingProducts } from "@/lib/indicadores/debriefing-products";
 
 type Params = { id: string };
 
@@ -16,10 +22,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<Pa
     hotmart_products,
     main_hotmart_product,
     debriefing_offer_codes,
+    debriefing_products,
     meta_ads_terms,
     captacao_leads_eventos,
     status,
   } = body ?? {};
+
+  let debriefingProductsValue: DebriefingProduct[] | null | undefined;
+  if (debriefing_products !== undefined) {
+    const validation = validateDebriefingProducts(debriefing_products);
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+    debriefingProductsValue = validation.value;
+  }
 
   if (status !== undefined && !FILTER_STATUSES.includes(status as FilterStatus)) {
     return NextResponse.json(
@@ -40,6 +56,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<Pa
   if (captacao_leads_eventos !== undefined) update.captacao_leads_eventos = captacao_leads_eventos;
   if (main_hotmart_product !== undefined) update.main_hotmart_product = main_hotmart_product;
   if (debriefing_offer_codes !== undefined) update.debriefing_offer_codes = debriefing_offer_codes;
+  if (debriefingProductsValue !== undefined) update.debriefing_products = debriefingProductsValue;
 
   if (status !== undefined) {
     const { data: current } = await supabase

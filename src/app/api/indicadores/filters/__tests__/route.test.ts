@@ -199,4 +199,68 @@ describe("POST /api/indicadores/filters", () => {
     expect(res.status).toBe(201);
     expect(body).toEqual(created);
   });
+
+  describe("debriefing_products", () => {
+    const url = "http://localhost/api/indicadores/filters";
+    const base = {
+      account_id: "acc",
+      name: "T",
+      hotmart_products: [{ product_id: "p1", product_name: "P1" }],
+    };
+
+    it.each([
+      ["não-array", "x"],
+      ["product_id vazio", [{ product_id: "", product_name: "A" }]],
+      ["product_name vazio", [{ product_id: "1", product_name: "" }]],
+      ["offer_codes inválido", [{ product_id: "1", product_name: "A", offer_codes: [1] }]],
+      [
+        "product_id repetido",
+        [
+          { product_id: "1", product_name: "A" },
+          { product_id: "1", product_name: "B" },
+        ],
+      ],
+    ])("retorna 400 para %s", async (_n, debriefing_products) => {
+      const { POST } = await import("../route");
+      const res = await POST(makeRequest("POST", url, { ...base, debriefing_products }));
+      const body = await res.json();
+      expect(res.status).toBe(400);
+      expect(body.error).toMatch(/debriefing_products/);
+      expect(mockInsert).not.toHaveBeenCalled();
+    });
+
+    it("grava normalizado (offer_codes ausente vira [])", async () => {
+      mockSingle.mockResolvedValueOnce({ data: { id: "x" }, error: null });
+      const { POST } = await import("../route");
+      const res = await POST(
+        makeRequest("POST", url, {
+          ...base,
+          debriefing_products: [{ product_id: "1", product_name: "A" }],
+        })
+      );
+      expect(res.status).toBe(201);
+      expect(mockInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          debriefing_products: [{ product_id: "1", product_name: "A", offer_codes: [] }],
+        })
+      );
+    });
+
+    it("aceita null explícito", async () => {
+      mockSingle.mockResolvedValueOnce({ data: { id: "x" }, error: null });
+      const { POST } = await import("../route");
+      const res = await POST(makeRequest("POST", url, { ...base, debriefing_products: null }));
+      expect(res.status).toBe(201);
+      expect(mockInsert).toHaveBeenCalledWith(
+        expect.objectContaining({ debriefing_products: null })
+      );
+    });
+
+    it("sem o campo, não inclui a coluna no insert", async () => {
+      mockSingle.mockResolvedValueOnce({ data: { id: "x" }, error: null });
+      const { POST } = await import("../route");
+      await POST(makeRequest("POST", url, base));
+      expect(mockInsert.mock.calls[0][0]).not.toHaveProperty("debriefing_products");
+    });
+  });
 });

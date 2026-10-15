@@ -856,7 +856,6 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
             setFilterEditTarget(activeFilter);
             setFilterModalOpen(true);
           }}
-          onFilterUpdated={handleFilterSaved}
         />
       ) : (
         <div className="z-layout">
