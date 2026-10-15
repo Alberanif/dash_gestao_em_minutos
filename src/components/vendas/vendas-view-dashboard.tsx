@@ -19,6 +19,7 @@ import {
   totalsMismatch,
 } from "@/lib/vendas/views";
 import { DateRangeFilter } from "./date-range-filter";
+import { ProductsList } from "./products-list";
 import { RefreshControls } from "./refresh-controls";
 import { SectionHeader } from "./section-header";
 import { SalesBarChart, ViewCumulativeChart } from "./view-charts";
@@ -93,6 +94,7 @@ function KpiTile({
 
 export function VendasViewDashboard({ view, productName, role, onRangeChange, onViewChanged }: VendasViewDashboardProps) {
   const isGestor = role === "gestor";
+  const offerCount = view.products.reduce((n, p) => n + p.offer_codes.length, 0);
   const range = viewRangeFrom(view.view_start_date, view.view_end_date);
   const rangeKey = range ? `${range.start}|${range.end}` : "";
 
@@ -106,7 +108,7 @@ export function VendasViewDashboard({ view, productName, role, onRangeChange, on
 
   // Os números dependem da visualização (id, ofertas, período) e do que o
   // servidor coletou desde então (last_refresh_at, estado do backfill).
-  const dataKey = [view.id, rangeKey, view.offer_codes.join(","), view.last_refresh_at ?? "", view.backfill_status, reloadToken].join("#");
+  const dataKey = [view.id, rangeKey, JSON.stringify(view.products), view.last_refresh_at ?? "", view.backfill_status, reloadToken].join("#");
 
   useEffect(() => {
     let cancelled = false;
@@ -175,7 +177,7 @@ export function VendasViewDashboard({ view, productName, role, onRangeChange, on
             {view.name}
           </h2>
           <p data-testid="view-product" style={{ fontSize: 12, color: "var(--text-muted)", margin: "2px 0 0", overflowWrap: "anywhere" }}>
-            {productName} · {view.offer_codes.length} {view.offer_codes.length === 1 ? "oferta" : "ofertas"}
+            {view.products.length > 1 ? `${view.products.length} produtos` : productName} · {offerCount} {offerCount === 1 ? "oferta" : "ofertas"}
           </p>
         </div>
         <div className="vendas-view-actions">
@@ -282,39 +284,8 @@ export function VendasViewDashboard({ view, productName, role, onRangeChange, on
           </section>
 
           <section>
-            <SectionHeader index="02" title="Por oferta" desc={`Total nas ofertas: ${fmtInt(sumSales(data.offers))}`} />
-            <ul data-testid="view-offers-list" style={{ listStyle: "none", margin: 0, padding: 0, background: "var(--surface)", border: "1px solid var(--border-vis)", borderRadius: 11 }}>
-              {data.offers.map((o) => {
-                const none = o.sales === 0 && o.refunded === 0;
-                return (
-                  <li
-                    key={o.offer_code}
-                    data-testid={`view-offer-${o.offer_code}`}
-                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 16px", borderBottom: "1px solid var(--border)" }}
-                  >
-                    <span style={{ minWidth: 0, overflowWrap: "anywhere", fontSize: 13, color: "var(--text)" }}>
-                      {o.offer_name ? `${o.offer_name} · ` : ""}
-                      <code>{o.offer_code}</code>
-                      {none && (
-                        <span data-testid={`view-offer-${o.offer_code}-empty`} style={{ marginLeft: 8, fontSize: 11, color: "var(--text-3)" }}>
-                          0 vendas coletadas
-                        </span>
-                      )}
-                    </span>
-                    <span style={{ textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
-                      <strong data-testid={`view-offer-${o.offer_code}-sales`} style={{ fontSize: 15, color: "var(--text-strong)" }}>
-                        {fmtInt(o.sales)}
-                      </strong>
-                      {o.refunded > 0 && (
-                        <span style={{ display: "block", fontSize: 11, color: "var(--text-3)" }}>
-                          {fmtInt(o.refunded)} reembolsada{o.refunded === 1 ? "" : "s"}
-                        </span>
-                      )}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
+            <SectionHeader index="02" title="Por produto" desc={`Total nos produtos: ${fmtInt(sumSales(data.offers))}`} />
+            <ProductsList offers={data.offers} />
           </section>
         </>
       )}
