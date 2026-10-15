@@ -45,7 +45,7 @@ interface Mock {
   folders?: VendasFolderRecord[];
   kpis?: { sales: number; refunded: number };
   daily?: { day: string; sales: number }[];
-  offers?: { offer_code: string; offer_name: string | null; sales: number; refunded: number }[];
+  offers?: { product_id: string; product_name: string; offer_code: string; offer_name: string | null; sales: number; refunded: number }[];
   // Sobrescritas por rota: "METHOD url" → resposta.
   overrides?: Record<string, { status?: number; body: unknown }>;
 }
@@ -67,8 +67,8 @@ function installFetch(m: Mock) {
     if (/\/offers$/.test(path))
       return respond({
         rows: m.offers ?? [
-          { offer_code: "OF-1", offer_name: "Oferta Um", sales: 7, refunded: 2 },
-          { offer_code: "OF-2", offer_name: null, sales: 0, refunded: 0 },
+          { product_id: "p1", product_name: "Produto Um", offer_code: "OF-1", offer_name: "Oferta Um", sales: 7, refunded: 2 },
+          { product_id: "p1", product_name: "Produto Um", offer_code: "OF-2", offer_name: null, sales: 0, refunded: 0 },
         ],
       });
     if (/offer-options/.test(path)) return respond({ offers: [{ offer_code: "OF-1", offer_name: "Oferta Um", sales_count: 7 }] });
@@ -163,7 +163,7 @@ describe("VendasScreen — números do dashboard", () => {
     await screen.findByTestId("view-kpi-sales");
     expect(screen.getByTestId("view-kpi-sales-value")).toHaveTextContent("7");
     expect(screen.getByText("Total no gráfico: 7")).toBeInTheDocument();
-    expect(screen.getByText("Total nas ofertas: 7")).toBeInTheDocument();
+    expect(screen.getByText("Total nos produtos: 7")).toBeInTheDocument();
     expect(screen.getByTestId("view-kpi-refunded-value")).toHaveTextContent("2");
     expect(screen.queryByTestId("view-totals-mismatch")).not.toBeInTheDocument();
   });
@@ -177,10 +177,47 @@ describe("VendasScreen — números do dashboard", () => {
   it("oferta sem venda coletada aparece com 0 e a marca '0 vendas coletadas'; oferta com venda não tem a marca", async () => {
     installFetch({ views: [makeView()] });
     render(<VendasScreen role="gestor" products={PRODUCTS} />);
-    await screen.findByTestId("view-offers-list");
+    await screen.findByTestId("view-products-list");
+    fireEvent.click(screen.getByTestId("view-product-p1-toggle"));
     expect(screen.getByTestId("view-offer-OF-2-sales")).toHaveTextContent("0");
     expect(screen.getByTestId("view-offer-OF-2-empty")).toHaveTextContent("0 vendas coletadas");
     expect(screen.queryByTestId("view-offer-OF-1-empty")).not.toBeInTheDocument();
+  });
+
+  it("lista de produtos: subtotal por produto, soma bate com o KPI, ofertas só ao expandir (0 vendas incluso)", async () => {
+    installFetch({
+      views: [makeView()],
+      kpis: { sales: 10, refunded: 3 },
+      daily: [{ day: "2026-08-01", sales: 10 }],
+      offers: [
+        { product_id: "p1", product_name: "Produto Um", offer_code: "OF-1", offer_name: "Oferta Um", sales: 6, refunded: 1 },
+        { product_id: "p1", product_name: "Produto Um", offer_code: "OF-2", offer_name: null, sales: 1, refunded: 1 },
+        { product_id: "p2", product_name: "Produto Dois", offer_code: "OF-3", offer_name: null, sales: 3, refunded: 1 },
+        { product_id: "p3", product_name: "Produto Zero", offer_code: "OF-4", offer_name: null, sales: 0, refunded: 0 },
+      ],
+    });
+    render(<VendasScreen role="gestor" products={PRODUCTS} />);
+    await screen.findByTestId("view-products-list");
+    expect(screen.getByTestId("view-product-p1-sales")).toHaveTextContent("7");
+    expect(screen.getByTestId("view-product-p1-refunded")).toHaveTextContent("2 reembolsadas");
+    expect(screen.getByTestId("view-product-p2-sales")).toHaveTextContent("3");
+    expect(screen.getByTestId("view-product-p3-sales")).toHaveTextContent("0");
+    expect(screen.getByText("Total nos produtos: 10")).toBeInTheDocument();
+    expect(screen.queryByTestId("view-totals-mismatch")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("view-offer-OF-1")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("view-product-p1-toggle"));
+    expect(screen.getByTestId("view-offer-OF-1-sales")).toHaveTextContent("6");
+    expect(screen.getByTestId("view-offer-OF-2")).toBeInTheDocument();
+    expect(screen.queryByTestId("view-offer-OF-3")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("view-product-p1-toggle"));
+    expect(screen.queryByTestId("view-offer-OF-1")).not.toBeInTheDocument();
+  });
+
+  it("visualização com 1 produto mostra uma única linha de produto", async () => {
+    installFetch({ views: [makeView()] });
+    render(<VendasScreen role="gestor" products={PRODUCTS} />);
+    await screen.findByTestId("view-products-list");
+    expect(screen.getByTestId("view-products-list").children).toHaveLength(1);
   });
 
   it("indicador de reembolsadas explica o reembolso retroativo", async () => {

@@ -191,3 +191,35 @@ export function normalizeOfferCode(raw: string): string | null {
   const t = raw.trim();
   return t === "" ? null : t;
 }
+
+// ── Produtos (lista expansível do dashboard) ────────────────────────────────
+
+export interface ProductSalesGroup {
+  product_id: string;
+  product_name: string;
+  /** Subtotal do produto: soma das suas ofertas. */
+  sales: number;
+  refunded: number;
+  offers: VendasViewOfferRow[];
+}
+
+/**
+ * Agrupa as linhas de `view_offers` (uma por produto × oferta) por produto.
+ * O subtotal é a soma das ofertas, então a soma dos produtos bate com a soma
+ * da quebra por oferta (e com o KPI). Preserva a ordem de chegada dos produtos
+ * e das ofertas; produto com todas as ofertas em 0 continua na lista.
+ */
+export function groupOffersByProduct(rows: VendasViewOfferRow[]): ProductSalesGroup[] {
+  const byId = new Map<string, ProductSalesGroup>();
+  for (const r of rows) {
+    let g = byId.get(r.product_id);
+    if (!g) {
+      g = { product_id: r.product_id, product_name: r.product_name, sales: 0, refunded: 0, offers: [] };
+      byId.set(r.product_id, g);
+    }
+    g.sales += safe(r.sales);
+    g.refunded += safe(r.refunded);
+    g.offers.push(r);
+  }
+  return Array.from(byId.values());
+}
