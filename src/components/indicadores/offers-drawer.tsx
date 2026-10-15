@@ -14,7 +14,6 @@ export interface HotmartOffer {
 }
 
 interface OffersDrawerProps {
-  accountId: string;
   productId: string;
   productName: string;
   selected: string[];
@@ -26,7 +25,6 @@ interface OffersDrawerProps {
 }
 
 export function OffersDrawer({
-  accountId,
   productId,
   productName,
   selected,
@@ -44,7 +42,7 @@ export function OffersDrawer({
     let cancelled = false;
     setLoadError(false);
     fetch(
-      `/api/hotmart/offers?account_id=${encodeURIComponent(accountId)}&product_id=${encodeURIComponent(productId)}&include_inactive=true`
+      `/api/hotmart/offers?product_id=${encodeURIComponent(productId)}&include_inactive=true`
     )
       .then(async (r) => {
         if (!r.ok) throw new Error("fail");
@@ -60,7 +58,7 @@ export function OffersDrawer({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accountId, productId, attempt, !!cachedOffers]);
+  }, [productId, attempt, !!cachedOffers]);
 
   // Esc fecha só o drawer; o modal ignora Esc enquanto o drawer está aberto.
   useEffect(() => {

@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import React from "react";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
 // Recharts não renderiza em jsdom sem dimensões; o gráfico não é o objeto deste teste.
@@ -46,6 +46,7 @@ const METRICS = {
       total_sales_foreign: 0,
       total_revenue_brl: 500,
       offers_breakdown: [{ offer_code: "oa1", offer_name: "Oferta A1", sales_count: 2, revenue: 500 }],
+      daily_series: [{ date: "2026-01-01", sales_count: 2, sales_brl: 2, sales_foreign: 0, revenue: 500 }],
     },
     {
       product_id: "222",
@@ -58,6 +59,7 @@ const METRICS = {
         { offer_code: "ob1", offer_name: "Oferta B1", sales_count: 1, revenue: 400 },
         { offer_code: "ob2", offer_name: "Oferta B2", sales_count: 2, revenue: 600 },
       ],
+      daily_series: [{ date: "2026-01-01", sales_count: 3, sales_brl: 3, sales_foreign: 0, revenue: 1000 }],
     },
   ],
 };
@@ -91,9 +93,10 @@ describe("DebriefingView", () => {
     expect(sent.map((p: { product_id: string }) => p.product_id)).toEqual(["111", "222"]);
     expect(sent[1].offer_codes).toEqual(["ob1"]);
 
-    // Cabeçalho multi-produto: nomes e contagem
-    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Produto A, Produto B");
-    expect(screen.getByText("2 produtos")).toBeInTheDocument();
+    // Cabeçalho multi-produto: nomes ocultos, só o seletor com contagem
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Produtos · 2 de 2");
+    expect(screen.queryByTestId("debriefing-products-panel")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Produto A" })).not.toBeInTheDocument();
 
     // KPI consolidado
     expect(screen.getByText("5")).toBeInTheDocument();
@@ -111,6 +114,61 @@ describe("DebriefingView", () => {
     expect(within(groupB).getByText("Oferta B1")).toBeInTheDocument();
     expect(within(groupB).getByText("Oferta B2")).toBeInTheDocument();
     expect(within(groupB).queryByText("Oferta A1")).not.toBeInTheDocument();
+  });
+
+  describe("seletor de produtos", () => {
+    const MULTI: FilterRecord = {
+      ...BASE,
+      debriefing_products: [
+        { product_id: "111", product_name: "Produto A", offer_codes: [] },
+        { product_id: "222", product_name: "Produto B", offer_codes: [] },
+      ],
+    };
+
+    async function openPanel() {
+      installFetch(METRICS);
+      renderView(MULTI);
+      await waitFor(() => expect(screen.getByText("Total de Vendas")).toBeInTheDocument());
+      fireEvent.click(screen.getByRole("button", { name: /Produtos · 2 de 2/ }));
+    }
+
+    it("abre no próprio cartão e o chip filtra KPIs e tabela", async () => {
+      await openPanel();
+      expect(screen.getByTestId("debriefing-products-panel")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Produto B" }));
+
+      expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Produtos · 1 de 2");
+      expect(screen.queryByTestId("debriefing-group-111")).not.toBeInTheDocument();
+      expect(screen.getByTestId("debriefing-group-222")).toBeInTheDocument();
+      // KPI "Total de Vendas" agora é só o produto B (3), não 5
+      expect(screen.queryByText("5")).not.toBeInTheDocument();
+      expect(screen.getAllByText("3").length).toBeGreaterThan(0);
+    });
+
+    it("'Todos' limpa a seleção e a seta recolhe o painel", async () => {
+      await openPanel();
+      fireEvent.click(screen.getByRole("button", { name: "Produto A" }));
+      fireEvent.click(screen.getByRole("button", { name: "Todos" }));
+      expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Produtos · 2 de 2");
+      expect(screen.getByTestId("debriefing-group-111")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Recolher produtos" }));
+      expect(screen.queryByTestId("debriefing-products-panel")).not.toBeInTheDocument();
+    });
+
+    it("Esc recolhe o painel", async () => {
+      await openPanel();
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(screen.queryByTestId("debriefing-products-panel")).not.toBeInTheDocument();
+    });
+
+    it("1 produto: sem seletor", async () => {
+      installFetch({ ...METRICS, products: [METRICS.products[0]] });
+      renderView({ ...BASE, debriefing_products: [MULTI.debriefing_products![0]] });
+      await waitFor(() => expect(screen.getByText("Total de Vendas")).toBeInTheDocument());
+      expect(screen.queryByRole("button", { name: /Produtos ·/ })).not.toBeInTheDocument();
+    });
   });
 
   it("filtro legado (main_hotmart_product) vira 1 produto: cabeçalho com nome e id", async () => {

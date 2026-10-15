@@ -739,7 +739,6 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
       {drawerProduct && (
         <OffersDrawer
           key={drawerProduct.product_id}
-          accountId={accountId}
           productId={drawerProduct.product_id}
           productName={drawerProduct.product_name}
           selected={drawerProduct.offer_codes}

@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import type { FilterRecord } from "@/types/indicadores";
 import { resolveDebriefingProducts } from "@/lib/indicadores/debriefing-products";
 import type { DebriefingMetrics } from "@/lib/indicadores/service/debriefing";
+import { selectDebriefingProducts, toggleProductSelection } from "@/lib/indicadores/debriefing-selection";
 import {
   ComposedChart,
   Bar,
@@ -56,12 +57,34 @@ const TOOLTIP_STYLE: React.CSSProperties = {
 };
 
 export function DebriefingView({ filter, startDate, endDate, onEditFilter }: DebriefingViewProps) {
-  const [metrics, setMetrics] = useState<DebriefingMetrics | null>(null);
+  const [rawMetrics, setMetrics] = useState<DebriefingMetrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Vazio = "Todos". Estado local: volta para Todos ao trocar filtro/período.
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [panelOpen, setPanelOpen] = useState(false);
 
   const products = useMemo(() => (filter ? resolveDebriefingProducts(filter) : []), [filter]);
   const productsKey = JSON.stringify(products);
+
+  useEffect(() => {
+    setSelectedIds([]);
+    setPanelOpen(false);
+  }, [productsKey, startDate, endDate]);
+
+  useEffect(() => {
+    if (!panelOpen) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setPanelOpen(false);
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [panelOpen]);
+
+  const metrics = useMemo(
+    () => (rawMetrics ? selectDebriefingProducts(rawMetrics, selectedIds) : null),
+    [rawMetrics, selectedIds]
+  );
 
   const loadDebriefingData = useCallback(async () => {
     if (products.length === 0 || !startDate || !endDate) {
@@ -169,9 +192,26 @@ export function DebriefingView({ filter, startDate, endDate, onEditFilter }: Deb
   }
 
   const single = products.length === 1 ? products[0] : null;
-  const headerTitle = single
-    ? metrics?.products[0]?.product_name || single.product_name
-    : products.map((p) => p.product_name).join(", ");
+  const selectedCount = selectedIds.length === 0 ? products.length : selectedIds.length;
+  const filtered = selectedCount < products.length;
+  const allIds = products.map((p) => p.product_id);
+  const nameOf = (id: string, fallback: string) =>
+    rawMetrics?.products.find((p) => p.product_id === id)?.product_name || fallback;
+
+  const chipStyle = (active: boolean): React.CSSProperties => ({
+    maxWidth: 260,
+    padding: "6px 12px",
+    fontSize: 12,
+    fontWeight: 600,
+    borderRadius: 20,
+    cursor: "pointer",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    border: `1px solid ${active ? "var(--violet)" : "var(--border-vis)"}`,
+    background: active ? "color-mix(in srgb, var(--violet) 18%, transparent)" : "var(--surface-2)",
+    color: active ? "var(--violet)" : "var(--text-2)",
+  });
 
   return (
     <div data-testid="debriefing-view" style={{ display: "flex", flexDirection: "column", gap: 20, margin: "16px 0" }}>
@@ -179,9 +219,7 @@ export function DebriefingView({ filter, startDate, endDate, onEditFilter }: Deb
       <div
         style={{
           display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
+          flexDirection: "column",
           gap: 12,
           padding: "16px 20px",
           borderRadius: 12,
@@ -189,27 +227,100 @@ export function DebriefingView({ filter, startDate, endDate, onEditFilter }: Deb
           background: "var(--surface)",
         }}
       >
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--violet)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            {single ? "Debriefing de Vendas do Produto Principal" : `Debriefing de Vendas de ${products.length} Produtos Principais`}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--violet)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              {single ? "Debriefing de Vendas do Produto Principal" : `Debriefing de Vendas de ${products.length} Produtos Principais`}
+            </div>
+            <h2 style={{ margin: "4px 0 0", fontSize: 18, fontWeight: 700, color: "var(--text)" }}>
+              {single ? (
+                metrics?.products[0]?.product_name || single.product_name
+              ) : (
+                <button
+                  type="button"
+                  aria-expanded={panelOpen}
+                  aria-controls="debriefing-products-panel"
+                  onClick={() => setPanelOpen((o) => !o)}
+                  style={{
+                    padding: 0,
+                    border: "none",
+                    background: "transparent",
+                    font: "inherit",
+                    color: filtered ? "var(--violet)" : "inherit",
+                    cursor: "pointer",
+                  }}
+                >
+                  {`Produtos · ${selectedCount} de ${products.length}`} {panelOpen ? "▴" : "▾"}
+                </button>
+              )}
+            </h2>
           </div>
-          <h2 style={{ margin: "4px 0 0", fontSize: 18, fontWeight: 700, color: "var(--text)" }}>
-            {headerTitle}
-          </h2>
+          {single && (
+            <div
+              style={{
+                padding: "4px 12px",
+                fontSize: 12,
+                fontWeight: 600,
+                borderRadius: 20,
+                background: "var(--surface-2)",
+                border: "1px solid var(--border-vis)",
+                color: "var(--text-2)",
+              }}
+            >
+              {`ID Hotmart: #${single.product_id}`}
+            </div>
+          )}
         </div>
-        <div
-          style={{
-            padding: "4px 12px",
-            fontSize: 12,
-            fontWeight: 600,
-            borderRadius: 20,
-            background: "var(--surface-2)",
-            border: "1px solid var(--border-vis)",
-            color: "var(--text-2)",
-          }}
-        >
-          {single ? `ID Hotmart: #${single.product_id}` : `${products.length} produtos`}
-        </div>
+
+        {!single && panelOpen && (
+          <div
+            id="debriefing-products-panel"
+            data-testid="debriefing-products-panel"
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: 8,
+              padding: 12,
+              borderRadius: 10,
+              border: "1px solid var(--border-vis)",
+              background: "var(--surface)",
+            }}
+          >
+            <button
+              type="button"
+              aria-pressed={selectedIds.length === 0}
+              onClick={() => setSelectedIds([])}
+              style={chipStyle(selectedIds.length === 0)}
+            >
+              Todos
+            </button>
+            {products.map((p) => {
+              const name = nameOf(p.product_id, p.product_name);
+              const active = selectedIds.includes(p.product_id);
+              return (
+                <button
+                  key={p.product_id}
+                  type="button"
+                  aria-pressed={active}
+                  title={name}
+                  onClick={() => setSelectedIds((cur) => toggleProductSelection(cur, p.product_id, allIds))}
+                  style={chipStyle(active)}
+                >
+                  {name}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              aria-label="Recolher produtos"
+              onClick={() => setPanelOpen(false)}
+              style={{ marginLeft: "auto", alignSelf: "flex-end", background: "transparent", border: "none", color: "var(--text-3)", cursor: "pointer", fontSize: 14 }}
+            >
+              ▴
+            </button>
+          </div>
+        )}
       </div>
 
       {loading ? (

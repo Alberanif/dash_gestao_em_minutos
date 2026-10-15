@@ -9,9 +9,12 @@ export async function GET(request: NextRequest) {
   const accountId = request.nextUrl.searchParams.get("account_id");
   const productId = request.nextUrl.searchParams.get("product_id");
 
-  if (!accountId || !productId) {
+  // account_id é opcional: product_id é único entre contas (o sync faz upsert por
+  // product_id), e o Debriefing não conhece a conta Hotmart — só a primeira conta
+  // de /api/accounts, que pode ser de outra plataforma e devolveria lista vazia.
+  if (!productId) {
     return NextResponse.json(
-      { error: "account_id e product_id são obrigatórios" },
+      { error: "product_id é obrigatório" },
       { status: 400 }
     );
   }
@@ -28,8 +31,9 @@ export async function GET(request: NextRequest) {
         ? "offer_code, offer_name, price, currency, is_main_offer, is_active"
         : "offer_code, offer_name, price, currency, is_main_offer"
     )
-    .eq("account_id", accountId)
     .eq("product_id", productId);
+
+  if (accountId) query = query.eq("account_id", accountId);
 
   if (includeInactive) {
     query = query

@@ -57,10 +57,26 @@ describe("GET /api/hotmart/offers", () => {
     ]);
   });
 
-  it("400 sem account_id/product_id", async () => {
+  it("400 sem product_id", async () => {
     const { GET } = await import("../route");
     const res = await GET(new NextRequest("http://localhost/api/hotmart/offers"));
     expect(res.status).toBe(400);
+    const res2 = await GET(new NextRequest("http://localhost/api/hotmart/offers?account_id=a1"));
+    expect(res2.status).toBe(400);
+  });
+
+  it("sem account_id: busca só por product_id (o product_id é único entre contas)", async () => {
+    const { GET } = await import("../route");
+    const res = await GET(new NextRequest("http://localhost/api/hotmart/offers?product_id=p1&include_inactive=true"));
+    expect(res.status).toBe(200);
+    expect(calls).toContainEqual(["eq", "product_id", "p1"]);
+    expect(calls.find((c) => c[0] === "eq" && c[1] === "account_id")).toBeUndefined();
+  });
+
+  it("com account_id: continua filtrando pela conta", async () => {
+    const { GET } = await import("../route");
+    await GET(new NextRequest(BASE));
+    expect(calls).toContainEqual(["eq", "account_id", "a1"]);
   });
 
   it("500 em erro do banco", async () => {

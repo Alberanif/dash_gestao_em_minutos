@@ -62,7 +62,7 @@ describe("OffersDrawer", () => {
     const { onSave } = setup();
     await openDrawer();
     expect(offerCalls()[0][0]).toBe(
-      "/api/hotmart/offers?account_id=acc-1&product_id=111&include_inactive=true"
+      "/api/hotmart/offers?product_id=111&include_inactive=true"
     );
     fireEvent.click(await screen.findByLabelText("Oferta Ativa"));
     fireEvent.click(screen.getByLabelText("Sem oferta"));

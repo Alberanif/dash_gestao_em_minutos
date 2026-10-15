@@ -30,6 +30,8 @@ export interface DebriefingProductMetrics extends DebriefingTotals {
   product_id: string;
   product_name: string;
   offers_breakdown: DebriefingOfferBreakdown[];
+  /** Série diária só deste produto (mesmos dias da consolidada). */
+  daily_series: DebriefingDailyPoint[];
 }
 
 export interface DebriefingMetrics {
@@ -110,18 +112,28 @@ export async function fetchDebriefingMetrics(
     total_revenue_brl: 0,
   };
 
-  const dailyMap = new Map<string, Omit<DebriefingDailyPoint, "date">>();
-  const current = new Date(`${startDate}T00:00:00-03:00`);
-  const end = new Date(`${endDate}T00:00:00-03:00`);
-  while (current <= end) {
-    dailyMap.set(current.toISOString().slice(0, 10), {
-      sales_count: 0,
-      sales_brl: 0,
-      sales_foreign: 0,
-      revenue: 0,
-    });
-    current.setDate(current.getDate() + 1);
-  }
+  type DailyMap = Map<string, Omit<DebriefingDailyPoint, "date">>;
+  const newDailyMap = (): DailyMap => {
+    const map: DailyMap = new Map();
+    const current = new Date(`${startDate}T00:00:00-03:00`);
+    const end = new Date(`${endDate}T00:00:00-03:00`);
+    while (current <= end) {
+      map.set(current.toISOString().slice(0, 10), {
+        sales_count: 0,
+        sales_brl: 0,
+        sales_foreign: 0,
+        revenue: 0,
+      });
+      current.setDate(current.getDate() + 1);
+    }
+    return map;
+  };
+  const toSeries = (map: DailyMap): DebriefingDailyPoint[] =>
+    Array.from(map.entries())
+      .map(([date, vals]) => ({ date, ...vals }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+  const dailyMap = newDailyMap();
 
   const productResults: DebriefingProductMetrics[] = products.map((product, idx) => {
     const sales = salesByProduct[idx];
@@ -143,7 +155,9 @@ export async function fetchDebriefingMetrics(
       total_sales_foreign: 0,
       total_revenue_brl: 0,
       offers_breakdown: [],
+      daily_series: [],
     };
+    const productDailyMap = newDailyMap();
     const offersMap = new Map<string, DebriefingOfferBreakdown>();
 
     for (const sale of filteredSales) {
@@ -157,8 +171,9 @@ export async function fetchDebriefingMetrics(
         result.total_sales_foreign += 1;
       }
 
-      const dayEntry = dailyMap.get(utcToBrtDate(sale.purchase_date));
-      if (dayEntry) {
+      const day = utcToBrtDate(sale.purchase_date);
+      for (const dayEntry of [dailyMap.get(day), productDailyMap.get(day)]) {
+        if (!dayEntry) continue;
         dayEntry.sales_count += 1;
         if (isBrl) {
           dayEntry.sales_brl += 1;
@@ -185,6 +200,7 @@ export async function fetchDebriefingMetrics(
 
     result.total_sales = result.total_sales_brl + result.total_sales_foreign;
     result.offers_breakdown = Array.from(offersMap.values()).sort((a, b) => b.sales_count - a.sales_count);
+    result.daily_series = toSeries(productDailyMap);
 
     totals.total_sales += result.total_sales;
     totals.total_sales_brl += result.total_sales_brl;
@@ -193,9 +209,5 @@ export async function fetchDebriefingMetrics(
     return result;
   });
 
-  const daily_series = Array.from(dailyMap.entries())
-    .map(([date, vals]) => ({ date, ...vals }))
-    .sort((a, b) => a.date.localeCompare(b.date));
-
-  return { totals, daily_series, products: productResults };
+  return { totals, daily_series: toSeries(dailyMap), products: productResults };
 }

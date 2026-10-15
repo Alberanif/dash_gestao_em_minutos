@@ -72,6 +72,11 @@ describe("fetchDebriefingMetrics (multi-produto)", () => {
       total_sales_foreign: 0,
       total_revenue_brl: 0,
       offers_breakdown: [],
+      daily_series: [
+        { date: "2026-05-09", sales_count: 0, sales_brl: 0, sales_foreign: 0, revenue: 0 },
+        { date: "2026-05-10", sales_count: 0, sales_brl: 0, sales_foreign: 0, revenue: 0 },
+        { date: "2026-05-11", sales_count: 0, sales_brl: 0, sales_foreign: 0, revenue: 0 },
+      ],
     });
     expect(res.products[2].product_name).toBe("p8");
     expect(res.products[0].product_name).toBe("Produto Principal");
@@ -111,6 +116,30 @@ describe("fetchDebriefingMetrics (multi-produto)", () => {
       { date: "2026-05-11", sales_count: 1, sales_brl: 0, sales_foreign: 1, revenue: 0 },
     ]);
     expect(res.totals).toMatchObject({ total_sales_brl: 2, total_sales_foreign: 1, total_revenue_brl: 140 });
+  });
+
+  it("cada produto traz a própria série diária, e a soma delas é a série consolidada", async () => {
+    const fake = setup([
+      sale({ product_id: "p1", price: 100 }),
+      sale({ product_id: "p2", price: 40 }),
+      sale({ product_id: "p2", price: 15, currency: "USD", purchase_date: "2026-05-11T12:00:00.000Z" }),
+    ]);
+
+    const res = await fetchDebriefingMetrics(
+      { ...range, products: [{ product_id: "p1" }, { product_id: "p2" }] },
+      fake.client
+    );
+
+    expect(res.products[0].daily_series.map((d) => [d.date, d.sales_count, d.revenue])).toEqual([
+      ["2026-05-09", 0, 0],
+      ["2026-05-10", 1, 100],
+      ["2026-05-11", 0, 0],
+    ]);
+    expect(res.products[1].daily_series.map((d) => [d.date, d.sales_count, d.sales_foreign, d.revenue])).toEqual([
+      ["2026-05-09", 0, 0, 0],
+      ["2026-05-10", 1, 0, 40],
+      ["2026-05-11", 1, 1, 0],
+    ]);
   });
 
   it("busca cada produto em consulta própria, paginando de 1000 em 1000", async () => {

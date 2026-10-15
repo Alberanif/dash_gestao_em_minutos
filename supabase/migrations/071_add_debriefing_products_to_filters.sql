@@ -6,6 +6,11 @@
 ALTER TABLE dash_gestao_filters
 ADD COLUMN IF NOT EXISTS debriefing_products jsonb DEFAULT null;
 
+-- O backfill abaixo le debriefing_offer_codes (criada pela 069). Garante que ela
+-- exista mesmo em bancos onde a 069 nunca foi aplicada; no-op se ja existir.
+ALTER TABLE dash_gestao_filters
+ADD COLUMN IF NOT EXISTS debriefing_offer_codes jsonb DEFAULT null;
+
 -- Backfill: so onde ainda nao foi preenchido e existe produto principal.
 UPDATE dash_gestao_filters
 SET debriefing_products = jsonb_build_array(
