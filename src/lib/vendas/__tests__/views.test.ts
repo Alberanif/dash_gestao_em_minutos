@@ -1,6 +1,7 @@
 import {
   buildViewDailyCumulative,
   describeBackfill,
+  groupOffersByProduct,
   groupViewsByFolder,
   incompleteBadge,
   normalizeOfferCode,
@@ -111,5 +112,36 @@ describe("normalizeOfferCode", () => {
   it("trim e vazio → null", () => {
     expect(normalizeOfferCode("  abc ")).toBe("abc");
     expect(normalizeOfferCode("   ")).toBeNull();
+  });
+});
+
+describe("groupOffersByProduct", () => {
+  const row = (product_id: string, offer_code: string, sales: number, refunded: number) => ({
+    product_id,
+    product_name: `Nome ${product_id}`,
+    offer_code,
+    offer_name: null,
+    sales,
+    refunded,
+  });
+
+  it("subtotal do produto é a soma das ofertas e a soma dos produtos fecha com o total", () => {
+    const rows = [row("a", "1", 5, 1), row("b", "2", 2, 0), row("a", "3", 4, 2)];
+    const g = groupOffersByProduct(rows);
+    expect(g.map((x) => [x.product_id, x.sales, x.refunded, x.offers.length])).toEqual([
+      ["a", 9, 3, 2],
+      ["b", 2, 0, 1],
+    ]);
+    expect(g.reduce((n, x) => n + x.sales, 0)).toBe(11);
+  });
+
+  it("produto com 0 vendas continua na lista; vazio devolve lista vazia", () => {
+    expect(groupOffersByProduct([row("a", "1", 0, 0)])).toHaveLength(1);
+    expect(groupOffersByProduct([])).toEqual([]);
+  });
+
+  it("mesmo código de oferta em produtos distintos não se mistura", () => {
+    const g = groupOffersByProduct([row("a", "X", 1, 0), row("b", "X", 2, 0)]);
+    expect(g.map((x) => x.sales)).toEqual([1, 2]);
   });
 });
