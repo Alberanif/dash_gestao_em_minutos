@@ -20,8 +20,9 @@ let lockCount: number;
 let upsertError: { message: string } | null;
 
 const VIEW = {
-  id: "view-1", account_id: "acc-1", product_id: "prod-99", view_start_date: null,
-  last_refresh_at: null, name: "V", offer_codes: ["A", "B"],
+  id: "view-1", account_id: "acc-1", view_start_date: null,
+  last_refresh_at: null, name: "V",
+  products: [{ product_id: "prod-99", offer_codes: ["A", "B"] }],
   backfill_status: "done", updated_at: "2020-01-01T00:00:00.000Z",
 };
 
@@ -119,6 +120,18 @@ describe("POST /views/[id]/refresh", () => {
     expect(filterOf(release, "eq")).toEqual(["id", "view-1"]);
     // release condicional: segundo eq() amarra ao NOSSO lock
     expect(release.filters.filter(([n]) => n === "eq")[1][1][0]).toBe("refresh_started_at");
+  });
+
+  it("visualização com 2 produtos: busca cada produto no incremental e soma o upserted", async () => {
+    viewRow = { ...VIEW, products: [{ product_id: "prod-99", offer_codes: ["A"] }, { product_id: "prod-100", offer_codes: ["Z"] }] };
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: "tok" }), text: async () => "" })
+      .mockResolvedValue({ ok: true, json: async () => ({ items: [saleItem], page_info: {} }), text: async () => "" });
+    const res = await call();
+    expect(res.status).toBe(200);
+    expect((await res.json()).upserted).toBe(2);
+    const products = (global.fetch as jest.Mock).mock.calls.slice(1).map(([u]) => new URL(String(u)).searchParams.get("product_id"));
+    expect(products).toEqual(["prod-99", "prod-100"]);
   });
 
   it("só grava vendas (nenhuma RPC e nenhuma tabela além de views, contas e hotmart_*)", async () => {

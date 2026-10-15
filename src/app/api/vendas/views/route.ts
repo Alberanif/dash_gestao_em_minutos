@@ -3,9 +3,15 @@ import { requireRole } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import {
   parseFolderId,
-  parseOfferCodes,
+  parseProducts,
   parseViewPeriod,
 } from "@/lib/vendas/views-validation";
+import {
+  VIEW_PRODUCTS_TABLE,
+  VIEW_WITH_PRODUCTS_SELECT,
+  resolveProductsAccount,
+  withProducts,
+} from "@/lib/vendas/view-products";
 import { runBackfill } from "@/lib/vendas/views-sync";
 import type { VendasViewRecord } from "@/types/vendas";
 
@@ -15,9 +21,11 @@ export const maxDuration = 60;
 const VIEWS_TABLE = "dash_gestao_vendas_views";
 
 /**
- * Visualizações do Relatório de Vendas (PRD #185, fatia 2/4).
- * GET: gestor e analista. POST: só gestor. O escopo de leitura é o mesmo de
- * a rota antiga de listagem (todas as visualizações; o app tem uma única conta).
+ * Visualizações do Relatório de Vendas (PRD #185, fatia 2/4; multi-produto PRD
+ * #213). GET: gestor e analista; cada visualização vem com `products`. POST: só
+ * gestor, com `products: [{ product_id, offer_codes }]`. O escopo de leitura é o
+ * mesmo de a rota antiga de listagem (todas as visualizações; o app tem uma
+ * única conta).
  */
 export async function GET() {
   const { error, role } = await requireRole(["gestor", "analista"]);
@@ -27,14 +35,16 @@ export async function GET() {
 
   const { data: views, error: viewsError } = await supabase
     .from(VIEWS_TABLE)
-    .select("*")
+    .select(VIEW_WITH_PRODUCTS_SELECT)
     .order("created_at", { ascending: false });
 
   if (viewsError) {
     return NextResponse.json({ error: viewsError.message }, { status: 500 });
   }
 
-  const rows = (views ?? []) as VendasViewRecord[];
+  const rows = ((views ?? []) as unknown as object[]).map(
+    (row) => withProducts(row) as unknown as VendasViewRecord
+  );
 
   // Aviso do RF-9: ciclos ativos que a migration não converteu. Só o gestor age
   // sobre isso, então o analista nem paga a query.
@@ -76,13 +86,9 @@ export async function POST(request: NextRequest) {
   if (typeof input.name !== "string" || input.name.trim().length === 0) {
     return NextResponse.json({ error: "name é obrigatório" }, { status: 400 });
   }
-  const productId = typeof input.product_id === "string" ? input.product_id.trim() : "";
-  if (productId.length === 0) {
-    return NextResponse.json({ error: "product_id é obrigatório" }, { status: 400 });
-  }
 
-  const codes = parseOfferCodes(input.offer_codes);
-  if (!codes.ok) return NextResponse.json({ error: codes.error }, { status: 400 });
+  const products = parseProducts(input.products);
+  if (!products.ok) return NextResponse.json({ error: products.error }, { status: 400 });
 
   let folderId: string | null = null;
   if (input.folder_id !== undefined) {
@@ -103,32 +109,16 @@ export async function POST(request: NextRequest) {
 
   const supabase = createSupabaseServiceClient();
 
-  const { data: product, error: productError } = await supabase
-    .from("dash_gestao_hotmart_products")
-    .select("product_id, account_id")
-    .eq("product_id", productId)
-    .maybeSingle();
-
-  if (productError) {
-    return NextResponse.json({ error: productError.message }, { status: 500 });
-  }
-  if (!product) {
-    return NextResponse.json(
-      {
-        error:
-          "Produto não encontrado. Rode o sync de produtos em /api/hotmart/sync-products e tente novamente.",
-      },
-      { status: 400 }
-    );
+  const account = await resolveProductsAccount(supabase, products.value);
+  if (!account.ok) {
+    return NextResponse.json({ error: account.error }, { status: account.status });
   }
 
   const { data: created, error: insertError } = await supabase
     .from(VIEWS_TABLE)
     .insert({
       name: input.name.trim(),
-      account_id: product.account_id,
-      product_id: productId,
-      offer_codes: codes.value,
+      account_id: account.accountId,
       folder_id: folderId,
       ...period,
       created_by: userId,
@@ -137,22 +127,41 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (insertError || !created) {
-    // 23514 = CHECK violada (allowlist/período): entrada inválida, não falha nossa.
+    // 23514 = CHECK violada (período): entrada inválida, não falha nossa.
     const status = insertError?.code === "23514" ? 400 : 500;
     return NextResponse.json({ error: insertError?.message ?? "Falha ao criar" }, { status });
+  }
+
+  const createdView = created as VendasViewRecord;
+
+  // Sem transação no client: se os produtos não gravarem, desfaz a visualização
+  // (cascade) para não deixar uma visualização sem produto.
+  const { error: productsError } = await supabase.from(VIEW_PRODUCTS_TABLE).insert(
+    products.value.map((p) => ({
+      view_id: createdView.id,
+      product_id: p.product_id,
+      offer_codes: p.offer_codes,
+    }))
+  );
+  if (productsError) {
+    await supabase.from(VIEWS_TABLE).delete().eq("id", createdView.id);
+    // 23514 = CHECK da allowlist; 23503 = FK (produto inexistente).
+    const status = productsError.code === "23514" || productsError.code === "23503" ? 400 : 500;
+    return NextResponse.json({ error: productsError.message }, { status });
   }
 
   // Backfill síncrono. Nunca derruba a criação: o resultado fica em
   // backfill_status/backfill_from do registro devolvido.
   const outcome = await runBackfill({
     supabase,
-    view: created as VendasViewRecord,
-    offerCodes: codes.value,
+    view: createdView,
+    targets: products.value.map((p) => ({ productId: p.product_id, offerCodes: p.offer_codes })),
     signal: request.signal,
   });
 
   const view: VendasViewRecord = {
-    ...(created as VendasViewRecord),
+    ...createdView,
+    products: products.value,
     backfill_status: outcome.status,
     backfill_from: outcome.status === "failed" ? null : outcome.backfillFrom,
   };
