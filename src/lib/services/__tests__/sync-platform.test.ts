@@ -131,6 +131,73 @@ describe("syncPlatform — hotmart", () => {
   });
 });
 
+function setupAccounts(accounts: unknown[]) {
+  const mockEqChain = jest.fn().mockResolvedValue({ data: accounts, error: null });
+  const mockEqFirst = jest.fn().mockReturnValue({ eq: mockEqChain });
+  const mockSelectChain = jest.fn().mockReturnValue({ eq: mockEqFirst });
+  mockFrom.mockImplementation((table: string) => {
+    if (table === "dash_gestao_accounts") return { select: mockSelectChain };
+    if (table === "dash_gestao_cron_logs") return { insert: mockInsert };
+    return {};
+  });
+  mockInsert.mockResolvedValue({ error: null });
+  return { from: mockFrom } as unknown as ReturnType<typeof import("@/lib/supabase/server").createSupabaseServiceClient>;
+}
+
+function lastWindowHours() {
+  const { startDate, endDate } = (collectHotmart as jest.Mock).mock.calls.at(-1)![1];
+  return (endDate.getTime() - startDate.getTime()) / (60 * 60 * 1000);
+}
+
+describe("syncPlatform — janela parametrizável", () => {
+  const hotmart = { id: "h1", name: "H", platform: "hotmart", is_active: true, credentials: {}, created_at: "" };
+
+  it('window "24h" coleta Hotmart com 24h', async () => {
+    (collectHotmart as jest.Mock).mockResolvedValue({ salesRecords: 1 });
+    const { syncPlatform } = await import("../sync-platform");
+    await syncPlatform("hotmart", setupAccounts([hotmart]), { window: "24h" });
+    expect(lastWindowHours()).toBeCloseTo(24);
+  });
+
+  it('window "3d" coleta Hotmart com 72h', async () => {
+    (collectHotmart as jest.Mock).mockResolvedValue({ salesRecords: 1 });
+    const { syncPlatform } = await import("../sync-platform");
+    await syncPlatform("hotmart", setupAccounts([hotmart]), { window: "3d" });
+    expect(lastWindowHours()).toBeCloseTo(72);
+  });
+
+  it("sem parâmetro mantém 3 dias", async () => {
+    (collectHotmart as jest.Mock).mockResolvedValue({ salesRecords: 1 });
+    const { syncPlatform } = await import("../sync-platform");
+    await syncPlatform("hotmart", setupAccounts([hotmart]));
+    expect(lastWindowHours()).toBeCloseTo(72);
+  });
+
+  it("Meta Ads ignora a janela", async () => {
+    const meta = { id: "m1", name: "M", platform: "meta-ads", is_active: true, credentials: {}, created_at: "" };
+    (collectMetaAds as jest.Mock).mockResolvedValue({ dailyRecords: 1, campaignDailyRecords: 1 });
+    const { syncPlatform } = await import("../sync-platform");
+    await syncPlatform("meta-ads", setupAccounts([meta]), { window: "24h" });
+    expect(collectMetaAds).toHaveBeenCalledWith(meta);
+    expect(collectHotmart).not.toHaveBeenCalled();
+  });
+
+  it("aceita lista de contas já resolvida, sem consultar dash_gestao_accounts, e erro numa conta não impede as demais", async () => {
+    const h2 = { ...hotmart, id: "h2", name: "H2" };
+    (collectHotmart as jest.Mock)
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockResolvedValueOnce({ salesRecords: 7 });
+    const { syncPlatform } = await import("../sync-platform");
+    const supabase = setupAccounts([]);
+    const results = await syncPlatform([hotmart, h2] as never, supabase, { window: "24h" });
+
+    expect(mockFrom).not.toHaveBeenCalledWith("dash_gestao_accounts");
+    expect(results.map((r) => r.status)).toEqual(["error", "success"]);
+    expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ account_id: "h1", status: "error", error_message: "boom" }));
+    expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ account_id: "h2", status: "success", records_collected: 7 }));
+  });
+});
+
 describe("syncPlatform — plataforma sem coletor", () => {
   it("logs an error instead of a silent success with 0 records", async () => {
     const account = { id: "acc-6", name: "Sem Coletor", platform: "tiktok", is_active: true, credentials: {}, created_at: "" };
