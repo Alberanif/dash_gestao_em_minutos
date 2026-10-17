@@ -6,6 +6,9 @@ import { createSupabaseServiceClient } from "@/lib/supabase/server";
 
 export const DEFAULT_LOCK_TTL_MS = 45 * 60 * 1000;
 
+/** Nome do lock da coleta de Indicadores (cron e botão "Atualizar Agora"). */
+export const INDICADORES_LOCK_NAME = "indicadores";
+
 /** Subconjunto do SupabaseClient usado aqui (facilita injetar fake nos testes). */
 export interface LockRpcClient {
   rpc(

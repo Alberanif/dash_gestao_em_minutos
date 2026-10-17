@@ -32,6 +32,7 @@ import { PlatformsCard } from "@/components/indicadores/platforms-card";
 import { LeadsSection } from "@/components/indicadores/leads-section";
 import { ConversionSourcesCard } from "@/components/indicadores/conversion-sources-card";
 import { CronFreshnessIndicator } from "@/components/indicadores/cron-freshness-indicator";
+import { RefreshNowButton } from "@/components/indicadores/refresh-now-button";
 import { FilterDropdown } from "@/components/indicadores/filter-dropdown";
 import { FilterModal } from "@/components/indicadores/filter-modal";
 import { IndicadoresEmptyState } from "@/components/indicadores/indicadores-empty-state";
@@ -322,6 +323,11 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
     window.history.pushState(null, "", qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
   }
 
+  // Sobe a cada coleta concluída pelo "Atualizar Agora": refaz as consultas dos
+  // dados e remonta o indicador de frescor, sem recarregar a página.
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleRefreshed = useCallback(() => setReloadKey((k) => k + 1), []);
+
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { messages, isStreaming, activeQuery, sendMessage, stop, clearHistory } = useAgentChat();
 
@@ -543,7 +549,7 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
   useEffect(() => {
     if (!activeFilter) return;
     fetchAll(startDate, endDate, activeFilter, activeOfferCode);
-  }, [startDate, endDate, activeFilter, activeOfferCode, fetchAll]);
+  }, [startDate, endDate, activeFilter, activeOfferCode, fetchAll, reloadKey]);
 
   const fetchPlanilha = useCallback(async (
     start: string,
@@ -607,11 +613,11 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
   // combinação Evento + período + oferta mudou desde o último fetch (RF-6).
   useEffect(() => {
     if (view !== "planilha" || !activeFilter) return;
-    const key = [startDate, endDate, activeFilter.id, activeOfferCode ?? ""].join("|");
+    const key = [startDate, endDate, activeFilter.id, activeOfferCode ?? "", reloadKey].join("|");
     if (planilhaKeyRef.current === key) return;
     planilhaKeyRef.current = key;
     fetchPlanilha(startDate, endDate, activeFilter, activeOfferCode);
-  }, [view, startDate, endDate, activeFilter, activeOfferCode, fetchPlanilha]);
+  }, [view, startDate, endDate, activeFilter, activeOfferCode, fetchPlanilha, reloadKey]);
 
   // Trocar de evento vai para a URL dele (push: o voltar navega entre eventos);
   // sair do evento ativo (null) volta para /indicadores sem deixar entrada
@@ -760,7 +766,7 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <CronFreshnessIndicator />
+          <CronFreshnessIndicator key={reloadKey} />
           <ViewTabs view={view} onView={handleViewChange} />
           <Link
             href="/indicadores/eventos"
@@ -851,6 +857,7 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
         </div>
       ) : view === "debriefing" ? (
         <DebriefingView
+          key={reloadKey}
           filter={activeFilter}
           startDate={startDate}
           endDate={endDate}
@@ -945,6 +952,8 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
 
         </div>
       )}
+
+      <RefreshNowButton onRefreshed={handleRefreshed} />
 
       {/* Agent FAB + Drawer — position: fixed, fora do fluxo do layout */}
       <AgentFAB onClick={() => setDrawerOpen(true)} />

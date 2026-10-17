@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   formatAge,
+  hasCurrentError,
   summarizeFreshness,
   type AccountCronStatus,
   type FreshnessLevel,
@@ -25,13 +26,6 @@ function formatDateTime(iso: string | null): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "nunca";
   return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
-}
-
-/** Erro só conta se for mais recente que o último sucesso; erro antigo já foi superado. */
-function hasCurrentError(a: AccountCronStatus): boolean {
-  if (!a.last_error_at) return false;
-  if (!a.last_success_at) return true;
-  return new Date(a.last_error_at).getTime() > new Date(a.last_success_at).getTime();
 }
 
 /** Indicador "Atualizado há X min" do cabeçalho de /indicadores; abre a lista por conta. */
