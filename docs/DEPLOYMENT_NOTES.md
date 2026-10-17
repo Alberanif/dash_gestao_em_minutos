@@ -1,3 +1,24 @@
+# Cron de Indicadores (cron-job.org)
+
+A coleta automática de Hotmart e Meta Ads é disparada por **dois jobs no cron-job.org** (PRD #225). O cron antigo da Railway está desligado e suas rotas (`/api/cron/collect`, `/api/cron/sync`, `/api/cron/hotmart/{daily,weekly,products}`, `/api/cron/youtube`, `/api/cron/instagram`) foram removidas. Passo a passo completo: [`OPS_2026-10-16_cron_indicadores.md`](./OPS_2026-10-16_cron_indicadores.md).
+
+**Antes do deploy:** aplicar a migration `073_cron_locks.sql` no Supabase (sem ela o endpoint responde 500 ao adquirir o lock).
+
+Configuração comum aos dois jobs:
+
+- Método: `POST`; header `Authorization: Bearer $CRON_SECRET` (mesmo valor da env `CRON_SECRET` da Railway).
+- Notificação por e-mail em caso de falha ativada nos dois jobs.
+- Timeout: ~30s no cron-job.org (confirmar no painel). A rota responde `202` assim que pega o lock e coleta em background.
+
+| Job | URL | Agenda |
+|-----|-----|--------|
+| Indicadores 24h | `https://<dominio>/api/cron/indicadores?window=24h` | de hora em hora (`0 * * * *`) |
+| Indicadores 3d | `https://<dominio>/api/cron/indicadores?window=3d` | diário às 03:00 |
+
+YouTube e Instagram **não** têm coleta automática hoje (apenas `*/batch-collect` manual pela UI).
+
+---
+
 # Instagram Daily Metrics — Parallel Collection Period
 
 ## Status
@@ -15,7 +36,7 @@
 
 ### Data Flow During Parallel Period
 
-Each daily collection run (via `/api/cron/collect`) now:
+Each Instagram collection run (via `/api/instagram/batch-collect`; the old `/api/cron/collect` was removed, see "Cron de Indicadores" above) now:
 1. Fetches Instagram profile metrics (followers, reach, impressions)
 2. Inserts into BOTH `profile_daily` (new) and `profile_snapshots` (legacy)
 3. Fetches last 5 recent media items
@@ -76,7 +97,7 @@ Complete these checks throughout the parallel period (Weeks 1-4):
 ### Week 2: API & Error Monitoring
 
 - [ ] **No API rate limit errors:** Check application logs daily
-  - Location: `/api/cron/collect` response logs
+  - Location: `/api/instagram/batch-collect` response logs and `dash_gestao_cron_logs`
   - Look for: HTTP 429 responses or "rate_limit" error messages
   - Expected: Clean responses, no throttling
 
@@ -141,7 +162,7 @@ Complete these checks throughout the parallel period (Weeks 1-4):
 
 ### Daily Checklist (Can be automated)
 
-1. **Logs:** Check `/api/cron/collect` endpoint responses
+1. **Logs:** Check `/api/instagram/batch-collect` responses and `dash_gestao_cron_logs`
    - Status: Should see successful collections with `{ profileRecords: X, mediaRecords: Y }`
    - Errors: Watch for Instagram API 429 (rate limit) or timeout errors
 
