@@ -1,11 +1,12 @@
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { releaseLock, type CronLock } from "@/lib/cron/lock";
+
+export { INDICADORES_LOCK_NAME } from "@/lib/cron/lock";
 import { syncPlatform, type SyncWindow } from "@/lib/services/sync-platform";
 
 // Rodada de coleta dos Indicadores, compartilhada pela rota do cron
 // (/api/cron/indicadores) e pelo botão "Atualizar Agora" (PRD #234).
 
-export const INDICADORES_LOCK_NAME = "indicadores";
 export const WINDOWS: readonly SyncWindow[] = ["24h", "3d"];
 export const ALLOWED_PLATFORMS = ["hotmart", "meta-ads"] as const;
 export const DEFAULT_PLATFORMS = "hotmart,meta-ads";
