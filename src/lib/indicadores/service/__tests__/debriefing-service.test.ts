@@ -98,6 +98,57 @@ describe("fetchDebriefingMetrics (multi-produto)", () => {
     expect(res.products[0].offers_breakdown.map((o) => o.offer_code)).toEqual(["Sem Oferta"]);
   });
 
+  it("oferta marcada também pega vendas cujo código a estende com sufixo (ex.: parcelamento)", async () => {
+    const fake = setup([
+      sale({ offer_code: "39jz6gwr", price: 10 }),
+      sale({ offer_code: "39jz6gwrj", price: 20 }),
+      sale({ offer_code: "39jz6gwrjk", price: 30 }),
+      sale({ offer_code: "outra123", price: 99 }),
+    ]);
+
+    const res = await fetchDebriefingMetrics(
+      { ...range, products: [{ product_id: "p1", offer_codes: ["39jz6gwr"] }] },
+      fake.client
+    );
+
+    expect(res.products[0].total_sales).toBe(3);
+    expect(res.products[0].total_revenue_brl).toBe(60);
+    expect(res.products[0].offers_breakdown.map((o) => o.offer_code).sort()).toEqual([
+      "39jz6gwr",
+      "39jz6gwrj",
+      "39jz6gwrjk",
+    ]);
+  });
+
+  it("código marcado com menos de 8 caracteres só casa por igualdade", async () => {
+    const fake = setup([
+      sale({ offer_code: "abc", price: 1 }),
+      sale({ offer_code: "abcdefgh", price: 2 }),
+    ]);
+
+    const res = await fetchDebriefingMetrics(
+      { ...range, products: [{ product_id: "p1", offer_codes: ["abc"] }] },
+      fake.client
+    );
+
+    expect(res.products[0].total_sales).toBe(1);
+    expect(res.products[0].total_revenue_brl).toBe(1);
+  });
+
+  it("o prefixo não vale em sentido inverso nem para 'Sem Oferta'", async () => {
+    const fake = setup([
+      sale({ offer_code: "39jz6gwr", price: 10 }),
+      sale({ offer_code: null, offer_name: null, price: 5 }),
+    ]);
+
+    const res = await fetchDebriefingMetrics(
+      { ...range, products: [{ product_id: "p1", offer_codes: ["39jz6gwrj"] }] },
+      fake.client
+    );
+
+    expect(res.products[0].total_sales).toBe(0);
+  });
+
   it("série diária consolidada soma os produtos e separa BRL de moeda estrangeira", async () => {
     const fake = setup([
       sale({ product_id: "p1", price: 100 }),
