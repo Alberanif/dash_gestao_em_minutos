@@ -66,6 +66,21 @@ type HotmartSaleRow = {
   offer_name: string | null;
 };
 
+// A Hotmart acrescenta sufixo ao código da oferta base em variantes de
+// parcelamento/pagamento (39jz6gwr -> 39jz6gwrj), e a venda grava o código da
+// variante. Por isso uma oferta marcada também casa com vendas cujo código a
+// estende. Dentro do mesmo produto (as vendas já chegam filtradas por ele) isso
+// é seguro; o piso de 8 caracteres impede que um código curto absorva vendas
+// de outras ofertas. "Sem Oferta" só casa por igualdade.
+const MIN_PREFIX_LENGTH = 8;
+
+function matchesOfferFilter(offerCode: string | null, codes: string[]): boolean {
+  const key = offerCode || "Sem Oferta";
+  return codes.some(
+    (c) => c === key || (offerCode != null && c.length >= MIN_PREFIX_LENGTH && key.startsWith(c))
+  );
+}
+
 async function fetchProductSales(
   productId: string,
   startUtc: string,
@@ -139,10 +154,8 @@ export async function fetchDebriefingMetrics(
     const sales = salesByProduct[idx];
     // Regra por produto: sem oferta marcada conta tudo; com ofertas, só as marcadas.
     const codes = product.offer_codes ?? [];
-    const filterSet = codes.length > 0 ? new Set(codes) : null;
-    const filteredSales = filterSet
-      ? sales.filter((s) => filterSet.has(s.offer_code || "Sem Oferta"))
-      : sales;
+    const filteredSales =
+      codes.length > 0 ? sales.filter((s) => matchesOfferFilter(s.offer_code, codes)) : sales;
 
     const productName =
       sales.find((s) => s.product_name)?.product_name || product.product_name || product.product_id;
