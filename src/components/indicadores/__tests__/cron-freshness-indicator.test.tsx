@@ -39,12 +39,21 @@ describe("CronFreshnessIndicator", () => {
   });
 
   it("ao clicar lista as contas com o erro mais recente", async () => {
-    mockAccounts([acc({ last_error_at: ago(30), last_error_message: "token expirado" })]);
+    mockAccounts([acc({ last_error_at: ago(5), last_error_message: "token expirado" })]);
     render(<CronFreshnessIndicator now={() => NOW} />);
     fireEvent.click(await screen.findByTestId("cron-freshness-button"));
     await waitFor(() => expect(screen.getByTestId("cron-freshness-list")).toBeTruthy());
     expect(screen.getByText("Conta A")).toBeTruthy();
     expect(screen.getByTestId("cron-freshness-error").textContent).toBe("token expirado");
+    expect(screen.queryByTestId("cron-freshness-ok")).toBeNull();
+  });
+
+  it("erro antigo, superado por um sucesso, nao aparece", async () => {
+    mockAccounts([acc({ last_error_at: ago(300), last_error_message: "Gateway Timeout" })]);
+    render(<CronFreshnessIndicator now={() => NOW} />);
+    fireEvent.click(await screen.findByTestId("cron-freshness-button"));
+    await waitFor(() => expect(screen.getByTestId("cron-freshness-ok")).toBeTruthy());
+    expect(screen.queryByTestId("cron-freshness-error")).toBeNull();
   });
 
   it("nao renderiza nada se a API falhar", async () => {

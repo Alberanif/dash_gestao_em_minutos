@@ -143,6 +143,14 @@
   flex-shrink: 0;
 }
 
+.ind-dark .cron-fresh-ok {
+  color: var(--green);
+}
+
+.ind-dark .cron-fresh-bad {
+  color: var(--red);
+}
+
 .ind-dark .cron-fresh-err {
   margin-top: 4px;
   color: var(--red);
