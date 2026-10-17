@@ -13,7 +13,7 @@ Configuração comum aos dois jobs:
 | Job | URL | Agenda |
 |-----|-----|--------|
 | Indicadores 24h | `https://<dominio>/api/cron/indicadores?window=24h` | de hora em hora (`0 * * * *`) |
-| Indicadores 3d | `https://<dominio>/api/cron/indicadores?window=3d` | diário às 03:00 |
+| Indicadores 3d | `https://<dominio>/api/cron/indicadores?window=3d` | diário às 03:30 |
 
 YouTube e Instagram **não** têm coleta automática hoje (apenas `*/batch-collect` manual pela UI).
 

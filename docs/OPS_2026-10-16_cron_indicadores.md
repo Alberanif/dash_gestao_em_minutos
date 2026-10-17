@@ -19,7 +19,7 @@ A env `CRON_SECRET` precisa estar definida na Railway. O mesmo valor vai no head
 - Auth: header `Authorization: Bearer <CRON_SECRET>`.
 - `window` (opcional, padrão `24h`): `24h` ou `3d`.
 - `platforms` (opcional, padrão `hotmart,meta-ads`): subconjunto de `hotmart`, `meta-ads`.
-- Respostas: `202 {accepted:true}` (coleta iniciada em background), `202 {skipped:"em andamento"}` (rodada anterior ainda com o lock; não é erro), `400` parâmetro inválido, `401/403` auth, `500` falha ao adquirir lock.
+- Respostas: `202 {accepted:true}` (coleta iniciada em background), `202 {skipped:"em andamento"}` (rodada anterior ainda com o lock; não é erro), `400` parâmetro inválido, `401` auth, `500` falha ao adquirir lock.
 - O lock expira sozinho em 45 min se uma rodada morrer sem liberá-lo.
 - O resultado por conta fica em `dash_gestao_cron_logs`.
 
@@ -31,7 +31,7 @@ Crie dois jobs com a mesma configuração, mudando URL e agenda.
 |-------|-------------|------------|
 | Título | Indicadores 24h | Indicadores 3d |
 | URL | `https://<dominio>/api/cron/indicadores?window=24h` | `https://<dominio>/api/cron/indicadores?window=3d` |
-| Agenda | de hora em hora (minuto 0) | todo dia às 03:00 |
+| Agenda | de hora em hora (minuto 0) | todo dia às 03:30 |
 | Fuso | America/Sao_Paulo | America/Sao_Paulo |
 | Método | POST | POST |
 
@@ -42,7 +42,7 @@ Em "Advanced":
 - Timeout: o cron-job.org corta a requisição em ~30s. A rota responde 202 logo após pegar o lock, então cabe no limite. **Confirmar o limite no painel** (Settings do job) e ajustar se o plano permitir outro valor.
 - Notificações: ativar aviso por e-mail em falha (e opcionalmente ao se recuperar). Falha = resposta fora de 2xx; `202 skipped` conta como sucesso.
 
-O job de 03:00 (`3d`) reprocessa os últimos 3 dias e captura confirmações tardias de PIX/boleto; o horário (`24h`) mantém os números do dia frescos. Os dois podem coincidir às 03:00: o lock faz o segundo responder `skipped`, sem problema.
+O job das 03:30 (`3d`) reprocessa os últimos 3 dias e captura confirmações tardias de PIX/boleto; o horário (`24h`) mantém os números do dia frescos. O noturno fica às 03:30, e não às 03:00, de propósito: se coincidisse com o job horário, o lock faria o segundo responder `skipped`, e podia ser justamente o de `3d` que fosse pulado. Se a rodada das 03:00 ainda estiver ativa às 03:30, o `3d` também é pulado; confira o log no dia seguinte.
 
 ## Teste manual
 
@@ -51,7 +51,7 @@ curl -i -X POST "https://<dominio>/api/cron/indicadores?window=24h" \
   -H "Authorization: Bearer $CRON_SECRET"
 ```
 
-Esperado: `202` com `{"accepted":true,"window":"24h","platforms":["hotmart","meta-ads"]}`. Conferir depois as linhas novas em `dash_gestao_cron_logs`. Sem o header, deve responder 401/403.
+Esperado: `202` com `{"accepted":true,"window":"24h","platforms":["hotmart","meta-ads"]}`. Conferir depois as linhas novas em `dash_gestao_cron_logs`. Sem o header, deve responder 401.
 
 ## Fora do escopo: YouTube e Instagram
 
