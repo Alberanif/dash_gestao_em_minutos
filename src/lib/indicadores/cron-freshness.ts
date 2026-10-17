@@ -74,3 +74,12 @@ export function formatAge(minutes: number | null): string {
   const m = minutes % 60;
   return m === 0 ? `há ${h}h` : `há ${h}h ${m}min`;
 }
+
+/** Erro só conta se for mais recente que o último sucesso; erro antigo já foi superado. */
+export function hasCurrentError(
+  a: Pick<AccountCronStatus, "last_success_at" | "last_error_at">,
+): boolean {
+  if (!a.last_error_at) return false;
+  if (!a.last_success_at) return true;
+  return new Date(a.last_error_at).getTime() > new Date(a.last_success_at).getTime();
+}
