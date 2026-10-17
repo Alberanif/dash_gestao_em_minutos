@@ -31,6 +31,7 @@ import { HorizontalFunnelFlow } from "@/components/indicadores/horizontal-funnel
 import { PlatformsCard } from "@/components/indicadores/platforms-card";
 import { LeadsSection } from "@/components/indicadores/leads-section";
 import { ConversionSourcesCard } from "@/components/indicadores/conversion-sources-card";
+import { CronFreshnessIndicator } from "@/components/indicadores/cron-freshness-indicator";
 import { FilterDropdown } from "@/components/indicadores/filter-dropdown";
 import { FilterModal } from "@/components/indicadores/filter-modal";
 import { IndicadoresEmptyState } from "@/components/indicadores/indicadores-empty-state";
@@ -759,6 +760,7 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <CronFreshnessIndicator />
           <ViewTabs view={view} onView={handleViewChange} />
           <Link
             href="/indicadores/eventos"

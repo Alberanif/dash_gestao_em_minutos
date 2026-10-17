@@ -116,7 +116,8 @@ describe("/indicadores/[id] — evento ativo definido pela URL", () => {
     render(<IndicadoresDashboard eventId="nao-e-uuid" />);
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/indicadores"));
-    expect(requests).toEqual([]);
+    // O indicador de ultima coleta (cron-status) e independente do evento.
+    expect(requests.filter((u) => !u.startsWith("/api/indicadores/cron-status"))).toEqual([]);
     expect(sessionStorage.getItem(SS_NOTICE)).toMatch(/Evento não encontrado/);
   });
 
