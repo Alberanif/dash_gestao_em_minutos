@@ -27,6 +27,13 @@ function formatDateTime(iso: string | null): string {
   return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
+/** Erro só conta se for mais recente que o último sucesso; erro antigo já foi superado. */
+function hasCurrentError(a: AccountCronStatus): boolean {
+  if (!a.last_error_at) return false;
+  if (!a.last_success_at) return true;
+  return new Date(a.last_error_at).getTime() > new Date(a.last_success_at).getTime();
+}
+
 /** Indicador "Atualizado há X min" do cabeçalho de /indicadores; abre a lista por conta. */
 export function CronFreshnessIndicator({ now }: { now?: () => Date } = {}) {
   const [accounts, setAccounts] = useState<AccountCronStatus[] | null>(null);
@@ -98,11 +105,16 @@ export function CronFreshnessIndicator({ now }: { now?: () => Date } = {}) {
                     <span>{a.name}</span>
                     <span className="cron-fresh-plat">{PLATFORM_LABEL[a.platform] ?? a.platform}</span>
                   </div>
-                  <div className="cron-fresh-row">Último sucesso: {formatDateTime(a.last_success_at)}</div>
-                  <div className="cron-fresh-row">Último erro: {formatDateTime(a.last_error_at)}</div>
-                  {a.last_error_message && (
-                    <div className="cron-fresh-err" data-testid="cron-freshness-error">
-                      {a.last_error_message}
+                  {hasCurrentError(a) ? (
+                    <>
+                      <div className="cron-fresh-row cron-fresh-bad">Falhou em {formatDateTime(a.last_error_at)}</div>
+                      <div className="cron-fresh-err" data-testid="cron-freshness-error">
+                        {a.last_error_message}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="cron-fresh-row cron-fresh-ok" data-testid="cron-freshness-ok">
+                      Atualizado em {formatDateTime(a.last_success_at)}
                     </div>
                   )}
                 </li>
