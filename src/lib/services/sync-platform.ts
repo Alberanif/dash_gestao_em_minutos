@@ -5,8 +5,18 @@ import { collectMetaAds } from "@/lib/services/meta-ads";
 import { collectHotmart } from "@/lib/services/hotmart";
 import type { Account } from "@/types/accounts";
 
-// Janela da coleta Hotmart: 3 dias para capturar confirmações tardias de PIX/boleto.
-const HOTMART_LOOKBACK_DAYS = 3;
+// Janela da coleta Hotmart. "3d" (padrão) captura confirmações tardias de PIX/boleto;
+// "24h" serve para a rodada horária. Meta Ads tem janela própria e ignora este valor.
+export type SyncWindow = "24h" | "3d";
+
+const WINDOW_MS: Record<SyncWindow, number> = {
+  "24h": 24 * 60 * 60 * 1000,
+  "3d": 3 * 24 * 60 * 60 * 1000,
+};
+
+export interface SyncPlatformOptions {
+  window?: SyncWindow;
+}
 
 export interface SyncPlatformResult {
   account_id: string;
@@ -17,23 +27,35 @@ export interface SyncPlatformResult {
   error?: string;
 }
 
+/**
+ * Coleta uma plataforma (busca as contas ativas) ou uma lista de contas já resolvida.
+ */
 export async function syncPlatform(
-  platform: string,
-  supabase: ReturnType<typeof createSupabaseServiceClient>
+  platformOrAccounts: string | Account[],
+  supabase: ReturnType<typeof createSupabaseServiceClient>,
+  options: SyncPlatformOptions = {}
 ): Promise<SyncPlatformResult[]> {
-  const { data: accounts, error: accountsError } = await supabase
-    .from("dash_gestao_accounts")
-    .select("*")
-    .eq("platform", platform)
-    .eq("is_active", true);
+  const window = options.window ?? "3d";
+  let accounts: Account[];
 
-  if (accountsError || !accounts) {
-    return [];
+  if (typeof platformOrAccounts === "string") {
+    const { data, error: accountsError } = await supabase
+      .from("dash_gestao_accounts")
+      .select("*")
+      .eq("platform", platformOrAccounts)
+      .eq("is_active", true);
+
+    if (accountsError || !data) {
+      return [];
+    }
+    accounts = data as Account[];
+  } else {
+    accounts = platformOrAccounts;
   }
 
   const results: SyncPlatformResult[] = [];
 
-  for (const account of accounts as Account[]) {
+  for (const account of accounts) {
     const startedAt = new Date().toISOString();
 
     try {
@@ -53,7 +75,7 @@ export async function syncPlatform(
       } else if (account.platform === "hotmart") {
         const endDate = new Date();
         const startDate = new Date(
-          endDate.getTime() - HOTMART_LOOKBACK_DAYS * 24 * 60 * 60 * 1000
+          endDate.getTime() - WINDOW_MS[window]
         );
         const result = await collectHotmart(account, { startDate, endDate });
         records = result.salesRecords;
