@@ -69,3 +69,8 @@ export function statusSummaryCounts(filters: FilterRecord[]): Record<FilterStatu
     cancelado: groups.cancelado.length,
   };
 }
+
+/** Selo "Orgânico" só aparece em eventos de captação orgânica; pagos não ganham selo. */
+export function eventoOrganicBadgeLabel(filter: Pick<FilterRecord, "is_organic">): string | null {
+  return filter.is_organic === true ? "Orgânico" : null;
+}
