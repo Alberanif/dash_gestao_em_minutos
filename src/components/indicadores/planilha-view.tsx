@@ -2,6 +2,7 @@
 
 import React from "react";
 import { calcROAS } from "@/lib/utils/cross-metrics";
+import { planilhaBlocksFor } from "@/lib/indicadores/planilha-columns";
 import type {
   ConversionSourcesWithWeeks,
   GlobalHotmartMetricsWithWeeks,
@@ -25,6 +26,8 @@ export interface PlanilhaViewProps {
   hasMetaFilter: boolean;
   hasHotmartFilter: boolean;
   hasLeadsFilter: boolean;
+  /** Evento orgânico: oculta os blocos de vendas/receita/ROAS. */
+  isOrganic?: boolean;
 }
 
 // ── Formatters — mesmas convenções dos cards do Dashboard ────────────────────
@@ -280,8 +283,10 @@ export function PlanilhaView({
   hasMetaFilter,
   hasHotmartFilter,
   hasLeadsFilter,
+  isOrganic = false,
 }: PlanilhaViewProps) {
   const columns = 2 + weeks.length; // Métrica + Total + semanas
+  const show = planilhaBlocksFor(isOrganic);
   const meta = metaState.data;
   const hotmart = hotmartState.data;
   const leads = leadsState.data;
@@ -457,26 +462,30 @@ export function PlanilhaView({
           notConfigured={!hasLeadsFilter}
           skeletonRows={4}
         />
-        <Block
-          title="Vendas por origem"
-          accent="var(--orange)"
-          state={sourcesState}
-          rows={vendasRows}
-          columns={columns}
-          errorMessage="Erro ao carregar origens de conversão."
-          notConfigured={!hasHotmartFilter}
-          skeletonRows={4}
-        />
-        <Block
-          title="Resumo"
-          accent="var(--violet)"
-          state={resumoState}
-          rows={resumoRows}
-          columns={columns}
-          errorMessage="Erro ao carregar dados da Hotmart."
-          notConfigured={!hasHotmartFilter}
-          skeletonRows={3}
-        />
+        {show.vendas && (
+          <Block
+            title="Vendas por origem"
+            accent="var(--orange)"
+            state={sourcesState}
+            rows={vendasRows}
+            columns={columns}
+            errorMessage="Erro ao carregar origens de conversão."
+            notConfigured={!hasHotmartFilter}
+            skeletonRows={4}
+          />
+        )}
+        {show.resumo && (
+          <Block
+            title="Resumo"
+            accent="var(--violet)"
+            state={resumoState}
+            rows={resumoRows}
+            columns={columns}
+            errorMessage="Erro ao carregar dados da Hotmart."
+            notConfigured={!hasHotmartFilter}
+            skeletonRows={3}
+          />
+        )}
       </table>
     </div>
   );

@@ -217,3 +217,21 @@ describe("PlanilhaView — estados", () => {
     expect(screen.getByRole("row", { name: /Receita BRL/ })).toBeInTheDocument();
   });
 });
+
+describe("PlanilhaView — modo orgânico", () => {
+  it("oculta vendas, receita, ROAS e total de vendas, mantendo Meta Ads e Leads", () => {
+    renderView({ isOrganic: true });
+
+    const headers = screen.getAllByTestId("planilha-block-title").map((el) => el.textContent);
+    expect(headers).toEqual(["Meta Ads", "Leads por origem"]);
+    expect(screen.queryByRole("row", { name: /Receita BRL/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("row", { name: /ROAS/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("row", { name: /Total de Vendas/ })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("planilha-vendas-total")).not.toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /Investimento/ })).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /Leads Gerados/ })).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /CPM/ })).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /CPL Tráfego/ })).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /Total de Leads/ })).toBeInTheDocument();
+  });
+});
