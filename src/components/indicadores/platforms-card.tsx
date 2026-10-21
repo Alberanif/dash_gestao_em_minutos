@@ -23,6 +23,8 @@ interface PlatformsCardProps {
   onOfferCodeChange?: (offerCode: string | null, productId: string | null) => void;
   hasMetaFilter?: boolean;
   hasHotmartFilter?: boolean;
+  /** Modo orgânico: sem aba Hotmart; só Meta Ads (investimento e leads por dia). */
+  isOrganic?: boolean;
   /** Query string (com "?") do período/filtro atual, usada pela lista de campanhas. */
   campaignsParams: string;
 }
@@ -92,9 +94,12 @@ export function PlatformsCard({
   onOfferCodeChange,
   hasMetaFilter = true,
   hasHotmartFilter = true,
+  isOrganic = false,
   campaignsParams,
 }: PlatformsCardProps) {
-  const [activePlatform, setActivePlatform] = useState<Platform>("meta");
+  const [selectedPlatform, setActivePlatform] = useState<Platform>("meta");
+  // Orgânico não tem aba Hotmart: nunca renderiza o painel, mesmo com estado herdado.
+  const activePlatform: Platform = isOrganic ? "meta" : selectedPlatform;
   // Local de propósito: trocar de aba ou recarregar volta ao resumo.
   const [campaignsOpen, setCampaignsOpen] = useState(false);
 
@@ -123,6 +128,7 @@ export function PlatformsCard({
           iconBorder="rgba(76,141,255,0.22)"
           label="Meta Ads"
         />
+        {!isOrganic && (
         <Tab
           active={activePlatform === "hotmart"}
           onClick={() => selectPlatform("hotmart")}
@@ -132,6 +138,7 @@ export function PlatformsCard({
           iconBorder="rgba(232,133,63,0.22)"
           label="Hotmart"
         />
+        )}
       </div>
       <div style={{ borderTop: "1px solid var(--border-vis)" }}>
         {activePlatform === "meta" ? (
