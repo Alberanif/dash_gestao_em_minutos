@@ -258,6 +258,24 @@ describe("getPartialFilterWarning", () => {
     const result = getPartialFilterWarning([], [], []);
     expect(result).toBeNull();
   });
+
+  it("modo organico: nao cita Hotmart quando so ha Meta Ads", () => {
+    const result = getPartialFilterWarning([], ["lançamento"], [], true);
+    expect(result).not.toBeNull();
+    expect(result).not.toContain("Hotmart");
+    expect(result).toContain("Leads");
+  });
+
+  it("modo organico: nao cita Hotmart quando so ha eventos de leads", () => {
+    const result = getPartialFilterWarning([], [], ["Inscricao Webinar"], true);
+    expect(result).not.toBeNull();
+    expect(result).not.toContain("Hotmart");
+    expect(result).toContain("Meta Ads");
+  });
+
+  it("modo organico: Meta Ads e Leads configurados nao geram aviso (Hotmart ausente)", () => {
+    expect(getPartialFilterWarning([], ["lançamento"], ["Inscricao Webinar"], true)).toBeNull();
+  });
 });
 
 // ── LeadsSection ──────────────────────────────────────────────────────────────

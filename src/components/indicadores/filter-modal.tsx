@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { OffersDrawer, type HotmartOffer } from "./offers-drawer";
 import type { DebriefingProduct, FilterRecord, FilterStatus } from "@/types/indicadores";
 import { resolveDebriefingProducts } from "@/lib/indicadores/debriefing-products";
+import { validateOrganicSources } from "@/lib/indicadores/organic-validation";
 
 const STATUS_OPTIONS: Array<{ value: FilterStatus; label: string; accent: string }> = [
   { value: "ativo", label: "Ativo", accent: "var(--green)" },
@@ -25,17 +26,20 @@ export function offersBadgeLabel(offerCodes: string[]): string {
 export function getPartialFilterWarning(
   hotmartProducts: HotmartProduct[],
   cleanTerms: string[],
-  captacaoLeadsEventos: string[]
+  captacaoLeadsEventos: string[],
+  isOrganic = false
 ): string | null {
   const hasHotmart = hotmartProducts.length > 0;
   const hasMeta = cleanTerms.length > 0;
   const hasLeads = captacaoLeadsEventos.length > 0;
 
-  const configuredCount = [hasHotmart, hasMeta, hasLeads].filter(Boolean).length;
-  if (configuredCount === 0 || configuredCount === 3) return null;
+  // No modo organico a captura Hotmart nao e fonte: so Meta Ads e Leads contam.
+  const sources = isOrganic ? [hasMeta, hasLeads] : [hasHotmart, hasMeta, hasLeads];
+  const configuredCount = sources.filter(Boolean).length;
+  if (configuredCount === 0 || configuredCount === sources.length) return null;
 
   const missing: string[] = [];
-  if (!hasHotmart) missing.push("dados de Hotmart");
+  if (!isOrganic && !hasHotmart) missing.push("dados de Hotmart");
   if (!hasMeta) missing.push("dados de Meta Ads");
   if (!hasLeads) missing.push("Captação de Leads");
 
@@ -60,6 +64,7 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
   const [captacaoLeadsEventos, setCaptacaoLeadsEventos] = useState<string[]>(
     editTarget?.captacao_leads_eventos ?? []
   );
+  const [isOrganic, setIsOrganic] = useState<boolean>(editTarget?.is_organic ?? false);
   const [status, setStatus] = useState<FilterStatus>(editTarget?.status ?? "ativo");
   const [debriefingProducts, setDebriefingProducts] = useState<DebriefingProduct[]>(() =>
     editTarget ? resolveDebriefingProducts(editTarget) : []
@@ -128,7 +133,7 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
   useEffect(() => {
     setPartialWarning("");
     setPartialWarningShown(false);
-  }, [hotmartProducts, metaTerms, captacaoLeadsEventos]);
+  }, [hotmartProducts, metaTerms, captacaoLeadsEventos, isOrganic]);
 
   const selectedIds = new Set(hotmartProducts.map((p) => p.product_id));
   const filteredOptions = productOptions.filter((p) => !selectedIds.has(p.product_id));
@@ -175,13 +180,18 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
       setError("Nome é obrigatório.");
       return;
     }
-    if (hotmartProducts.length === 0 && cleanTerms.length === 0 && captacaoLeadsEventos.length === 0) {
+    if (isOrganic) {
+      if (validateOrganicSources(cleanTerms, captacaoLeadsEventos) !== null) {
+        setError("Captação orgânica exige pelo menos um evento de Captação de Leads ou um termo de campanha Meta Ads.");
+        return;
+      }
+    } else if (hotmartProducts.length === 0 && cleanTerms.length === 0 && captacaoLeadsEventos.length === 0) {
       setError("Selecione pelo menos um produto, termo de campanha ou evento de Captação de Leads.");
       return;
     }
     // Show partial-source warning once before proceeding; second click confirms
     if (!partialWarningShown) {
-      const warning = getPartialFilterWarning(hotmartProducts, cleanTerms, captacaoLeadsEventos);
+      const warning = getPartialFilterWarning(hotmartProducts, cleanTerms, captacaoLeadsEventos, isOrganic);
       if (warning) {
         setPartialWarning(warning);
         setPartialWarningShown(true);
@@ -203,6 +213,7 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
             debriefing_products: debriefingProducts,
             meta_ads_terms: cleanTerms,
             captacao_leads_eventos: captacaoLeadsEventos,
+            is_organic: isOrganic,
             status,
           }
         : {
@@ -212,6 +223,7 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
             debriefing_products: debriefingProducts,
             meta_ads_terms: cleanTerms,
             captacao_leads_eventos: captacaoLeadsEventos,
+            is_organic: isOrganic,
           };
 
       const res = await fetch(url, {
@@ -286,7 +298,50 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
           />
         </div>
 
-        {/* Hotmart products (Captura) */}
+        {/* Captacao organica */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <label
+            htmlFor="organic-switch"
+            style={{ fontSize: 11, fontWeight: 600, color: "var(--text-2)", textTransform: "uppercase", letterSpacing: "0.05em" }}
+          >
+            Captação orgânica
+          </label>
+          <button
+            id="organic-switch"
+            type="button"
+            role="switch"
+            aria-checked={isOrganic}
+            data-testid="organic-switch"
+            onClick={() => setIsOrganic((v) => !v)}
+            style={{
+              position: "relative",
+              width: 36,
+              height: 20,
+              borderRadius: 10,
+              border: "1px solid var(--border-vis)",
+              background: isOrganic ? "var(--green)" : "var(--surface-2)",
+              cursor: "pointer",
+              padding: 0,
+              flexShrink: 0,
+            }}
+          >
+            <span
+              style={{
+                position: "absolute",
+                top: 2,
+                left: isOrganic ? 18 : 2,
+                width: 14,
+                height: 14,
+                borderRadius: "50%",
+                background: "var(--text)",
+                transition: "left 0.15s",
+              }}
+            />
+          </button>
+        </div>
+
+        {/* Hotmart products (Captura) — oculto no modo organico; o estado e preservado */}
+        {!isOrganic && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-2)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
             Produtos Hotmart (Captura)
@@ -388,6 +443,7 @@ export function FilterModal({ accountId, editTarget, onSave, onCancel }: FilterM
             </div>
           )}
         </div>
+        )}
 
         {/* Produto Principal (Debriefing) */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
