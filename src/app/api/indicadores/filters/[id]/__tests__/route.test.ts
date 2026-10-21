@@ -78,7 +78,10 @@ describe("PUT /api/indicadores/filters/[id]", () => {
 
   it("persists captacao_leads_eventos in the update call", async () => {
     const mockUpdate = jest.fn();
-    mockFrom.mockReturnValue({ update: mockUpdate });
+    mockFrom.mockReturnValue({
+      update: mockUpdate,
+      select: jest.fn().mockReturnValue({ eq: jest.fn().mockReturnValue({ single: mockCurrentSingle }) }),
+    });
     const mockEq = jest.fn().mockReturnValue({ select: jest.fn().mockReturnValue({ single: jest.fn().mockResolvedValue({ data: { id: "filter-uuid" }, error: null }) }) });
     mockUpdate.mockReturnValue({ eq: mockEq });
 
@@ -235,5 +238,86 @@ describe("DELETE /api/indicadores/filters/[id]", () => {
     const res = await DELETE(req, { params: Promise.resolve(params) });
 
     expect(res.status).toBe(204);
+  });
+});
+
+
+// ─── PUT: captação orgânica ──────────────────────────────────────────────────
+
+describe("PUT /api/indicadores/filters/[id] (is_organic)", () => {
+  const url = "http://localhost/api/indicadores/filters/filter-uuid";
+  const call = async (body: object) => {
+    const { PUT } = await import("../route");
+    return PUT(makeRequest("PUT", url, body), { params: Promise.resolve(params) });
+  };
+
+  beforeEach(() => {
+    mockSingle.mockResolvedValue({ data: { id: "filter-uuid" }, error: null });
+  });
+
+  it("persiste is_organic=true quando o payload traz termos", async () => {
+    const res = await call({ is_organic: true, meta_ads_terms: ["t"] });
+    expect(res.status).toBe(200);
+    expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ is_organic: true }));
+  });
+
+  it("omitir is_organic não toca a coluna (mantém o valor atual)", async () => {
+    mockCurrentSingle.mockResolvedValue({ data: { is_organic: false }, error: null });
+    await call({ name: "Novo nome" });
+    expect(mockUpdate.mock.calls[0][0]).not.toHaveProperty("is_organic");
+  });
+
+  it("não altera hotmart_products ao ligar o switch", async () => {
+    await call({ is_organic: true, meta_ads_terms: ["t"] });
+    expect(mockUpdate.mock.calls[0][0]).not.toHaveProperty("hotmart_products");
+  });
+
+  it("retorna 400 ao ligar orgânico num evento sem leads nem termo (estado atual)", async () => {
+    mockCurrentSingle.mockResolvedValue({
+      data: { is_organic: false, meta_ads_terms: [], captacao_leads_eventos: [] },
+      error: null,
+    });
+    const res = await call({ is_organic: true });
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("aceita ligar orgânico usando as fontes já salvas", async () => {
+    mockCurrentSingle.mockResolvedValue({
+      data: { is_organic: false, meta_ads_terms: ["t"], captacao_leads_eventos: [] },
+      error: null,
+    });
+    const res = await call({ is_organic: true });
+    expect(res.status).toBe(200);
+  });
+
+  it("retorna 400 ao esvaziar as fontes de um evento já orgânico", async () => {
+    mockCurrentSingle.mockResolvedValue({
+      data: { is_organic: true, meta_ads_terms: ["t"], captacao_leads_eventos: [] },
+      error: null,
+    });
+    const res = await call({ meta_ads_terms: [] });
+    expect(res.status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("evento pago pode esvaziar as fontes (regra atual inalterada)", async () => {
+    mockCurrentSingle.mockResolvedValue({
+      data: { is_organic: false, meta_ads_terms: ["t"], captacao_leads_eventos: [] },
+      error: null,
+    });
+    const res = await call({ meta_ads_terms: [] });
+    expect(res.status).toBe(200);
+  });
+
+  it("desligar orgânico (is_organic=false) não exige leads nem termo", async () => {
+    const res = await call({ is_organic: false, meta_ads_terms: [], captacao_leads_eventos: [] });
+    expect(res.status).toBe(200);
+    expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ is_organic: false }));
+  });
+
+  it("retorna 400 quando is_organic não é booleano", async () => {
+    const res = await call({ is_organic: "sim" });
+    expect(res.status).toBe(400);
   });
 });

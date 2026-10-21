@@ -15,6 +15,7 @@ function makeFilter(overrides: Partial<FilterRecord> = {}): FilterRecord {
     hotmart_products: [],
     meta_ads_terms: ["termo"],
     captacao_leads_eventos: [],
+    is_organic: false,
     status: "ativo",
     status_changed_at: null,
     created_at: "2026-01-01T00:00:00Z",

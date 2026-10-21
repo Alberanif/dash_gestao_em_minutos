@@ -96,6 +96,7 @@ export interface FilterRecord {
   debriefing_products?: DebriefingProduct[] | null;
   meta_ads_terms: string[];
   captacao_leads_eventos: string[];
+  is_organic: boolean;
   status: FilterStatus;
   status_changed_at: string | null;
   created_at: string;

@@ -3,6 +3,7 @@ import { validateApiAuth } from "@/lib/utils/api-auth";
 import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server";
 import type { FilterRecord } from "@/types/indicadores";
 import { validateDebriefingProducts } from "@/lib/indicadores/debriefing-products";
+import { validateOrganicSources } from "@/lib/indicadores/organic-validation";
 
 export async function GET(request: NextRequest) {
   const { error } = await validateApiAuth();
@@ -41,6 +42,7 @@ export async function POST(request: NextRequest) {
     debriefing_products,
     meta_ads_terms = [],
     captacao_leads_eventos = [],
+    is_organic = false,
   } = body ?? {};
 
   if (!name) {
@@ -50,7 +52,15 @@ export async function POST(request: NextRequest) {
   if (!debriefing.ok) {
     return NextResponse.json({ error: debriefing.error }, { status: 400 });
   }
-  if (hotmart_products.length === 0 && meta_ads_terms.length === 0 && captacao_leads_eventos.length === 0) {
+  if (typeof is_organic !== "boolean") {
+    return NextResponse.json({ error: "is_organic must be a boolean" }, { status: 400 });
+  }
+  if (is_organic) {
+    const organicError = validateOrganicSources(meta_ads_terms, captacao_leads_eventos);
+    if (organicError) {
+      return NextResponse.json({ error: organicError }, { status: 400 });
+    }
+  } else if (hotmart_products.length === 0 && meta_ads_terms.length === 0 && captacao_leads_eventos.length === 0) {
     return NextResponse.json(
       { error: "at least one of hotmart_products, meta_ads_terms, or captacao_leads_eventos must be non-empty" },
       { status: 400 }
@@ -69,6 +79,7 @@ export async function POST(request: NextRequest) {
       ...(debriefing_products !== undefined ? { debriefing_products: debriefing.value } : {}),
       meta_ads_terms,
       captacao_leads_eventos,
+      is_organic,
       status: "ativo",
     })
     .select()
