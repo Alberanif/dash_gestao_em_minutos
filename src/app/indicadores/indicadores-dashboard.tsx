@@ -35,6 +35,7 @@ import { CronFreshnessIndicator } from "@/components/indicadores/cron-freshness-
 import { RefreshNowButton } from "@/components/indicadores/refresh-now-button";
 import { FilterModal } from "@/components/indicadores/filter-modal";
 import { IndicadoresEmptyState } from "@/components/indicadores/indicadores-empty-state";
+import { EventoOrganicoBadge } from "@/components/indicadores/evento-organico-badge";
 import { useAgentChat } from "@/hooks/use-agent-chat";
 import { AgentFAB } from "@/components/agent/AgentFAB";
 import { AgentDrawer } from "@/components/agent/AgentDrawer";
@@ -755,6 +756,7 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
           <div style={{ width: 1, height: 18, background: "#262b33" }} />
           <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-strong)", margin: 0 }}>
             Indicadores
+            <EventoOrganicoBadge filter={activeFilter} />
           </h1>
         </div>
 

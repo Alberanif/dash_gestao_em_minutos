@@ -5,6 +5,7 @@ import type { FilterRecord } from "@/types/indicadores";
 import { eventoMetaLine, eventoCompositionSubtitle } from "@/lib/indicadores/eventos";
 import type { EventoMetrics } from "@/lib/indicadores/service/eventos-metrics";
 import type { StatusAccent } from "./evento-folder";
+import { EventoOrganicoBadge } from "./evento-organico-badge";
 
 const fmtBRL = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
@@ -93,18 +94,22 @@ export function EventoCard({ filter, accent, onOpenDashboard, menu, metrics }: E
     >
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
         <div style={{ minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 14,
-              fontWeight: 600,
-              color: "var(--text-strong)",
-              lineHeight: 1.3,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {filter.name}
+          <div style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: "var(--text-strong)",
+                lineHeight: 1.3,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                minWidth: 0,
+              }}
+            >
+              {filter.name}
+            </div>
+            <EventoOrganicoBadge filter={filter} />
           </div>
           <div style={{ fontSize: 11.5, color: "var(--text-3)", marginTop: 3 }}>
             {eventoCompositionSubtitle(filter)}
