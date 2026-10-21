@@ -26,6 +26,12 @@ import { expandFilter, toSearchParams } from "@/lib/indicadores/filter-expansion
 import { partitionWeeks } from "@/lib/indicadores/week-partition";
 import { PlanilhaView } from "@/components/indicadores/planilha-view";
 import { DebriefingView } from "@/components/indicadores/debriefing-view";
+import {
+  isOrganicFilter,
+  shouldFetchHotmart,
+  dashboardSectionLayout,
+  organicResultKpis,
+} from "@/lib/indicadores/organic-dashboard";
 import { HeroKpiCard } from "@/components/indicadores/hero-kpi-card";
 import { HorizontalFunnelFlow } from "@/components/indicadores/horizontal-funnel-flow";
 import { PlatformsCard } from "@/components/indicadores/platforms-card";
@@ -467,7 +473,10 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
     // O que este filtro significa — definido em um único lugar, compartilhado
     // com o agente. Enquanto houver duas cópias dessa lógica, elas divergem.
     const expanded = expandFilter(filter, offerCode);
-    const { meta: hasMetaFilter, hotmart: hasHotmartFilter, leads: hasLeadsFilter } = expanded.sources;
+    const { meta: hasMetaFilter, leads: hasLeadsFilter } = expanded.sources;
+    // Evento orgânico não usa Hotmart nem origens de conversão: tratado como
+    // fonte não configurada (zerada, sem fetch).
+    const hasHotmartFilter = shouldFetchHotmart(expanded.sources.hotmart, isOrganicFilter(filter));
 
     const ZEROED_LEADS: GlobalLeadsMetrics = { total: 0, by_event: [], by_source: [] };
 
@@ -684,11 +693,15 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
 
   // ── Derived source flags ──────────────────────────────────────────────────
 
+  const isOrganic = isOrganicFilter(activeFilter);
   const {
     meta: hasMetaFilter,
-    hotmart: hasHotmartFilter,
+    hotmart: hasHotmartSource,
     leads: hasLeadsFilter,
   } = expandFilter(activeFilter).sources;
+  // Orgânico não busca Hotmart: tratar como não configurado evita exibir os
+  // zeros do placeholder como se fossem dados reais.
+  const hasHotmartFilter = shouldFetchHotmart(hasHotmartSource, isOrganic);
 
   // ── Derived data for Z-1 and Z-2 ──────────────────────────────────────────
 
@@ -719,6 +732,123 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
   const funnelRates = funnelStages ? calcConversionRates(funnelStages) : null;
 
   const heroLoading = metaState.loading || hotmartState.loading;
+
+  const organicKpis = organicResultKpis({
+    leadsTotal: leadsState.data?.total ?? 0,
+    metaData,
+    hasMetaFilter,
+  });
+  const sectionIndex = Object.fromEntries(
+    dashboardSectionLayout(isOrganic).map((slot) => [slot.key, slot.index]),
+  ) as Record<"resultado" | "jornada" | "plataformas" | "captacao", string>;
+
+  const sections: Record<"resultado" | "jornada" | "plataformas" | "captacao", React.ReactNode> = {
+    resultado: (
+          <section>
+            <SectionHeader index={sectionIndex.resultado} title="Resultado" desc="Desempenho consolidado do período" />
+            {isOrganic ? (
+            <div className="z-row-3col">
+              <HeroKpiCard
+                label="Leads capturados"
+                value={fmtNum(organicKpis.leads)}
+                subtitle="total do período"
+                dotColor="var(--violet)"
+                loading={leadsState.loading}
+              />
+              <HeroKpiCard
+                label="Investimento"
+                value={organicKpis.investment !== null ? fmtBRL(organicKpis.investment) : "—"}
+                subtitle="via Meta Ads"
+                dotColor="var(--orange)"
+                loading={metaState.loading}
+              />
+              <HeroKpiCard
+                label="CPL"
+                value={organicKpis.cpl !== null ? fmtBRL(organicKpis.cpl) : "—"}
+                subtitle="Investimento ÷ Leads"
+                dotColor="var(--orange)"
+                loading={metaState.loading}
+              />
+            </div>
+            ) : (
+            <div className="z-row-3col">
+              <HeroKpiCard
+                label="ROAS"
+                value={roas !== null ? `${fmtDecimal(roas, 2)}×` : "—"}
+                subtitle="Receita ÷ Investimento"
+                dotColor="var(--violet)"
+                loading={heroLoading}
+              />
+              <HeroKpiCard
+                label="Receita BRL"
+                value={hotmartData ? fmtBRL(hotmartData.total_revenue) : "—"}
+                subtitle="via Hotmart"
+                dotColor="var(--orange)"
+                loading={heroLoading}
+              />
+              <HeroKpiCard
+                label="Total de Vendas"
+                value={hotmartData ? fmtNum(hotmartData.total_sales) : "—"}
+                subtitle="total de conversões"
+                dotColor="var(--orange)"
+                loading={heroLoading}
+              />
+            </div>
+            )}
+          </section>
+    ),
+    jornada: funnelStages && funnelRates && (
+            <section>
+              <SectionHeader index={sectionIndex.jornada} title="Jornada de Conversão" desc="Do investimento até a venda" />
+              <div className="z-row">
+                <HorizontalFunnelFlow
+                  stages={funnelStages}
+                  rates={funnelRates}
+                  metaSpend={hasMetaFilter ? (metaData?.meta_spend ?? null) : null}
+                  metaCpl={hasMetaFilter ? (metaData?.meta_cpl_traffic ?? null) : null}
+                  metaCpm={hasMetaFilter ? (metaData?.meta_cpm ?? null) : null}
+                  metaConvRate={convRate}
+                  cpa={cpa}
+                />
+              </div>
+            </section>
+    ),
+    plataformas: (
+          <section>
+            <SectionHeader index={sectionIndex.plataformas} title="Plataformas" desc="Detalhe por fonte de dados" />
+            <div className="z-row">
+              <PlatformsCard
+                metaState={metaState}
+                hotmartState={hotmartState}
+                dailyState={dailyState}
+                accountId={accountId}
+                selectedProductId={activeProductForOffer}
+                onOfferCodeChange={handleOfferCodeChange}
+                hasMetaFilter={hasMetaFilter}
+                hasHotmartFilter={hasHotmartFilter}
+                campaignsParams={campaignsParams}
+              />
+            </div>
+            {hasHotmartFilter && (
+              <div className="z-row" style={{ marginTop: 14 }}>
+                <ConversionSourcesCard state={conversionSourcesState} />
+              </div>
+            )}
+          </section>
+    ),
+    captacao: (
+          <section>
+            <SectionHeader
+              index={sectionIndex.captacao}
+              title="Captação de Leads"
+              desc="Novos leads que entraram no funil · dados não filtrados"
+            />
+            <div className="z-row">
+              <LeadsSection leadsState={leadsState} dailyState={dailyState} />
+            </div>
+          </section>
+    ),
+  };
 
   return (
     <div className="dash-dark ind-dark" style={{ maxWidth: 1220, margin: "0 auto", padding: "0 28px 64px" }}>
@@ -830,88 +960,9 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
         />
       ) : (
         <div className="z-layout">
-
-          {/* 01 · Resultado — 3 hero KPIs */}
-          <section>
-            <SectionHeader index="01" title="Resultado" desc="Desempenho consolidado do período" />
-            <div className="z-row-3col">
-              <HeroKpiCard
-                label="ROAS"
-                value={roas !== null ? `${fmtDecimal(roas, 2)}×` : "—"}
-                subtitle="Receita ÷ Investimento"
-                dotColor="var(--violet)"
-                loading={heroLoading}
-              />
-              <HeroKpiCard
-                label="Receita BRL"
-                value={hotmartData ? fmtBRL(hotmartData.total_revenue) : "—"}
-                subtitle="via Hotmart"
-                dotColor="var(--orange)"
-                loading={heroLoading}
-              />
-              <HeroKpiCard
-                label="Total de Vendas"
-                value={hotmartData ? fmtNum(hotmartData.total_sales) : "—"}
-                subtitle="total de conversões"
-                dotColor="var(--orange)"
-                loading={heroLoading}
-              />
-            </div>
-          </section>
-
-          {/* 02 · Jornada de Conversão — full width */}
-          {funnelStages && funnelRates && (
-            <section>
-              <SectionHeader index="02" title="Jornada de Conversão" desc="Do investimento até a venda" />
-              <div className="z-row">
-                <HorizontalFunnelFlow
-                  stages={funnelStages}
-                  rates={funnelRates}
-                  metaSpend={hasMetaFilter ? (metaData?.meta_spend ?? null) : null}
-                  metaCpl={hasMetaFilter ? (metaData?.meta_cpl_traffic ?? null) : null}
-                  metaCpm={hasMetaFilter ? (metaData?.meta_cpm ?? null) : null}
-                  metaConvRate={convRate}
-                  cpa={cpa}
-                />
-              </div>
-            </section>
-          )}
-
-          {/* 03 · Plataformas — card com abas + origens de conversão */}
-          <section>
-            <SectionHeader index="03" title="Plataformas" desc="Detalhe por fonte de dados" />
-            <div className="z-row">
-              <PlatformsCard
-                metaState={metaState}
-                hotmartState={hotmartState}
-                dailyState={dailyState}
-                accountId={accountId}
-                selectedProductId={activeProductForOffer}
-                onOfferCodeChange={handleOfferCodeChange}
-                hasMetaFilter={hasMetaFilter}
-                hasHotmartFilter={hasHotmartFilter}
-                campaignsParams={campaignsParams}
-              />
-            </div>
-            {hasHotmartFilter && (
-              <div className="z-row" style={{ marginTop: 14 }}>
-                <ConversionSourcesCard state={conversionSourcesState} />
-              </div>
-            )}
-          </section>
-
-          {/* 04 · Captação de Leads — full width */}
-          <section>
-            <SectionHeader
-              index="04"
-              title="Captação de Leads"
-              desc="Novos leads que entraram no funil · dados não filtrados"
-            />
-            <div className="z-row">
-              <LeadsSection leadsState={leadsState} dailyState={dailyState} />
-            </div>
-          </section>
-
+          {dashboardSectionLayout(isOrganic).map((slot) => (
+            <React.Fragment key={slot.key}>{sections[slot.key]}</React.Fragment>
+          ))}
         </div>
       )}
 
