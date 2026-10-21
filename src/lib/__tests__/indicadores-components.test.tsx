@@ -4,7 +4,6 @@ import { KpiCell } from "@/components/indicadores/kpi-cell";
 import { HorizontalFunnelFlow } from "@/components/indicadores/horizontal-funnel-flow";
 import { LeadsSection } from "@/components/indicadores/leads-section";
 import { ConversionSourcesCard } from "@/components/indicadores/conversion-sources-card";
-import { FilterDropdownList } from "@/components/indicadores/filter-dropdown";
 import { IndicadoresEmptyState } from "@/components/indicadores/indicadores-empty-state";
 import { getPartialFilterWarning, FilterModal } from "@/components/indicadores/filter-modal";
 import { MetaAdsPanel } from "@/components/indicadores/meta-ads-card";
@@ -393,8 +392,6 @@ describe("IndicadoresEmptyState", () => {
 // definição de "o que um filtro significa". Cobertura em
 // src/lib/indicadores/__tests__/filter-expansion.test.ts.
 
-// ── FilterDropdownList ────────────────────────────────────────────────────────
-
 const sampleFilters: FilterRecord[] = [
   {
     id: "f1",
@@ -430,64 +427,6 @@ describe("FilterModal — segmented control de status", () => {
       <FilterModal accountId="acc1" editTarget={null} onSave={noop} onCancel={noop} />
     );
     expect(html).not.toContain('data-testid="status-option-ativo"');
-  });
-});
-
-describe("FilterDropdownList", () => {
-  it("does not render 'Sem filtro' option", () => {
-    const html = render(
-      <FilterDropdownList
-        filters={sampleFilters}
-        activeFilter={null}
-        onSelect={noop}
-        onNew={noop}
-        onEdit={noop}
-        onDelete={noop}
-      />
-    );
-    expect(html).not.toContain("Sem filtro");
-  });
-
-  it("renders '+ Novo filtro' button", () => {
-    const html = render(
-      <FilterDropdownList
-        filters={sampleFilters}
-        activeFilter={null}
-        onSelect={noop}
-        onNew={noop}
-        onEdit={noop}
-        onDelete={noop}
-      />
-    );
-    expect(html).toContain("+ Novo filtro");
-  });
-
-  it("renders filter names from the list", () => {
-    const html = render(
-      <FilterDropdownList
-        filters={sampleFilters}
-        activeFilter={null}
-        onSelect={noop}
-        onNew={noop}
-        onEdit={noop}
-        onDelete={noop}
-      />
-    );
-    expect(html).toContain("Filtro Alpha");
-  });
-
-  it("renders 'Nenhum filtro salvo' when filters list is empty", () => {
-    const html = render(
-      <FilterDropdownList
-        filters={[]}
-        activeFilter={null}
-        onSelect={noop}
-        onNew={noop}
-        onEdit={noop}
-        onDelete={noop}
-      />
-    );
-    expect(html).toContain("Nenhum filtro salvo");
   });
 });
 

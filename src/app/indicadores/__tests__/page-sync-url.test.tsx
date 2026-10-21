@@ -94,12 +94,6 @@ beforeEach(() => {
   window.history.replaceState(null, "", "/");
 });
 
-// Abre o dropdown (botão com o nome do evento ativo) e devolve o item da lista.
-async function openDropdown(activeName: string) {
-  const trigger = (await screen.findAllByText(activeName)).find((el) => el.closest("button"))!;
-  fireEvent.click(trigger.closest("button")!);
-}
-
 describe("/indicadores sem ID: restaura do localStorage com replace", () => {
   it("evento salvo: replace para /indicadores/<id> preservando ?view=", async () => {
     localStorage.setItem(LS_FILTER_ID, ID_B);
@@ -125,7 +119,7 @@ describe("/indicadores sem ID: restaura do localStorage com replace", () => {
     render(<IndicadoresDashboard />);
 
     await waitFor(() => expect(requests.some((u) => u.startsWith("/api/indicadores/filters"))).toBe(true));
-    await screen.findByText("Filtros");
+    await screen.findByText("Nenhum filtro selecionado");
     expect(replace).not.toHaveBeenCalled();
     expect(dailyHits()).toEqual([]);
   });
@@ -141,107 +135,47 @@ describe("/indicadores sem ID: restaura do localStorage com replace", () => {
   });
 });
 
-describe("dropdown e ciclo de vida do evento", () => {
-  it("trocar de evento faz push para a URL dele, preservando ?view=", async () => {
-    window.history.replaceState(null, "", `/indicadores/${ID_A}?view=planilha`);
-    installFetch([makeFilter(ID_A, "Evento A"), makeFilter(ID_B, "Evento B")]);
-    render(<IndicadoresDashboard eventId={ID_A} />);
-
-    await openDropdown("Evento A");
-    fireEvent.click(await screen.findByText("Evento B"));
-
-    expect(push).toHaveBeenCalledWith(`/indicadores/${ID_B}?view=planilha`);
-    expect(localStorage.getItem(LS_FILTER_ID)).toBe(ID_B);
-    expect(replace).not.toHaveBeenCalled();
-  });
-
-  it("escolher o evento que já está ativo não empilha histórico", async () => {
-    installFetch([makeFilter(ID_A, "Evento A"), makeFilter(ID_B, "Evento B")]);
-    render(<IndicadoresDashboard eventId={ID_A} />);
-
-    await openDropdown("Evento A");
-    const items = await screen.findAllByText("Evento A");
-    fireEvent.click(items[items.length - 1]);
-
-    expect(push).not.toHaveBeenCalled();
-  });
-
-  it("criar evento ativa e vai para a URL do novo", async () => {
+describe("cabeçalho do dashboard do evento", () => {
+  it("'Voltar' leva à lista de eventos; não há mais 'Módulos' nem o botão 'Eventos'", async () => {
     window.history.replaceState(null, "", `/indicadores/${ID_A}`);
     installFetch([makeFilter(ID_A, "Evento A")]);
     render(<IndicadoresDashboard eventId={ID_A} />);
 
-    await openDropdown("Evento A");
-    fireEvent.click(await screen.findByText("+ Novo filtro"));
+    const voltar = await screen.findByRole("link", { name: /Voltar/ });
+    expect(voltar.getAttribute("href")).toBe("/indicadores/eventos");
+    expect(screen.queryByRole("link", { name: /Módulos/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /^Eventos$/ })).toBeNull();
+  });
+});
+
+describe("ciclo de vida do evento (sem o dropdown do cabeçalho)", () => {
+  it("criar evento pelo estado vazio ativa e vai para a URL do novo", async () => {
+    installFetch([makeFilter(ID_A, "Evento A")]);
+    render(<IndicadoresDashboard />);
+
+    fireEvent.click(await screen.findByText("Criar ou selecionar filtro"));
     fireEvent.click(await screen.findByText("Salvar (stub)"));
 
     expect(push).toHaveBeenCalledWith(`/indicadores/${NEW_ID}`);
     expect(localStorage.getItem(LS_FILTER_ID)).toBe(NEW_ID);
   });
 
-  it("editar (renomear) o evento ativo não muda a URL", async () => {
-    window.history.replaceState(null, "", `/indicadores/${ID_A}?view=planilha`);
+  it("editar o evento ativo pelo Debriefing não muda a URL", async () => {
+    window.history.replaceState(null, "", `/indicadores/${ID_A}?view=debriefing`);
     installFetch([makeFilter(ID_A, "Evento A")]);
     render(<IndicadoresDashboard eventId={ID_A} />);
 
-    await openDropdown("Evento A");
-    fireEvent.click(await screen.findByTitle("Editar"));
+    fireEvent.click(await screen.findByText("Configurar Produto Principal"));
     fireEvent.click(await screen.findByText("Salvar (stub)"));
 
-    await waitFor(() => expect(screen.getAllByText("Evento A renomeado").length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.queryByText("Salvar (stub)")).toBeNull());
     expect(push).not.toHaveBeenCalled();
     expect(replace).not.toHaveBeenCalled();
-    expect(localStorage.getItem(LS_FILTER_ID)).toBe(ID_A);
-  });
-
-  it("excluir o evento ativo vai para /indicadores e limpa o localStorage", async () => {
-    window.history.replaceState(null, "", `/indicadores/${ID_A}`);
-    installFetch([makeFilter(ID_A, "Evento A"), makeFilter(ID_B, "Evento B")]);
-    render(<IndicadoresDashboard eventId={ID_A} />);
-
-    await openDropdown("Evento A");
-    fireEvent.click((await screen.findAllByTitle("Deletar"))[0]);
-
-    await waitFor(() => expect(replace).toHaveBeenCalledWith("/indicadores"));
-    expect(localStorage.getItem(LS_FILTER_ID)).toBeNull();
-    expect(push).not.toHaveBeenCalled();
-  });
-
-  it("excluir um evento que não é o ativo não navega", async () => {
-    window.history.replaceState(null, "", `/indicadores/${ID_A}`);
-    installFetch([makeFilter(ID_A, "Evento A"), makeFilter(ID_B, "Evento B")]);
-    render(<IndicadoresDashboard eventId={ID_A} />);
-
-    await openDropdown("Evento A");
-    fireEvent.click((await screen.findAllByTitle("Deletar"))[1]);
-
-    await waitFor(() => expect(screen.queryByText("Evento B")).toBeNull());
-    expect(replace).not.toHaveBeenCalled();
-    expect(push).not.toHaveBeenCalled();
     expect(localStorage.getItem(LS_FILTER_ID)).toBe(ID_A);
   });
 });
 
 describe("resolvedEventIdRef: resolve uma vez por ID da URL", () => {
-  it("mudar `filters` (criar/editar) não puxa o evento ativo de volta para o da URL", async () => {
-    window.history.replaceState(null, "", `/indicadores/${ID_A}`);
-    installFetch([makeFilter(ID_A, "Evento A"), makeFilter(ID_B, "Evento B")]);
-    render(<IndicadoresDashboard eventId={ID_A} />);
-
-    // Muda de evento (a URL do teste não muda porque o router é mock) e depois edita.
-    await openDropdown("Evento A");
-    fireEvent.click(await screen.findByText("Evento B"));
-    await waitFor(() => expect(localStorage.getItem(LS_FILTER_ID)).toBe(ID_B));
-
-    await openDropdown("Evento B");
-    fireEvent.click((await screen.findAllByTitle("Editar"))[1]);
-    fireEvent.click(await screen.findByText("Salvar (stub)"));
-
-    await waitFor(() => expect(screen.getAllByText("Evento B renomeado").length).toBeGreaterThan(0));
-    expect(localStorage.getItem(LS_FILTER_ID)).toBe(ID_B);
-    expect(screen.queryByText("Evento A")).toBeNull();
-  });
-
   it("mudança de ID na URL (voltar do navegador) resolve o novo ID uma vez, sem redirect", async () => {
     installFetch([makeFilter(ID_A, "Evento A"), makeFilter(ID_B, "Evento B")]);
     const { rerender } = render(<IndicadoresDashboard eventId={ID_A} />);
@@ -249,11 +183,9 @@ describe("resolvedEventIdRef: resolve uma vez por ID da URL", () => {
 
     rerender(<IndicadoresDashboard eventId={ID_B} />);
     await waitFor(() => expect(localStorage.getItem(LS_FILTER_ID)).toBe(ID_B));
-    expect(screen.getAllByText("Evento B").length).toBeGreaterThan(0);
 
     rerender(<IndicadoresDashboard eventId={ID_A} />);
     await waitFor(() => expect(localStorage.getItem(LS_FILTER_ID)).toBe(ID_A));
-    expect(screen.getAllByText("Evento A").length).toBeGreaterThan(0);
     expect(replace).not.toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
   });
@@ -263,12 +195,10 @@ describe("resolvedEventIdRef: resolve uma vez por ID da URL", () => {
     const { rerender } = render(<IndicadoresDashboard eventId={ID_A} />);
     await waitFor(() => expect(localStorage.getItem(LS_FILTER_ID)).toBe(ID_A));
 
-    await openDropdown("Evento A");
-    fireEvent.click(await screen.findByText("Evento B"));
-    expect(localStorage.getItem(LS_FILTER_ID)).toBe(ID_B);
-
+    // Outra aba do usuário troca o evento salvo. O mesmo ID na URL já foi
+    // resolvido: o re-render não pode sobrescrever essa escolha.
+    localStorage.setItem(LS_FILTER_ID, ID_B);
     rerender(<IndicadoresDashboard eventId={ID_A} />);
-    // Mesmo ID já resolvido: a URL "velha" não sobrescreve a escolha do usuário.
     expect(localStorage.getItem(LS_FILTER_ID)).toBe(ID_B);
   });
 });

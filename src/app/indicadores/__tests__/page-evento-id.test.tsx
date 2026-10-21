@@ -79,8 +79,6 @@ describe("/indicadores/[id] — evento ativo definido pela URL", () => {
 
     await waitFor(() => expect(hits("/api/indicadores/daily").length).toBeGreaterThan(0));
     expect(localStorage.getItem(LS_FILTER_ID)).toBe(ID_A);
-    expect(screen.getAllByText("Evento A").length).toBeGreaterThan(0);
-    expect(screen.queryByText("Evento B")).toBeNull();
     expect(replace).not.toHaveBeenCalled();
   });
 

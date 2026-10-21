@@ -33,7 +33,6 @@ import { LeadsSection } from "@/components/indicadores/leads-section";
 import { ConversionSourcesCard } from "@/components/indicadores/conversion-sources-card";
 import { CronFreshnessIndicator } from "@/components/indicadores/cron-freshness-indicator";
 import { RefreshNowButton } from "@/components/indicadores/refresh-now-button";
-import { FilterDropdown } from "@/components/indicadores/filter-dropdown";
 import { FilterModal } from "@/components/indicadores/filter-modal";
 import { IndicadoresEmptyState } from "@/components/indicadores/indicadores-empty-state";
 import { useAgentChat } from "@/hooks/use-agent-chat";
@@ -646,12 +645,6 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
     setFilterEditTarget(null);
   }
 
-  async function handleDeleteFilter(filter: FilterRecord) {
-    await fetch(`/api/indicadores/filters/${filter.id}`, { method: "DELETE" });
-    setFilters((prev) => prev.filter((f) => f.id !== filter.id));
-    if (activeFilter?.id === filter.id) handleSelectFilter(null);
-  }
-
   function handleOfferCodeChange(offerCode: string | null, productId: string | null) {
     setActiveOfferCode(offerCode);
     setActiveProductForOffer(productId);
@@ -744,7 +737,7 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <Link
-            href="/"
+            href="/indicadores/eventos"
             style={{
               display: "flex",
               alignItems: "center",
@@ -757,7 +750,7 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M19 12H5M12 5l-7 7 7 7" />
             </svg>
-            Módulos
+            Voltar
           </Link>
           <div style={{ width: 1, height: 18, background: "#262b33" }} />
           <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-strong)", margin: 0 }}>
@@ -768,27 +761,6 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <CronFreshnessIndicator key={reloadKey} />
           <ViewTabs view={view} onView={handleViewChange} />
-          <Link
-            href="/indicadores/eventos"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 7,
-              padding: "8px 14px",
-              fontSize: 12,
-              fontWeight: 600,
-              background: "var(--surface)",
-              border: "1px solid var(--border-vis)",
-              borderRadius: 8,
-              color: "var(--text-2)",
-              textDecoration: "none",
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-            </svg>
-            Eventos
-          </Link>
           <PeriodControls
             startDate={startDate}
             endDate={endDate}
@@ -797,16 +769,6 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
             onStartDate={handleStartDate}
             onEndDate={handleEndDate}
           />
-          {accountId && (
-            <FilterDropdown
-              filters={filters}
-              activeFilter={activeFilter}
-              onSelect={handleSelectFilter}
-              onNew={() => { setFilterEditTarget(null); setFilterModalOpen(true); }}
-              onEdit={(f) => { setFilterEditTarget(f); setFilterModalOpen(true); }}
-              onDelete={handleDeleteFilter}
-            />
-          )}
         </div>
       </header>
 
