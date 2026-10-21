@@ -827,10 +827,11 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
                 onOfferCodeChange={handleOfferCodeChange}
                 hasMetaFilter={hasMetaFilter}
                 hasHotmartFilter={hasHotmartFilter}
+                isOrganic={isOrganic}
                 campaignsParams={campaignsParams}
               />
             </div>
-            {hasHotmartFilter && (
+            {!isOrganic && hasHotmartFilter && (
               <div className="z-row" style={{ marginTop: 14 }}>
                 <ConversionSourcesCard state={conversionSourcesState} />
               </div>

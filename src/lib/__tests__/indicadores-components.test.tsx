@@ -573,4 +573,22 @@ describe("PlatformsCard", () => {
     expect(html).toContain('data-chart="meta"');
     expect(html).not.toContain('data-chart="hotmart"');
   });
+
+  it("organic mode: no Hotmart tab, Meta panel with investment/leads chart only", () => {
+    const html = render(
+      <PlatformsCard
+        metaState={zeroedMeta}
+        hotmartState={zeroedHotmart}
+        dailyState={emptyDaily}
+        hasMetaFilter={true}
+        hasHotmartFilter={true}
+        isOrganic={true}
+        campaignsParams="?a=1"
+      />
+    );
+    expect(html).toContain("Meta Ads");
+    expect(html).not.toContain("Hotmart");
+    expect(html).toContain('data-chart="meta"');
+    expect(html).not.toContain('data-chart="hotmart"');
+  });
 });
