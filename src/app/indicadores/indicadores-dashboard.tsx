@@ -947,6 +947,7 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
             hasMetaFilter={hasMetaFilter}
             hasHotmartFilter={hasHotmartFilter}
             hasLeadsFilter={hasLeadsFilter}
+            isOrganic={activeFilter.is_organic}
           />
         </div>
       ) : view === "debriefing" ? (

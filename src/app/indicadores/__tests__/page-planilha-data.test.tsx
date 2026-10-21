@@ -195,3 +195,18 @@ describe("IndicadoresPage — dados da Planilha", () => {
     expect(screen.getAllByTestId("planilha-block-title").length).toBe(4);
   });
 });
+
+describe("IndicadoresPage — Planilha em evento orgânico", () => {
+  it("passa is_organic do filtro ativo e oculta os blocos de vendas e resumo", async () => {
+    await renderAt("/indicadores?view=planilha", {
+      ...FULL_FILTER,
+      hotmart_products: [],
+      is_organic: true,
+    });
+    await waitFor(() => expect(screen.getAllByTestId("planilha-block-title").length).toBe(2));
+
+    const titles = screen.getAllByTestId("planilha-block-title").map((el) => el.textContent);
+    expect(titles).toEqual(["Meta Ads", "Leads por origem"]);
+    expect(screen.queryByRole("row", { name: /Receita BRL/ })).not.toBeInTheDocument();
+  });
+});
