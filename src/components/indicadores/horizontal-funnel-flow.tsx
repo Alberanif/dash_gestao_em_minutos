@@ -10,6 +10,8 @@ interface HorizontalFunnelFlowProps {
   metaCpm?: number | null;
   metaConvRate?: number | null;
   cpa?: number | null;
+  /** Orgânico: funil termina em Leads; sem CPA nem conversão em venda. */
+  isOrganic?: boolean;
 }
 
 function fmtBRL(n: number | null | undefined): string {
@@ -118,6 +120,7 @@ export function HorizontalFunnelFlow({
   metaCpm,
   metaConvRate,
   cpa,
+  isOrganic = false,
 }: HorizontalFunnelFlowProps) {
   if (!stages || stages.length === 0) return null;
 
@@ -230,12 +233,18 @@ export function HorizontalFunnelFlow({
           display: "flex",
         }}
       >
-        {[
-          { label: "CPA", value: fmtBRL(cpa) },
-          { label: "CPL Tráfego", value: fmtBRL(metaCpl) },
-          { label: "Conv. Ads→Vendas", value: fmtPct(metaConvRate) },
-          { label: "CPM", value: fmtBRL(metaCpm) },
-        ].map((metric, idx) => (
+        {(isOrganic
+          ? [
+              { label: "CPL Tráfego", value: fmtBRL(metaCpl) },
+              { label: "CPM", value: fmtBRL(metaCpm) },
+            ]
+          : [
+              { label: "CPA", value: fmtBRL(cpa) },
+              { label: "CPL Tráfego", value: fmtBRL(metaCpl) },
+              { label: "Conv. Ads→Vendas", value: fmtPct(metaConvRate) },
+              { label: "CPM", value: fmtBRL(metaCpm) },
+            ]
+        ).map((metric, idx) => (
           <div
             key={metric.label}
             style={{

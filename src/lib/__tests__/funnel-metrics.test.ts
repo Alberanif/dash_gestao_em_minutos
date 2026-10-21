@@ -122,3 +122,32 @@ describe("calcConversionRates()", () => {
     expect(rates[0].pct).toBeNull();
   });
 });
+
+describe("calcFunnelStages (modo orgânico)", () => {
+  it("termina em Leads, sem Vendas, mesmo sem Hotmart", () => {
+    const stages = calcFunnelStages(baseMetrics, null, baseLeads, true)!;
+    expect(stages.map((s) => s.label)).toEqual([
+      "Impressões",
+      "Cliques no link",
+      "Visualizações de LP",
+      "Leads captados",
+    ]);
+    expect(stages[3].value).toBe(baseLeads);
+    expect(calcConversionRates(stages).map((r) => r.label)).not.toContain("Taxa de Fechamento");
+  });
+
+  it("sem Meta mas com leads: renderiza com etapas Meta zeradas", () => {
+    const stages = calcFunnelStages(null, null, baseLeads, true)!;
+    expect(stages).toHaveLength(4);
+    expect(stages[0].value).toBe(0);
+    expect(stages[3].value).toBe(baseLeads);
+  });
+
+  it("sem Meta e sem leads: null", () => {
+    expect(calcFunnelStages(null, null, 0, true)).toBeNull();
+  });
+
+  it("modo pago continua exigindo Hotmart", () => {
+    expect(calcFunnelStages(baseMetrics, null, baseLeads)).toBeNull();
+  });
+});

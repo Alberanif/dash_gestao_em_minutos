@@ -729,6 +729,7 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
     hasMetaFilter ? metaData : null,
     hasHotmartFilter ? hotmartData : null,
     leadsState.data?.total ?? 0,
+    isOrganic,
   );
   const funnelRates = funnelStages ? calcConversionRates(funnelStages) : null;
 
@@ -800,7 +801,7 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
     ),
     jornada: funnelStages && funnelRates && (
             <section>
-              <SectionHeader index={sectionIndex.jornada} title="Jornada de Conversão" desc="Do investimento até a venda" />
+              <SectionHeader index={sectionIndex.jornada} title="Jornada de Conversão" desc={isOrganic ? "Do investimento até os leads" : "Do investimento até a venda"} />
               <div className="z-row">
                 <HorizontalFunnelFlow
                   stages={funnelStages}
@@ -810,6 +811,7 @@ export function IndicadoresDashboard({ eventId }: { eventId?: string }) {
                   metaCpm={hasMetaFilter ? (metaData?.meta_cpm ?? null) : null}
                   metaConvRate={convRate}
                   cpa={cpa}
+                  isOrganic={isOrganic}
                 />
               </div>
             </section>

@@ -574,3 +574,35 @@ describe("PlatformsCard", () => {
     expect(html).not.toContain('data-chart="hotmart"');
   });
 });
+
+describe("HorizontalFunnelFlow (modo orgânico)", () => {
+  const organicStages = fiveStages.slice(0, 4);
+  const organicRates = fourRates.slice(0, 3);
+  const props = { metaCpl: 12.5, metaCpm: 30, metaConvRate: 1.5, cpa: 99 };
+
+  it("termina em Leads, sem Vendas, CPA e conversão em venda", () => {
+    const html = render(
+      <HorizontalFunnelFlow stages={organicStages} rates={organicRates} isOrganic {...props} />,
+    );
+    expect(html).toContain("Leads captados");
+    expect(html).not.toContain("Vendas aprovadas");
+    expect(html).not.toContain("CPA");
+    expect(html).not.toContain("Conv. Ads→Vendas");
+  });
+
+  it("mantém CPM e CPL", () => {
+    const html = render(
+      <HorizontalFunnelFlow stages={organicStages} rates={organicRates} isOrganic {...props} />,
+    );
+    expect(html).toContain("CPL Tráfego");
+    expect(html).toContain("CPM");
+    expect(html).toContain("12,50");
+  });
+
+  it("modo pago idêntico: mostra Vendas, CPA e conversão", () => {
+    const html = render(<HorizontalFunnelFlow stages={fiveStages} rates={fourRates} {...props} />);
+    expect(html).toContain("Vendas aprovadas");
+    expect(html).toContain("CPA");
+    expect(html).toContain("Conv. Ads→Vendas");
+  });
+});

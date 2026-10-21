@@ -26,8 +26,10 @@ const RATE_LABELS: string[] = ["CTR", "Taxa LP", "Conversão LP→Lead", "Taxa d
 export function calcFunnelStages(
   metrics: GlobalMetrics | null,
   hotmartMetrics: GlobalHotmartMetrics | null,
-  leadsTotal: number
+  leadsTotal: number,
+  isOrganic = false
 ): FunnelStage[] | null {
+  if (isOrganic) return calcOrganicFunnelStages(metrics, leadsTotal);
   if (!metrics || !hotmartMetrics) return null;
   if (metrics.meta_impressions === undefined || metrics.meta_impressions === null) return null;
 
@@ -37,6 +39,23 @@ export function calcFunnelStages(
     { label: "Visualizações de LP", value: metrics.meta_page_views },
     { label: "Leads captados", value: leadsTotal },
     { label: "Vendas aprovadas", value: hotmartMetrics.total_sales },
+  ];
+}
+
+/**
+ * Funil do modo orgânico: do topo (Meta) até Leads, sem a etapa de vendas (não
+ * há Hotmart). Renderiza com Meta e/ou leads: sem Meta, as etapas de Meta
+ * ficam em 0 e só Leads tem valor; sem nenhum dos dois, retorna null.
+ */
+function calcOrganicFunnelStages(metrics: GlobalMetrics | null, leadsTotal: number): FunnelStage[] | null {
+  const hasMeta = !!metrics && metrics.meta_impressions !== undefined && metrics.meta_impressions !== null;
+  if (!hasMeta && leadsTotal <= 0) return null;
+
+  return [
+    { label: "Impressões", value: hasMeta ? metrics.meta_impressions : 0 },
+    { label: "Cliques no link", value: hasMeta ? metrics.meta_link_clicks : 0 },
+    { label: "Visualizações de LP", value: hasMeta ? metrics.meta_page_views : 0 },
+    { label: "Leads captados", value: leadsTotal },
   ];
 }
 
