@@ -26,8 +26,8 @@
   --v2-queda: #f0645a;
   --v2-ardosia: #4f6d86;      /* terceira série */
 
-  /* Tipografia: família única, Urbanist via next/font.
-     Confirmar algarismos tabulares (font-variant-numeric: tabular-nums);
-     plano B: Manrope. Números grandes em peso leve (300), tabelas em 500. */
-  --v2-fonte: var(--font-urbanist), system-ui, sans-serif;
+  /* Tipografia: família única, Manrope via next/font.
+     Manrope tem tnum (Urbanist, a escolha inicial, não tem). Usar
+     font-variant-numeric: tabular-nums. Números grandes em peso leve (300), tabelas em 500. */
+  --v2-fonte: var(--font-manrope), system-ui, sans-serif;
 }

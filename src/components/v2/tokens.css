@@ -1,0 +1,74 @@
+/*
+ * Tokens do Dash V2. Fonte de verdade dos valores: dash_gestao_v2/tokens.css
+ * e dash_gestao_v2/DIRECAO_DESIGN.md. As variáveis vivem sob .v2 (nada vaza
+ * para o V1); o @theme inline só mapeia utilitários do Tailwind para elas.
+ */
+
+.v2 {
+  /* Superfícies: azul-tinta em camadas */
+  --v2-abismo: #06141d;
+  --v2-casco: #0c2230;
+  --v2-casco-alto: #123246;
+
+  /* Marca */
+  --v2-azul-igt: #2e8bb9;
+  --v2-azul-luz: #6ec3ea;
+  --v2-ponto: #fbac00; /* só o dado vivo e o foco do momento */
+
+  --v2-nevoa: #e8f3f9;
+
+  /* Semânticas de dado (provisórias até a #254) */
+  --v2-alta: #3fbf9a;
+  --v2-queda: #f0645a;
+  --v2-ardosia: #4f6d86;
+
+  /* Profundidade e luz: camadas de azul, sem cinza */
+  --v2-sombra-1: 0 1px 2px rgb(2 10 16 / 0.5), 0 4px 12px rgb(2 10 16 / 0.35);
+  --v2-sombra-2: 0 2px 4px rgb(2 10 16 / 0.5), 0 12px 32px rgb(2 10 16 / 0.5);
+  --v2-brilho-azul: 0 0 0 1px rgb(110 195 234 / 0.35), 0 0 24px rgb(46 139 185 / 0.35);
+  --v2-brilho-ponto: 0 0 12px rgb(251 172 0 / 0.6);
+
+  --v2-raio-sm: 8px;
+  --v2-raio-md: 14px;
+  --v2-raio-lg: 22px;
+
+  /* Movimento */
+  --v2-dur-rapida: 120ms;
+  --v2-dur-media: 240ms;
+  --v2-dur-lenta: 480ms;
+  --v2-ease-saida: cubic-bezier(0.16, 1, 0.3, 1);
+  --v2-ease-suave: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --v2-fonte: var(--font-manrope), system-ui, sans-serif;
+
+  background: var(--v2-abismo);
+  color: var(--v2-nevoa);
+  font-family: var(--v2-fonte);
+  font-variant-numeric: tabular-nums;
+}
+
+@theme inline {
+  --color-v2-abismo: var(--v2-abismo);
+  --color-v2-casco: var(--v2-casco);
+  --color-v2-casco-alto: var(--v2-casco-alto);
+  --color-v2-azul-igt: var(--v2-azul-igt);
+  --color-v2-azul-luz: var(--v2-azul-luz);
+  --color-v2-ponto: var(--v2-ponto);
+  --color-v2-nevoa: var(--v2-nevoa);
+  --color-v2-alta: var(--v2-alta);
+  --color-v2-queda: var(--v2-queda);
+  --color-v2-ardosia: var(--v2-ardosia);
+
+  --shadow-v2-1: var(--v2-sombra-1);
+  --shadow-v2-2: var(--v2-sombra-2);
+  --shadow-v2-brilho-azul: var(--v2-brilho-azul);
+  --shadow-v2-brilho-ponto: var(--v2-brilho-ponto);
+
+  --radius-v2-sm: var(--v2-raio-sm);
+  --radius-v2-md: var(--v2-raio-md);
+  --radius-v2-lg: var(--v2-raio-lg);
+
+  --ease-v2-saida: var(--v2-ease-saida);
+  --ease-v2-suave: var(--v2-ease-suave);
+  --font-v2: var(--v2-fonte);
+}

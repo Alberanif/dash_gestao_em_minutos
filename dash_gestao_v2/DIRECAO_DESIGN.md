@@ -26,7 +26,7 @@ Alta `#3FBF9A`, queda `#F0645A` e ardósia `#4F6D86` são provisórias até a va
 
 ## Tipografia
 
-Uma família: **Urbanist** (`next/font`, self-host). Geometria próxima da logo. Números grandes em peso leve, tabelas em peso médio. Pendente confirmar algarismos tabulares; plano B Manrope.
+Uma família: **Manrope** (`next/font`, self-host). Números grandes em peso leve, tabelas em peso médio. Urbanist (a escolha inicial, de geometria mais próxima da logo) foi trocada porque não tem algarismos tabulares (sem a feature `tnum`, dígitos proporcionais); Manrope tem `tnum` e geometria parecida, e é o que importa em dashboard.
 
 ## Layout
 
