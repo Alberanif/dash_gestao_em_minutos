@@ -1,0 +1,33 @@
+/*
+ * Dash V2 — tokens de design (direção aprovada em 2026-10-22).
+ * Fonte de verdade da paleta e da tipografia. A issue #251 transcreve este
+ * arquivo para src/components/v2/ dentro de um @theme do Tailwind 4, escopado
+ * ao root .v2. Não importar este arquivo no app diretamente.
+ *
+ * Cores da marca extraídas dos pixels de IGT.png: azul #2E8BB9, ponto #FBAC00.
+ */
+
+.v2 {
+  /* Superfícies: azul-tinta em camadas, nunca cinza neutro */
+  --v2-abismo: #06141d;       /* fundo da página */
+  --v2-casco: #0c2230;        /* cards e superfícies */
+  --v2-casco-alto: #123246;   /* elevados, hover */
+
+  /* Marca */
+  --v2-azul-igt: #2e8bb9;     /* primária, séries, links (contraste ~4,9:1 sobre abismo: só elementos grandes) */
+  --v2-azul-luz: #6ec3ea;     /* feixes de luz, realces, texto pequeno sobre escuro */
+  --v2-ponto: #fbac00;        /* SÓ o dado vivo e o foco do momento; nunca botão, borda ou degradê */
+
+  /* Texto */
+  --v2-nevoa: #e8f3f9;        /* texto principal */
+
+  /* Semânticas de dado (provisórias; validar com a skill dataviz na #254) */
+  --v2-alta: #3fbf9a;
+  --v2-queda: #f0645a;
+  --v2-ardosia: #4f6d86;      /* terceira série */
+
+  /* Tipografia: família única, Manrope via next/font.
+     Manrope tem tnum (Urbanist, a escolha inicial, não tem). Usar
+     font-variant-numeric: tabular-nums. Números grandes em peso leve (300), tabelas em 500. */
+  --v2-fonte: var(--font-manrope), system-ui, sans-serif;
+}
