@@ -1,0 +1,80 @@
+name: V2 orçamento de desempenho
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
+      - "next.config.ts"
+      - "tsconfig.json"
+      - "scripts/check-v2-bundle.mts"
+      - "scripts/lighthouse-summary.mts"
+      - ".github/workflows/v2-orcamento.yml"
+  workflow_dispatch:
+
+env:
+  # O build só precisa de valores com formato válido; nada aqui chama o Supabase.
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder' }}
+
+jobs:
+  bundle:
+    name: JS inicial das rotas /v2 (limite 180 KB gzip)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Testes do orçamento
+        run: npx jest src/lib/bundle-budget
+      - run: npm run build
+      - name: Medir e falhar se estourar
+        run: npm run check:v2-bundle
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v2-bundle-report
+          path: .next/v2-bundle-report.json
+
+  lighthouse:
+    name: Lighthouse em /v2 (relatório, não bloqueia)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Subir o app
+        run: |
+          npx next start -p 3000 &
+          for i in $(seq 1 30); do curl -s -o /dev/null http://localhost:3000/login && break; sleep 1; done
+      - name: Rodar Lighthouse
+        env:
+          # Cookie de sessão de uma conta gestora, no formato "nome=valor; nome2=valor2".
+          # Sem ele o /v2 redireciona para /login e a medição vale para o login.
+          LIGHTHOUSE_COOKIE: ${{ secrets.LIGHTHOUSE_COOKIE }}
+        run: |
+          mkdir -p lighthouse
+          HEADERS='{}'
+          if [ -n "$LIGHTHOUSE_COOKIE" ]; then
+            HEADERS=$(node -e 'console.log(JSON.stringify({Cookie: process.env.LIGHTHOUSE_COOKIE}))')
+          fi
+          npx --yes lighthouse@12.8.2 http://localhost:3000/v2 \
+            --only-categories=performance \
+            --output=json --output=html --output-path=lighthouse/v2 \
+            --chrome-flags="--headless=new --no-sandbox" \
+            --extra-headers="$HEADERS"
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/lighthouse-summary.mts lighthouse/v2.report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse-v2
+          path: lighthouse/
