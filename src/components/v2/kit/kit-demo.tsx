@@ -57,10 +57,9 @@ export function KitDemo() {
   const [valor, setValor] = useState(12840);
 
   return (
-    <main className="mx-auto max-w-5xl space-y-10 p-8">
+    <div className="max-w-5xl space-y-10 py-4">
       <header>
-        <h1 className="text-3xl font-light">Kit de primitivos V2</h1>
-        <p className="mt-1 text-sm text-v2-nevoa/70">
+        <p className="text-sm text-v2-nevoa/70">
           Movimento reduzido: {reduced ? "ativo (trocas instantâneas)" : "desligado"}
         </p>
       </header>
@@ -195,6 +194,6 @@ export function KitDemo() {
           </FilterTransition>
         </div>
       </Secao>
-    </main>
+    </div>
   );
 }
