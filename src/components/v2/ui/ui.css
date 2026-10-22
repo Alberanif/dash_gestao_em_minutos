@@ -1,0 +1,31 @@
+/*
+ * Entradas dos primitivos Radix (data-state). Só opacity e transform.
+ * Com prefers-reduced-motion não há animação: a troca é instantânea.
+ */
+@keyframes v2-pop-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes v2-pop-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(2px) scale(0.99); }
+}
+@keyframes v2-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes v2-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.v2 .v2-pop[data-state="open"] { animation: v2-pop-in var(--v2-dur-media) var(--v2-ease-saida); }
+.v2 .v2-pop[data-state="closed"] { animation: v2-pop-out var(--v2-dur-rapida) var(--v2-ease-suave); }
+.v2 .v2-fade[data-state="open"] { animation: v2-fade-in var(--v2-dur-media) var(--v2-ease-saida); }
+.v2 .v2-fade[data-state="closed"] { animation: v2-fade-out var(--v2-dur-rapida) var(--v2-ease-suave); }
+
+@media (prefers-reduced-motion: reduce) {
+  .v2 .v2-pop,
+  .v2 .v2-fade { animation: none !important; }
+  .v2 * { transition-duration: 0s !important; }
+}
