@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import "@/components/v2/tokens.css";
 import "@/components/v2/ui/ui.css";
 import { MotionProvider } from "@/components/v2/motion";
+import { V2Shell } from "@/components/v2/shell";
 import { V2Root } from "@/components/v2/ui/v2-root";
 import { v2AccessRedirect } from "./access";
 
@@ -25,7 +26,9 @@ export default async function V2Layout({ children }: { children: React.ReactNode
 
   return (
     <V2Root className={`v2 ${manrope.variable}`}>
-      <MotionProvider>{children}</MotionProvider>
+      <MotionProvider>
+        <V2Shell userEmail={user?.email ?? ""}>{children}</V2Shell>
+      </MotionProvider>
     </V2Root>
   );
 }
