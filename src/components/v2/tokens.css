@@ -17,10 +17,32 @@
 
   --v2-nevoa: #e8f3f9;
 
-  /* Semânticas de dado (provisórias até a #254) */
+  /* Semânticas de dado: alta e queda sempre com ícone e rótulo; ardósia a 3,0:1 do casco */
   --v2-alta: #3fbf9a;
   --v2-queda: #f0645a;
   --v2-ardosia: #4f6d86;
+
+  /* Gráficos (#254). Séries categóricas validadas com a skill dataviz contra o
+     casco (#0c2230), modo escuro: faixa de luminância, croma, CVD adjacente
+     (pior par 9,4 >= 8), visão normal (>= 19,7) e contraste >= 3:1.
+     Ordem fixa, nunca cíclica; a 6ª série vira "Outros" em ardósia.
+     O âmbar (--v2-ponto) fica de fora de propósito: é só o último ponto. */
+  --v2-serie-1: #2e8bb9;
+  --v2-serie-2: #d95926;
+  --v2-serie-3: #199e70;
+  --v2-serie-4: #9085e9;
+  --v2-serie-5: #d55181;
+  /* Funil: rampa ordinal de um tom (azul), validada com --ordinal (passos de L >= 0,06,
+     ponta mais escura a 2,94:1 do casco). */
+  --v2-funil-1: #a9ddf3;
+  --v2-funil-2: #7fcbeb;
+  --v2-funil-3: #55b0db;
+  --v2-funil-4: #2e8bb9;
+  --v2-funil-5: #216f97;
+  /* Estrutura do gráfico: grade e eixo recessivos, texto mudo (contraste 6,4:1) */
+  --v2-grade: #163446;
+  --v2-eixo: #24506a;
+  --v2-texto-mudo: #8fa6b5;
 
   /* Profundidade e luz: camadas de azul, sem cinza */
   --v2-sombra-1: 0 1px 2px rgb(2 10 16 / 0.5), 0 4px 12px rgb(2 10 16 / 0.35);
