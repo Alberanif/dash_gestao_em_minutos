@@ -11,7 +11,6 @@ import type {
   VendasViewDailyRow,
   VendasViewHourlyRow,
   VendasViewKpis,
-  VendasViewOfferRow,
 } from "@/types/vendas";
 
 const RAW = readFileSync(
@@ -233,18 +232,12 @@ describe("contrato de tipos x colunas das RPCs", () => {
   const kpis: VendasViewKpis = { sales: 0, refunded: 0 };
   const daily: VendasViewDailyRow = { day: "", sales: 0 };
   const hourly: VendasViewHourlyRow = { hour: "", sales: 0 };
-  const offers: VendasViewOfferRow = {
-    offer_code: "",
-    offer_name: null,
-    sales: 0,
-    refunded: 0,
-  };
-
+  // view_offers ganhou product_id/product_name na 072: contrato em
+  // vendas-views-multi-produto-migration.test.ts.
   it.each([
     ["kpis", kpis],
     ["daily", daily],
     ["hourly", hourly],
-    ["offers", offers],
   ])("view_%s: chaves do tipo = colunas do returns table", (k, sample) => {
     const cols = returnColumns(fn(`dash_gestao_vendas_view_${k}`));
     expect(cols).toEqual(Object.keys(sample));

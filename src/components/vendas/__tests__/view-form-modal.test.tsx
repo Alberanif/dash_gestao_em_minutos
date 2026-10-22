@@ -16,6 +16,7 @@ const EXISTING: VendasViewRecord = {
   account_id: "acc-1",
   product_id: "p1",
   offer_codes: ["OF-1"],
+  products: [{ product_id: "p1", offer_codes: ["OF-1"] }],
   folder_id: null,
   view_start_date: null,
   view_end_date: null,
