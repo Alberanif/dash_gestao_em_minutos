@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiAuth } from "@/lib/utils/api-auth";
 import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server";
-import { fetchEventosMetrics } from "@/lib/indicadores/service/eventos-metrics";
-import type { FilterRecord } from "@/types/indicadores";
+import { loadEventosMetrics } from "@/lib/indicadores/leitura-complementar";
 
 /**
  * Métricas vitalícias de todos os filtros da conta numa única resposta:
@@ -18,20 +17,10 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = await createSupabaseServerClient();
-  const { data: filters, error: dbError } = await supabase
-    .from("dash_gestao_filters")
-    .select("*")
-    .eq("account_id", account_id)
-    .order("name", { ascending: true });
+  const result = await loadEventosMetrics(account_id, supabase, createSupabaseServiceClient());
 
-  if (dbError) {
-    return NextResponse.json({ error: dbError.message }, { status: 500 });
+  if (result.error !== undefined) {
+    return NextResponse.json({ error: result.error }, { status: 500 });
   }
-
-  const map = await fetchEventosMetrics(
-    (filters ?? []) as FilterRecord[],
-    createSupabaseServiceClient()
-  );
-
-  return NextResponse.json(map);
+  return NextResponse.json(result.data);
 }

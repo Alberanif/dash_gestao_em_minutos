@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiAuth } from "@/lib/utils/api-auth";
 import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server";
-import type { FilterRecord } from "@/types/indicadores";
+import { createFilter, listFilters } from "@/lib/indicadores/leitura";
 import { validateDebriefingProducts } from "@/lib/indicadores/debriefing-products";
 
 export async function GET(request: NextRequest) {
@@ -14,17 +14,13 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = await createSupabaseServerClient();
-  const { data, error: dbError } = await supabase
-    .from("dash_gestao_filters")
-    .select("*")
-    .eq("account_id", account_id)
-    .order("name", { ascending: true });
+  const { data, error: dbError } = await listFilters(account_id, supabase);
 
-  if (dbError) {
-    return NextResponse.json({ error: dbError.message }, { status: 500 });
+  if (dbError !== undefined) {
+    return NextResponse.json({ error: dbError }, { status: 500 });
   }
 
-  return NextResponse.json(data as FilterRecord[]);
+  return NextResponse.json(data);
 }
 
 export async function POST(request: NextRequest) {
@@ -58,25 +54,23 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = createSupabaseServiceClient();
-  const { data, error: dbError } = await supabase
-    .from("dash_gestao_filters")
-    .insert({
+  const { data, error: dbError } = await createFilter(
+    {
       account_id,
       name,
       hotmart_products,
       main_hotmart_product,
       debriefing_offer_codes,
-      ...(debriefing_products !== undefined ? { debriefing_products: debriefing.value } : {}),
+      debriefing_products: debriefing_products !== undefined ? debriefing.value : undefined,
       meta_ads_terms,
       captacao_leads_eventos,
-      status: "ativo",
-    })
-    .select()
-    .single();
+    },
+    supabase
+  );
 
-  if (dbError) {
-    return NextResponse.json({ error: dbError.message }, { status: 500 });
+  if (dbError !== undefined) {
+    return NextResponse.json({ error: dbError }, { status: 500 });
   }
 
-  return NextResponse.json(data as FilterRecord, { status: 201 });
+  return NextResponse.json(data, { status: 201 });
 }
