@@ -1,6 +1,6 @@
 "use client";
 
-import { CountUp } from "../motion";
+import { CountUp } from "../motion/count-up";
 import type { EventoMetrics } from "@/lib/indicadores/service/eventos-metrics";
 
 const fmtNum = (v: number) => new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(v);

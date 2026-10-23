@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { animate } from "motion/react";
 import { easeSaida, dur } from "./variants";
 import { useReducedMotion } from "./use-reduced-motion";
 
@@ -31,15 +30,24 @@ export function CountUp({ value, from = 0, format = defaultFormat, className }: 
       last.current = value;
       return;
     }
-    const controls = animate(last.current, value, {
-      duration: dur.lenta * 2,
-      ease: easeSaida,
-      onUpdate: (n) => {
-        last.current = n;
-        el.textContent = format(n);
-      },
+    // `animate` do Motion só carrega quando há número para contar: fica fora do JS inicial da rota.
+    let controls: { stop: () => void } | undefined;
+    let cancelado = false;
+    void import("motion/react").then(({ animate }) => {
+      if (cancelado) return;
+      controls = animate(last.current, value, {
+        duration: dur.lenta * 2,
+        ease: easeSaida,
+        onUpdate: (n) => {
+          last.current = n;
+          el.textContent = format(n);
+        },
+      });
     });
-    return () => controls.stop();
+    return () => {
+      cancelado = true;
+      controls?.stop();
+    };
   }, [value, reduced, format]);
 
   return (

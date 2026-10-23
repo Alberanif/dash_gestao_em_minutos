@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Popover, PopoverContent, PopoverTrigger, Tooltip } from "../ui";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Tooltip } from "../ui/tooltip";
 import { cx, foco } from "../ui/cx";
 import { Icone, IconeMais, IconeRecolher, IconeSair } from "./icons";
 import { DESTINOS, ROTULO_EM_BREVE, destinoAtivo, tituloDaRota, type DestinoNav } from "./nav-config";
