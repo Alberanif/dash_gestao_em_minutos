@@ -1,5 +1,7 @@
 /** @jest-environment jsdom */
 import React from "react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { V2Shell } from "../shell";
 import { DESTINOS, ROTULO_EM_BREVE, destinoAtivo, tituloDaRota } from "../shell/nav-config";
@@ -131,17 +133,15 @@ describe("V2Shell", () => {
     }
   });
 
-  it("sem movimento reduzido a página parte de opacity 0 (controle do teste abaixo)", () => {
+  it("a página entra pela animação CSS v2-entra (opacity e transform)", () => {
     renderShell();
     const pagina = screen.getByText("conteúdo da página").parentElement as HTMLElement;
-    expect(pagina.style.opacity).toBe("0");
+    expect(pagina.className).toContain("v2-entra");
   });
 
-  it("com movimento reduzido a página entra sem deslocamento", () => {
-    mockReducedMotion(true);
-    renderShell();
-    const pagina = screen.getByText("conteúdo da página").parentElement as HTMLElement;
-    expect(pagina.style.transform === "" || pagina.style.transform === "none").toBe(true);
-    expect(pagina.style.opacity === "" || pagina.style.opacity === "1").toBe(true);
+  it("com movimento reduzido o CSS desliga a entrada da página", () => {
+    const css = readFileSync(join(__dirname, "../ui/ui.css"), "utf8");
+    const reduzido = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
+    expect(reduzido).toMatch(/\.v2 \.v2-entra\s*\{\s*animation: none !important/);
   });
 });

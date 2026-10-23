@@ -10,7 +10,8 @@ import {
   matchesEventoSearch,
   statusSummaryCounts,
 } from "@/lib/indicadores/eventos";
-import { Button, Surface } from "../ui";
+import { Button } from "../ui/button";
+import { Surface } from "../ui/surface";
 import { cx, foco } from "../ui/cx";
 import { PASTAS, PASTAS_RECOLHIDAS_INICIAL, hrefDoEvento, type PastaConfig } from "./pastas";
 

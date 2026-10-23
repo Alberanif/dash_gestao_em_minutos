@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, m } from "motion/react";
+import { AnimatePresence, LazyMotion, domAnimation, m } from "motion/react";
 import { fadeRise, instantaneo } from "./variants";
 import { useReducedMotion } from "./use-reduced-motion";
 
@@ -15,7 +15,9 @@ type Props = {
 export function FilterTransition({ filtroKey, children, className }: Props) {
   const reduced = useReducedMotion();
   const variants = reduced ? instantaneo : fadeRise;
+  // LazyMotion aqui e não no layout: o Motion só entra no JS das telas que filtram.
   return (
+    <LazyMotion features={domAnimation}>
     <AnimatePresence mode="wait" initial={false}>
       <m.div
         key={filtroKey}
@@ -28,5 +30,6 @@ export function FilterTransition({ filtroKey, children, className }: Props) {
         {children}
       </m.div>
     </AnimatePresence>
+    </LazyMotion>
   );
 }

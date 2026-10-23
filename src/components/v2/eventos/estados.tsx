@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Surface } from "../ui";
+import { Surface } from "../ui/surface";
 import { cx, foco } from "../ui/cx";
 
 const bloco = "rounded-v2-sm bg-v2-casco-alto/60 motion-safe:animate-pulse";

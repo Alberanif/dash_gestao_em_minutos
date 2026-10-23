@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { Button, Surface } from "@/components/v2/ui";
+import { Button } from "@/components/v2/ui/button";
+import { Surface } from "@/components/v2/ui/surface";
 
 export default function Error({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
   useEffect(() => {
