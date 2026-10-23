@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { Tooltip } from "../ui/tooltip";
+import { MaisMenu } from "./mais-menu";
+import { TooltipTardio as Tooltip } from "./tooltip-tardio";
 import { cx, foco } from "../ui/cx";
 import { Icone, IconeMais, IconeRecolher, IconeSair } from "./icons";
 import { DESTINOS, ROTULO_EM_BREVE, destinoAtivo, tituloDaRota, type DestinoNav } from "./nav-config";
@@ -196,37 +196,33 @@ function BarraDeAbas({ userEmail, pathname }: { userEmail: string; pathname: str
           </Link>
         );
       })}
-      <Popover>
-        <PopoverTrigger
-          className={cx(
-            "flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-v2-sm text-xs font-medium text-v2-nevoa/70",
-            foco,
-          )}
-        >
-          <IconeMais />
-          <span>Mais</span>
-        </PopoverTrigger>
-        <PopoverContent side="top" align="end" className="w-64 p-2">
-          <ul className="flex flex-col">
-            {emBreve.map((d) => (
-              <li key={d.id}>
-                <span aria-disabled="true" className="flex h-11 items-center gap-3 px-3 text-sm text-v2-nevoa/40">
-                  <Icone id={d.id} />
-                  <span className="flex-1 truncate">{d.rotulo}</span>
-                  <EmBreve />
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-2 truncate px-3 text-xs text-v2-nevoa/60">{userEmail}</p>
-          <form action="/api/auth/signout" method="post">
-            <button type="submit" className={cx(itemBase, foco, "w-full text-v2-nevoa/80")}>
-              <IconeSair />
-              Sair
-            </button>
-          </form>
-        </PopoverContent>
-      </Popover>
+      <MaisMenu
+        botao={
+          <>
+            <IconeMais />
+            <span>Mais</span>
+          </>
+        }
+      >
+        <ul className="flex flex-col">
+          {emBreve.map((d) => (
+            <li key={d.id}>
+              <span aria-disabled="true" className="flex h-11 items-center gap-3 px-3 text-sm text-v2-nevoa/40">
+                <Icone id={d.id} />
+                <span className="flex-1 truncate">{d.rotulo}</span>
+                <EmBreve />
+              </span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-2 truncate px-3 text-xs text-v2-nevoa/60">{userEmail}</p>
+        <form action="/api/auth/signout" method="post">
+          <button type="submit" className={cx(itemBase, foco, "w-full text-v2-nevoa/80")}>
+            <IconeSair />
+            Sair
+          </button>
+        </form>
+      </MaisMenu>
     </nav>
   );
 }

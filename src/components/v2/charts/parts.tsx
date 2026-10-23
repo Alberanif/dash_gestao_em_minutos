@@ -1,24 +1,28 @@
 "use client";
 
-import { AnimatePresence, m } from "motion/react";
+import { AnimatePresence, LazyMotion, domAnimation, m } from "motion/react";
 import { fadeRise, instantaneo } from "../motion/variants";
 import { useReducedMotion } from "../motion/use-reduced-motion";
 
 /** Troca de série ou de filtro: o conteúdo anterior sai e o novo entra, só com opacity e translateY. */
 export function CamadaAnimada({ animKey, children }: { animKey: string; children: React.ReactNode }) {
   const reduced = useReducedMotion();
+  // LazyMotion aqui: o gráfico funciona em qualquer tela, sem depender de um provedor acima (sem ele o `m.g` fica em opacity 0).
+  // O chunk do gráfico já é sob demanda, então as features não pesam no JS inicial.
   return (
-    <AnimatePresence mode="wait" initial>
-      <m.g
-        key={animKey}
-        variants={reduced ? instantaneo : fadeRise}
-        initial="oculto"
-        animate="visivel"
-        exit="saindo"
-      >
-        {children}
-      </m.g>
-    </AnimatePresence>
+    <LazyMotion features={domAnimation}>
+      <AnimatePresence mode="wait" initial>
+        <m.g
+          key={animKey}
+          variants={reduced ? instantaneo : fadeRise}
+          initial="oculto"
+          animate="visivel"
+          exit="saindo"
+        >
+          {children}
+        </m.g>
+      </AnimatePresence>
+    </LazyMotion>
   );
 }
 
@@ -111,25 +115,28 @@ export function TabelaDados({
   colunas: ReadonlyArray<string>;
   linhas: ReadonlyArray<ReadonlyArray<string>>;
 }) {
+  // O sr-only vai num div: em <table> o conteúdo ignora a largura de 1px e alarga a rolagem da página no celular.
   return (
-    <table className="sr-only">
-      <caption>{legenda}</caption>
-      <thead>
-        <tr>
-          {colunas.map((c) => (
-            <th key={c} scope="col">
-              {c}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {linhas.map((l, i) => (
-          <tr key={i}>
-            {l.map((c, j) => (j === 0 ? <th key={j} scope="row">{c}</th> : <td key={j}>{c}</td>))}
+    <div className="sr-only">
+      <table>
+        <caption>{legenda}</caption>
+        <thead>
+          <tr>
+            {colunas.map((c) => (
+              <th key={c} scope="col">
+                {c}
+              </th>
+            ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {linhas.map((l, i) => (
+            <tr key={i}>
+              {l.map((c, j) => (j === 0 ? <th key={j} scope="row">{c}</th> : <td key={j}>{c}</td>))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

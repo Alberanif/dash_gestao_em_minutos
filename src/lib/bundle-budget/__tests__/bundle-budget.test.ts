@@ -87,6 +87,11 @@ describe("parseClientReferenceManifest", () => {
     expect(parseClientReferenceManifest(src).entryJSFiles).toEqual({ a: ["static/chunks/x.js"] });
   });
 
+  it("lê a rota dinâmica, cuja chave tem colchetes", () => {
+    const src = `globalThis.__RSC_MANIFEST = globalThis.__RSC_MANIFEST || {};\nglobalThis.__RSC_MANIFEST["/v2/indicadores/[id]/page"] = {"entryJSFiles":{"a":["static/chunks/x.js"]},"clientModules":{}}\n`;
+    expect(parseClientReferenceManifest(src).entryJSFiles).toEqual({ a: ["static/chunks/x.js"] });
+  });
+
   it("falha em formato inesperado em vez de passar em silêncio", () => {
     expect(() => parseClientReferenceManifest("console.log(1)")).toThrow();
   });
