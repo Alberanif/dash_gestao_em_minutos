@@ -116,6 +116,6 @@ describe("guarda de orçamento do shell", () => {
     );
     for (const src of blocos) expect(src).not.toMatch(/from\s+["']\.\.\/charts\//);
     const lazy = readFileSync(join(raiz, "src/components/v2/evento/charts-lazy.tsx"), "utf8");
-    expect((lazy.match(/dynamic\(/g) ?? []).length).toBe(3);
+    expect((lazy.match(/dynamic\(/g) ?? []).length).toBe(4);
   });
 });

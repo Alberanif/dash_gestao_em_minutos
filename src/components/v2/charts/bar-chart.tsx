@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { cx, foco } from "../ui/cx";
 import { caminhoBarra, formatarCompacto, formatarValor, yDomain } from "./geometry";
 import { COR, corSerie } from "./palette";
@@ -20,6 +20,8 @@ export type BarChartProps = {
   formatarValor?: (n: number) => string;
   /** Índice da série na paleta. Padrão: 0 (azul IGT). Barras nominais usam todas a mesma cor. */
   serie?: number;
+  /** Cor da métrica (token CSS). Quando passada, vale mais que `serie`. */
+  cor?: string;
   animKey?: string;
   className?: string;
 };
@@ -36,6 +38,7 @@ export function BarChart({
   altura,
   formatarValor: formatarRotulo = formatarCompacto,
   serie = 0,
+  cor,
   animKey,
   className,
 }: BarChartProps) {
@@ -56,7 +59,7 @@ export function BarChart({
           largura={largura}
           altura={alt}
           formatar={formatarRotulo}
-          cor={corSerie(serie)}
+          cor={cor ?? corSerie(serie)}
           animKey={animKey ?? limpos.map((d) => `${d.id}:${d.value}`).join("|")}
         />
       ) : (
@@ -88,6 +91,7 @@ function BarrasInternas({
   // Escalonamento de 60 ms por barra, limitado a 600 ms no total (a CSS multiplica `--i` pelo token).
   const passoEscalona = Math.min(1, 10 / dados.length);
   const { ativo, setAtivo, handlers } = useItemAtivo(dados.length);
+  const idGrad = `v2-barra-${useId().replace(/:/g, "")}`;
 
   const esq = horizontal ? Math.min(150, Math.max(70, Math.round(largura * 0.3))) : MARGEM.esquerda;
   const areaW = Math.max(0, largura - esq - MARGEM.direita);
@@ -141,6 +145,19 @@ function BarrasInternas({
         {...handlers}
       >
         <svg width={largura} height={altura} aria-hidden="true" className="block overflow-visible">
+          <defs>
+            {/* Do pé da barra (mais fraco) até a ponta, onde está o dado (cor cheia). Cada barra usa a própria caixa. */}
+            <linearGradient
+              id={idGrad}
+              x1={horizontal ? 0 : 0}
+              y1={horizontal ? 0 : 1}
+              x2={horizontal ? 1 : 0}
+              y2={0}
+            >
+              <stop offset="0" stopColor={cor} stopOpacity={0.45} />
+              <stop offset="1" stopColor={cor} stopOpacity={1} />
+            </linearGradient>
+          </defs>
           <g transform={`translate(${esq} ${MARGEM.topo})`}>
             {ticks.map((t) => {
               const p = valorScale(t);
@@ -186,7 +203,7 @@ function BarrasInternas({
                 <g key={d.id}>
                   <path
                     d={caminhoBarra(x, y, w, h, RAIO, ponta)}
-                    fill={cor}
+                    fill={`url(#${idGrad})`}
                     className={cx("v2-g", horizontal ? "v2-g-cresce" : "v2-g-sobe")}
                     style={
                       {

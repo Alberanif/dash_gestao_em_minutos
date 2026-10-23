@@ -26,6 +26,11 @@ export const BarChartLazy = dynamic(() => import("../charts/bar-chart").then((m)
   ssr: false,
   loading: comAltura(240, "barras"),
 });
+/** A tendência do KPI também vem do chunk dos gráficos; reserva o tamanho dela para o número não pular. */
+export const SparklineLazy = dynamic(() => import("../charts/sparkline").then((m) => m.Sparkline), {
+  ssr: false,
+  loading: () => <span aria-hidden="true" className="mb-2 inline-block h-8 w-[88px] shrink-0" />,
+});
 export const DonutChartLazy = dynamic(() => import("../charts/donut-chart").then((m) => m.DonutChart), {
   ssr: false,
   loading: comAltura(220, "rosca"),

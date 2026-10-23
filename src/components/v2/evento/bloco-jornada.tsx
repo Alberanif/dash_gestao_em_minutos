@@ -8,16 +8,8 @@ import { CabecalhoSecao, Corpo } from "./bloco";
 import { useEvento } from "./contexto";
 import { fmtBRL, fmtPct } from "./format";
 import { FluxoJornada } from "./fluxo-jornada";
+import { Numero } from "./numero";
 import { useFonte } from "./use-fonte";
-
-function Numero({ rotulo, valor }: { rotulo: string; valor: string }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-xs text-v2-nevoa/60">{rotulo}</dt>
-      <dd className="mt-0.5 truncate text-sm font-medium tabular-nums">{valor}</dd>
-    </div>
-  );
-}
 
 /** Jornada de conversão: do investimento à venda. Sem Meta e Hotmart juntos, o V1 esconde o bloco e a V2 também. */
 export function BlocoJornada({
@@ -48,11 +40,11 @@ export function BlocoJornada({
             <FluxoJornada etapas={funil.etapas} taxas={funil.taxas} />
             <Surface nivel={2}>
               <dl className="grid grid-cols-2 gap-4 @3xl:grid-cols-5">
-                <Numero rotulo="Investimento" valor={m ? fmtBRL(m.meta_spend) : "—"} />
-                <Numero rotulo="CPA" valor={cpa === null ? "—" : fmtBRL(cpa)} />
-                <Numero rotulo="Custo por lead" valor={m?.meta_cpl_traffic == null ? "—" : fmtBRL(m.meta_cpl_traffic)} />
-                <Numero rotulo="CPM" valor={m ? fmtBRL(m.meta_cpm) : "—"} />
-                <Numero rotulo="Conversão anúncio em venda" valor={convRate === null ? "—" : fmtPct(convRate)} />
+                <Numero dado="custo" rotulo="Investimento" valor={m ? fmtBRL(m.meta_spend) : "—"} />
+                <Numero dado="custo" rotulo="CPA" valor={cpa === null ? "—" : fmtBRL(cpa)} />
+                <Numero dado="custo" rotulo="Custo por lead" valor={m?.meta_cpl_traffic == null ? "—" : fmtBRL(m.meta_cpl_traffic)} />
+                <Numero dado="custo" rotulo="CPM" valor={m ? fmtBRL(m.meta_cpm) : "—"} />
+                <Numero dado="venda" rotulo="Conversão anúncio em venda" valor={convRate === null ? "—" : fmtPct(convRate)} />
               </dl>
             </Surface>
           </div>

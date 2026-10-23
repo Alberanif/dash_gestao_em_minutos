@@ -15,6 +15,8 @@ export type SparklineProps = {
   altura?: number;
   /** Complemento do nome acessível, por exemplo "Receita". */
   rotulo?: string;
+  /** Cor da métrica (token CSS). Padrão: azul IGT. */
+  cor?: string;
   className?: string;
 };
 
@@ -24,7 +26,7 @@ const PAD = 5; // folga para o ponto e o anel não serem cortados
  * Tendência em miniatura para tile de KPI: sem eixos nem tooltip, com nome acessível que resume
  * início, fim e variação. O último ponto é o âmbar.
  */
-export function Sparkline({ valores, largura = 96, altura = 28, rotulo = "Tendência", className }: SparklineProps) {
+export function Sparkline({ valores, largura = 96, altura = 28, rotulo = "Tendência", cor = "var(--v2-azul-igt)", className }: SparklineProps) {
   const { ref, visto } = useVisto<SVGSVGElement>();
   const pontos = useMemo<XY[]>(
     () => valores.flatMap((v, i) => (Number.isFinite(v) ? [{ x: i, y: v }] : [])),
@@ -80,7 +82,7 @@ export function Sparkline({ valores, largura = 96, altura = 28, rotulo = "Tendê
             x={(d) => escalas.x(d.x)}
             y={(d) => escalas.y(d.y)}
             curve={curveMonotoneX}
-            stroke="var(--v2-azul-igt)"
+            stroke={cor}
             strokeWidth={2}
             strokeLinecap="round"
             strokeLinejoin="round"

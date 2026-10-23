@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo, useId, useMemo } from "react";
 import { Area, LinePath } from "@visx/shape";
 import { curveMonotoneX } from "@visx/curve";
 import { cx, foco } from "../ui/cx";
@@ -25,6 +25,8 @@ export type SerieLinha = {
   id: string;
   label: string;
   data: ReadonlyArray<{ x: XValue; y: number }>;
+  /** Cor da métrica (token CSS). Sem ela, a série pega a cor da sua posição na paleta. */
+  cor?: string;
 };
 
 export type LineChartProps = {
@@ -32,7 +34,7 @@ export type LineChartProps = {
   titulo: string;
   series: ReadonlyArray<SerieLinha>;
   altura?: number;
-  /** Lavagem de 10% sob a linha. Padrão: ligada só quando há uma série. */
+  /** Degradê sob a linha, da cor da série até transparente. Padrão: ligado só quando há uma série. */
   area?: boolean;
   formatarY?: (n: number) => string;
   /** Rótulo do eixo x. Padrão: dia e mês quando x é Date. */
@@ -51,16 +53,22 @@ const MEIO_DIA = 43_200_000;
 type Limpa = { id: string; label: string; cor: string; pontos: XY[]; xs: number[] };
 type Escala = EscalaLinear;
 
-type CamadaProps = { limpas: Limpa[]; xLin: Escala; yLin: Escala; area: boolean; brilho: boolean };
+type CamadaProps = { limpas: Limpa[]; xLin: Escala; yLin: Escala; area: boolean; brilho: boolean; idBase: string };
 
 /** Camada estática das séries. Memoizada: mover o cursor não recalcula nem redesenha os caminhos. */
-const CamadaSeries = memo(function CamadaSeries({ limpas, xLin, yLin, area, brilho }: CamadaProps) {
+const CamadaSeries = memo(function CamadaSeries({ limpas, xLin, yLin, area, brilho, idBase }: CamadaProps) {
   return (
     <>
-      {limpas.map((s) => {
+      {limpas.map((s, k) => {
         const ultimo = s.pontos[s.pontos.length - 1];
         return (
           <g key={s.id}>
+            <defs>
+              <linearGradient id={`${idBase}-${k}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor={s.cor} stopOpacity={0.34} />
+                <stop offset="1" stopColor={s.cor} stopOpacity={0} />
+              </linearGradient>
+            </defs>
             {s.pontos.length > 1 ? (
               <g
                 className="v2-g v2-g-traco"
@@ -73,8 +81,7 @@ const CamadaSeries = memo(function CamadaSeries({ limpas, xLin, yLin, area, bril
                     y0={yLin.range()[0]}
                     y1={(d) => yLin(d.y)}
                     curve={curveMonotoneX}
-                    fill={s.cor}
-                    fillOpacity={0.1}
+                    fill={`url(#${idBase}-${k})`}
                   />
                 ) : null}
                 <LinePath<XY>
@@ -152,6 +159,7 @@ function LinhaInterna({
   }, [limpas]);
 
   const { ativo, setAtivo, handlers } = useItemAtivo(refXs.length);
+  const idBase = `v2-area-${useId().replace(/:/g, "")}`;
 
   const { yLin, ticksY, esq } = useMemo(() => {
     const valores: number[] = [];
@@ -237,7 +245,7 @@ function LinhaInterna({
             </text>
           ))}
           <CamadaAnimada animKey={animKey}>
-            <CamadaSeries limpas={limpas} xLin={xLin} yLin={yLin} area={area} brilho={totalPontos <= LIMITE_BRILHO_PONTOS} />
+            <CamadaSeries limpas={limpas} xLin={xLin} yLin={yLin} area={area} brilho={totalPontos <= LIMITE_BRILHO_PONTOS} idBase={idBase} />
           </CamadaAnimada>
           {refX !== null && leitura ? (
             <g pointerEvents="none">
@@ -299,7 +307,7 @@ export function LineChart({
         // A cor segue a entidade (posição original), mesmo que outra série esteja vazia.
         .map((s, i) => {
           const pontos = cleanPoints(s.data);
-          return { id: s.id, label: s.label, cor: corSerie(i), pontos, xs: pontos.map((p) => p.x) };
+          return { id: s.id, label: s.label, cor: s.cor ?? corSerie(i), pontos, xs: pontos.map((p) => p.x) };
         })
         .filter((s) => s.pontos.length > 0),
     [series],

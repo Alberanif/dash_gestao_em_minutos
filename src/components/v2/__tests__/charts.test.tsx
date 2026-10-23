@@ -134,7 +134,10 @@ describe("BarChart", () => {
     const { container } = com(<BarChart titulo="Origem" data={dados} />);
     const barras = Array.from(container.querySelectorAll("path"));
     expect(barras).toHaveLength(3);
-    expect(new Set(barras.map((p) => p.getAttribute("fill")))).toEqual(new Set(["var(--v2-serie-1)"]));
+    // Todas as barras usam o mesmo degradê, que vai do pé fraco à ponta cheia na cor da série.
+    expect(new Set(barras.map((p) => p.getAttribute("fill"))).size).toBe(1);
+    const paradas = Array.from(container.querySelectorAll("linearGradient stop")).map((s) => s.getAttribute("stop-color"));
+    expect(paradas).toEqual(["var(--v2-serie-1)", "var(--v2-serie-1)"]);
     expect(container.innerHTML).not.toContain("--v2-ponto");
   });
 
