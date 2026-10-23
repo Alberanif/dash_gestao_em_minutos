@@ -15,7 +15,6 @@ import { mockReducedMotion } from "./helpers";
 
 jest.mock("next/navigation", () => ({ useRouter: () => ({ push: jest.fn() }) }));
 jest.mock("../evento/charts-lazy", () => ({
-  FunnelChartLazy: () => <div data-testid="funil" />,
   LineChartLazy: () => null,
   BarChartLazy: () => null,
   DonutChartLazy: () => null,
@@ -144,12 +143,14 @@ describe("BlocoJornada", () => {
     expect(container.querySelector("#titulo-jornada")).toBeNull();
   });
 
-  it("com as duas fontes mostra o funil e as taxas do V1", () => {
+  it("com as duas fontes mostra um card por etapa, as taxas do V1 nas cordas e os custos na faixa", () => {
     const f = filtro();
     const leads: Fonte<typeof ZERADO_LEADS> = { data: { ...ZERADO_LEADS, total: 8 }, chave: montarConsulta(f, PERIODO).chave };
     montar(f, <BlocoJornada meta={metaFonte(f, 200)} hotmart={hotmartFonte(f, 1000)} leads={leads} />);
-    expect(screen.getByTestId("funil")).toBeTruthy();
-    expect(screen.getByText("CTR")).toBeTruthy();
+    expect(screen.getAllByRole("listitem")).toHaveLength(5);
+    expect(screen.getByText("Impressões")).toBeTruthy();
+    expect(screen.getByText("Vendas aprovadas")).toBeTruthy();
+    expect(screen.getByText(/^CTR:/)).toBeTruthy(); // a taxa mora na corda; o leitor de tela a ouve no card de chegada
     expect(screen.getByText("R$ 100,00")).toBeTruthy(); // CPA = 200 / 2 vendas
   });
 });

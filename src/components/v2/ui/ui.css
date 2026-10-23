@@ -71,6 +71,10 @@
   from { opacity: 0.7; transform: scale(1); }
   to { opacity: 0; transform: scale(3.4); }
 }
+@keyframes v2-g-surge {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
 @keyframes v2-g-fade {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -112,6 +116,30 @@
   animation-delay: calc(var(--i, 0) * var(--v2-escalona-item) + var(--v2-dur-traco) * 0.6);
 }
 
+/*
+ * Fluxo da Jornada: card, corda, selo da taxa e ponto âmbar entram em sequência, etapa por etapa
+ * (--i = índice da etapa). Cada corda começa a se traçar quando o card de onde sai já está em cena
+ * e termina por volta da chegada do próximo.
+ */
+.v2 .v2-fl-card {
+  animation-name: v2-g-surge;
+  animation-duration: 520ms;
+  animation-delay: calc(var(--i, 0) * var(--v2-fluxo-passo));
+}
+.v2 .v2-fl-corda {
+  animation-name: v2-g-varre;
+  animation-duration: var(--v2-fluxo-corda);
+  animation-delay: calc(var(--i, 0) * var(--v2-fluxo-passo) + 260ms);
+}
+.v2 .v2-fl-corda-vazia { animation-name: v2-g-fade; animation-duration: 300ms; }
+.v2 .v2-fl-taxa {
+  animation-name: v2-g-fade;
+  animation-duration: 300ms;
+  animation-delay: calc(var(--i, 0) * var(--v2-fluxo-passo) + 260ms + var(--v2-fluxo-corda) * 0.75);
+}
+.v2 .v2-fl-ponto,
+.v2 .v2-fl-pulso { animation-delay: calc(var(--i, 0) * var(--v2-fluxo-passo) + 700ms); }
+
 .v2 [data-gate]:not([data-visto]) .v2-g { animation-play-state: paused; }
 .v2 [data-troca] .v2-g { animation: none; }
 
@@ -121,6 +149,8 @@
   --v2-dur-pulso: 400ms;
   --v2-escalona-item: 0ms;
   --v2-atraso-ponto: 500ms;
+  --v2-fluxo-passo: 160ms;
+  --v2-fluxo-corda: 300ms;
 }
 
 /* Esqueleto: a forma já é a do gráfico, o brilho azul atravessa devagar. */
