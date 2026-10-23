@@ -30,7 +30,3 @@ export const DonutChartLazy = dynamic(() => import("../charts/donut-chart").then
   ssr: false,
   loading: comAltura(220, "rosca"),
 });
-export const FunnelChartLazy = dynamic(() => import("../charts/funnel-chart").then((m) => m.FunnelChart), {
-  ssr: false,
-  loading: comAltura(260, "funil"),
-});

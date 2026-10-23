@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { Fonte } from "@/lib/indicadores/dashboard-evento";
 import { Button } from "../ui/button";
@@ -14,7 +14,7 @@ export function Esqueleto({ className }: { className?: string }) {
   return <div className={cx(esqueleto, className)} aria-hidden="true" />;
 }
 
-export type FormaEsqueleto = "linha" | "barras" | "rosca" | "funil";
+export type FormaEsqueleto = "linha" | "barras" | "rosca" | "funil" | "fluxo";
 
 const LARGURAS_BARRAS = ["86%", "64%", "48%", "34%", "22%"];
 const LARGURAS_FUNIL = ["100%", "72%", "50%", "32%"];
@@ -42,6 +42,16 @@ export function EsqueletoGrafico({ forma, className }: { forma: FormaEsqueleto; 
       ) : null}
       {forma === "rosca" ? (
         <div className="absolute left-4 top-1/2 aspect-square h-[78%] max-h-56 -translate-y-1/2 rounded-full border-[14px] border-v2-casco-alto/80" />
+      ) : null}
+      {forma === "fluxo" ? (
+        <div className="absolute inset-0 flex items-center gap-3 px-4">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <React.Fragment key={i}>
+              {i > 0 ? <div className="h-px w-6 shrink-0 bg-[var(--v2-eixo)]" /> : null}
+              <div className="h-24 min-w-0 flex-1 rounded-v2-sm bg-v2-casco-alto/80" />
+            </React.Fragment>
+          ))}
+        </div>
       ) : null}
       {forma === "funil" ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4">
@@ -128,6 +138,7 @@ export function Corpo({
           Primeira entrada: lenta e escalonada entre os blocos. Troca de filtro: a entrada curta de sempre. */}
       <div
         key={chave}
+        data-troca={estado.trocou ? "" : undefined}
         className={estado.trocou ? "v2-entra" : "v2-entra-bloco"}
         style={estado.trocou ? undefined : ({ "--i": ordem } as React.CSSProperties)}
       >

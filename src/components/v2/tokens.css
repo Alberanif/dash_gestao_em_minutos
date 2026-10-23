@@ -70,6 +70,8 @@
   --v2-atraso-ponto: 1000ms;
   --v2-dur-pulso: 600ms;
   --v2-escalona-item: 60ms;
+  --v2-fluxo-passo: 420ms;
+  --v2-fluxo-corda: 480ms;
   --v2-ease-desenho: cubic-bezier(0.22, 1, 0.36, 1);
 
   --v2-fonte: var(--font-manrope), system-ui, sans-serif;
