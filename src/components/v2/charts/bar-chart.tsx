@@ -1,10 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { m } from "motion/react";
 import { cx, foco } from "../ui/cx";
-import { useReducedMotion } from "../motion/use-reduced-motion";
-import { dur, easeSaida } from "../motion/variants";
 import { caminhoBarra, formatarCompacto, formatarValor, yDomain } from "./geometry";
 import { COR, corSerie } from "./palette";
 import { escalaBanda, escalaLinear } from "./scales";
@@ -88,7 +85,8 @@ function BarrasInternas({
   cor: string;
   animKey: string;
 }) {
-  const reduced = useReducedMotion();
+  // Escalonamento de 60 ms por barra, limitado a 600 ms no total (a CSS multiplica `--i` pelo token).
+  const passoEscalona = Math.min(1, 10 / dados.length);
   const { ativo, setAtivo, handlers } = useItemAtivo(dados.length);
 
   const esq = horizontal ? Math.min(150, Math.max(70, Math.round(largura * 0.3))) : MARGEM.esquerda;
@@ -186,20 +184,23 @@ function BarrasInternas({
             <CamadaAnimada animKey={animKey}>
               {barras.map(({ d, i, x, y, w, h, ponta }) => (
                 <g key={d.id}>
-                  <m.path
+                  <path
                     d={caminhoBarra(x, y, w, h, RAIO, ponta)}
                     fill={cor}
-                    style={{
-                      transformBox: "fill-box",
-                      transformOrigin: horizontal ? "left" : "bottom",
-                      opacity: ativo === null || ativo === i ? 1 : 0.5,
-                    }}
-                    initial={reduced ? false : horizontal ? { scaleX: 0 } : { scaleY: 0 }}
-                    animate={horizontal ? { scaleX: 1 } : { scaleY: 1 }}
-                    transition={{ duration: dur.lenta, ease: easeSaida, delay: reduced ? 0 : Math.min(i * 0.025, 0.3) }}
+                    className={cx("v2-g", horizontal ? "v2-g-cresce" : "v2-g-sobe")}
+                    style={
+                      {
+                        "--i": i * passoEscalona,
+                        opacity: ativo === null || ativo === i ? 1 : 0.5,
+                        // Barra negativa nasce do zero, que fica no lado oposto ao da positiva.
+                        ...(d.value < 0 ? { transformOrigin: horizontal ? "right" : "top" } : null),
+                      } as React.CSSProperties
+                    }
                   />
                   {rotularValor ? (
                     <text
+                      className="v2-g v2-g-rotulo"
+                      style={{ "--i": i * passoEscalona } as React.CSSProperties}
                       x={horizontal ? x + w + 6 : x + w / 2}
                       y={horizontal ? y + h / 2 : y - 6}
                       textAnchor={horizontal ? "start" : "middle"}

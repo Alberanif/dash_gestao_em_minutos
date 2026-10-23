@@ -7,6 +7,10 @@ export const easeSuave = [0.4, 0, 0.2, 1] as const;
 /** Durações em segundos, iguais aos tokens --v2-dur-*. */
 export const dur = { rapida: 0.12, media: 0.24, lenta: 0.48 } as const;
 
+/** Desenho dos gráficos e contagem dos números, em segundos. Espelham os tokens --v2-dur-* e --v2-ease-desenho. */
+export const durDesenho = { traco: 1.2, contagem: 1.4, filtro: 0.38 } as const;
+export const easeDesenho = [0.22, 1, 0.36, 1] as const;
+
 export const transicaoPadrao: Transition = { duration: dur.media, ease: easeSaida };
 
 /** Só opacity e transform (y), nunca propriedades de layout ou cor. */

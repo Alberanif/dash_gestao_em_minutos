@@ -32,7 +32,7 @@ export function BlocoLeads({
         descricao="Novos leads que entraram no funil, sem filtro de campanha"
         id="titulo-leads"
       />
-      <Corpo consultas={[leads, daily]} esqueletoAltura="h-96">
+      <Corpo consultas={[leads, daily]} esqueletoAltura="h-96" formas={["rosca", "linha"]} ordem={3}>
         {l && d && (
           <div className="grid gap-4 @3xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
             <Surface className="flex flex-col justify-between">

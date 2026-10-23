@@ -142,6 +142,10 @@ describe("V2Shell", () => {
   it("com movimento reduzido o CSS desliga a entrada da página", () => {
     const css = readFileSync(join(__dirname, "../ui/ui.css"), "utf8");
     const reduzido = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
-    expect(reduzido).toMatch(/\.v2 \.v2-entra\s*\{\s*animation: none !important/);
+    // A entrada da página, a dos blocos, o desenho dos gráficos e o brilho do esqueleto saem da mesma regra.
+    for (const alvo of [".v2 .v2-entra", ".v2 .v2-entra-bloco", ".v2 .v2-g", ".v2 .v2-esq::after"]) {
+      expect(reduzido).toContain(alvo);
+    }
+    expect(reduzido).toMatch(/\{\s*animation: none !important/);
   });
 });

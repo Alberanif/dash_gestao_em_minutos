@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { LinePath } from "@visx/shape";
 import { curveMonotoneX } from "@visx/curve";
+import { useVisto } from "../motion/use-visto";
 import { formatarPercentual, formatarValor, xDomain, type XY } from "./geometry";
 import { COR } from "./palette";
 import { escalaLinear } from "./scales";
@@ -24,6 +25,7 @@ const PAD = 5; // folga para o ponto e o anel não serem cortados
  * início, fim e variação. O último ponto é o âmbar.
  */
 export function Sparkline({ valores, largura = 96, altura = 28, rotulo = "Tendência", className }: SparklineProps) {
+  const { ref, visto } = useVisto<SVGSVGElement>();
   const pontos = useMemo<XY[]>(
     () => valores.flatMap((v, i) => (Number.isFinite(v) ? [{ x: i, y: v }] : [])),
     [valores],
@@ -60,21 +62,34 @@ export function Sparkline({ valores, largura = 96, altura = 28, rotulo = "Tendê
         (primeiro !== 0 ? ` (${formatarPercentual((ultimo.y - primeiro) / Math.abs(primeiro))})` : "");
 
   return (
-    <svg role="img" aria-label={nome} width={largura} height={altura} className={className} style={{ overflow: "visible" }}>
+    <svg
+      ref={ref}
+      role="img"
+      aria-label={nome}
+      width={largura}
+      height={altura}
+      className={className}
+      style={{ overflow: "visible" }}
+      data-gate=""
+      data-visto={visto ? "" : undefined}
+    >
       {pontos.length > 1 ? (
-        <LinePath<XY>
-          data={pontos}
-          x={(d) => escalas.x(d.x)}
-          y={(d) => escalas.y(d.y)}
-          curve={curveMonotoneX}
-          stroke="var(--v2-azul-igt)"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
+        <g className="v2-g v2-g-traco">
+          <LinePath<XY>
+            data={pontos}
+            x={(d) => escalas.x(d.x)}
+            y={(d) => escalas.y(d.y)}
+            curve={curveMonotoneX}
+            stroke="var(--v2-azul-igt)"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        </g>
       ) : null}
       <circle
+        className="v2-g v2-g-ponto"
         data-ponto-vivo=""
         cx={escalas.x(ultimo.x)}
         cy={escalas.y(ultimo.y)}

@@ -42,7 +42,7 @@ export function BlocoJornada({
   return (
     <section aria-labelledby="titulo-jornada">
       <CabecalhoSecao titulo="Jornada de conversão" descricao="Do investimento até a venda" id="titulo-jornada" />
-      <Corpo consultas={[meta, hotmart, leads]} esqueletoAltura="h-72">
+      <Corpo consultas={[meta, hotmart, leads]} esqueletoAltura="h-72" formas={["funil", "barras"]} ordem={1}>
         {funil && (
           <div className="grid gap-4 @3xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             <Surface>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Surface } from "../ui/surface";
 import { cx, foco } from "../ui/cx";
 
-const bloco = "rounded-v2-sm bg-v2-casco-alto/60 motion-safe:animate-pulse";
+const bloco = "v2-esq rounded-v2-sm bg-v2-casco-alto/60";
 
 /** Mesmo tamanho das células reais, para a troca não deslocar o layout. */
 export function MetricasSkeleton() {

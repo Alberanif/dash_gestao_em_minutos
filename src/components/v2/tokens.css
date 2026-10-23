@@ -61,6 +61,17 @@
   --v2-ease-saida: cubic-bezier(0.16, 1, 0.3, 1);
   --v2-ease-suave: cubic-bezier(0.4, 0, 0.2, 1);
 
+  /* Desenho dos gráficos: lento de propósito, para o dado ser visto chegando. Em
+     aparelho fraco o provedor troca para data-movimento="curto" (ver ui.css). */
+  --v2-dur-traco: 1200ms;
+  --v2-dur-contagem: 1400ms;
+  --v2-dur-filtro: 380ms;
+  --v2-dur-brilho: 1800ms;
+  --v2-atraso-ponto: 1000ms;
+  --v2-dur-pulso: 600ms;
+  --v2-escalona-item: 60ms;
+  --v2-ease-desenho: cubic-bezier(0.22, 1, 0.36, 1);
+
   --v2-fonte: var(--font-manrope), system-ui, sans-serif;
 
   background: var(--v2-abismo);
