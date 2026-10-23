@@ -1,0 +1,173 @@
+"use client";
+
+import { useMemo } from "react";
+import { Pie } from "@visx/shape";
+import { m } from "motion/react";
+import { cx, foco } from "../ui/cx";
+import { useReducedMotion } from "../motion/use-reduced-motion";
+import { dur, easeSaida } from "../motion/variants";
+import { foldTail, formatarCompacto, formatarPercentual, formatarValor } from "./geometry";
+import { COR, NUM_SERIES, corSerie } from "./palette";
+import { CamadaAnimada, EstadoVazio, Legenda, TabelaDados, TooltipGrafico } from "./parts";
+import { useItemAtivo, useLarguraMedida } from "./use-chart";
+
+export type FatiaRosca = { id: string; label: string; value: number };
+
+export type DonutChartProps = {
+  titulo: string;
+  data: ReadonlyArray<FatiaRosca>;
+  /** Texto pequeno sob o total no centro. */
+  rotuloTotal?: string;
+  formatarValor?: (n: number) => string;
+  altura?: number;
+  animKey?: string;
+  className?: string;
+};
+
+type Item = { id: string; label: string; value: number; cor: string };
+
+/**
+ * Rosca para parte do todo. No máximo 5 fatias nas cores da paleta; o resto vira "Outros" em ardósia
+ * (nunca uma sexta cor). A cor segue a posição da fatia, não o tamanho.
+ */
+export function DonutChart({
+  titulo,
+  data,
+  rotuloTotal = "Total",
+  formatarValor: fmt = formatarValor,
+  altura = 220,
+  animKey,
+  className,
+}: DonutChartProps) {
+  const { ref, largura } = useLarguraMedida<HTMLDivElement>();
+  const itens = useMemo<Item[]>(
+    () =>
+      foldTail(data, NUM_SERIES + 1).map((d, i) => ({
+        id: d.id,
+        label: d.label,
+        value: d.value,
+        cor: "outros" in d ? COR.outros : corSerie(i),
+      })),
+    [data],
+  );
+
+  return (
+    <div ref={ref} className={className}>
+      {itens.length === 0 ? (
+        <EstadoVazio titulo="Sem dados no período" dica="Ajuste o período ou os filtros." altura={altura} />
+      ) : largura > 0 ? (
+        <RoscaInterna
+          titulo={titulo}
+          itens={itens}
+          largura={largura}
+          altura={altura}
+          rotuloTotal={rotuloTotal}
+          fmt={fmt}
+          animKey={animKey ?? itens.map((d) => `${d.id}:${d.value}`).join("|")}
+        />
+      ) : (
+        <div style={{ height: altura }} />
+      )}
+    </div>
+  );
+}
+
+function RoscaInterna({
+  titulo,
+  itens,
+  largura,
+  altura,
+  rotuloTotal,
+  fmt,
+  animKey,
+}: {
+  titulo: string;
+  itens: Item[];
+  largura: number;
+  altura: number;
+  rotuloTotal: string;
+  fmt: (n: number) => string;
+  animKey: string;
+}) {
+  const reduced = useReducedMotion();
+  const { ativo, setAtivo, handlers } = useItemAtivo(itens.length);
+  const total = useMemo(() => itens.reduce((s, i) => s + i.value, 0), [itens]);
+  const lado = Math.min(altura, largura);
+  const raio = lado / 2 - 4;
+  const espessura = Math.min(28, raio * 0.32);
+  const cx0 = lado / 2;
+
+  return (
+    <div className="relative">
+      <div
+        role="group"
+        aria-roledescription="gráfico de rosca"
+        aria-label={`${titulo}. Use as setas para percorrer as fatias.`}
+        tabIndex={0}
+        className={cx("relative flex flex-wrap items-center gap-x-6 gap-y-3 rounded-v2-sm", foco)}
+        {...handlers}
+      >
+        <div className="relative shrink-0" style={{ width: lado, height: lado }}>
+          <svg width={lado} height={lado} aria-hidden="true" className="block overflow-visible">
+            <g transform={`translate(${cx0} ${cx0})`}>
+              <CamadaAnimada animKey={animKey}>
+                <Pie<Item>
+                  data={itens}
+                  pieValue={(d) => d.value}
+                  outerRadius={raio}
+                  innerRadius={raio - espessura}
+                  padAngle={itens.length > 1 ? 0.025 : 0}
+                  cornerRadius={3}
+                  pieSort={null}
+                >
+                  {(pie) =>
+                    pie.arcs.map((arc, i) => (
+                      <m.path
+                        key={arc.data.id}
+                        d={pie.path(arc) ?? ""}
+                        fill={arc.data.cor}
+                        style={{ opacity: ativo === null || ativo === i ? 1 : 0.5 }}
+                        initial={reduced ? false : { opacity: 0 }}
+                        animate={{ opacity: ativo === null || ativo === i ? 1 : 0.5 }}
+                        transition={{ duration: dur.media, ease: easeSaida, delay: reduced ? 0 : i * 0.05 }}
+                        onPointerEnter={() => setAtivo(i)}
+                        onPointerDown={() => setAtivo(i)}
+                        onPointerLeave={() => setAtivo(null)}
+                      />
+                    ))
+                  }
+                </Pie>
+              </CamadaAnimada>
+              <text textAnchor="middle" y={2} fontSize={Math.min(26, raio * 0.4)} fontWeight={300} fill={COR.texto}>
+                {formatarCompacto(total)}
+              </text>
+              <text textAnchor="middle" y={raio * 0.3 + 6} fontSize={11} fill={COR.textoMudo}>
+                {rotuloTotal}
+              </text>
+            </g>
+          </svg>
+          {ativo !== null ? (
+            <TooltipGrafico
+              x={lado - 8}
+              y={0}
+              larguraContainer={largura}
+              titulo={itens[ativo].label}
+              linhas={[
+                { cor: itens[ativo].cor, rotulo: formatarPercentual(itens[ativo].value / total), valor: fmt(itens[ativo].value) },
+              ]}
+            />
+          ) : null}
+        </div>
+        <Legenda itens={itens.map((i) => ({ cor: i.cor, rotulo: `${i.label} · ${formatarPercentual(i.value / total)}` }))} forma="quadrado" />
+        <div aria-live="polite" className="sr-only">
+          {ativo !== null ? `${itens[ativo].label}: ${fmt(itens[ativo].value)}, ${formatarPercentual(itens[ativo].value / total)}` : ""}
+        </div>
+        <TabelaDados
+          legenda={titulo}
+          colunas={["Fatia", "Valor", "Parte do total"]}
+          linhas={itens.map((i) => [i.label, fmt(i.value), formatarPercentual(i.value / total)])}
+        />
+      </div>
+    </div>
+  );
+}

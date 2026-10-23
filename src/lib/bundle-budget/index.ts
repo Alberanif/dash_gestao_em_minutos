@@ -33,7 +33,8 @@ const normalize = (file: string) => file.replace(/^\/?(_next\/)?/, "");
 const isJs = (file: string) => file.endsWith(".js");
 
 export function parseClientReferenceManifest(source: string): ClientReferenceManifest {
-  const match = source.match(/__RSC_MANIFEST\[[^\]]+\]\s*=\s*(\{[\s\S]*\})\s*;?\s*$/);
+  // A chave é a rota entre aspas e pode ter colchetes (`/v2/indicadores/[id]/page`).
+  const match = source.match(/__RSC_MANIFEST\["[^"]+"\]\s*=\s*(\{[\s\S]*\})\s*;?\s*$/);
   if (!match) throw new Error("client-reference-manifest em formato inesperado");
   return JSON.parse(match[1]) as ClientReferenceManifest;
 }
