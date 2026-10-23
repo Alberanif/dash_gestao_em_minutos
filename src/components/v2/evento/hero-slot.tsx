@@ -1,5 +1,6 @@
 import type { FilterStatus } from "@/types/indicadores";
 import { cx } from "../ui/cx";
+import { HeroLuz } from "./hero-luz";
 
 const STATUS: Record<FilterStatus, string> = {
   ativo: "Ativo",
@@ -8,9 +9,9 @@ const STATUS: Record<FilterStatus, string> = {
 };
 
 /**
- * Espaço do herói do evento. Hoje é só CSS: um feixe de luz azul que desce até o ponto
- * âmbar. A #260 troca o conteúdo por WebGL com este mesmo fallback, sem mexer na tela
- * ao redor: o espaço (altura, rótulo e posição) já está fixo aqui.
+ * Herói do evento: um feixe de luz azul que desce até o ponto âmbar. O feixe é CSS no
+ * servidor e vira WebGL no cliente (HeroLuz); o ponto é sempre DOM, então o âmbar nunca
+ * entra no shader. O espaço (altura, rótulo e posição) é o mesmo nos dois modos.
  */
 export function HeroSlot({ nome, status }: { nome: string; status: FilterStatus }) {
   return (
@@ -18,12 +19,10 @@ export function HeroSlot({ nome, status }: { nome: string; status: FilterStatus 
       data-hero-slot
       className="relative isolate overflow-hidden rounded-v2-md bg-v2-casco px-5 py-8 shadow-v2-2 ring-1 ring-inset ring-v2-azul-luz/15 @xl:px-8 @xl:py-12"
     >
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-y-0 right-[12%] -z-10 w-24 bg-gradient-to-b from-v2-azul-luz/0 via-v2-azul-luz/25 to-v2-azul-luz/0 blur-2xl @xl:right-[18%] @xl:w-40"
-      />
+      <HeroLuz />
       <span
         aria-hidden="true"
+        data-hero-ponto
         className="absolute bottom-6 right-[calc(12%+2.75rem)] size-3 rounded-full bg-v2-ponto shadow-v2-brilho-ponto @xl:right-[calc(18%+4.75rem)]"
       />
       <p className="text-sm text-v2-nevoa/70">
