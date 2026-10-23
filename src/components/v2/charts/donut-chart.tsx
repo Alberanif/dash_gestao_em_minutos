@@ -1,11 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { Pie } from "@visx/shape";
-import { m } from "motion/react";
 import { cx, foco } from "../ui/cx";
-import { useReducedMotion } from "../motion/use-reduced-motion";
-import { dur, easeSaida } from "../motion/variants";
 import { foldTail, formatarCompacto, formatarPercentual, formatarValor } from "./geometry";
 import { COR, NUM_SERIES, corSerie } from "./palette";
 import { CamadaAnimada, EstadoVazio, Legenda, TabelaDados, TooltipGrafico } from "./parts";
@@ -89,7 +86,7 @@ function RoscaInterna({
   fmt: (n: number) => string;
   animKey: string;
 }) {
-  const reduced = useReducedMotion();
+  const idMascara = `v2-rosca-${useId().replace(/\W/g, "")}`;
   const { ativo, setAtivo, handlers } = useItemAtivo(itens.length);
   const total = useMemo(() => itens.reduce((s, i) => s + i.value, 0), [itens]);
   const lado = Math.min(altura, largura);
@@ -111,32 +108,45 @@ function RoscaInterna({
           <svg width={lado} height={lado} aria-hidden="true" className="block overflow-visible">
             <g transform={`translate(${cx0} ${cx0})`}>
               <CamadaAnimada animKey={animKey}>
-                <Pie<Item>
-                  data={itens}
-                  pieValue={(d) => d.value}
-                  outerRadius={raio}
-                  innerRadius={raio - espessura}
-                  padAngle={itens.length > 1 ? 0.025 : 0}
-                  cornerRadius={3}
-                  pieSort={null}
-                >
-                  {(pie) =>
-                    pie.arcs.map((arc, i) => (
-                      <m.path
-                        key={arc.data.id}
-                        d={pie.path(arc) ?? ""}
-                        fill={arc.data.cor}
-                        style={{ opacity: ativo === null || ativo === i ? 1 : 0.5 }}
-                        initial={reduced ? false : { opacity: 0 }}
-                        animate={{ opacity: ativo === null || ativo === i ? 1 : 0.5 }}
-                        transition={{ duration: dur.media, ease: easeSaida, delay: reduced ? 0 : i * 0.05 }}
-                        onPointerEnter={() => setAtivo(i)}
-                        onPointerDown={() => setAtivo(i)}
-                        onPointerLeave={() => setAtivo(null)}
-                      />
-                    ))
-                  }
-                </Pie>
+                {/* A rosca é varrida a partir das 12h por uma máscara: um anel grosso com o traço crescendo. */}
+                <mask id={idMascara}>
+                  <circle
+                    className="v2-g v2-g-varre"
+                    r={raio / 2}
+                    fill="none"
+                    stroke="#fff"
+                    strokeWidth={raio + 2}
+                    pathLength={1}
+                    strokeDasharray={1}
+                    transform="rotate(-90)"
+                  />
+                </mask>
+                <g mask={`url(#${idMascara})`}>
+                  <Pie<Item>
+                    data={itens}
+                    pieValue={(d) => d.value}
+                    outerRadius={raio}
+                    innerRadius={raio - espessura}
+                    padAngle={itens.length > 1 ? 0.025 : 0}
+                    cornerRadius={3}
+                    pieSort={null}
+                  >
+                    {(pie) =>
+                      pie.arcs.map((arc, i) => (
+                        <path
+                          key={arc.data.id}
+                          d={pie.path(arc) ?? ""}
+                          fill={arc.data.cor}
+                          className="transition-opacity duration-150"
+                          style={{ opacity: ativo === null || ativo === i ? 1 : 0.5 }}
+                          onPointerEnter={() => setAtivo(i)}
+                          onPointerDown={() => setAtivo(i)}
+                          onPointerLeave={() => setAtivo(null)}
+                        />
+                      ))
+                    }
+                  </Pie>
+                </g>
               </CamadaAnimada>
               <text textAnchor="middle" y={2} fontSize={Math.min(26, raio * 0.4)} fontWeight={300} fill={COR.texto}>
                 {formatarCompacto(total)}

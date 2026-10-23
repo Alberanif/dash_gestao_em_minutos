@@ -166,7 +166,7 @@ export function BlocoPlataformas({
             ]}
           />
           <Surface className="mt-3" id="painel-plataforma" role="tabpanel" aria-label={abaAtiva === "meta" ? "Meta Ads" : "Hotmart"}>
-            <Corpo consultas={[meta, hotmart, daily, sources]} esqueletoAltura="h-96">
+            <Corpo consultas={[meta, hotmart, daily, sources]} esqueletoAltura="h-96" formas={["linha", "rosca"]} ordem={2}>
               {abaAtiva === "meta" && meta.data && daily.data && (
                 <div className="space-y-6">
                   <PainelMeta meta={meta.data.data} daily={daily.data.data} />

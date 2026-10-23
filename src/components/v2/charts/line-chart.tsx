@@ -62,7 +62,10 @@ const CamadaSeries = memo(function CamadaSeries({ limpas, xLin, yLin, area, bril
         return (
           <g key={s.id}>
             {s.pontos.length > 1 ? (
-              <g style={brilho ? { filter: `drop-shadow(0 0 6px color-mix(in srgb, ${s.cor} 55%, transparent))` } : undefined}>
+              <g
+                className="v2-g v2-g-traco"
+                style={brilho ? { filter: `drop-shadow(0 0 6px color-mix(in srgb, ${s.cor} 55%, transparent))` } : undefined}
+              >
                 {area ? (
                   <Area<XY>
                     data={s.pontos}
@@ -87,8 +90,19 @@ const CamadaSeries = memo(function CamadaSeries({ limpas, xLin, yLin, area, bril
                 />
               </g>
             ) : null}
-            {/* Último ponto da linha: o único uso do âmbar na biblioteca. */}
+            {/* Último ponto da linha: o único uso do âmbar na biblioteca. Chega depois do traço e pulsa uma vez. */}
             <circle
+              className="v2-g v2-g-pulso"
+              cx={xLin(ultimo.x)}
+              cy={yLin(ultimo.y)}
+              r={4}
+              fill="none"
+              stroke={COR.ponto}
+              strokeWidth={1.5}
+              pointerEvents="none"
+            />
+            <circle
+              className="v2-g v2-g-ponto"
               data-ponto-vivo=""
               cx={xLin(ultimo.x)}
               cy={yLin(ultimo.y)}

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState } from "react";
+import { usePerfilMovimento } from "../motion/use-perfil-movimento";
 
 const PortalContext = createContext<HTMLElement | null>(null);
 
@@ -10,8 +11,9 @@ const PortalContext = createContext<HTMLElement | null>(null);
  */
 export function V2Root({ className, children }: { className?: string; children: React.ReactNode }) {
   const [el, setEl] = useState<HTMLElement | null>(null);
+  const perfil = usePerfilMovimento();
   return (
-    <div ref={setEl} className={className} style={{ minHeight: "100vh" }}>
+    <div ref={setEl} className={className} data-movimento={perfil} style={{ minHeight: "100vh" }}>
       <PortalContext.Provider value={el}>{children}</PortalContext.Provider>
     </div>
   );

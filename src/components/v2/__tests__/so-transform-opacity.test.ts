@@ -46,8 +46,11 @@ describe("animações só com transform e opacity", () => {
       const css = fs.readFileSync(f, "utf8");
       for (const kf of css.matchAll(/@keyframes\s+([\w-]+)\s*\{([\s\S]*?)\n\}/g)) {
         keyframes++;
+        // Exceção deliberada, só do desenho dos gráficos (keyframes v2-g-*): a linha é traçada por
+        // clip-path e a rosca é varrida por stroke-dashoffset, que não têm equivalente em transform.
+        const permitidas = kf[1].startsWith("v2-g-") ? ["opacity", "transform", "clip-path", "stroke-dashoffset"] : ["opacity", "transform"];
         for (const decl of kf[2].matchAll(/([a-z-]+)\s*:/g)) {
-          if (!["opacity", "transform"].includes(decl[1])) ruins.push(`${kf[1]}: ${decl[1]}`);
+          if (!permitidas.includes(decl[1])) ruins.push(`${kf[1]}: ${decl[1]}`);
         }
       }
     }

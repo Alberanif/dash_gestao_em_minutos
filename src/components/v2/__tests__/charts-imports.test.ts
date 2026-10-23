@@ -63,7 +63,8 @@ describe("animação só com transform e opacity", () => {
         }
       }
     }
-    expect(achadas).toBeGreaterThan(3);
+    // Só sobrou a camada de crossfade em Motion; o desenho dos gráficos é CSS e tem teste próprio (animacoes.test.tsx).
+    expect(achadas).toBeGreaterThan(1);
     expect(ruins).toEqual([]);
   });
 });

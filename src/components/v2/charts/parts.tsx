@@ -1,23 +1,47 @@
 "use client";
 
+import { useState } from "react";
 import { AnimatePresence, LazyMotion, domAnimation, m } from "motion/react";
-import { fadeRise, instantaneo } from "../motion/variants";
-import { useReducedMotion } from "../motion/use-reduced-motion";
+import { dur, durDesenho, easeSuave, easeDesenho } from "../motion/variants";
+import { usePerfilMovimento } from "../motion/use-perfil-movimento";
+import { useVisto } from "../motion/use-visto";
 
-/** Troca de série ou de filtro: o conteúdo anterior sai e o novo entra, só com opacity e translateY. */
+/** Saída rápida (120 ms), igual em toda troca: só opacity. */
+const SAIDA = { opacity: 0, transition: { duration: dur.rapida, ease: easeSuave } };
+
+/**
+ * Camada de séries de um gráfico. Na primeira vez, o desenho é em CSS (classes `v2-g-*` nos
+ * filhos), preso no primeiro quadro até o gráfico ficar 30% visível; roda uma vez e não repete
+ * ao rolar. Quando o dado muda (filtro, período), o desenho é desligado (`data-troca`) e fica só um
+ * crossfade de 380 ms: o usuário lê o valor novo em vez de esperar a linha se traçar de novo.
+ * Com movimento reduzido o crossfade cai para 150 ms.
+ */
 export function CamadaAnimada({ animKey, children }: { animKey: string; children: React.ReactNode }) {
-  const reduced = useReducedMotion();
+  const perfil = usePerfilMovimento();
+  const { ref, visto } = useVisto<SVGGElement>();
+  // "Ajustar estado durante a renderização": lembra a primeira chave e marca quando ela muda.
+  const [estado, setEstado] = useState({ chave: animKey, trocou: false });
+  if (estado.chave !== animKey) setEstado({ chave: animKey, trocou: true });
+  const { trocou } = estado;
+
+  // Entrada com desenho em CSS não precisa de fade; os outros casos fazem crossfade.
+  const fade = trocou ? durDesenho.filtro : perfil === "reduzido" ? 0.15 : 0;
+
   // LazyMotion aqui: o gráfico funciona em qualquer tela, sem depender de um provedor acima (sem ele o `m.g` fica em opacity 0).
   // O chunk do gráfico já é sob demanda, então as features não pesam no JS inicial.
   return (
     <LazyMotion features={domAnimation}>
-      <AnimatePresence mode="wait" initial>
+      <AnimatePresence mode="wait" initial={false}>
         <m.g
           key={animKey}
-          variants={reduced ? instantaneo : fadeRise}
-          initial="oculto"
-          animate="visivel"
-          exit="saindo"
+          ref={ref}
+          data-gate=""
+          data-visto={visto ? "" : undefined}
+          data-troca={trocou ? "" : undefined}
+          initial={fade > 0 ? { opacity: 0 } : false}
+          animate={{ opacity: 1 }}
+          transition={{ duration: fade, ease: easeDesenho }}
+          exit={SAIDA}
         >
           {children}
         </m.g>

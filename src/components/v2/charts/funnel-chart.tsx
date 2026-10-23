@@ -1,10 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { m } from "motion/react";
 import { cx, foco } from "../ui/cx";
-import { useReducedMotion } from "../motion/use-reduced-motion";
-import { dur, easeSaida } from "../motion/variants";
 import { etapasFunil, formatarPercentual, formatarValor, passoFunil } from "./geometry";
 import { COR, corFunil } from "./palette";
 import { CamadaAnimada, EstadoVazio, TabelaDados, TooltipGrafico } from "./parts";
@@ -67,7 +64,6 @@ function FunilInterno({
   fmt: (n: number) => string;
   animKey: string;
 }) {
-  const reduced = useReducedMotion();
   const { ativo, setAtivo, handlers } = useItemAtivo(etapas.length);
   const conv = useMemo(() => etapasFunil(etapas.map((e) => e.value)), [etapas]);
   const centro = largura / 2;
@@ -115,17 +111,11 @@ function FunilInterno({
                     {fmt(e.value)}
                     {conv[i].pctDaAnterior !== null ? ` · ${formatarPercentual(conv[i].pctDaAnterior!)} da anterior` : ""}
                   </text>
-                  <m.polygon
+                  <polygon
                     points={pontos}
                     fill={corFunil(passoFunil(i, etapas.length))}
-                    style={{
-                      transformBox: "fill-box",
-                      transformOrigin: "center",
-                      opacity: ativo === null || ativo === i ? 1 : 0.5,
-                    }}
-                    initial={reduced ? false : { scaleX: 0 }}
-                    animate={{ scaleX: 1 }}
-                    transition={{ duration: dur.lenta, ease: easeSaida, delay: reduced ? 0 : i * 0.06 }}
+                    className="v2-g v2-g-cresce v2-g-centro transition-opacity duration-150"
+                    style={{ "--i": i, opacity: ativo === null || ativo === i ? 1 : 0.5 } as React.CSSProperties}
                   />
                   <rect
                     x={0}

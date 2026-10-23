@@ -32,10 +32,117 @@
   animation: v2-rise-in var(--v2-dur-media) var(--v2-ease-saida) both;
   animation-delay: calc(var(--i, 0) * 40ms);
 }
+/* Primeira entrada de um bloco do dashboard: mais lenta, e cada bloco espera 140 ms a mais que o anterior. */
+.v2 .v2-entra-bloco {
+  animation: v2-rise-in 700ms var(--v2-ease-desenho) both;
+  animation-delay: calc(var(--i, 0) * 140ms);
+}
+
+/*
+ * Desenho dos gráficos (#v2-animacoes). Cada gráfico se desenha do jeito que é: a linha é
+ * traçada, as barras crescem da base, a rosca é varrida, o funil abre de cima para baixo.
+ * Exceção deliberada à regra de só transform e opacity, restrita a estes keyframes `v2-g-*`:
+ * clip-path (linha) e stroke-dashoffset (rosca) não têm equivalente em transform.
+ *
+ * O gatilho vive em quem envolve o gráfico: [data-gate] sem [data-visto] segura tudo em pausa no
+ * primeiro quadro; [data-troca] (filtro mudou) desliga o desenho e deixa só o crossfade do Motion.
+ */
+@keyframes v2-g-traco {
+  from { clip-path: inset(-10% 100% -10% -10%); }
+  to { clip-path: inset(-10% -10% -10% -10%); }
+}
+@keyframes v2-g-sobe {
+  from { transform: scaleY(0); }
+  to { transform: none; }
+}
+@keyframes v2-g-cresce {
+  from { transform: scaleX(0); }
+  to { transform: none; }
+}
+@keyframes v2-g-varre {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes v2-g-ponto {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes v2-g-pulso {
+  from { opacity: 0.7; transform: scale(1); }
+  to { opacity: 0; transform: scale(3.4); }
+}
+@keyframes v2-g-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+/* Brilho do esqueleto: varredura lenta, só transform. */
+@keyframes v2-brilho {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+.v2 .v2-g {
+  animation-duration: var(--v2-dur-traco);
+  animation-timing-function: var(--v2-ease-desenho);
+  animation-fill-mode: both;
+}
+.v2 .v2-g-traco { animation-name: v2-g-traco; }
+.v2 .v2-g-sobe,
+.v2 .v2-g-cresce {
+  transform-box: fill-box;
+  animation-delay: calc(var(--i, 0) * var(--v2-escalona-item));
+}
+.v2 .v2-g-sobe { transform-origin: bottom; animation-name: v2-g-sobe; }
+.v2 .v2-g-cresce { transform-origin: left; animation-name: v2-g-cresce; }
+.v2 .v2-g-cresce.v2-g-centro { transform-origin: center; }
+.v2 .v2-g-varre { animation-name: v2-g-varre; }
+.v2 .v2-g-ponto,
+.v2 .v2-g-pulso {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-delay: var(--v2-atraso-ponto);
+}
+.v2 .v2-g-ponto { animation-name: v2-g-ponto; animation-duration: 240ms; }
+.v2 .v2-g-pulso { opacity: 0; animation-name: v2-g-pulso; animation-duration: var(--v2-dur-pulso); }
+
+/* Rótulo do valor da barra: aparece quando a barra já está quase no lugar. */
+.v2 .v2-g-rotulo {
+  animation-name: v2-g-fade;
+  animation-duration: 400ms;
+  animation-delay: calc(var(--i, 0) * var(--v2-escalona-item) + var(--v2-dur-traco) * 0.6);
+}
+
+.v2 [data-gate]:not([data-visto]) .v2-g { animation-play-state: paused; }
+.v2 [data-troca] .v2-g { animation: none; }
+
+/* Aparelho fraco: traçado de 0,6 s, sem escalonamento. */
+.v2[data-movimento="curto"] {
+  --v2-dur-traco: 600ms;
+  --v2-dur-pulso: 400ms;
+  --v2-escalona-item: 0ms;
+  --v2-atraso-ponto: 500ms;
+}
+
+/* Esqueleto: a forma já é a do gráfico, o brilho azul atravessa devagar. */
+.v2 .v2-esq {
+  position: relative;
+  overflow: hidden;
+}
+.v2 .v2-esq::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(110 195 234 / 0.1) 50%, transparent);
+  transform: translateX(-100%);
+  animation: v2-brilho var(--v2-dur-brilho) var(--v2-ease-suave) infinite;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .v2 .v2-pop,
   .v2 .v2-fade,
-  .v2 .v2-entra { animation: none !important; }
+  .v2 .v2-entra,
+  .v2 .v2-entra-bloco,
+  .v2 .v2-g,
+  .v2 .v2-esq::after { animation: none !important; }
   .v2 * { transition-duration: 0s !important; }
 }
