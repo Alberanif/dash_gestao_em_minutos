@@ -2,12 +2,14 @@
 
 import type { Fonte } from "@/lib/indicadores/dashboard-evento";
 import type { DailyPoint, GlobalLeadsMetrics } from "@/types/indicadores";
+import { corDado } from "../cor";
 import { CountUp } from "../motion/count-up";
 import { Surface } from "../ui/surface";
 import { topComOutros } from "./agrupar";
 import { CabecalhoSecao, Corpo } from "./bloco";
-import { BarChartLazy, DonutChartLazy, LineChartLazy } from "./charts-lazy";
+import { BarChartLazy, DonutChartLazy, LineChartLazy, SparklineLazy } from "./charts-lazy";
 import { fmtNum } from "./format";
+import { Kpi } from "./kpi";
 import { useFonte } from "./use-fonte";
 
 /** Captação de leads. O V1 avisa que estes dados não seguem o filtro de campanha; a V2 mantém o aviso. */
@@ -35,18 +37,30 @@ export function BlocoLeads({
       <Corpo consultas={[leads, daily]} esqueletoAltura="h-96" formas={["rosca", "linha"]} ordem={3}>
         {l && d && (
           <div className="grid gap-4 @3xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-            <Surface className="flex flex-col justify-between">
-              <div>
-                <p className="text-sm text-v2-nevoa/70">Leads captados</p>
-                <p className="mt-2 text-4xl font-light tabular-nums tracking-tight">
-                  <CountUp value={l.total} format={fmtNum} />
-                </p>
-              </div>
-              <div className="mt-6">
+            <div className="flex flex-col gap-4">
+              <Kpi
+                rotulo="Leads captados"
+                dado="lead"
+                icone="leads"
+                grande
+                lateral={
+                  <SparklineLazy
+                    rotulo="Leads por dia"
+                    cor={corDado("lead")}
+                    valores={d.map((p) => p.lead_captacoes)}
+                    largura={88}
+                    altura={32}
+                    className="mb-2 shrink-0"
+                  />
+                }
+              >
+                <CountUp value={l.total} format={fmtNum} />
+              </Kpi>
+              <Surface className="flex-1">
                 <h3 className="mb-2 text-sm font-medium">Por origem</h3>
                 <DonutChartLazy titulo="Leads por origem" data={porOrigem} rotuloTotal="leads" formatarValor={fmtNum} />
-              </div>
-            </Surface>
+              </Surface>
+            </div>
             <Surface className="space-y-5">
               <LineChartLazy
                 titulo="Leads por dia"
@@ -54,6 +68,7 @@ export function BlocoLeads({
                   {
                     id: "leads",
                     label: "Leads",
+                    cor: corDado("lead"),
                     data: d.map((p) => ({ x: new Date(`${p.date}T00:00:00`), y: p.lead_captacoes })),
                   },
                 ]}
@@ -62,7 +77,7 @@ export function BlocoLeads({
               />
               <div>
                 <h3 className="mb-2 text-sm font-medium">Por evento de captação</h3>
-                <BarChartLazy titulo="Leads por evento" data={porEvento} orientacao="horizontal" formatarValor={fmtNum} />
+                <BarChartLazy titulo="Leads por evento" cor={corDado("lead")} data={porEvento} orientacao="horizontal" formatarValor={fmtNum} />
               </div>
             </Surface>
           </div>

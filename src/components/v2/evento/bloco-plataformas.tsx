@@ -10,23 +10,16 @@ import type {
   GlobalMetrics,
   MetaCampaignsResponse,
 } from "@/types/indicadores";
+import { corDado } from "../cor";
 import { Surface } from "../ui/surface";
 import { topComOutros } from "./agrupar";
 import { CabecalhoSecao, Corpo, Esqueleto } from "./bloco";
 import { BarChartLazy, DonutChartLazy, LineChartLazy } from "./charts-lazy";
 import { useEvento } from "./contexto";
+import { Numero } from "./numero";
 import { Segmentado } from "./segmentado";
 import { fmtBRL, fmtNum, fmtPct } from "./format";
 import { useFonte } from "./use-fonte";
-
-function Numero({ rotulo, valor }: { rotulo: string; valor: string }) {
-  return (
-    <div className="min-w-0 rounded-v2-sm bg-v2-abismo/50 px-3 py-2.5">
-      <dt className="text-xs text-v2-nevoa/60">{rotulo}</dt>
-      <dd className="mt-0.5 truncate text-sm font-medium tabular-nums">{valor}</dd>
-    </div>
-  );
-}
 
 const serieDiaria = (daily: DailyPoint[], campo: "meta_spend" | "hotmart_sales") =>
   daily.map((p) => ({ x: new Date(`${p.date}T00:00:00`), y: p[campo] }));
@@ -35,18 +28,18 @@ function PainelMeta({ meta, daily }: { meta: GlobalMetrics; daily: DailyPoint[] 
   return (
     <div className="space-y-5">
       <dl className="grid grid-cols-2 gap-2 @xl:grid-cols-4">
-        <Numero rotulo="Investimento" valor={fmtBRL(meta.meta_spend)} />
-        <Numero rotulo="CPM" valor={fmtBRL(meta.meta_cpm)} />
-        <Numero rotulo="CTR" valor={fmtPct(meta.meta_ctr)} />
-        <Numero rotulo="Leads" valor={fmtNum(meta.meta_leads)} />
-        <Numero rotulo="Custo por lead" valor={meta.meta_cpl_traffic === null ? "—" : fmtBRL(meta.meta_cpl_traffic)} />
-        <Numero rotulo="Checkouts" valor={fmtNum(meta.meta_checkout)} />
-        <Numero rotulo="Taxa de conexão" valor={fmtPct(meta.meta_connect_rate)} />
-        <Numero rotulo="Conversão da página" valor={fmtPct(meta.meta_lp_conversion)} />
+        <Numero caixa dado="custo" rotulo="Investimento" valor={fmtBRL(meta.meta_spend)} />
+        <Numero caixa dado="custo" rotulo="CPM" valor={fmtBRL(meta.meta_cpm)} />
+        <Numero caixa dado="alcance" rotulo="CTR" valor={fmtPct(meta.meta_ctr)} />
+        <Numero caixa dado="lead" rotulo="Leads" valor={fmtNum(meta.meta_leads)} />
+        <Numero caixa dado="custo" rotulo="Custo por lead" valor={meta.meta_cpl_traffic === null ? "—" : fmtBRL(meta.meta_cpl_traffic)} />
+        <Numero caixa dado="venda" rotulo="Checkouts" valor={fmtNum(meta.meta_checkout)} />
+        <Numero caixa dado="pagina" rotulo="Taxa de conexão" valor={fmtPct(meta.meta_connect_rate)} />
+        <Numero caixa dado="pagina" rotulo="Conversão da página" valor={fmtPct(meta.meta_lp_conversion)} />
       </dl>
       <LineChartLazy
         titulo="Investimento por dia"
-        series={[{ id: "gasto", label: "Investimento", data: serieDiaria(daily, "meta_spend") }]}
+        series={[{ id: "gasto", label: "Investimento", cor: corDado("custo"), data: serieDiaria(daily, "meta_spend") }]}
         formatarY={fmtBRL}
         altura={240}
       />
@@ -99,21 +92,21 @@ function PainelHotmart({
   return (
     <div className="space-y-5">
       <dl className="grid grid-cols-2 gap-2 @xl:grid-cols-4">
-        <Numero rotulo="Vendas" valor={fmtNum(hotmart.total_sales)} />
-        <Numero rotulo="Receita" valor={fmtBRL(hotmart.total_revenue)} />
-        <Numero rotulo="Vendas em reais" valor={fmtNum(hotmart.total_sales_brl)} />
-        <Numero rotulo="Vendas no exterior" valor={fmtNum(hotmart.total_sales_foreign)} />
+        <Numero caixa dado="venda" rotulo="Vendas" valor={fmtNum(hotmart.total_sales)} />
+        <Numero caixa dado="venda" rotulo="Receita" valor={fmtBRL(hotmart.total_revenue)} />
+        <Numero caixa dado="venda" rotulo="Vendas em reais" valor={fmtNum(hotmart.total_sales_brl)} />
+        <Numero caixa dado="venda" rotulo="Vendas no exterior" valor={fmtNum(hotmart.total_sales_foreign)} />
       </dl>
       <LineChartLazy
         titulo="Vendas por dia"
-        series={[{ id: "vendas", label: "Vendas", data: serieDiaria(daily, "hotmart_sales") }]}
+        series={[{ id: "vendas", label: "Vendas", cor: corDado("venda"), data: serieDiaria(daily, "hotmart_sales") }]}
         formatarY={fmtNum}
         altura={240}
       />
       <div className="grid gap-5 @3xl:grid-cols-2">
         <div>
           <h3 className="mb-2 text-sm font-medium">Receita por produto</h3>
-          <BarChartLazy titulo="Receita por produto" data={produtos} orientacao="horizontal" formatarValor={fmtBRL} />
+          <BarChartLazy titulo="Receita por produto" cor={corDado("venda")} data={produtos} orientacao="horizontal" formatarValor={fmtBRL} />
         </div>
         <div>
           <h3 className="mb-2 text-sm font-medium">Origem das vendas</h3>

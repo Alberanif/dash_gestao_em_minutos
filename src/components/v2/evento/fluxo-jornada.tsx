@@ -1,72 +1,58 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { CountUp } from "../motion/count-up";
 import { durFluxo } from "../motion/variants";
 import { usePerfilMovimento } from "../motion/use-perfil-movimento";
 import { useVisto } from "../motion/use-visto";
+import { corDado } from "../cor";
 import { cx, foco } from "../ui/cx";
+import { ETAPAS } from "./dados";
 import { fmtDecimal, fmtNum } from "./format";
+import { SeloIcone } from "./icones";
+
+const corDaEtapa = (i: number) => corDado(ETAPAS[i]?.dado ?? "alcance");
 
 export type EtapaFluxo = { label: string; value: number };
 export type TaxaFluxo = { label: string; pct: number | null };
 
-const TRACO = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" } as const;
-
-/** Um ícone de traço fino por etapa, na ordem do funil: impressões, cliques, página, leads, vendas. */
-const ICONES: Array<React.ReactNode> = [
-  <g key="0">
-    <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z" {...TRACO} />
-    <circle cx="12" cy="12" r="3" {...TRACO} />
-  </g>,
-  <path key="cursor" d="M6 3.5 18 12l-5.2 1.3L10.6 19 6 3.5Z" {...TRACO} />,
-  <g key="1">
-    <rect x="4" y="4" width="16" height="16" rx="2.5" {...TRACO} />
-    <path d="M4 9h16M8 13h5M8 16.5h8" {...TRACO} />
-  </g>,
-  <g key="2">
-    <circle cx="12" cy="8" r="3.5" {...TRACO} />
-    <path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5" {...TRACO} />
-  </g>,
-  <g key="3">
-    <path d="M5.5 8h13l-1 11.5h-11L5.5 8Z" {...TRACO} />
-    <path d="M9 8V6.5a3 3 0 0 1 6 0V8M9.5 13.5l2 2 3.5-3.8" {...TRACO} />
-  </g>,
-];
-
 /** De onde vem cada número, na mesma ordem. */
 const ORIGENS = ["Meta Ads", "Meta Ads", "Meta Ads", "Captação de leads", "Hotmart"];
 
-function Selo({ indice }: { indice: number }) {
-  return (
-    <span className="grid size-10 shrink-0 place-items-center rounded-full bg-v2-casco-alto text-v2-azul-luz ring-1 ring-inset ring-v2-azul-luz/25">
-      <svg viewBox="0 0 24 24" className="size-5" aria-hidden="true">
-        {ICONES[indice] ?? ICONES[0]}
-      </svg>
-    </span>
-  );
-}
-
-function Pino({ x, y }: { x: number; y: number }) {
-  return <circle cx={x} cy={y} r={3} className="fill-v2-casco-alto stroke-v2-azul-luz/70" strokeWidth={1.25} />;
+function Pino({ x, y, cor }: { x: number; y: number; cor: string }) {
+  return <circle cx={x} cy={y} r={3} className="fill-v2-casco-alto" stroke={cor} strokeWidth={1.5} />;
 }
 
 /**
  * Corda entre duas etapas, com uma leve barriga caída. Sai de um pino e chega a outro: horizontal em tela larga,
  * vertical em tela estreita. Sem taxa calculável a corda fica tracejada e não se traça: só aparece.
  */
-function Corda({ indice, tracejada, escurecida }: { indice: number; tracejada: boolean; escurecida: boolean }) {
+function Corda({ indice, tracejada, escurecida, idBase }: { indice: number; tracejada: boolean; escurecida: boolean; idBase: string }) {
+  const de = corDaEtapa(indice);
+  const para = corDaEtapa(indice + 1);
+  const idH = `${idBase}-h${indice}`;
+  const idV = `${idBase}-v${indice}`;
   const comum = {
     fill: "none",
-    stroke: "currentColor",
     strokeWidth: 1.5,
     strokeLinecap: "round",
   } as const;
-  const traco = tracejada
-    ? { className: "v2-g v2-fl-corda v2-fl-corda-vazia", strokeDasharray: "3 6" }
-    : { className: "v2-g v2-fl-corda", pathLength: 1, strokeDasharray: 1 };
+  // A corda leva a cor da etapa de saída até a da chegada. Sem taxa, fica tracejada e neutra.
+  const traco = (id: string) =>
+    tracejada
+      ? { className: "v2-g v2-fl-corda v2-fl-corda-vazia", strokeDasharray: "3 6", stroke: "currentColor" }
+      : { className: "v2-g v2-fl-corda", pathLength: 1, strokeDasharray: 1, stroke: `url(#${id})` };
   const estilo = { "--i": indice } as React.CSSProperties;
   const classes = cx("pointer-events-none absolute text-v2-azul-luz/60 transition-opacity duration-150", escurecida && "opacity-30");
+  const gradiente = (id: string, vertical: boolean) => (
+    <defs>
+      <linearGradient id={id} x1="0" y1="0" x2={vertical ? 0 : 1} y2={vertical ? 1 : 0}>
+        <stop offset="0" stopColor={de} />
+        <stop offset="1" stopColor={para} />
+      </linearGradient>
+    </defs>
+  );
+  const pino = tracejada ? ["var(--v2-azul-luz)", "var(--v2-azul-luz)"] : [de, para];
   return (
     <>
       <svg
@@ -74,18 +60,20 @@ function Corda({ indice, tracejada, escurecida }: { indice: number; tracejada: b
         viewBox="0 0 72 48"
         className={cx(classes, "left-full top-1/2 hidden h-12 w-[72px] -translate-y-1/2 overflow-visible @5xl:block")}
       >
-        <path d="M0 24 Q36 46 72 24" style={estilo} {...comum} {...traco} />
-        <Pino x={0} y={24} />
-        <Pino x={72} y={24} />
+        {gradiente(idH, false)}
+        <path d="M0 24 Q36 46 72 24" style={estilo} {...comum} {...traco(idH)} />
+        <Pino x={0} y={24} cor={pino[0]} />
+        <Pino x={72} y={24} cor={pino[1]} />
       </svg>
       <svg
         aria-hidden="true"
         viewBox="0 0 48 56"
         className={cx(classes, "left-3 top-full block h-14 w-12 overflow-visible @5xl:hidden")}
       >
-        <path d="M24 0 Q6 28 24 56" style={estilo} {...comum} {...traco} />
-        <Pino x={24} y={0} />
-        <Pino x={24} y={56} />
+        {gradiente(idV, true)}
+        <path d="M24 0 Q6 28 24 56" style={estilo} {...comum} {...traco(idV)} />
+        <Pino x={24} y={0} cor={pino[0]} />
+        <Pino x={24} y={56} cor={pino[1]} />
       </svg>
     </>
   );
@@ -93,6 +81,7 @@ function Corda({ indice, tracejada, escurecida }: { indice: number; tracejada: b
 
 /** Selo da taxa de conversão, pendurado no meio da corda. */
 function Taxa({ indice, taxa, escurecida }: { indice: number; taxa: TaxaFluxo; escurecida: boolean }) {
+  const cor = corDaEtapa(indice + 1);
   const texto = taxa.pct === null ? "—" : `${fmtDecimal(taxa.pct, 2)}%`;
   return (
     <span
@@ -102,8 +91,9 @@ function Taxa({ indice, taxa, escurecida }: { indice: number; taxa: TaxaFluxo; e
       className="v2-g v2-fl-taxa absolute left-9 top-[calc(100%+28px)] z-10 -translate-x-1/2 -translate-y-1/2 @5xl:left-[calc(100%+36px)] @5xl:top-1/2"
     >
       <span
+        style={{ boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${cor} ${taxa.pct === null ? 20 : 55}%, transparent)` }}
         className={cx(
-          "block whitespace-nowrap rounded-full bg-v2-abismo px-2 py-0.5 text-[11px] font-medium tabular-nums text-v2-nevoa/85 ring-1 ring-inset ring-v2-azul-luz/30 transition-opacity duration-150",
+          "block whitespace-nowrap rounded-full bg-v2-abismo px-2 py-0.5 text-[11px] font-medium tabular-nums text-v2-nevoa transition-opacity duration-150",
           escurecida && "opacity-30",
         )}
       >
@@ -124,6 +114,7 @@ export function FluxoJornada({ etapas, taxas, className }: { etapas: ReadonlyArr
   const [ativo, setAtivo] = useState<number | null>(null);
   const passo = perfil === "curto" ? durFluxo.passoCurto : durFluxo.passo;
   const ultima = etapas.length - 1;
+  const idBase = `v2-corda-${useId().replace(/:/g, "")}`;
 
   return (
     <div ref={ref} data-gate="" data-visto={visto ? "" : undefined} className={className}>
@@ -146,11 +137,21 @@ export function FluxoJornada({ etapas, taxas, className }: { etapas: ReadonlyArr
             >
               <div
                 className={cx(
-                  "flex h-full items-center gap-3 rounded-v2-md bg-v2-casco p-4 shadow-v2-1 ring-1 ring-inset ring-v2-azul-luz/15 transition-opacity duration-150 @5xl:flex-col @5xl:items-start @5xl:gap-3",
+                  "relative flex h-full items-center gap-3 overflow-hidden rounded-v2-md bg-v2-casco p-4 shadow-v2-1 ring-1 ring-inset ring-v2-azul-luz/15 transition-opacity duration-150 @5xl:flex-col @5xl:items-start @5xl:gap-3",
                   escurecido && "opacity-45",
                 )}
               >
-                <Selo indice={i} />
+                <span
+                  aria-hidden="true"
+                  className={cx("pointer-events-none absolute inset-0 rounded-v2-md transition-opacity duration-150", ativo === i ? "opacity-100" : "opacity-0")}
+                  style={{ boxShadow: `inset 0 0 42px color-mix(in srgb, ${corDaEtapa(i)} 20%, transparent)` }}
+                />
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-x-0 top-0 h-0.5"
+                  style={{ background: `linear-gradient(90deg, ${corDaEtapa(i)}, transparent 85%)` }}
+                />
+                <SeloIcone nome={ETAPAS[i]?.icone ?? "impressoes"} dado={ETAPAS[i]?.dado ?? "alcance"} />
                 <div className="min-w-0">
                   <p className="text-xs text-v2-nevoa/70">{etapa.label}</p>
                   <p className="mt-0.5 truncate text-xl font-semibold tabular-nums tracking-tight">
@@ -172,7 +173,7 @@ export function FluxoJornada({ etapas, taxas, className }: { etapas: ReadonlyArr
               ) : null}
               {i < ultima ? (
                 <>
-                  <Corda indice={i} tracejada={taxas[i]?.pct === null || taxas[i] === undefined} escurecida={cordaEscura} />
+                  <Corda idBase={idBase} indice={i} tracejada={taxas[i]?.pct === null || taxas[i] === undefined} escurecida={cordaEscura} />
                   {taxas[i] ? <Taxa indice={i} taxa={taxas[i]} escurecida={cordaEscura} /> : null}
                 </>
               ) : null}

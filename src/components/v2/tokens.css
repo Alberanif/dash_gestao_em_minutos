@@ -22,16 +22,23 @@
   --v2-queda: #f0645a;
   --v2-ardosia: #4f6d86;
 
-  /* Gráficos (#254). Séries categóricas validadas com a skill dataviz contra o
-     casco (#0c2230), modo escuro: faixa de luminância, croma, CVD adjacente
-     (pior par 9,4 >= 8), visão normal (>= 19,7) e contraste >= 3:1.
-     Ordem fixa, nunca cíclica; a 6ª série vira "Outros" em ardósia.
-     O âmbar (--v2-ponto) fica de fora de propósito: é só o último ponto. */
-  --v2-serie-1: #2e8bb9;
-  --v2-serie-2: #d95926;
-  --v2-serie-3: #199e70;
-  --v2-serie-4: #9085e9;
-  --v2-serie-5: #d55181;
+  /* Cor por significado: cada tipo de dado tem sempre a mesma cor, em qualquer bloco.
+     Contraste medido contra o casco (#0c2230) e o casco-alto (#123246): todas >= 5,3:1.
+     O âmbar (--v2-ponto) fica de fora de propósito: é só o dado vivo. */
+  --v2-d-alcance: #6ec3ea; /* impressões, cliques, Meta Ads */
+  --v2-d-pagina: #4fd1d9; /* visualizações de página */
+  --v2-d-lead: #3fd9a8; /* leads */
+  --v2-d-venda: #7be08a; /* vendas e receita */
+  --v2-d-custo: #a99bff; /* investimento e custos */
+  --v2-d-alerta: #ff7a7a; /* queda e alerta */
+
+  /* Séries sem significado próprio (campanhas, produtos, origens), em ordem fixa, nunca cíclica;
+     a 6ª vira "Outros" em ardósia. Azul e violeta abrem a ordem; coral e ciano ficam longe dos vizinhos. */
+  --v2-serie-1: #6ec3ea;
+  --v2-serie-2: #a99bff;
+  --v2-serie-3: #3fd9a8;
+  --v2-serie-4: #ff7a7a;
+  --v2-serie-5: #4fd1d9;
   /* Funil: rampa ordinal de um tom (azul), validada com --ordinal (passos de L >= 0,06,
      ponta mais escura a 2,94:1 do casco). */
   --v2-funil-1: #a9ddf3;
@@ -93,6 +100,12 @@
   --color-v2-alta: var(--v2-alta);
   --color-v2-queda: var(--v2-queda);
   --color-v2-ardosia: var(--v2-ardosia);
+  --color-v2-d-alcance: var(--v2-d-alcance);
+  --color-v2-d-pagina: var(--v2-d-pagina);
+  --color-v2-d-lead: var(--v2-d-lead);
+  --color-v2-d-venda: var(--v2-d-venda);
+  --color-v2-d-custo: var(--v2-d-custo);
+  --color-v2-d-alerta: var(--v2-d-alerta);
 
   --shadow-v2-1: var(--v2-sombra-1);
   --shadow-v2-2: var(--v2-sombra-2);
