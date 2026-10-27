@@ -144,3 +144,81 @@ describe("conta ativa", () => {
     expect((await visit("/api/admin/users")).status).toBe(200);
   });
 });
+
+describe("rota pública da Central de Links (/p/*)", () => {
+  it("ehRotaPublicaDaCentral só cobre /p/<algo>", async () => {
+    const { ehRotaPublicaDaCentral } = await import("../middleware");
+    expect(ehRotaPublicaDaCentral("/p/abc")).toBe(true);
+    for (const p of ["/pasta", "/p", "/painel", "/pagina", "/pasta/x", "/api/p/x"]) {
+      expect(ehRotaPublicaDaCentral(p)).toBe(false);
+    }
+  });
+
+  it("/p/abc sem sessão passa, sem redirecionar", async () => {
+    anonymous();
+    const response = await visit("/p/abc");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("location")).toBeNull();
+  });
+
+  it("/p/abc passa também para conta pendente e comum", async () => {
+    for (const role of ["pendente", "comum"]) {
+      signedInAs({ role });
+      const response = await visit("/p/abc");
+      expect(response.status).toBe(200);
+      expect(response.headers.get("location")).toBeNull();
+    }
+  });
+
+  it("/api/track e /t.js (coleta do Teste A/B) são públicos, e só eles", async () => {
+    const { ehRotaPublicaDaCentral } = await import("../middleware");
+    expect(ehRotaPublicaDaCentral("/api/track")).toBe(true);
+    expect(ehRotaPublicaDaCentral("/t.js")).toBe(true);
+    for (const p of ["/api/trackx", "/api/tracking", "/api/track/x", "/t.jsx", "/tt.js", "/t.json", "/x/t.js", "/api/track.js"]) {
+      expect(ehRotaPublicaDaCentral(p)).toBe(false);
+    }
+  });
+
+  it("/api/track e /t.js passam sem sessão, sem redirecionar", async () => {
+    anonymous();
+    for (const path of ["/api/track", "/t.js"]) {
+      const response = await visit(path);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("location")).toBeNull();
+    }
+  });
+
+  it("/api/track e /t.js passam também para conta pendente e comum", async () => {
+    for (const role of ["pendente", "comum"]) {
+      signedInAs({ role });
+      for (const path of ["/api/track", "/t.js"]) {
+        const response = await visit(path);
+        expect(response.status).toBe(200);
+        expect(response.headers.get("location")).toBeNull();
+      }
+    }
+  });
+
+  it("/api/trackx, /t.jsx e /tt.js continuam barrados sem sessão", async () => {
+    anonymous();
+    for (const path of ["/api/trackx", "/api/track/x", "/t.jsx", "/tt.js"]) {
+      const response = await visit(path);
+      expect(response.status).toBe(307);
+      expect(response.headers.get("location")).toContain("/login");
+    }
+  });
+
+  it("/api/trackx continua dando 403 para conta pendente", async () => {
+    signedInAs({ role: "pendente" });
+    expect((await visit("/api/trackx")).status).toBe(403);
+  });
+
+  it("rotas de nome parecido continuam barradas sem sessão", async () => {
+    anonymous();
+    for (const path of ["/pagina", "/pasta", "/p", "/painel"]) {
+      const response = await visit(path);
+      expect(response.status).toBe(307);
+      expect(response.headers.get("location")).toContain("/login");
+    }
+  });
+});

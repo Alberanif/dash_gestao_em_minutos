@@ -1,0 +1,214 @@
+/*
+ * Central de links: pastas em linhas (uma acima da outra) e links em cartões de miniatura.
+ * Usa as classes da pasta dos Eventos (eventos/pastas.css); aqui só entra o que muda na lista.
+ * Tudo anima só transform e opacity.
+ */
+
+/* Pasta de lista: menor e sempre à vista (na tela de Eventos as fechadas recuam). */
+.v2 .v2-pasta[data-lista] { max-width: 11rem; padding-top: 1.5rem; }
+.v2 .v2-pasta[data-lista]:not([data-aberta]) { transform: none; opacity: 1; }
+.v2 .v2-pasta[data-lista]:not([data-aberta])[data-esmaecida] { opacity: 0.55; }
+.v2 .v2-pasta[data-lista]:not([data-aberta]):hover { opacity: 1; }
+.v2 .v2-pasta[data-lista] .v2-pasta-corpo { width: 11rem; height: 7.25rem; }
+.v2 .v2-pasta[data-lista] .v2-pasta-nome { margin-top: 1rem; font-size: 1rem; padding: 0 0.5rem; }
+.v2 .v2-pasta[data-lista] .v2-pasta-conta { font-size: 0.8125rem; }
+
+/* Linha: a pasta à esquerda e, ao lado, a relação dos links que ela guarda. */
+.v2 .v2-cl-linha {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  align-items: center;
+  column-gap: 2rem;
+  /* referência para o cqw da pasta aberta */
+  container-type: inline-size;
+}
+/* Pasta aberta: anda só no eixo X, até o meio da largura dos cartões; o Y não muda. */
+.v2 .v2-cl-pasta { transition: transform 760ms var(--v2-ease-suave); }
+.v2 .v2-cl-linha[data-aberta] .v2-cl-pasta { transform: translateX(calc(50cqw - 5.5rem)); }
+/* A relação some sem sair do fluxo, para a altura da linha ficar a mesma. */
+.v2 .v2-cl-previa { transition: opacity 200ms var(--v2-ease-suave); }
+.v2 .v2-cl-previa[data-oculta] { opacity: 0; visibility: hidden; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) {
+  .v2 .v2-cl-pasta, .v2 .v2-cl-previa { transition: none; }
+}
+@media (max-width: 40rem) {
+  .v2 .v2-cl-linha { grid-template-columns: 1fr; row-gap: 0.5rem; justify-items: center; }
+  .v2 .v2-cl-previa { width: 100%; }
+  /* em coluna única a pasta já está centrada */
+  .v2 .v2-cl-linha[data-aberta] .v2-cl-pasta { transform: none; }
+  .v2 .v2-cl-previa[data-oculta] { display: none; }
+}
+
+.v2 .v2-cl-previa {
+  min-width: 0;
+  cursor: pointer;
+  border-radius: var(--v2-raio-md);
+  padding: 0.75rem 1rem;
+}
+@media (hover: hover) {
+  .v2 .v2-cl-previa:hover { background: rgb(232 243 249 / 0.04); }
+}
+.v2 .v2-cl-previa-item { list-style: none; min-width: 0; }
+/* Cada nome é um botão delimitado: alvo grande (mín. 3rem), borda, fundo próprio e ponto na cor da pasta. */
+.v2 .v2-cl-previa-botao {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid rgb(232 243 249 / 0.16);
+  border-radius: var(--v2-raio-md);
+  background: rgb(232 243 249 / 0.06);
+  color: rgb(232 243 249 / 0.92);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+}
+.v2 .v2-cl-previa-botao::before {
+  content: "";
+  flex: none;
+  width: 0.5625rem;
+  height: 0.5625rem;
+  border-radius: 9999px;
+  background: var(--pc);
+}
+.v2 .v2-cl-previa-botao:hover { background: rgb(232 243 249 / 0.14); border-color: var(--pc); }
+.v2 .v2-cl-previa-botao:focus-visible { outline: 2px solid var(--v2-azul-luz); outline-offset: 2px; }
+.v2 .v2-cl-previa-botao > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Relação completa: rola com a roda do mouse; passa de ~4 nomes e o efeito por item entra (data-onda, posto pelo JS). */
+.v2 .v2-cl-lista {
+  position: relative;
+  margin: 0;
+  /* folga à direita: o nome em destaque desliza e cresce para lá sem ser cortado */
+  padding: 0.5rem 1.75rem 0.5rem 0.5rem;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 14rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(232 243 249 / 0.3) transparent;
+}
+.v2 .v2-cl-lista:focus-visible { outline: 2px solid var(--v2-azul-luz); outline-offset: 2px; border-radius: var(--v2-raio-sm); }
+/* --w (0 a 1) é a proximidade do item ao centro da janela; no hover o item cresce mais um degrau. */
+.v2 .v2-cl-lista[data-onda] .v2-cl-previa-item {
+  transform-origin: left center;
+  transform: translateX(calc(var(--w, 0) * 1rem)) scale(calc(0.93 + var(--w, 0) * 0.07));
+  opacity: calc(0.45 + var(--w, 0) * 0.55);
+  transition: transform 160ms var(--v2-ease-suave), opacity 160ms var(--v2-ease-suave);
+}
+@media (hover: hover) {
+  .v2 .v2-cl-lista[data-onda] .v2-cl-previa-item:hover,
+  .v2 .v2-cl-lista[data-onda] .v2-cl-previa-item:focus-within {
+    transform: translateX(1.25rem) scale(1.07);
+    opacity: 1;
+  }
+  .v2 .v2-cl-lista:not([data-onda]) .v2-cl-previa-item { transition: transform 160ms var(--v2-ease-suave); transform-origin: left center; }
+  .v2 .v2-cl-lista:not([data-onda]) .v2-cl-previa-item:hover { transform: translateX(0.75rem) scale(1.05); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .v2 .v2-cl-lista .v2-cl-previa-item,
+  .v2 .v2-cl-lista .v2-cl-previa-item:hover { transform: none !important; transition: none; }
+}
+
+/* Painel dos links: abre logo abaixo da linha da pasta. */
+.v2 .v2-cl-painel { padding: 1.25rem 0 0.5rem; }
+/* Faixa horizontal: os cartões ficam lado a lado e a faixa rola para o lado; cada cartão para no início. */
+.v2 .v2-cl-faixa {
+  display: flex;
+  gap: 1.25rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  /* folga em cima e embaixo para o cartão subir no hover sem ser cortado */
+  padding: 0.5rem 0.25rem 1.25rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(232 243 249 / 0.3) transparent;
+}
+.v2 .v2-cl-faixa:focus-visible { outline: 2px solid var(--v2-azul-luz); outline-offset: 2px; border-radius: var(--v2-raio-md); }
+.v2 .v2-cl-faixa > * { scroll-snap-align: start; }
+
+/*
+ * Cartão do link (base: Uiverse, monkey_8812). Moldura na cor da pasta, miolo escuro com o canto
+ * superior direito bem arredondado, miniatura da página no miolo e um painel de vidro com o texto.
+ */
+.v2 .v2-cl-card {
+  position: relative;
+  flex: none;
+  width: min(30rem, 86vw);
+  height: 23rem;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid rgb(232 243 249 / 0.28);
+  box-shadow: var(--v2-sombra-1);
+  isolation: isolate;
+  transition: transform 240ms var(--v2-ease-suave);
+}
+@media (hover: hover) {
+  .v2 .v2-cl-card:hover { transform: translateY(-3px); }
+}
+/*
+ * Os cartões saem da pasta: com ela já a caminho do centro, cada um desce um pouco, de leve, em sequência.
+ * Só fill-mode "backwards": ao terminar, o transform volta ao CSS normal e o hover do cartão funciona.
+ */
+@keyframes v2-cl-card-abre {
+  from { opacity: 0; transform: translateY(-1rem) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+.v2 .v2-cl-card.v2-arquivo {
+  animation: v2-cl-card-abre 640ms var(--v2-ease-saida) backwards;
+  animation-delay: calc(380ms + var(--i, 0) * 80ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .v2 .v2-cl-card.v2-arquivo { animation: none; }
+}
+.v2 .v2-cl-card:has(:focus-visible) { outline: 2px solid var(--v2-azul-luz); outline-offset: 3px; }
+.v2 .v2-cl-moldura { position: absolute; inset: 0; padding: 0.25rem; background: var(--pc); }
+.v2 .v2-cl-miolo {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 0.75rem 6.25rem 2.5rem 0.75rem;
+  background: var(--v2-abismo);
+}
+.v2 .v2-cl-miniatura {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
+  transform-origin: top left;
+  transition: transform 600ms var(--v2-ease-suave);
+}
+@media (hover: hover) {
+  .v2 .v2-cl-card:hover .v2-cl-miniatura { transform: scale(1.04); }
+}
+/* Sem miniatura: o tipo do link, grande e apagado, sobre um degradê da cor da pasta. */
+.v2 .v2-cl-vazio {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 70% 25%, color-mix(in srgb, var(--pc) 45%, transparent), transparent 60%);
+  color: color-mix(in srgb, var(--pc) 55%, white);
+}
+/* Escurece a base da miniatura para o texto de vidro ler bem */
+.v2 .v2-cl-miolo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgb(5 12 20 / 0.82), transparent 55%);
+  pointer-events: none;
+}
+.v2 .v2-cl-vidro {
+  background: rgb(232 243 249 / 0.1);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}

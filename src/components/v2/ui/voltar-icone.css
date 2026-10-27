@@ -1,0 +1,81 @@
+/*
+ * Botão de voltar só com seta (base: Uiverse.io, vinodjangid07). 45px, moldura fina; no hover o fundo
+ * escuro gira 35° pela base e a moldura se preenche. Só transform e opacity animam: o preenchimento é
+ * uma camada que ganha opacidade, no lugar do background-color.
+ */
+.v2 .v2-voltar-icone {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  width: 45px;
+  height: 45px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  color: var(--v2-nevoa);
+  outline: none;
+}
+
+.v2 .v2-voltar-icone-fundo {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 10px;
+  background: var(--v2-casco);
+  pointer-events: none;
+  transition: transform 300ms ease;
+}
+
+.v2 .v2-voltar-icone-moldura {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v2-azul-luz) 40%, transparent);
+}
+
+.v2 .v2-voltar-icone-brilho {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--v2-azul-luz) 35%, transparent);
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.v2 .v2-voltar-icone-seta {
+  position: relative;
+  transition: transform 300ms ease;
+}
+
+@media (hover: hover) {
+  .v2 .v2-voltar-icone:hover .v2-voltar-icone-fundo {
+    transform: rotate(35deg);
+    transform-origin: bottom;
+  }
+  .v2 .v2-voltar-icone:hover .v2-voltar-icone-brilho {
+    opacity: 1;
+  }
+  .v2 .v2-voltar-icone:hover .v2-voltar-icone-seta {
+    transform: translateX(-2px);
+  }
+}
+
+.v2 .v2-voltar-icone:focus-visible {
+  outline: 2px solid var(--v2-azul-luz);
+  outline-offset: 3px;
+}
+.v2 .v2-voltar-icone:focus-visible .v2-voltar-icone-brilho {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2 .v2-voltar-icone-fundo,
+  .v2 .v2-voltar-icone-brilho,
+  .v2 .v2-voltar-icone-seta {
+    transition-duration: 1ms;
+  }
+}

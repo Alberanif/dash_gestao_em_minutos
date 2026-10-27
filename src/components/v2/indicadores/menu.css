@@ -1,0 +1,151 @@
+/*
+ * Menu principal dos Indicadores. Tudo anima só transform e opacity.
+ * Repouso e hover seguem o card do Uiverse (Javierrocadev): o bloco dá zoom, o título sobe e a
+ * descrição aparece. Sem hover (touch) a descrição fica sempre à vista.
+ */
+.v2 .v2-card {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 23rem;
+  overflow: hidden;
+  cursor: pointer;
+  border-radius: var(--v2-raio-md);
+  background: var(--v2-casco);
+  box-shadow: var(--v2-sombra-1);
+  outline-offset: 3px;
+  transition: box-shadow var(--v2-dur-lenta) var(--v2-ease-saida);
+}
+.v2 .v2-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgb(110 195 234 / 0.15);
+}
+.v2 .v2-card-arte {
+  height: 15rem;
+  transform-origin: 50% 40%;
+  transition: transform var(--v2-dur-lenta) var(--v2-ease-saida);
+}
+.v2 .v2-arte { width: 100%; height: 100%; }
+.v2 .v2-arte svg { display: block; width: 100%; height: 100%; }
+
+.v2 .v2-card-texto {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  height: 8.5rem;
+  padding: 1.5rem 1.5rem 0;
+  background: var(--v2-casco);
+  /* Em repouso só o título aparece; a descrição fica abaixo da borda, cortada pelo card */
+  transform: translateY(3.25rem);
+  transition: transform var(--v2-dur-lenta) var(--v2-ease-saida);
+}
+.v2 .v2-card-titulo { display: block; font-size: 1.5rem; font-weight: 600; line-height: 2rem; letter-spacing: -0.01em; }
+.v2 .v2-card-desc {
+  margin-top: 0.5rem;
+  max-width: 24ch;
+  font-size: 1rem;
+  line-height: 1.45;
+  color: rgb(232 243 249 / 0.8);
+  opacity: 0;
+  transition: opacity var(--v2-dur-lenta) var(--v2-ease-saida);
+}
+
+/* Faixas do funil e feixe de luz da miniatura */
+.v2 .v2-arte-faixa {
+  transform-box: fill-box;
+  transition: transform var(--v2-dur-lenta) var(--v2-ease-saida);
+  transition-delay: calc(var(--i, 0) * 30ms);
+}
+.v2 .v2-arte-feixe { transform-box: fill-box; opacity: 0; }
+
+@keyframes v2-feixe-desce {
+  0% { opacity: 0; transform: translateY(0); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(290px); }
+}
+
+.v2 .v2-card:hover,
+.v2 .v2-card:focus-visible { box-shadow: var(--v2-sombra-2), var(--v2-brilho-azul); }
+.v2 .v2-card:hover .v2-card-arte,
+.v2 .v2-card:focus-visible .v2-card-arte { transform: scale(1.1); }
+.v2 .v2-card:hover .v2-card-texto,
+.v2 .v2-card:focus-visible .v2-card-texto { transform: none; }
+.v2 .v2-card:hover .v2-card-desc,
+.v2 .v2-card:focus-visible .v2-card-desc { opacity: 1; }
+.v2 .v2-card:hover .v2-arte-faixa,
+.v2 .v2-card:focus-visible .v2-arte-faixa { transform: translateY(calc(var(--i, 0) * 2px - 4px)); }
+.v2 .v2-card:hover .v2-arte-feixe,
+.v2 .v2-card:focus-visible .v2-arte-feixe { animation: v2-feixe-desce 1400ms var(--v2-ease-suave) both; }
+
+/* Sem hover (touch): a descrição já aparece e o card não depende de passar o mouse */
+@media (hover: none) {
+  .v2 .v2-card-texto { transform: none; }
+  .v2 .v2-card-desc { opacity: 1; }
+}
+
+/*
+ * Entrada no card: a arte cresce do lugar do card até cobrir a janela, enquanto o fundo escurece e um
+ * véu da cor da página fecha o quadro no fim. Some junto com o hub quando a navegação acontece.
+ */
+.v2 .v2-entrada { position: fixed; inset: 0; z-index: 100; }
+.v2 .v2-entrada-fundo {
+  position: absolute;
+  inset: 0;
+  background: var(--v2-abismo);
+  opacity: 0;
+  transition: opacity var(--dur) var(--v2-ease-suave);
+}
+.v2 .v2-entrada-janela {
+  position: absolute;
+  overflow: hidden;
+  border-radius: var(--v2-raio-md);
+  background: var(--v2-casco);
+  transform-origin: 50% 50%;
+  transition: transform var(--dur) cubic-bezier(0.65, 0, 0.35, 1);
+}
+.v2 .v2-entrada-veu {
+  position: absolute;
+  inset: 0;
+  background: var(--v2-abismo);
+  opacity: 0;
+  transition: opacity calc(var(--dur) * 0.4) var(--v2-ease-suave) calc(var(--dur) * 0.6);
+}
+.v2 .v2-entrada[data-rodando] .v2-entrada-fundo { opacity: 0.85; }
+.v2 .v2-entrada[data-rodando] .v2-entrada-janela { transform: translate(var(--dx), var(--dy)) scale(var(--escala)); }
+.v2 .v2-entrada[data-rodando] .v2-entrada-veu { opacity: 1; }
+/* Movimento reduzido: sem zoom, só o fade curto do fundo */
+.v2 .v2-entrada[data-perfil="reduzido"] .v2-entrada-janela { display: none; }
+.v2 .v2-entrada[data-perfil="reduzido"][data-rodando] .v2-entrada-fundo { opacity: 1; }
+
+/* Chegada em Eventos: começa um pouco maior e assenta, fechando o movimento de entrada */
+@keyframes v2-chega {
+  from { opacity: 0; transform: scale(1.03); }
+  to { opacity: 1; transform: none; }
+}
+.v2 .v2-chega { animation: v2-chega 420ms var(--v2-ease-saida) both; }
+
+/* Voltando do dashboard a lista assenta de um pouco menor (zoom out); o dashboard se afasta antes disso */
+@keyframes v2-volta {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+html[data-v2-volta] .v2 .v2-chega { animation-name: v2-volta; }
+@keyframes v2-afasta {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: scale(0.94); }
+}
+.v2 .v2-pagina-evento[data-saindo] { animation: v2-afasta 320ms cubic-bezier(0.65, 0, 0.35, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .v2 .v2-pagina-evento[data-saindo],
+  .v2 .v2-chega,
+  .v2 .v2-arte-feixe { animation: none !important; }
+  .v2 .v2-card:hover .v2-card-arte,
+  .v2 .v2-card:focus-visible .v2-card-arte { transform: none; }
+}

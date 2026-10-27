@@ -64,6 +64,20 @@ describe("SelectionCards — role: gestor", () => {
   });
 });
 
+describe("SelectionCards — botão Layout V2", () => {
+  it("gestor vê o botão, que leva a /v2", () => {
+    const html = render(<SelectionCards role="gestor" userEmail="g@igt.com" />);
+    expect(html).toContain('href="/v2"');
+    expect(html).toContain("Layout V2");
+  });
+
+  it.each(["analista", "comum"] as const)("%s não vê o botão", (role) => {
+    const html = render(<SelectionCards role={role} userEmail="x@igt.com" />);
+    expect(html).not.toContain('href="/v2"');
+    expect(html).not.toContain("Layout V2");
+  });
+});
+
 describe("SelectionCards — role: analista", () => {
   let html: string;
 

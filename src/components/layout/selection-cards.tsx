@@ -97,6 +97,30 @@ export function SelectionCards({ role, userEmail }: SelectionCardsProps) {
         padding: "80px 24px 48px",
       }}
     >
+      {/* Layout V2: em validação, só o gestor vê o atalho */}
+      {role === "gestor" && (
+        <Link
+          href="/v2"
+          style={{
+            position: "absolute",
+            top: 24,
+            right: 68,
+            height: 34,
+            padding: "0 12px",
+            borderRadius: 7,
+            border: "1px solid #1c2b40",
+            color: "#7b9ab6",
+            fontSize: 12,
+            fontWeight: 500,
+            textDecoration: "none",
+            display: "flex",
+            alignItems: "center",
+          }}
+        >
+          Layout V2
+        </Link>
+      )}
+
       {/* Logout */}
       <form
         action="/api/auth/signout"
