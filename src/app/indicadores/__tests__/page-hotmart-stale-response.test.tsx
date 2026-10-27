@@ -28,6 +28,7 @@ const FILTER: FilterRecord = {
   hotmart_products: [{ product_id: "8043650", product_name: "Protocolo 6%" }],
   meta_ads_terms: [],
   captacao_leads_eventos: [],
+  is_organic: false,
   status: "ativo",
   status_changed_at: null,
   created_at: "2026-01-01T00:00:00Z",

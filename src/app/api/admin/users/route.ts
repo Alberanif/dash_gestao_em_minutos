@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole, validateApiAuth } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { listAllUsers } from "@/lib/supabase/list-all-users";
+import { papelDoUsuario } from "@/lib/central-de-links/papel";
 import { resolveAccountRole, type UserRole } from "@/types/auth";
 
 export async function GET() {
@@ -22,6 +23,7 @@ export async function GET() {
     email: u.email,
     name: (u.user_metadata?.name as string | undefined) ?? null,
     role: resolveAccountRole(u.app_metadata?.role),
+    central_role: papelDoUsuario(u),
     created_at: u.created_at,
     last_sign_in_at: u.last_sign_in_at,
   }));

@@ -264,3 +264,91 @@ describe("POST /api/indicadores/filters", () => {
     });
   });
 });
+
+
+// ─── POST: captação orgânica ─────────────────────────────────────────────────
+
+describe("POST /api/indicadores/filters (is_organic)", () => {
+  const url = "http://localhost/api/indicadores/filters";
+  const hotmart = [{ product_id: "p1", product_name: "Prod 1" }];
+
+  it("grava is_organic=false por padrão quando o campo é omitido", async () => {
+    mockSingle.mockResolvedValueOnce({ data: { id: "x", is_organic: false }, error: null });
+    const { POST } = await import("../route");
+    await POST(makeRequest("POST", url, { account_id: "acc", name: "Pago", hotmart_products: hotmart }));
+    expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ is_organic: false }));
+  });
+
+  it("grava e retorna is_organic=true", async () => {
+    const created = { id: "x", is_organic: true };
+    mockSingle.mockResolvedValueOnce({ data: created, error: null });
+    const { POST } = await import("../route");
+    const res = await POST(
+      makeRequest("POST", url, {
+        account_id: "acc",
+        name: "Organico",
+        is_organic: true,
+        meta_ads_terms: ["campanha"],
+      })
+    );
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual(created);
+    expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ is_organic: true }));
+  });
+
+  it("aceita orgânico só com evento de leads", async () => {
+    mockSingle.mockResolvedValueOnce({ data: { id: "x" }, error: null });
+    const { POST } = await import("../route");
+    const res = await POST(
+      makeRequest("POST", url, { account_id: "acc", name: "O", is_organic: true, captacao_leads_eventos: ["Ev"] })
+    );
+    expect(res.status).toBe(201);
+  });
+
+  it("retorna 400 para orgânico sem leads e sem termo Meta Ads", async () => {
+    const { POST } = await import("../route");
+    const res = await POST(makeRequest("POST", url, { account_id: "acc", name: "O", is_organic: true }));
+    expect(res.status).toBe(400);
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it("retorna 400 para orgânico apenas com produto Hotmart", async () => {
+    const { POST } = await import("../route");
+    const res = await POST(
+      makeRequest("POST", url, { account_id: "acc", name: "O", is_organic: true, hotmart_products: hotmart })
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("pago continua aceitando apenas produto Hotmart", async () => {
+    mockSingle.mockResolvedValueOnce({ data: { id: "x" }, error: null });
+    const { POST } = await import("../route");
+    const res = await POST(
+      makeRequest("POST", url, { account_id: "acc", name: "P", is_organic: false, hotmart_products: hotmart })
+    );
+    expect(res.status).toBe(201);
+  });
+
+  it("preserva hotmart_products ao salvar com is_organic=true", async () => {
+    mockSingle.mockResolvedValueOnce({ data: { id: "x" }, error: null });
+    const { POST } = await import("../route");
+    await POST(
+      makeRequest("POST", url, {
+        account_id: "acc",
+        name: "O",
+        is_organic: true,
+        hotmart_products: hotmart,
+        meta_ads_terms: ["t"],
+      })
+    );
+    expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ hotmart_products: hotmart }));
+  });
+
+  it("retorna 400 quando is_organic não é booleano", async () => {
+    const { POST } = await import("../route");
+    const res = await POST(
+      makeRequest("POST", url, { account_id: "acc", name: "O", is_organic: "true", meta_ads_terms: ["t"] })
+    );
+    expect(res.status).toBe(400);
+  });
+});

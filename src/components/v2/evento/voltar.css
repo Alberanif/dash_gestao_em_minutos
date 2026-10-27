@@ -1,0 +1,90 @@
+/*
+ * Botão "Voltar aos eventos" (base: Uiverse.io, abrahamcalsin). O preenchimento claro varre o botão
+ * da direita para a esquerda no hover. Só transform e opacity animam: o preenchimento é um scaleX
+ * e o texto escuro entra por opacidade sobre o claro.
+ */
+@keyframes v2-voltar-aperta {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+.v2 .v2-voltar {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: var(--v2-casco);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v2-azul-luz) 25%, transparent), 0 6px 24px rgb(0 0 0 / 0.2);
+  color: var(--v2-nevoa);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  outline: none;
+}
+
+.v2 .v2-voltar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--v2-azul-luz);
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 400ms ease-in-out;
+}
+
+.v2 .v2-voltar-texto {
+  padding: 0.75rem 1.5rem;
+  text-align: center;
+}
+
+/* Texto escuro por cima do claro: aparece quando o preenchimento chega. */
+.v2 .v2-voltar-texto-escuro {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--v2-abismo);
+  opacity: 0;
+  transition: opacity 300ms ease-in-out;
+}
+
+.v2 .v2-voltar:focus-visible {
+  outline: 2px solid var(--v2-azul-luz);
+  outline-offset: 3px;
+}
+
+@media (hover: hover) {
+  .v2 .v2-voltar:hover::after {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+  .v2 .v2-voltar:hover .v2-voltar-texto-escuro {
+    opacity: 1;
+  }
+  .v2 .v2-voltar:hover .v2-voltar-texto {
+    animation: v2-voltar-aperta 300ms ease-in-out;
+  }
+}
+
+.v2 .v2-voltar:focus-visible::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+.v2 .v2-voltar:focus-visible .v2-voltar-texto-escuro {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2 .v2-voltar::after,
+  .v2 .v2-voltar-texto-escuro {
+    transition-duration: 1ms;
+  }
+  .v2 .v2-voltar:hover .v2-voltar-texto {
+    animation: none;
+  }
+}

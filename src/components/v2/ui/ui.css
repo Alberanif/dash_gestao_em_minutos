@@ -1,0 +1,279 @@
+/*
+ * Entradas dos primitivos Radix (data-state). Só opacity e transform.
+ * Com prefers-reduced-motion não há animação: a troca é instantânea.
+ */
+@keyframes v2-pop-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes v2-pop-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(2px) scale(0.99); }
+}
+@keyframes v2-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes v2-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+/* Entrada de lista sem JS: roda no primeiro paint, escalonada por --i (limitado a 8 no uso). */
+@keyframes v2-rise-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.v2 .v2-pop[data-state="open"] { animation: v2-pop-in var(--v2-dur-media) var(--v2-ease-saida); }
+.v2 .v2-pop[data-state="closed"] { animation: v2-pop-out var(--v2-dur-rapida) var(--v2-ease-suave); }
+.v2 .v2-fade[data-state="open"] { animation: v2-fade-in var(--v2-dur-media) var(--v2-ease-saida); }
+.v2 .v2-fade[data-state="closed"] { animation: v2-fade-out var(--v2-dur-rapida) var(--v2-ease-suave); }
+.v2 .v2-entra {
+  animation: v2-rise-in var(--v2-dur-media) var(--v2-ease-saida) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+/* Primeira entrada de um bloco do dashboard: mais lenta, e cada bloco espera 140 ms a mais que o anterior. */
+.v2 .v2-entra-bloco {
+  animation: v2-rise-in 700ms var(--v2-ease-desenho) both;
+  animation-delay: calc(var(--i, 0) * 140ms);
+}
+
+/* Troca de etapa do assistente de evento: a etapa nova desliza 16 px e aparece. Só transform e opacity. */
+@keyframes v2-etapa-entra {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: none; }
+}
+.v2 .v2-etapa { animation: v2-etapa-entra var(--v2-dur-media) var(--v2-ease-saida) both; }
+.v2[data-movimento="curto"] .v2-etapa { animation: none; }
+
+/*
+ * Desenho dos gráficos (#v2-animacoes). Cada gráfico se desenha do jeito que é: a linha é
+ * traçada, as barras crescem da base, a rosca é varrida, o funil abre de cima para baixo.
+ * Exceção deliberada à regra de só transform e opacity, restrita a estes keyframes `v2-g-*`:
+ * clip-path (linha) e stroke-dashoffset (rosca) não têm equivalente em transform.
+ *
+ * O gatilho vive em quem envolve o gráfico: [data-gate] sem [data-visto] segura tudo em pausa no
+ * primeiro quadro; [data-troca] (filtro mudou) desliga o desenho e deixa só o crossfade do Motion.
+ */
+@keyframes v2-g-traco {
+  from { clip-path: inset(-10% 100% -10% -10%); }
+  to { clip-path: inset(-10% -10% -10% -10%); }
+}
+@keyframes v2-g-sobe {
+  from { transform: scaleY(0); }
+  to { transform: none; }
+}
+@keyframes v2-g-cresce {
+  from { transform: scaleX(0); }
+  to { transform: none; }
+}
+@keyframes v2-g-varre {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes v2-g-ponto {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes v2-g-pulso {
+  from { opacity: 0.7; transform: scale(1); }
+  to { opacity: 0; transform: scale(3.4); }
+}
+@keyframes v2-g-surge {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes v2-g-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+/* Brilho do esqueleto: varredura lenta, só transform. */
+@keyframes v2-brilho {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+.v2 .v2-g {
+  animation-duration: var(--v2-dur-traco);
+  animation-timing-function: var(--v2-ease-desenho);
+  animation-fill-mode: both;
+}
+.v2 .v2-g-traco { animation-name: v2-g-traco; }
+.v2 .v2-g-sobe,
+.v2 .v2-g-cresce {
+  transform-box: fill-box;
+  animation-delay: calc(var(--i, 0) * var(--v2-escalona-item));
+}
+.v2 .v2-g-sobe { transform-origin: bottom; animation-name: v2-g-sobe; }
+.v2 .v2-g-cresce { transform-origin: left; animation-name: v2-g-cresce; }
+.v2 .v2-g-cresce.v2-g-centro { transform-origin: center; }
+.v2 .v2-g-varre { animation-name: v2-g-varre; }
+.v2 .v2-g-ponto,
+.v2 .v2-g-pulso {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-delay: var(--v2-atraso-ponto);
+}
+.v2 .v2-g-ponto { animation-name: v2-g-ponto; animation-duration: 240ms; }
+.v2 .v2-g-pulso { opacity: 0; animation-name: v2-g-pulso; animation-duration: var(--v2-dur-pulso); }
+
+/* Campanhas do Meta Ads: cartões e linhas entram em sequência (--i = posição), a barra cresce logo depois. */
+.v2 .v2-camp-surge {
+  animation-name: v2-g-surge;
+  animation-duration: 520ms;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+.v2 .v2-camp-barra {
+  transform-origin: left;
+  animation-name: v2-g-cresce;
+  animation-duration: 700ms;
+  animation-delay: calc(var(--i, 0) * 70ms + 200ms);
+}
+
+/*
+ * Cabeçalho do evento: faixa aberta, sem moldura. A luz azul é um degradê estático atrás do início
+ * do título; a linha da base se apaga para a direita no mesmo ritmo do título.
+ */
+.v2 .v2-hero-faixa {
+  background: radial-gradient(60% 120% at 0% 30%, rgb(46 134 181 / 0.22), transparent 70%);
+}
+.v2 .v2-hero-linha {
+  background: linear-gradient(90deg, rgb(111 184 227 / 0.55), rgb(111 184 227 / 0.12) 55%, transparent);
+}
+.v2 .v2-hero-entra {
+  animation-name: v2-g-surge;
+  animation-duration: 600ms;
+  animation-delay: calc(var(--i, 0) * 110ms);
+}
+/*
+ * Título que se funde: a cópia base tem a máscara final (branco pleno até 35%, 35% de opacidade na
+ * ponta); a cópia forte, sem máscara, empilhada por cima, some ao carregar. Sem animação a forte fica
+ * invisível, que é o estado final.
+ */
+.v2 .v2-titulo { display: grid; }
+.v2 .v2-titulo > span { grid-area: 1 / 1; }
+.v2 .v2-titulo-base {
+  -webkit-mask-image: linear-gradient(to right, #000 35%, rgb(0 0 0 / 0.35));
+  mask-image: linear-gradient(to right, #000 35%, rgb(0 0 0 / 0.35));
+}
+.v2 .v2-titulo-forte {
+  opacity: 0;
+  pointer-events: none;
+  animation: v2-titulo-funde 900ms var(--v2-ease-suave) 500ms both;
+}
+@keyframes v2-titulo-funde {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+.v2[data-movimento="curto"] .v2-titulo-forte { display: none; }
+/* Selo de status ao vivo: um anel latão que cresce e some, devagar. */
+@keyframes v2-hero-pulso {
+  from { opacity: 0.55; transform: scale(1); }
+  to { opacity: 0; transform: scale(2.8); }
+}
+.v2 .v2-hero-pulso { animation: v2-hero-pulso 2400ms var(--v2-ease-saida) infinite; }
+
+/*
+ * Cor da plataforma na seção Plataformas: azul na Meta Ads, latão na Hotmart. O ancestral .v2-plat
+ * define --plat; barras, hastes dos números, aba ativa e o brilho do painel leem dela.
+ */
+.v2 .v2-plat { --plat: var(--v2-azul-luz); }
+.v2 .v2-plat[data-plat="hotmart"] { --plat: var(--v2-ponto); }
+.v2 .v2-plat-painel {
+  --tw-ring-color: color-mix(in srgb, var(--plat) 28%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--plat) 18%, var(--v2-casco)), var(--v2-casco) 260px);
+}
+.v2 .v2-plat-aba[data-state="active"] {
+  background: color-mix(in srgb, var(--plat) 16%, transparent);
+  color: var(--plat);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--plat) 40%, transparent);
+}
+
+/*
+ * Vidro fosco: só para o que flutua (card do herói, filtros, KPIs, modais, popovers). Os blocos de
+ * gráfico ficam em superfície sólida. O blur é fixo em 12px e some em aparelho fraco.
+ */
+.v2 .v2-vidro {
+  background:
+    linear-gradient(180deg, rgb(228 238 243 / 0.06), rgb(228 238 243 / 0.015)),
+    var(--v2-vidro-fundo);
+  -webkit-backdrop-filter: blur(12px) saturate(1.1);
+  backdrop-filter: blur(12px) saturate(1.1);
+  box-shadow: inset 0 1px 0 var(--v2-vidro-reflexo), inset 0 0 0 1px var(--v2-vidro-borda), var(--v2-sombra-2);
+}
+.v2[data-movimento="curto"] .v2-vidro {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--v2-casco-alto);
+}
+
+/* Rótulo do valor da barra: aparece quando a barra já está quase no lugar. */
+.v2 .v2-g-rotulo {
+  animation-name: v2-g-fade;
+  animation-duration: 400ms;
+  animation-delay: calc(var(--i, 0) * var(--v2-escalona-item) + var(--v2-dur-traco) * 0.6);
+}
+
+/*
+ * Fluxo da Jornada: card, corda, selo da taxa e ponto latão entram em sequência, etapa por etapa
+ * (--i = índice da etapa). Cada corda começa a se traçar quando o card de onde sai já está em cena
+ * e termina por volta da chegada do próximo.
+ */
+.v2 .v2-fl-card {
+  animation-name: v2-g-surge;
+  animation-duration: 520ms;
+  animation-delay: calc(var(--i, 0) * var(--v2-fluxo-passo));
+}
+.v2 .v2-fl-corda {
+  animation-name: v2-g-varre;
+  animation-duration: var(--v2-fluxo-corda);
+  animation-delay: calc(var(--i, 0) * var(--v2-fluxo-passo) + 260ms);
+}
+.v2 .v2-fl-corda-vazia { animation-name: v2-g-fade; animation-duration: 300ms; }
+.v2 .v2-fl-taxa {
+  animation-name: v2-g-fade;
+  animation-duration: 300ms;
+  animation-delay: calc(var(--i, 0) * var(--v2-fluxo-passo) + 260ms + var(--v2-fluxo-corda) * 0.75);
+}
+.v2 .v2-fl-ponto,
+.v2 .v2-fl-pulso { animation-delay: calc(var(--i, 0) * var(--v2-fluxo-passo) + 700ms); }
+
+.v2 [data-gate]:not([data-visto]) .v2-g { animation-play-state: paused; }
+.v2 [data-troca] .v2-g { animation: none; }
+
+/* Aparelho fraco: traçado de 0,6 s, sem escalonamento. */
+.v2[data-movimento="curto"] {
+  --v2-dur-traco: 600ms;
+  --v2-dur-pulso: 400ms;
+  --v2-escalona-item: 0ms;
+  --v2-atraso-ponto: 500ms;
+  --v2-fluxo-passo: 160ms;
+  --v2-fluxo-corda: 300ms;
+}
+
+/* Esqueleto: a forma já é a do gráfico, o brilho azul atravessa devagar. */
+.v2 .v2-esq {
+  position: relative;
+  overflow: hidden;
+}
+.v2 .v2-esq::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(111 184 227 / 0.1) 50%, transparent);
+  transform: translateX(-100%);
+  animation: v2-brilho var(--v2-dur-brilho) var(--v2-ease-suave) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2 .v2-pop,
+  .v2 .v2-fade,
+  .v2 .v2-entra,
+  .v2 .v2-entra-bloco,
+  .v2 .v2-etapa,
+  .v2 .v2-g,
+  .v2 .v2-hero-pulso,
+  .v2 .v2-titulo-forte,
+  .v2 .v2-esq::after { animation: none !important; }
+  .v2 * { transition-duration: 0s !important; }
+}

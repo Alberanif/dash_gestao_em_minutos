@@ -13,6 +13,7 @@ function filterWith(terms: string[]): FilterRecord {
     hotmart_products: [],
     meta_ads_terms: terms,
     captacao_leads_eventos: [],
+    is_organic: false,
     status: "ativo",
     status_changed_at: null,
     created_at: "2026-01-01T00:00:00Z",

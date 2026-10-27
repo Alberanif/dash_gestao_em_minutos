@@ -57,6 +57,7 @@ function makeFilter(id: string, name: string): FilterRecord {
     hotmart_products: [{ product_id: "111", product_name: "Ingresso" }],
     meta_ads_terms: ["PC"],
     captacao_leads_eventos: ["evento-a"],
+    is_organic: false,
     status: "ativo",
     status_changed_at: null,
     created_at: "2026-01-01T00:00:00Z",

@@ -25,17 +25,20 @@ export function offersBadgeLabel(offerCodes: string[]): string {
 export function getPartialFilterWarning(
   hotmartProducts: HotmartProduct[],
   cleanTerms: string[],
-  captacaoLeadsEventos: string[]
+  captacaoLeadsEventos: string[],
+  isOrganic = false
 ): string | null {
   const hasHotmart = hotmartProducts.length > 0;
   const hasMeta = cleanTerms.length > 0;
   const hasLeads = captacaoLeadsEventos.length > 0;
 
-  const configuredCount = [hasHotmart, hasMeta, hasLeads].filter(Boolean).length;
-  if (configuredCount === 0 || configuredCount === 3) return null;
+  // No modo organico a captura Hotmart nao e fonte: so Meta Ads e Leads contam.
+  const sources = isOrganic ? [hasMeta, hasLeads] : [hasHotmart, hasMeta, hasLeads];
+  const configuredCount = sources.filter(Boolean).length;
+  if (configuredCount === 0 || configuredCount === sources.length) return null;
 
   const missing: string[] = [];
-  if (!hasHotmart) missing.push("dados de Hotmart");
+  if (!isOrganic && !hasHotmart) missing.push("dados de Hotmart");
   if (!hasMeta) missing.push("dados de Meta Ads");
   if (!hasLeads) missing.push("Captação de Leads");
 

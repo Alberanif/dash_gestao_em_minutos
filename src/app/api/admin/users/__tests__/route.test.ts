@@ -66,4 +66,24 @@ describe("GET /api/admin/users", () => {
 
     expect(body[0].role).toBe("pendente");
   });
+
+  it("devolve central_role de cada usuário; ausente ou desconhecido vira null", async () => {
+    const base = { email: "x@igt.com", user_metadata: {}, created_at: "2026-01-01T10:00:00Z", last_sign_in_at: null };
+    mockListUsers.mockResolvedValue({
+      data: {
+        users: [
+          { ...base, id: "a", app_metadata: { role: "gestor", central_role: "admin" } },
+          { ...base, id: "m", app_metadata: { role: "comum", central_role: "membro" } },
+          { ...base, id: "s", app_metadata: { role: "comum" } },
+          { ...base, id: "x", app_metadata: { role: "comum", central_role: "dono" } },
+        ],
+      },
+      error: null,
+    });
+
+    const { GET } = await import("../route");
+    const body = await (await GET()).json();
+
+    expect(body.map((u: { central_role: unknown }) => u.central_role)).toEqual(["admin", "membro", null, null]);
+  });
 });

@@ -96,8 +96,14 @@ export interface FilterRecord {
   debriefing_products?: DebriefingProduct[] | null;
   meta_ads_terms: string[];
   captacao_leads_eventos: string[];
+  is_organic: boolean;
+  /** Período do evento (AAAA-MM-DD). null/ausente = sem período definido. */
+  start_date?: string | null;
+  end_date?: string | null;
   status: FilterStatus;
   status_changed_at: string | null;
+  /** Só na resposta da API: true quando "finalizado" veio da data de fim, não do banco. */
+  status_automatico?: boolean;
   created_at: string;
   updated_at: string;
 }

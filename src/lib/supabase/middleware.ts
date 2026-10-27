@@ -5,7 +5,19 @@ import { resolveAccountRole } from "@/types/auth";
 /** Única página acessível a uma conta aguardando aprovação do gestor. */
 const PENDING_PATH = "/aguardando-aprovacao";
 
+/**
+ * Partes públicas da Central de Links, sem sessão: páginas arquivadas (/p/<slug ou id>) e a coleta
+ * do Teste A/B (o snippet /t.js e o POST /api/track), que roda em páginas de terceiros.
+ */
+export function ehRotaPublicaDaCentral(pathname: string): boolean {
+  return pathname.startsWith("/p/") || pathname === "/api/track" || pathname === "/t.js";
+}
+
 export async function updateSession(request: NextRequest) {
+  if (ehRotaPublicaDaCentral(request.nextUrl.pathname)) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

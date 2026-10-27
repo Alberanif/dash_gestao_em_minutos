@@ -1,0 +1,147 @@
+/*
+ * Tokens do Dash V2. Fonte de verdade dos valores: dash_gestao_v2/tokens.css
+ * e dash_gestao_v2/DIRECAO_DESIGN.md. As variáveis vivem sob .v2 (nada vaza
+ * para o V1); o @theme inline só mapeia utilitários do Tailwind para elas.
+ */
+
+.v2 {
+  /* Superfícies: azul-tinta em camadas */
+  --v2-abismo: #071219;
+  --v2-casco: #0e1f2b;
+  --v2-casco-alto: #162b39;
+
+  /* Marca */
+  --v2-azul-igt: #2e86b5;
+  --v2-azul-luz: #6fb8e3;
+  --v2-ponto: #d9a441; /* latão vivo: só o dado vivo e o foco do momento */
+
+  --v2-nevoa: #e4eef3;
+
+  /* Semânticas de dado: alta e queda sempre com ícone e rótulo; ardósia a 3,0:1 do casco */
+  --v2-alta: #3fb58c;
+  --v2-queda: #e8706a;
+  --v2-ardosia: #4f6d86;
+
+  /* Cor por significado: cada tipo de dado tem sempre a mesma cor, em qualquer bloco.
+     Contraste medido contra o casco (#0c2230) e o casco-alto (#123246): todas >= 5,3:1.
+     O latão (--v2-ponto) fica de fora de propósito: é o dado vivo e, dentro da aba Hotmart, a cor da plataforma. */
+  --v2-d-alcance: #4da6db; /* impressões, cliques, Meta Ads */
+  --v2-d-pagina: #3dbbc9; /* visualizações de página */
+  --v2-d-lead: #34b98e; /* leads */
+  --v2-d-venda: #86c25e; /* vendas e receita */
+  --v2-d-custo: #9a8ce0; /* investimento e custos */
+  --v2-d-alerta: #e8706a; /* queda e alerta */
+
+  /* Séries sem significado próprio (campanhas, produtos, origens), em ordem fixa, nunca cíclica;
+     a 6ª vira "Outros" em ardósia. Azul e violeta abrem a ordem; coral e ciano ficam longe dos vizinhos. */
+  --v2-serie-1: #4da6db;
+  --v2-serie-2: #9a8ce0;
+  --v2-serie-3: #34b98e;
+  --v2-serie-4: #e8706a;
+  --v2-serie-5: #3dbbc9;
+  /* Hotmart: rampa ordinal de latão para produtos e origens (a cor da plataforma, ver .v2-plat em ui/ui.css). */
+  --v2-hot-1: #f2dda4;
+  --v2-hot-2: #d9a441;
+  --v2-hot-3: #b88428;
+  --v2-hot-4: #a37319;
+  --v2-hot-5: #85601a;
+  /* Funil: rampa ordinal de um tom (azul), validada com --ordinal (passos de L >= 0,06,
+     ponta mais escura a 2,94:1 do casco). */
+  --v2-funil-1: #a9d6f0;
+  --v2-funil-2: #7dbfe8;
+  --v2-funil-3: #4fa3d1;
+  --v2-funil-4: #3484b3;
+  --v2-funil-5: #2a6a96;
+  /* Estrutura do gráfico: grade e eixo recessivos, texto mudo (contraste 6,4:1) */
+  --v2-grade: #142a38;
+  --v2-eixo: #2a5570;
+  --v2-texto-mudo: #8ea3b0;
+
+  /* Profundidade e luz: camadas de azul, sem cinza */
+  --v2-sombra-1: 0 1px 2px rgb(2 8 12 / 0.5), 0 4px 12px rgb(2 8 12 / 0.35);
+  --v2-sombra-2: 0 2px 4px rgb(2 8 12 / 0.5), 0 12px 32px rgb(2 8 12 / 0.5);
+  --v2-brilho-azul: 0 0 0 1px rgb(111 184 227 / 0.3), 0 8px 24px rgb(2 8 12 / 0.4);
+  --v2-brilho-ponto: 0 0 8px rgb(217 164 65 / 0.45);
+
+  /* Luz e vidro (paleta fosca): uma única fonte, no alto à esquerda; o vidro só nas camadas que flutuam */
+  --v2-luz: rgb(46 134 181 / 0.3);
+  --v2-vidro-fundo: rgb(22 43 57 / 0.55);
+  --v2-vidro-borda: rgb(228 238 243 / 0.1);
+  --v2-vidro-reflexo: rgb(228 238 243 / 0.14);
+
+  --v2-raio-sm: 8px;
+  --v2-raio-md: 14px;
+  --v2-raio-lg: 22px;
+
+  /* Movimento */
+  --v2-dur-rapida: 120ms;
+  --v2-dur-media: 240ms;
+  --v2-dur-lenta: 480ms;
+  --v2-ease-saida: cubic-bezier(0.16, 1, 0.3, 1);
+  --v2-ease-suave: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Desenho dos gráficos: lento de propósito, para o dado ser visto chegando. Em
+     aparelho fraco o provedor troca para data-movimento="curto" (ver ui.css). */
+  --v2-dur-traco: 1200ms;
+  --v2-dur-contagem: 1400ms;
+  --v2-dur-filtro: 380ms;
+  --v2-dur-brilho: 1800ms;
+  --v2-atraso-ponto: 1000ms;
+  --v2-dur-pulso: 600ms;
+  --v2-escalona-item: 60ms;
+  --v2-fluxo-passo: 420ms;
+  --v2-fluxo-corda: 480ms;
+  --v2-ease-desenho: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --v2-fonte: var(--font-manrope), system-ui, sans-serif;
+
+  background: var(--v2-abismo);
+  color: var(--v2-nevoa);
+  font-family: var(--v2-fonte);
+  font-variant-numeric: tabular-nums;
+  isolation: isolate;
+}
+
+/* Luz ambiente: um halo largo no alto à esquerda que se apaga para o abismo. Camada fixa e estática (sem repintura). */
+.v2::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(70% 55% at 12% -8%, var(--v2-luz), transparent 70%),
+    radial-gradient(60% 45% at 0% 0%, rgb(111 184 227 / 0.1), transparent 65%);
+}
+
+@theme inline {
+  --color-v2-abismo: var(--v2-abismo);
+  --color-v2-casco: var(--v2-casco);
+  --color-v2-casco-alto: var(--v2-casco-alto);
+  --color-v2-azul-igt: var(--v2-azul-igt);
+  --color-v2-azul-luz: var(--v2-azul-luz);
+  --color-v2-ponto: var(--v2-ponto);
+  --color-v2-nevoa: var(--v2-nevoa);
+  --color-v2-alta: var(--v2-alta);
+  --color-v2-queda: var(--v2-queda);
+  --color-v2-ardosia: var(--v2-ardosia);
+  --color-v2-d-alcance: var(--v2-d-alcance);
+  --color-v2-d-pagina: var(--v2-d-pagina);
+  --color-v2-d-lead: var(--v2-d-lead);
+  --color-v2-d-venda: var(--v2-d-venda);
+  --color-v2-d-custo: var(--v2-d-custo);
+  --color-v2-d-alerta: var(--v2-d-alerta);
+
+  --shadow-v2-1: var(--v2-sombra-1);
+  --shadow-v2-2: var(--v2-sombra-2);
+  --shadow-v2-brilho-azul: var(--v2-brilho-azul);
+  --shadow-v2-brilho-ponto: var(--v2-brilho-ponto);
+
+  --radius-v2-sm: var(--v2-raio-sm);
+  --radius-v2-md: var(--v2-raio-md);
+  --radius-v2-lg: var(--v2-raio-lg);
+
+  --ease-v2-saida: var(--v2-ease-saida);
+  --ease-v2-suave: var(--v2-ease-suave);
+  --font-v2: var(--v2-fonte);
+}
