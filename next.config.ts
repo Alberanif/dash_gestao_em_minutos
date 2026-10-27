@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     optimizePackageImports: ["recharts"],
+    agentUpgrade: "security",
   },
 };
 
