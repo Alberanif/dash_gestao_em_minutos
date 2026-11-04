@@ -125,7 +125,7 @@ function FormularioNovo({
   );
 }
 
-/** Aprovar solicitação: escolhe a função (padrão Comum) e confirma. */
+/** Aprovar solicitação: escolhe a função (padrão Analista) e confirma. */
 export function DialogoAprovar({
   usuario,
   onFechar,

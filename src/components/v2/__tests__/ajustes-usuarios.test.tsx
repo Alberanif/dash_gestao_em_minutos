@@ -14,7 +14,7 @@ beforeAll(() => {
 });
 
 const EU = { id: "u-eu", email: "eu@igt.com", name: "Eu Mesmo", role: "gestor", central_role: "admin", created_at: "2026-01-01T12:00:00Z", last_sign_in_at: "2026-02-01T12:00:00Z" };
-const ANA = { id: "u-ana", email: "ana@igt.com", name: null, role: "comum", central_role: null, created_at: "2026-01-02T12:00:00Z", last_sign_in_at: null };
+const ANA = { id: "u-ana", email: "ana@igt.com", name: null, role: "analista", central_role: null, created_at: "2026-01-02T12:00:00Z", last_sign_in_at: null };
 const PEDRO = { id: "u-pedro", email: "pedro@igt.com", name: "Pedro Lima", role: "pendente", central_role: null, created_at: "2026-03-01T12:00:00Z", last_sign_in_at: null };
 
 type Chamada = { url: string; method: string; body?: unknown };
@@ -80,25 +80,25 @@ describe("Usuários e acessos", () => {
     await montar();
     const lista = screen.getByRole("list", { name: "Usuários com acesso" });
     expect(within(lista).getByText("Gestor")).toBeTruthy();
-    expect(within(lista).getByText("Comum")).toBeTruthy();
+    expect(within(lista).getByText("Analista")).toBeTruthy();
   });
 
   it("aprovar faz PATCH com a função escolhida", async () => {
     await montar();
     fireEvent.click(screen.getByRole("button", { name: "Aprovar Pedro Lima" }));
     const dialogo = await screen.findByRole("dialog");
-    await escolherFuncao(dialogo, "Analista");
+    await escolherFuncao(dialogo, "Gestor");
     fireEvent.click(within(dialogo).getByRole("button", { name: "Aprovar" }));
     await waitFor(() => expect(chamadasDe("PATCH")).toHaveLength(1));
-    expect(chamadasDe("PATCH")[0]).toMatchObject({ url: "/api/admin/users/u-pedro", body: { role: "analista" } });
+    expect(chamadasDe("PATCH")[0]).toMatchObject({ url: "/api/admin/users/u-pedro", body: { role: "gestor" } });
   });
 
-  it("aprovar sem mexer na função usa Comum", async () => {
+  it("aprovar sem mexer na função usa Analista", async () => {
     await montar();
     fireEvent.click(screen.getByRole("button", { name: "Aprovar Pedro Lima" }));
     const dialogo = await screen.findByRole("dialog");
     fireEvent.click(within(dialogo).getByRole("button", { name: "Aprovar" }));
-    await waitFor(() => expect(chamadasDe("PATCH")[0]?.body).toEqual({ role: "comum" }));
+    await waitFor(() => expect(chamadasDe("PATCH")[0]?.body).toEqual({ role: "analista" }));
   });
 
   it("erro da API ao aprovar aparece no diálogo e o diálogo continua aberto", async () => {
@@ -152,7 +152,7 @@ describe("Usuários e acessos", () => {
     await montar();
     fireEvent.click(screen.getByRole("button", { name: "Alterar função de ana@igt.com" }));
     const dialogo = await screen.findByRole("dialog");
-    expect(within(dialogo).getByRole("combobox", { name: "Função" }).textContent).toContain("Comum");
+    expect(within(dialogo).getByRole("combobox", { name: "Função" }).textContent).toContain("Analista");
     await escolherFuncao(dialogo, "Gestor");
     fireEvent.click(within(dialogo).getByRole("button", { name: "Alterar função" }));
     await waitFor(() => expect(chamadasDe("PATCH")).toHaveLength(1));
