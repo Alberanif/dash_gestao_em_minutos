@@ -38,7 +38,7 @@ describe("FolderSection", () => {
       <FolderSection
         group={group}
         selectedId={null}
-        isGestor={true}
+        canEdit={true}
         onSelect={jest.fn()}
         onToggleExpand={jest.fn()}
       />
@@ -63,7 +63,7 @@ describe("FolderSection", () => {
       <FolderSection
         group={group}
         selectedId="c1"
-        isGestor={true}
+        canEdit={true}
         onSelect={onSelect}
         onToggleExpand={jest.fn()}
       />
@@ -91,7 +91,7 @@ describe("FolderSection", () => {
       <FolderSection
         group={group}
         selectedId={null}
-        isGestor={true}
+        canEdit={true}
         onSelect={jest.fn()}
         onToggleExpand={onToggleExpand}
       />

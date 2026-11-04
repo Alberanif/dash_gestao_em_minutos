@@ -75,14 +75,15 @@ describe("GET /views/[id]", () => {
 });
 
 describe("PATCH /views/[id]", () => {
-  it("analista recebe 403 em PATCH (inclusive de período) e nada é escrito", async () => {
+  it("analista edita a visualização, inclusive o período", async () => {
     role = "analista";
     const m = await mod();
-    expect((await m.PATCH(req("PATCH", { name: "x" }), ctx)).status).toBe(403);
+    resolver = patchResolver();
+    expect((await m.PATCH(req("PATCH", { name: "x" }), ctx)).status).toBe(200);
+    resolver = patchResolver();
     expect(
       (await m.PATCH(req("PATCH", { view_start_date: "2026-01-01", view_end_date: "2026-01-31" }), ctx)).status
-    ).toBe(403);
-    expect(fake.calls).toHaveLength(0);
+    ).toBe(200);
   });
 
   it("product_id no body => 400 e nada é lido nem escrito", async () => {
@@ -157,10 +158,11 @@ describe("PATCH /views/[id]", () => {
 });
 
 describe("DELETE /views/[id]", () => {
-  it("analista => 403", async () => {
+  it("analista exclui a visualização, como o gestor", async () => {
     role = "analista";
-    expect((await (await mod()).DELETE(req("DELETE"), ctx)).status).toBe(403);
-    expect(fake.calls).toHaveLength(0);
+    resolver = () => ({ data: [{ id: "view-1" }] });
+    const res = await (await mod()).DELETE(req("DELETE"), ctx);
+    expect(await res.json()).toEqual({ ok: true });
   });
 
   it("apaga só a view (nunca hotmart_sales) e responde { ok: true }", async () => {

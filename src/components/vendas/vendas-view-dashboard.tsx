@@ -92,7 +92,7 @@ function KpiTile({
 }
 
 export function VendasViewDashboard({ view, productName, role, onRangeChange, onViewChanged }: VendasViewDashboardProps) {
-  const isGestor = role === "gestor";
+  const canEdit = role === "gestor" || role === "analista";
   const range = viewRangeFrom(view.view_start_date, view.view_end_date);
   const rangeKey = range ? `${range.start}|${range.end}` : "";
 
@@ -210,7 +210,7 @@ export function VendasViewDashboard({ view, productName, role, onRangeChange, on
         )}
       </div>
 
-      <DateRangeFilter value={range} canEdit={isGestor} onSave={onRangeChange} />
+      <DateRangeFilter value={range} canEdit={canEdit} onSave={onRangeChange} />
 
       {loadError && (
         <div data-testid="view-load-error" style={{ textAlign: "center", padding: 32, color: "#ef4444" }}>

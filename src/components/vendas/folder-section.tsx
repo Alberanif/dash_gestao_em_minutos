@@ -21,7 +21,7 @@ export interface FolderSectionGroup<T extends FolderSectionItem> {
 interface FolderSectionProps<T extends FolderSectionItem> {
   group: FolderSectionGroup<T>;
   selectedId: string | null;
-  isGestor: boolean;
+  canEdit: boolean;
   // Substantivo do item, no singular.
   itemNoun?: string;
   onSelect: (itemId: string) => void;
@@ -38,7 +38,7 @@ function pluralize(noun: string): string {
 export function FolderSection<T extends FolderSectionItem>({
   group,
   selectedId,
-  isGestor,
+  canEdit,
   itemNoun = "visualização",
   onSelect,
   onEdit,
@@ -123,7 +123,7 @@ export function FolderSection<T extends FolderSectionItem>({
 
         <div style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={(e) => e.stopPropagation()}>
           {/* Menu de ações da pasta (...) para Gestor */}
-          {isGestor && !group.isUnfolder && group.folder && (
+          {canEdit && !group.isUnfolder && group.folder && (
             <div style={{ position: "relative" }}>
               <button
                 type="button"
@@ -287,7 +287,7 @@ export function FolderSection<T extends FolderSectionItem>({
                     {item.name}
                   </button>
 
-                  {isGestor && selected && onEdit && (
+                  {canEdit && selected && onEdit && (
                     <button
                       type="button"
                       onClick={() => onEdit(item)}

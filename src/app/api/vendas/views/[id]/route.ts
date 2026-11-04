@@ -41,7 +41,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<P
  * remover apenas tira da allowlist (as vendas continuam em hotmart_sales).
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<Params> }) {
-  const { error } = await requireRole(["gestor"]);
+  const { error } = await requireRole(["gestor", "analista"]);
   if (error) return error;
 
   const { id } = await params;
@@ -149,7 +149,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 // Remover a visualização NÃO apaga vendas: hotmart_sales é compartilhada e não
 // tem FK para a visualização.
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<Params> }) {
-  const { error } = await requireRole(["gestor"]);
+  const { error } = await requireRole(["gestor", "analista"]);
   if (error) return error;
 
   const { id } = await params;
