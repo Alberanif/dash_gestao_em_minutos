@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { canManageSettings, type ActiveRole } from "@/types/auth";
 import { CartaoGiro, type CartaoDoMenu } from "./cartao-giro";
 
 /** Ícones de traço fino, na cor do cartão em tom apagado (ver .v2-menu-icone no CSS). */
@@ -38,6 +39,30 @@ const ICONE_CONFIGURACOES = (
   </svg>
 );
 
+const ICONE_GESTAO_A_VISTA = (
+  <svg {...TRACO}>
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" />
+  </svg>
+);
+
+const ICONE_BASE_DE_DADOS = (
+  <svg {...TRACO}>
+    <ellipse cx="12" cy="5" rx="9" ry="3" />
+    <path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12" />
+    <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5" />
+  </svg>
+);
+
+const ICONE_VENDAS = (
+  <svg {...TRACO}>
+    <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+    <path d="M21 3v6h-6" />
+  </svg>
+);
+
 const ICONE_SAIR = (
   <svg {...TRACO}>
     <path d="M9 4H5v16h4" />
@@ -46,51 +71,98 @@ const ICONE_SAIR = (
   </svg>
 );
 
+const CARTAO_INDICADORES: CartaoDoMenu = {
+  id: "indicadores",
+  href: "/v2/indicadores",
+  titulo: "Indicadores",
+  icone: ICONE_INDICADORES,
+  descricao: "KPIs de campanhas, Meta Ads, Google Ads e leads orgânicos",
+  destaque: "#6ec3ea",
+  tamanho: "grande",
+};
+
+const CARTAO_CENTRAL_DE_LINKS: CartaoDoMenu = {
+  id: "central-de-links",
+  href: "/v2/central-de-links",
+  titulo: "Central de links",
+  icone: ICONE_LINKS,
+  descricao: "Guarda em um só lugar os links dos projetos",
+  destaque: "#8fb3a3",
+  tamanho: "grande",
+};
+
+const CARTAO_CONFIGURACOES: CartaoDoMenu = {
+  id: "configuracoes",
+  href: "/v2/ajustes",
+  titulo: "Configurações",
+  icone: ICONE_CONFIGURACOES,
+  descricao: "Ajustes do projeto e gerenciamento de dados",
+  destaque: "#8fa6b5",
+  tamanho: "pequeno",
+};
+
+const CARTAO_SAIR: CartaoDoMenu = {
+  id: "sair",
+  titulo: "Sair",
+  icone: ICONE_SAIR,
+  descricao: "Encerra a sua sessão",
+  destaque: "#a8939b",
+  tamanho: "mini",
+};
+
 /**
- * Cartões do menu principal da V2, em blocos como os do Windows Phone: as áreas de trabalho são grandes e
- * as ações simples (Configurações, Sair) são menores. Configurações leva ao hub de Ajustes da V2;
- * Sair encerra a sessão.
+ * Cartões das áreas de trabalho da V2, em blocos como os do Windows Phone: as áreas são grandes e as ações
+ * simples (Configurações, Sair) são menores. Configurações leva ao hub de Ajustes e é só do gestor — o
+ * analista não vê o cartão. Sair encerra a sessão.
  */
-export const CARTOES_DO_MENU: readonly CartaoDoMenu[] = [
+export function cartoesDoMenu(role: ActiveRole): CartaoDoMenu[] {
+  return [
+    CARTAO_INDICADORES,
+    CARTAO_CENTRAL_DE_LINKS,
+    ...(canManageSettings(role) ? [CARTAO_CONFIGURACOES] : []),
+    CARTAO_SAIR,
+  ];
+}
+
+/**
+ * Áreas que ainda não têm versão V2 e abrem no layout anterior, nos endereços de sempre. Saem desta lista
+ * (e ganham cartão no menu acima) quando a V2 delas existir. O selo "V1" avisa que a tela muda de visual.
+ */
+export const CARTOES_DO_LAYOUT_ANTERIOR: readonly CartaoDoMenu[] = [
   {
-    id: "indicadores",
-    href: "/v2/indicadores",
-    titulo: "Indicadores",
-    icone: ICONE_INDICADORES,
-    descricao: "KPIs de campanhas, Meta Ads, Google Ads e leads orgânicos",
-    destaque: "#6ec3ea",
-    tamanho: "grande",
-  },
-  {
-    id: "central-de-links",
-    href: "/v2/central-de-links",
-    titulo: "Central de links",
-    icone: ICONE_LINKS,
-    descricao: "Guarda em um só lugar os links dos projetos",
-    destaque: "#8fb3a3",
-    tamanho: "grande",
-  },
-  {
-    id: "configuracoes",
-    href: "/v2/ajustes",
-    titulo: "Configurações",
-    icone: ICONE_CONFIGURACOES,
-    descricao: "Ajustes do projeto e gerenciamento de dados",
-    destaque: "#8fa6b5",
+    id: "gestao-a-vista",
+    href: "/dashboard",
+    titulo: "Gestão à Vista",
+    icone: ICONE_GESTAO_A_VISTA,
+    descricao: "Painéis de EQA, posicionamento, relacionamento e Meta Ads",
+    destaque: "#7fa6e8",
     tamanho: "pequeno",
+    selo: "V1",
   },
   {
-    id: "sair",
-    titulo: "Sair",
-    icone: ICONE_SAIR,
-    descricao: "Encerra a sua sessão",
-    destaque: "#a8939b",
-    tamanho: "mini",
+    id: "relatorio-de-vendas",
+    href: "/relatorio-de-vendas",
+    titulo: "Relatório de Vendas",
+    icone: ICONE_VENDAS,
+    descricao: "Visualizações de vendas por produto e oferta da Hotmart",
+    destaque: "#d9b26a",
+    tamanho: "pequeno",
+    selo: "V1",
+  },
+  {
+    id: "base-de-dados",
+    href: "/base-de-dados",
+    titulo: "Base de Dados",
+    icone: ICONE_BASE_DE_DADOS,
+    descricao: "Atenção, EQA, Convite e Entrega Nível A",
+    destaque: "#7fbf9a",
+    tamanho: "pequeno",
+    selo: "V1",
   },
 ];
 
 /** Menu principal da V2: a capa mostra ícone e nome; o verso (hover ou foco) mostra nome e descrição. */
-export function MenuPrincipal({ saudacao, nome }: { saudacao: string; nome: string }) {
+export function MenuPrincipal({ saudacao, nome, role }: { saudacao: string; nome: string; role: ActiveRole }) {
   return (
     <div className="v2-menu-pagina">
       <header className="v2-menu-cabecalho">
@@ -98,7 +170,12 @@ export function MenuPrincipal({ saudacao, nome }: { saudacao: string; nome: stri
         <h1 className="v2-menu-titulo">{nome ? `${saudacao}, ${nome}` : saudacao}</h1>
       </header>
       <nav aria-label="Módulos" className="v2-menu">
-        {CARTOES_DO_MENU.map((c) => (
+        {cartoesDoMenu(role).map((c) => (
+          <CartaoGiro key={c.id} c={c} />
+        ))}
+      </nav>
+      <nav aria-label="Áreas do layout anterior" className="v2-menu-legado">
+        {CARTOES_DO_LAYOUT_ANTERIOR.map((c) => (
           <CartaoGiro key={c.id} c={c} />
         ))}
       </nav>

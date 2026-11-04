@@ -13,6 +13,8 @@ export type CartaoDoMenu = {
   destaque: string;
   /** Cartão ainda sem destino: aparece apagado, com selo "Em breve", e não leva a lugar nenhum. */
   emBreve?: boolean;
+  /** Selo no canto da capa (ex.: "V1" nas áreas que ainda não têm versão V2). */
+  selo?: string;
   /** Configuração é menor que as áreas de trabalho, para separar uma da outra. */
   tamanho: "grande" | "pequeno" | "mini";
 };
@@ -27,6 +29,7 @@ function Faces({ c }: { c: CartaoDoMenu }) {
           </span>
           <p className="v2-menu-nome">{c.titulo}</p>
           {c.emBreve && <span className="v2-menu-selo">Em breve</span>}
+          {!c.emBreve && c.selo && <span className="v2-menu-selo">{c.selo}</span>}
         </div>
       </div>
       <div className="v2-menu-face v2-menu-verso">

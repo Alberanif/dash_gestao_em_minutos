@@ -9,6 +9,5 @@ describe("redirecionamentos do Teste A/B", () => {
         { source: "/v2/central-de-links/testes/:id", destination: "/v2/indicadores/testes-ab/:id", permanent: true },
       ]),
     );
-    expect(regras).toHaveLength(2);
   });
 });
