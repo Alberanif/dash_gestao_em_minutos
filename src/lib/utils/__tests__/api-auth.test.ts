@@ -63,7 +63,7 @@ describe("requireRole", () => {
     signedInAs({ role: "pendente" });
 
     const { requireRole } = await import("../api-auth");
-    const result = await requireRole(["gestor", "analista", "comum"]);
+    const result = await requireRole(["gestor", "analista"]);
 
     expect(result.error?.status).toBe(403);
   });

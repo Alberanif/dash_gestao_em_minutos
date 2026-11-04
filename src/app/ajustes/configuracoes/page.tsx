@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { AccountList } from "@/components/settings/account-list";
 import { UserManagement } from "@/components/settings/user-management";
 import type { Account } from "@/types/accounts";
-import { resolveAccountRole } from "@/types/auth";
+import { canManageSettings, resolveAccountRole } from "@/types/auth";
 
 export default async function ConfiguracoesPage() {
   const supabase = await createSupabaseServerClient();
@@ -14,7 +14,7 @@ export default async function ConfiguracoesPage() {
 
   const role = resolveAccountRole(user.app_metadata?.role);
   if (role === "pendente") redirect("/aguardando-aprovacao");
-  if (role !== "gestor" && role !== "analista") redirect("/ajustes");
+  if (!canManageSettings(role)) redirect("/");
 
   const { data: accounts } = await supabase
     .from("dash_gestao_accounts")

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { UserRole } from "@/types/auth";
+import type { ActiveRole } from "@/types/auth";
 
 const MODULES = [
   {
@@ -17,7 +17,7 @@ const MODULES = [
       </svg>
     ),
     accent: "#3d84f5",
-    restrictedTo: ["analista", "comum"] as UserRole[],
+    restrictedTo: ["comum"] as ActiveRole[],
   },
   {
     // Entrada do módulo é sempre o seletor de eventos; o dashboard (/indicadores)
@@ -31,7 +31,7 @@ const MODULES = [
       </svg>
     ),
     accent: "#9070e8",
-    restrictedTo: ["analista", "comum"] as UserRole[],
+    restrictedTo: ["comum"] as ActiveRole[],
   },
   {
     href: "/base-de-dados",
@@ -45,7 +45,7 @@ const MODULES = [
       </svg>
     ),
     accent: "#1ab96c",
-    restrictedTo: [] as UserRole[],
+    restrictedTo: [] as ActiveRole[],
   },
   {
     href: "/ajustes",
@@ -59,7 +59,7 @@ const MODULES = [
       </svg>
     ),
     accent: "#7b9ab6",
-    restrictedTo: ["comum"] as UserRole[],
+    restrictedTo: ["analista", "comum"] as ActiveRole[],
   },
   {
     href: "/relatorio-de-vendas",
@@ -72,12 +72,12 @@ const MODULES = [
       </svg>
     ),
     accent: "#e0a72e",
-    restrictedTo: ["comum"] as UserRole[],
+    restrictedTo: ["comum"] as ActiveRole[],
   },
 ];
 
 interface SelectionCardsProps {
-  role: UserRole;
+  role: ActiveRole;
   userEmail: string;
 }
 

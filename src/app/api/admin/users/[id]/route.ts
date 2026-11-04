@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import { resolveAccountRole, type UserRole } from "@/types/auth";
+import { ASSIGNABLE_ROLES, resolveAccountRole, type UserRole } from "@/types/auth";
 
 export async function PATCH(
   request: NextRequest,
@@ -27,7 +27,7 @@ export async function PATCH(
     return NextResponse.json({ error: "role é obrigatório" }, { status: 400 });
   }
 
-  const validRoles: UserRole[] = ["gestor", "analista", "comum"];
+  const validRoles: readonly UserRole[] = ASSIGNABLE_ROLES;
   if (!validRoles.includes(role)) {
     return NextResponse.json(
       { error: `role deve ser um de: ${validRoles.join(", ")}` },

@@ -137,6 +137,35 @@ describe("conta ativa", () => {
     expect((await visit("/api/base-de-dados/planilha")).status).toBe(200);
   });
 
+  it("analista navega por tudo, menos Configurações e gestão de usuários", async () => {
+    signedInAs({ role: "analista" });
+
+    expect((await visit("/dashboard/posicionamento")).status).toBe(200);
+    expect((await visit("/indicadores/eventos")).status).toBe(200);
+    expect((await visit("/v2/indicadores")).status).toBe(200);
+    expect((await visit("/api/indicadores/metrics")).status).toBe(200);
+
+    for (const path of ["/ajustes", "/ajustes/dados", "/v2/ajustes", "/v2/ajustes/usuarios"]) {
+      const response = await visit(path);
+      expect(response.status).toBe(307);
+      expect(response.headers.get("location")).toBe("http://localhost/");
+    }
+    expect((await visit("/api/admin/users")).status).toBe(403);
+  });
+
+  it("não confunde rotas parecidas com Configurações (/ajustes-x segue livre)", async () => {
+    signedInAs({ role: "analista" });
+
+    expect((await visit("/ajustes-x")).status).toBe(200);
+  });
+
+  it("deixa o gestor entrar em Configurações", async () => {
+    signedInAs({ role: "gestor" });
+
+    expect((await visit("/ajustes")).status).toBe(200);
+    expect((await visit("/v2/ajustes/usuarios")).status).toBe(200);
+  });
+
   it("deixa o gestor navegar livremente", async () => {
     signedInAs({ role: "gestor" });
 

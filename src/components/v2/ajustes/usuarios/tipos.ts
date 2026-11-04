@@ -1,4 +1,4 @@
-import type { AccountRole, UserRole } from "@/types/auth";
+import type { AccountRole, ActiveRole } from "@/types/auth";
 import type { PapelCentral } from "@/lib/central-de-links/papel";
 import type { TomDoSelo } from "../../ui";
 
@@ -13,20 +13,19 @@ export interface Usuario {
   last_sign_in_at: string | null;
 }
 
-export const ROTULO_FUNCAO: Record<UserRole, string> = {
+export const ROTULO_FUNCAO: Record<ActiveRole, string> = {
   gestor: "Gestor",
   analista: "Analista",
-  comum: "Comum",
+  comum: "Comum (legado)",
 };
 
-export const TOM_FUNCAO: Record<UserRole, TomDoSelo> = {
+export const TOM_FUNCAO: Record<ActiveRole, TomDoSelo> = {
   gestor: "info",
   analista: "ok",
   comum: "neutro",
 };
 
 export const OPCOES_FUNCAO = [
-  { value: "comum", label: "Comum" },
   { value: "analista", label: "Analista" },
   { value: "gestor", label: "Gestor" },
 ];

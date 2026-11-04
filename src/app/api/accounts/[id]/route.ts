@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { validateApiAuth } from "@/lib/utils/api-auth";
+import { requireRole } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await validateApiAuth();
+  const { error } = await requireRole(["gestor"]);
   if (error) return error;
 
   const { id } = await params;
@@ -72,7 +72,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await validateApiAuth();
+  const { error } = await requireRole(["gestor"]);
   if (error) return error;
 
   const { id } = await params;

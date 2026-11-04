@@ -1,7 +1,7 @@
 import "../dash-theme.css";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { resolveAccountRole } from "@/types/auth";
+import { canManageSettings, resolveAccountRole } from "@/types/auth";
 
 export default async function AjustesLayout({
   children,
@@ -15,7 +15,8 @@ export default async function AjustesLayout({
 
   const role = resolveAccountRole(user.app_metadata?.role);
   if (role === "pendente") redirect("/aguardando-aprovacao");
-  if (role === "comum") redirect("/");
+  // Configurações são só do gestor (comum, legado, também não entra).
+  if (!canManageSettings(role)) redirect("/");
 
   return (
     <main

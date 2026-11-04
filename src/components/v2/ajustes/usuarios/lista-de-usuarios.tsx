@@ -1,7 +1,7 @@
 "use client";
 
 import type { PapelCentral } from "@/lib/central-de-links/papel";
-import type { UserRole } from "@/types/auth";
+import type { ActiveRole } from "@/types/auth";
 import { Button, Select, Selo, Surface } from "../../ui";
 import {
   formatarData,
@@ -43,7 +43,7 @@ export function ListaDeUsuarios({
       <ul className="m-0 flex list-none flex-col p-0" aria-label="Usuários com acesso">
         {usuarios.map((u) => {
           const propria = u.id === usuarioAtualId;
-          const funcao = u.role as UserRole;
+          const funcao = u.role as ActiveRole;
           const chaveAcesso = u.central_role ?? "nenhum";
           return (
             <li

@@ -36,9 +36,9 @@ describe("ajustesAccessRedirect", () => {
     expect(ajustesAccessRedirect(null)).toBe("/login");
     expect(ajustesAccessRedirect(com("pendente"))).toBe("/aguardando-aprovacao");
   });
-  it("gestor e analista entram; comum não", () => {
+  it("só o gestor entra; analista e comum são mandados ao menu", () => {
     expect(ajustesAccessRedirect(com("gestor"))).toBeNull();
-    expect(ajustesAccessRedirect(com("analista"))).toBeNull();
+    expect(ajustesAccessRedirect(com("analista"))).toBe("/v2");
     expect(ajustesAccessRedirect(com("comum"))).not.toBeNull();
   });
 });

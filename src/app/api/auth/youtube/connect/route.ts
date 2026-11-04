@@ -1,12 +1,12 @@
 // src/app/api/auth/youtube/connect/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac } from "crypto";
-import { validateApiAuth } from "@/lib/utils/api-auth";
+import { requireRole } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { buildOAuthUrl } from "@/lib/youtube/auth";
 
 export async function GET(request: NextRequest) {
-  const { error } = await validateApiAuth();
+  const { error } = await requireRole(["gestor"]);
   if (error) return error;
 
   const accountId = request.nextUrl.searchParams.get("account_id");

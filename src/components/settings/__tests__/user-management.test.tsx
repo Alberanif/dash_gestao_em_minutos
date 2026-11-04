@@ -124,7 +124,7 @@ describe("UserManagement — aprovar solicitação", () => {
     );
   });
 
-  it("propõe 'comum' como role padrão ao aprovar", async () => {
+  it("propõe 'analista' como role padrão ao aprovar", async () => {
     const { calls } = mockApi([GESTOR, PENDENTE]);
     render(<UserManagement />);
 
@@ -135,7 +135,7 @@ describe("UserManagement — aprovar solicitação", () => {
     fireEvent.click(screen.getByRole("button", { name: /confirmar aprovação/i }));
 
     await waitFor(() => expect(calls).toHaveLength(1));
-    expect(calls[0].body).toEqual({ role: "comum" });
+    expect(calls[0].body).toEqual({ role: "analista" });
   });
 
   it("nunca oferece 'pendente' como opção no seletor de aprovação", async () => {
@@ -150,8 +150,9 @@ describe("UserManagement — aprovar solicitação", () => {
       .getAllByRole("option")
       .map((o) => (o as HTMLOptionElement).value);
 
-    expect(options).toEqual(expect.arrayContaining(["gestor", "analista", "comum"]));
+    expect([...options].sort()).toEqual(["analista", "gestor"]);
     expect(options).not.toContain("pendente");
+    expect(options).not.toContain("comum");
   });
 });
 
