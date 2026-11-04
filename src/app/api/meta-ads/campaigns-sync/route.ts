@@ -1,12 +1,12 @@
 // src/app/api/meta-ads/campaigns-sync/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { validateApiAuth } from "@/lib/utils/api-auth";
+import { requireRole } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { collectMetaAdsCampaignsList } from "@/lib/services/meta-ads";
 import type { Account } from "@/types/accounts";
 
 export async function POST(request: NextRequest) {
-  const { error } = await validateApiAuth();
+  const { error } = await requireRole(["gestor"]);
   if (error) return error;
 
   const body = await request.json().catch(() => null);

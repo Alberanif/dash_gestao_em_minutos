@@ -87,30 +87,29 @@ describe("SelectionCards — role: analista", () => {
     );
   });
 
-  it("Gestão à Vista NÃO é link (sem href=/dashboard)", () => {
-    expect(html).not.toContain('href="/dashboard"');
+  it("Gestão à Vista é link acessível (href=/dashboard)", () => {
+    expect(html).toContain('href="/dashboard"');
   });
 
-  it("Indicadores NÃO é link (sem href=/indicadores)", () => {
-    expect(html).not.toContain('href="/indicadores');
+  it("Indicadores é link acessível (href=/indicadores/eventos)", () => {
+    expect(html).toContain('href="/indicadores/eventos"');
   });
 
   it("Base de Dados é link acessível (href=/base-de-dados)", () => {
     expect(html).toContain('href="/base-de-dados"');
   });
 
-  it("Ajustes é link acessível (href=/ajustes)", () => {
-    expect(html).toContain('href="/ajustes"');
-  });
-
   it("Relatório de Vendas é link acessível (href=/relatorio-de-vendas)", () => {
     expect(html).toContain('href="/relatorio-de-vendas"');
   });
 
-  it("módulos restritos exibem badge Restrito", () => {
-    // Gestão à Vista e Indicadores são restritos — badge deve aparecer pelo menos 2 vezes
+  it("Ajustes NÃO é link: Configurações são só do gestor", () => {
+    expect(html).not.toContain('href="/ajustes"');
+  });
+
+  it("só Ajustes exibe o badge Restrito", () => {
     const matches = html.match(/Restrito/g) ?? [];
-    expect(matches.length).toBeGreaterThanOrEqual(2);
+    expect(matches).toHaveLength(1);
   });
 });
 

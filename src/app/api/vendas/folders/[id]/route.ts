@@ -8,7 +8,7 @@ export async function PATCH(
   request: NextRequest,
   context: { params: Promise<Params> }
 ) {
-  const { error } = await requireRole(["gestor"]);
+  const { error } = await requireRole(["gestor", "analista"]);
   if (error) return error;
 
   const { id } = await context.params;
@@ -61,7 +61,7 @@ export async function DELETE(
   _request: NextRequest,
   context: { params: Promise<Params> }
 ) {
-  const { error } = await requireRole(["gestor"]);
+  const { error } = await requireRole(["gestor", "analista"]);
   if (error) return error;
 
   const { id } = await context.params;

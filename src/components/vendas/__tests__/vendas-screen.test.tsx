@@ -100,15 +100,14 @@ describe("VendasScreen — estado vazio e papéis", () => {
     expect(screen.getByTestId("vendas-create-cta")).toBeInTheDocument();
   });
 
-  it("analista sem visualizações vê texto informativo, sem CTA nem botão de criar", async () => {
+  it("analista sem visualizações também vê o CTA de criar", async () => {
     installFetch({ views: [] });
     render(<VendasScreen role="analista" products={PRODUCTS} />);
     expect(await screen.findByText("Nenhuma visualização criada ainda")).toBeInTheDocument();
-    expect(screen.queryByTestId("vendas-create-cta")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("vendas-new-view-btn")).not.toBeInTheDocument();
+    expect(screen.getByTestId("vendas-create-cta")).toBeInTheDocument();
   });
 
-  it("gestor vê criar, editar e editar período; analista não vê nenhum deles (mas vê Atualizar agora)", async () => {
+  it("gestor e analista veem criar, editar, editar período e Atualizar agora", async () => {
     installFetch({ views: [makeView()], folders: [FOLDER] });
     const { unmount } = render(<VendasScreen role="gestor" products={PRODUCTS} />);
     await screen.findByTestId("view-dashboard");
@@ -120,11 +119,11 @@ describe("VendasScreen — estado vazio e papéis", () => {
     installFetch({ views: [makeView({ view_start_date: "2026-08-01", view_end_date: "2026-08-10" })], folders: [FOLDER] });
     render(<VendasScreen role="analista" products={PRODUCTS} />);
     await screen.findByTestId("view-dashboard");
-    expect(screen.queryByTestId("vendas-new-view-btn")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("vendas-new-folder-btn")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("vendas-edit-view-btn")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("vendas-date-apply")).not.toBeInTheDocument();
-    expect(screen.getByTestId("vendas-date-readonly")).toBeInTheDocument();
+    expect(screen.getByTestId("vendas-new-view-btn")).toBeInTheDocument();
+    expect(screen.getByTestId("vendas-new-folder-btn")).toBeInTheDocument();
+    expect(screen.getByTestId("vendas-edit-view-btn")).toBeInTheDocument();
+    expect(screen.getByTestId("vendas-date-apply")).toBeInTheDocument();
+    expect(screen.queryByTestId("vendas-date-readonly")).not.toBeInTheDocument();
     expect(screen.getByTestId("vendas-refresh-btn")).toBeInTheDocument();
   });
 
@@ -139,7 +138,7 @@ describe("VendasScreen — estado vazio e papéis", () => {
     expect(await screen.findByTestId("view-selected-name")).toHaveTextContent("Nova");
   });
 
-  it("aviso de ciclos antigos não migrados aparece só para o gestor", async () => {
+  it("aviso de ciclos antigos não migrados aparece para gestor e analista", async () => {
     const mock = { views: [makeView()], unmigrated: [{ id: "c1", name: "Ciclo A" }, { id: "c2", name: "Ciclo B" }] };
     installFetch(mock);
     const { unmount } = render(<VendasScreen role="gestor" products={PRODUCTS} />);
@@ -150,8 +149,7 @@ describe("VendasScreen — estado vazio e papéis", () => {
 
     installFetch(mock);
     render(<VendasScreen role="analista" products={PRODUCTS} />);
-    await screen.findByTestId("view-dashboard");
-    expect(screen.queryByTestId("vendas-unmigrated-notice")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("vendas-unmigrated-notice")).toBeInTheDocument();
   });
 });
 

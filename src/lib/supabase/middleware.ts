@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { resolveAccountRole } from "@/types/auth";
+import { canManageSettings, resolveAccountRole } from "@/types/auth";
 
 /** Única página acessível a uma conta aguardando aprovação do gestor. */
 const PENDING_PATH = "/aguardando-aprovacao";
@@ -11,6 +11,12 @@ const PENDING_PATH = "/aguardando-aprovacao";
  */
 export function ehRotaPublicaDaCentral(pathname: string): boolean {
   return pathname.startsWith("/p/") || pathname === "/api/track" || pathname === "/t.js";
+}
+
+/** Áreas de Configurações e gestão de usuários: só o gestor entra (páginas V1 e V2 e a API de admin). */
+export function ehRotaDeConfiguracoes(pathname: string): boolean {
+  const alvo = (base: string) => pathname === base || pathname.startsWith(`${base}/`);
+  return alvo("/ajustes") || alvo("/v2/ajustes") || alvo("/api/admin");
 }
 
 export async function updateSession(request: NextRequest) {
@@ -89,6 +95,16 @@ export async function updateSession(request: NextRequest) {
     if (role !== "pendente" && pathname === PENDING_PATH) {
       const url = request.nextUrl.clone();
       url.pathname = "/";
+      return NextResponse.redirect(url);
+    }
+
+    if (role !== "pendente" && !canManageSettings(role) && ehRotaDeConfiguracoes(pathname)) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      const url = request.nextUrl.clone();
+      url.pathname = "/";
+      url.search = "";
       return NextResponse.redirect(url);
     }
 

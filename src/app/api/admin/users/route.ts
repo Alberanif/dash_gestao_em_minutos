@@ -3,7 +3,7 @@ import { requireRole, validateApiAuth } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { listAllUsers } from "@/lib/supabase/list-all-users";
 import { papelDoUsuario } from "@/lib/central-de-links/papel";
-import { resolveAccountRole, type UserRole } from "@/types/auth";
+import { ASSIGNABLE_ROLES, resolveAccountRole, type UserRole } from "@/types/auth";
 
 export async function GET() {
   const { error, userId } = await requireRole(["gestor"]);
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
   if (error) return error;
 
   const body = await request.json();
-  const { email, password, role = "comum" } = body;
+  const { email, password, role = "analista" } = body;
 
   if (!email || !password) {
     return NextResponse.json(
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const validRoles: UserRole[] = ["gestor", "analista", "comum"];
+  const validRoles: readonly UserRole[] = ASSIGNABLE_ROLES;
   if (!validRoles.includes(role)) {
     return NextResponse.json(
       { error: `role deve ser um de: ${validRoles.join(", ")}` },
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     {
       id: data.user.id,
       email: data.user.email,
-      role: (data.user.app_metadata?.role as UserRole) ?? "comum",
+      role: (data.user.app_metadata?.role as UserRole) ?? "analista",
     },
     { status: 201 }
   );

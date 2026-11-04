@@ -4,13 +4,13 @@
 // To do so, POST this endpoint with { account_id, start_date: "2026-02-21", end_date: "2026-05-27" }
 // for each Meta Ads account. DO NOT trigger this automatically.
 import { NextRequest, NextResponse } from "next/server";
-import { validateApiAuth } from "@/lib/utils/api-auth";
+import { requireRole } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { collectMetaAds } from "@/lib/services/meta-ads";
 import type { Account } from "@/types/accounts";
 
 export async function POST(request: NextRequest) {
-  const { error } = await validateApiAuth();
+  const { error } = await requireRole(["gestor"]);
   if (error) return error;
 
   const body = await request.json().catch(() => null);

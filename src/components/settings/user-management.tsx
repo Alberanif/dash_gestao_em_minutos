@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { AccountRole, UserRole } from "@/types/auth";
+import type { AccountRole, ActiveRole, UserRole } from "@/types/auth";
 
 interface AuthUser {
   id: string;
@@ -19,10 +19,10 @@ export function UserManagement() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<UserRole>("comum");
-  const [newRole, setNewRole] = useState<UserRole>("comum");
+  const [role, setRole] = useState<UserRole>("analista");
+  const [newRole, setNewRole] = useState<UserRole>("analista");
   const [approving, setApproving] = useState<string | null>(null);
-  const [approveRole, setApproveRole] = useState<UserRole>("comum");
+  const [approveRole, setApproveRole] = useState<UserRole>("analista");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -67,7 +67,7 @@ export function UserManagement() {
     } else {
       setEmail("");
       setPassword("");
-      setRole("comum");
+      setRole("analista");
       setShowForm(false);
       await loadUsers();
     }
@@ -140,16 +140,16 @@ export function UserManagement() {
   const pendingUsers = users.filter((u) => u.role === "pendente");
   const activeUsers = users.filter((u) => u.role !== "pendente");
 
-  const roleColors: Record<UserRole, { bg: string; text: string }> = {
+  const roleColors: Record<ActiveRole, { bg: string; text: string }> = {
     gestor: { bg: "var(--badge-amber-bg, #fef08a)", text: "var(--badge-amber-fg, #a16207)" },
     analista: { bg: "var(--badge-violet-bg, #e0e7ff)", text: "var(--badge-violet-fg, #4f46e5)" },
     comum: { bg: "var(--badge-blue-bg, #dbeafe)", text: "var(--badge-blue-fg, #0369a1)" },
   };
 
-  const roleLabels: Record<UserRole, string> = {
+  const roleLabels: Record<ActiveRole, string> = {
     gestor: "Gestor",
     analista: "Analista",
-    comum: "Comum",
+    comum: "Comum (legado)",
   };
 
   return (
@@ -203,7 +203,7 @@ export function UserManagement() {
                   <button
                     onClick={() => {
                       setApproving(user.id);
-                      setApproveRole("comum");
+                      setApproveRole("analista");
                     }}
                     className="text-sm font-medium transition-colors"
                     style={{
@@ -276,14 +276,14 @@ export function UserManagement() {
                 alignItems: "center",
                 gap: 6,
                 padding: "4px 12px",
-                background: roleColors[user.role as UserRole].bg,
-                color: roleColors[user.role as UserRole].text,
+                background: roleColors[user.role as ActiveRole].bg,
+                color: roleColors[user.role as ActiveRole].text,
                 borderRadius: 6,
                 fontSize: 12,
                 fontWeight: 600,
               }}
             >
-              {roleLabels[user.role as UserRole]}
+              {roleLabels[user.role as ActiveRole]}
             </div>
 
             <div style={{ display: "flex", gap: 8 }}>
@@ -291,7 +291,7 @@ export function UserManagement() {
                 <button
                   onClick={() => {
                     setShowChangeRole(user.id);
-                    setNewRole(user.role as UserRole);
+                    setNewRole(user.role === "gestor" ? "gestor" : "analista");
                   }}
                   className="text-sm font-medium transition-colors"
                   style={{
@@ -388,7 +388,6 @@ export function UserManagement() {
                   onChange={(e) => setRole(e.target.value as UserRole)}
                   className="field-control"
                 >
-                  <option value="comum">Comum</option>
                   <option value="analista">Analista</option>
                   <option value="gestor">Gestor</option>
                 </select>
@@ -445,7 +444,6 @@ export function UserManagement() {
                   onChange={(e) => setApproveRole(e.target.value as UserRole)}
                   className="field-control"
                 >
-                  <option value="comum">Comum</option>
                   <option value="analista">Analista</option>
                   <option value="gestor">Gestor</option>
                 </select>
@@ -497,7 +495,6 @@ export function UserManagement() {
                 onChange={(e) => setNewRole(e.target.value as UserRole)}
                 className="field-control"
               >
-                <option value="comum">Comum</option>
                 <option value="analista">Analista</option>
                 <option value="gestor">Gestor</option>
               </select>

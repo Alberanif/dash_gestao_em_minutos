@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { validateApiAuth } from "@/lib/utils/api-auth";
+import { requireRole } from "@/lib/utils/api-auth";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
-  const { error } = await validateApiAuth();
+  const { error } = await requireRole(["gestor"]);
   if (error) return error;
 
   const { searchParams } = new URL(request.url);

@@ -78,7 +78,7 @@ function FormularioNovo({
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<UserRole>("comum");
+  const [role, setRole] = useState<UserRole>("analista");
   return (
     <form
       onSubmit={(e) => {
@@ -146,7 +146,7 @@ export function DialogoAprovar({
           key={usuario.id}
           titulo="Aprovar solicitação"
           descricao={`Escolha a função de ${nomeDe(usuario)} no painel.`}
-          funcaoInicial="comum"
+          funcaoInicial="analista"
           rotuloAcao="Aprovar"
           rotuloCarregando="Aprovando…"
           salvando={salvando}
@@ -179,7 +179,7 @@ export function DialogoAlterarFuncao({
           key={usuario.id}
           titulo="Alterar função"
           descricao={`Defina a nova função de ${nomeDe(usuario)}.`}
-          funcaoInicial={usuario.role as UserRole}
+          funcaoInicial={usuario.role === "gestor" ? "gestor" : "analista"}
           rotuloAcao="Alterar função"
           rotuloCarregando="Alterando…"
           salvando={salvando}
