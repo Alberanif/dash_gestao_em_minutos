@@ -16,11 +16,11 @@ const VIEWS_TABLE = "dash_gestao_vendas_views";
 
 /**
  * Visualizações do Relatório de Vendas (PRD #185, fatia 2/4).
- * GET: gestor e analista. POST: só gestor. O escopo de leitura é o mesmo de
+ * GET e POST: gestor e analista. O escopo de leitura é o mesmo de
  * a rota antiga de listagem (todas as visualizações; o app tem uma única conta).
  */
 export async function GET() {
-  const { error, role } = await requireRole(["gestor", "analista"]);
+  const { error } = await requireRole(["gestor", "analista"]);
   if (error) return error;
 
   const supabase = createSupabaseServiceClient();
@@ -36,11 +36,11 @@ export async function GET() {
 
   const rows = (views ?? []) as VendasViewRecord[];
 
-  // Aviso do RF-9: ciclos ativos que a migration não converteu. Só o gestor age
-  // sobre isso, então o analista nem paga a query.
+  // Aviso do RF-9: ciclos ativos que a migration não converteu. Gestor e analista
+  // podem agir sobre isso (criar a visualização), então os dois recebem o aviso.
   let unmigrated: { id: string; name: string }[] = [];
 
-  if (role === "gestor") {
+  {
     const { data: cycles, error: cyclesError } = await supabase
       .from("dash_gestao_vendas_cycles")
       .select("id, name")
@@ -64,7 +64,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const { error, userId } = await requireRole(["gestor"]);
+  const { error, userId } = await requireRole(["gestor", "analista"]);
   if (error) return error;
 
   const body = await request.json().catch(() => null);

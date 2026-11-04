@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { error } = await requireRole(["gestor"]);
+  const { error } = await requireRole(["gestor", "analista"]);
   if (error) return error;
 
   let body: any;

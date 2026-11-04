@@ -33,7 +33,7 @@ type DeleteTarget =
 // Tela do Relatório de Vendas (PRD #185): lista de Visualizações por pasta e o
 // dashboard enxuto da selecionada. Só vendas dos produtos Hotmart.
 export function VendasScreen({ role, products }: VendasScreenProps) {
-  const isGestor = role === "gestor";
+  const canEdit = role === "gestor" || role === "analista";
 
   const [views, setViews] = useState<VendasViewRecord[] | null>(null);
   const [unmigrated, setUnmigrated] = useState<UnmigratedCycle[]>([]);
@@ -234,7 +234,7 @@ export function VendasScreen({ role, products }: VendasScreenProps) {
           </h1>
         </div>
 
-        {isGestor && (
+        {canEdit && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <button type="button" className="btn-secondary" onClick={() => setCreateFolderOpen(true)} data-testid="vendas-new-folder-btn">
               + Nova pasta
@@ -246,11 +246,11 @@ export function VendasScreen({ role, products }: VendasScreenProps) {
         )}
       </header>
 
-      {createOpen && isGestor && (
+      {createOpen && canEdit && (
         <ViewFormModal products={products} folders={folders} onSaved={handleSaved} onCancel={() => setCreateOpen(false)} />
       )}
 
-      {editTarget && isGestor && (
+      {editTarget && canEdit && (
         <ViewFormModal
           products={products}
           folders={folders}
@@ -261,15 +261,15 @@ export function VendasScreen({ role, products }: VendasScreenProps) {
         />
       )}
 
-      {createFolderOpen && isGestor && (
+      {createFolderOpen && canEdit && (
         <FolderFormModal onSave={handleCreateFolder} onCancel={() => setCreateFolderOpen(false)} />
       )}
 
-      {editFolderTarget && isGestor && (
+      {editFolderTarget && canEdit && (
         <FolderFormModal folderTarget={editFolderTarget} onSave={handleRenameFolder} onCancel={() => setEditFolderTarget(null)} />
       )}
 
-      {deleteTarget && isGestor && (
+      {deleteTarget && canEdit && (
         <ConfirmDialog
           title={deleteTarget.kind === "view" ? "Excluir visualização" : "Deletar pasta"}
           message={
@@ -283,7 +283,7 @@ export function VendasScreen({ role, products }: VendasScreenProps) {
         />
       )}
 
-      {isGestor && unmigrated.length > 0 && (
+      {canEdit && unmigrated.length > 0 && (
         <div
           role="status"
           data-testid="vendas-unmigrated-notice"
@@ -312,11 +312,11 @@ export function VendasScreen({ role, products }: VendasScreenProps) {
             Nenhuma visualização criada ainda
           </p>
           <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0, maxWidth: 380, lineHeight: 1.6 }}>
-            {isGestor
+            {canEdit
               ? "Crie a primeira visualização para acompanhar a quantidade de vendas de um produto e de suas ofertas."
-              : "Assim que um gestor criar a primeira visualização, ela aparecerá aqui."}
+              : "Assim que alguém criar a primeira visualização, ela aparecerá aqui."}
           </p>
-          {isGestor && (
+          {canEdit && (
             <button type="button" onClick={() => setCreateOpen(true)} className="btn-primary" data-testid="vendas-create-cta">
               Criar visualização
             </button>
@@ -332,7 +332,7 @@ export function VendasScreen({ role, products }: VendasScreenProps) {
                 key={group.id}
                 group={group}
                 selectedId={selectedView?.id ?? null}
-                isGestor={isGestor}
+                canEdit={canEdit}
                 onSelect={(id) => setSelectedId(id)}
                 onEdit={(view) => setEditTarget(view)}
                 onToggleExpand={(groupId) =>

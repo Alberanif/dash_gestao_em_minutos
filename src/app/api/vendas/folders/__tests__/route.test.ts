@@ -197,3 +197,15 @@ describe("DELETE /api/vendas/folders/[id]", () => {
     expect(body.success).toBe(true);
   });
 });
+
+describe("papéis das pastas: gestor e analista", () => {
+  it.each([
+    ["POST", async () => POST(makeRequest("POST", "http://x/api/vendas/folders", { name: " " }))],
+    ["PATCH", async () => PATCH(makeRequest("PATCH", "http://x/api/vendas/folders/f1", { name: " " }), { params: Promise.resolve({ id: "f1" }) })],
+    ["DELETE", async () => DELETE(makeRequest("DELETE", "http://x/api/vendas/folders/f1"), { params: Promise.resolve({ id: "f1" }) })],
+  ])("%s libera o analista (requireRole recebe gestor e analista)", async (_m, chamar) => {
+    mockFrom.mockReturnValue({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null }) }) }) });
+    await chamar();
+    expect(requireRoleMock()).toHaveBeenCalledWith(["gestor", "analista"]);
+  });
+});

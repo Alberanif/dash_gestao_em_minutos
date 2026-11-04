@@ -93,22 +93,26 @@ describe("GET /api/vendas/views", () => {
     expect(filterOf(cycles, "eq")).toEqual(["status", "ativo"]);
   });
 
-  it("analista lê as views mas unmigrated_cycles vem [] (sem nem consultar ciclos)", async () => {
+  it("analista recebe as views e o aviso de ciclos não migrados, como o gestor", async () => {
     role = "analista";
-    resolver = (c) => (c.table === "dash_gestao_vendas_views" ? { data: [VIEW] } : {});
+    resolver = (c) => {
+      if (c.table === "dash_gestao_vendas_views") return { data: [VIEW] };
+      if (c.table === "dash_gestao_vendas_cycles") return { data: [{ id: "c2", name: "Fora" }] };
+      return {};
+    };
     const body = await (await get()).json();
     expect(body.views).toHaveLength(1);
-    expect(body.unmigrated_cycles).toEqual([]);
-    expect(fake.calls.some((c) => c.table === "dash_gestao_vendas_cycles")).toBe(false);
+    expect(body.unmigrated_cycles).toEqual([{ id: "c2", name: "Fora" }]);
   });
 });
 
 describe("POST /api/vendas/views", () => {
-  it("analista recebe 403 e nada é escrito", async () => {
+  it("analista cria visualização, como o gestor", async () => {
     role = "analista";
+    resolver = creationResolver();
     const res = await call(post(valid));
-    expect(res.status).toBe(403);
-    expect(fake.calls).toHaveLength(0);
+    expect(res.status).toBe(201);
+    expect(fake.calls.some((c) => c.op === "insert")).toBe(true);
   });
 
   it.each([
