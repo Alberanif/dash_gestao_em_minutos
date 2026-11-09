@@ -3,6 +3,7 @@
 import type { PresetKey } from "@/lib/utils/period-presets";
 import { Segmentado } from "./segmentado";
 import { cx, foco } from "../ui/cx";
+import { AlternarVisao } from "./alternar-visao";
 import { AtualizarAgora } from "./atualizar-agora";
 import { useEvento } from "./contexto";
 
@@ -27,6 +28,7 @@ export function ControlesDoEvento() {
 
   return (
     <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
+      <AlternarVisao />
       <div className="grid min-w-0 max-w-full gap-1.5">
         <span className={rotulo}>Período</span>
         <Segmentado

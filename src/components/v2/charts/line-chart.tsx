@@ -19,7 +19,7 @@ import {
 import { COR, LIMITE_BRILHO_PONTOS, corSerie } from "./palette";
 import { escalaLinear, marcasDeData, type EscalaLinear } from "./scales";
 import { CamadaAnimada, EstadoVazio, Legenda, TabelaDados, TooltipGrafico } from "./parts";
-import { useItemAtivo, useLarguraMedida } from "./use-chart";
+import { useItemAtivo, useLarguraMedida, type ControleAtivo } from "./use-chart";
 
 export type SerieLinha = {
   id: string;
@@ -44,7 +44,7 @@ export type LineChartProps = {
   /** Muda quando os dados trocam de forma que pede animação. Padrão: derivada dos dados. */
   animKey?: string;
   className?: string;
-};
+} & ControleAtivo;
 
 const MARGEM = { topo: 12, direita: 20, base: 28 };
 /** Espaço por rótulo do eixo x: ~4 datas em 360 px, mais em tela larga. Os rótulos nunca giram. */
@@ -141,7 +141,9 @@ function LinhaInterna({
   formatarXLongo,
   animKey,
   className,
+  controle,
 }: {
+  controle: ControleAtivo;
   titulo: string;
   limpas: Limpa[];
   ehData: boolean;
@@ -161,7 +163,7 @@ function LinhaInterna({
     return maior.map((p) => p.x);
   }, [limpas]);
 
-  const { ativo, setAtivo, handlers } = useItemAtivo(refXs.length);
+  const { ativo, setAtivo, handlers } = useItemAtivo(refXs.length, controle);
   const idBase = `v2-area-${useId().replace(/:/g, "")}`;
 
   const { yLin, ticksY, esq, fy } = useMemo(() => {
@@ -315,6 +317,8 @@ export function LineChart({
   formatarXLongo,
   animKey,
   className,
+  indiceAtivo,
+  onIndiceAtivo,
 }: LineChartProps) {
   const { ref, largura } = useLarguraMedida<HTMLDivElement>();
   // Em celular o gráfico fica mais baixo, para não ocupar a tela inteira.
@@ -357,6 +361,7 @@ export function LineChart({
           formatarX={fx}
           formatarXLongo={fxLongo}
           animKey={chave}
+          controle={{ indiceAtivo, onIndiceAtivo }}
         />
       ) : (
         <div style={{ height: altura }} />
