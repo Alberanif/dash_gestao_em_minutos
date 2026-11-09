@@ -42,6 +42,8 @@ export async function POST(request: NextRequest) {
     is_organic = false,
     start_date,
     end_date,
+    debriefing_start_date,
+    debriefing_end_date,
   } = body ?? {};
 
   if (!name) {
@@ -50,6 +52,14 @@ export async function POST(request: NextRequest) {
   const periodo = validateEventPeriod(start_date, end_date);
   if (!periodo.ok) {
     return NextResponse.json({ error: periodo.error }, { status: 400 });
+  }
+  const periodoDebriefing = validateEventPeriod(
+    debriefing_start_date,
+    debriefing_end_date,
+    "de vendas do produto principal",
+  );
+  if (!periodoDebriefing.ok) {
+    return NextResponse.json({ error: periodoDebriefing.error }, { status: 400 });
   }
   const debriefing = validateDebriefingProducts(debriefing_products === undefined ? null : debriefing_products);
   if (!debriefing.ok) {
@@ -83,6 +93,12 @@ export async function POST(request: NextRequest) {
       captacao_leads_eventos,
       is_organic,
       ...(start_date !== undefined || end_date !== undefined ? periodo.value : {}),
+      ...(debriefing_start_date !== undefined || debriefing_end_date !== undefined
+        ? {
+            debriefing_start_date: periodoDebriefing.value.start_date,
+            debriefing_end_date: periodoDebriefing.value.end_date,
+          }
+        : {}),
     },
     supabase
   );

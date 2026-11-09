@@ -245,6 +245,24 @@ describe("EtapaProdutoPrincipal", () => {
     expect(screen.getByRole("checkbox", { name: /Oferta Cheia/ })).toBeTruthy();
   });
 
+  it("o período de vendas só aparece com produto principal, grava as datas e Limpar período apaga", async () => {
+    render(<Casca Etapa={EtapaProdutoPrincipal} />);
+    expect(screen.queryByLabelText("Início das vendas do produto principal")).toBeNull();
+
+    await buscarEEscolher(/produto principal/i, "Mentoria Alfa");
+    fireEvent.change(screen.getByLabelText("Início das vendas do produto principal"), { target: { value: "2026-10-01" } });
+    expect(screen.getByRole("alert").textContent).toContain("produto principal");
+    fireEvent.change(screen.getByLabelText("Fim das vendas do produto principal"), { target: { value: "2026-10-20" } });
+    expect(estadoAtual.debriefingInicio).toBe("2026-10-01");
+    expect(estadoAtual.debriefingFim).toBe("2026-10-20");
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Limpar período" }));
+    expect(estadoAtual.debriefingInicio).toBe("");
+    expect(estadoAtual.debriefingFim).toBe("");
+    expect(screen.queryByRole("button", { name: "Limpar período" })).toBeNull();
+  });
+
   it("explica que a etapa é opcional", () => {
     render(<Casca Etapa={EtapaProdutoPrincipal} />);
     expect(screen.getByText(/opcional/i)).toBeTruthy();

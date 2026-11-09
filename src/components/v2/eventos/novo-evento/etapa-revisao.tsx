@@ -124,6 +124,14 @@ export function EtapaRevisao({ estado, problemas, aviso, irParaEtapa }: PropsRev
           ) : (
             <Vazio>Nenhum produto principal</Vazio>
           )}
+          {estado.produtosPrincipais.length > 0 &&
+            (estado.debriefingInicio && estado.debriefingFim ? (
+              <span className="text-v2-nevoa/75">
+                Vendas de {formatarData(estado.debriefingInicio)} a {formatarData(estado.debriefingFim)}
+              </span>
+            ) : (
+              <Vazio>Vendas no período do dashboard</Vazio>
+            ))}
         </Bloco>
 
         <Bloco titulo="Tráfego" etapa="trafego" irParaEtapa={irParaEtapa}>

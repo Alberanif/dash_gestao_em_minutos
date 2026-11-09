@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Button, Selo } from "../../ui";
+import { Button, Campo, Input, Selo } from "../../ui";
 import { cx, foco } from "../../ui/cx";
 import { offersBadgeLabel } from "@/components/indicadores/filter-modal";
 import type { HotmartOffer } from "@/components/indicadores/offers-drawer";
 import { BuscaProduto } from "./busca-produto";
-import type { PropsEtapa } from "./estado";
+import { periodoProdutoPrincipal, type PropsEtapa } from "./estado";
 import { OfertasPainel } from "./ofertas-painel";
 
 export function EtapaProdutoPrincipal({ estado, atualizar }: PropsEtapa) {
@@ -26,6 +26,11 @@ export function EtapaProdutoPrincipal({ estado, atualizar }: PropsEtapa) {
       produtosPrincipais: produtos.map((p) => (p.product_id === productId ? { ...p, offer_codes: codigos } : p)),
     });
   }
+
+  const periodoProduto = periodoProdutoPrincipal(estado);
+  const erroPeriodo = periodoProduto.ok ? null : periodoProduto.error;
+  const idErro = "novo-evento-periodo-produto-erro";
+  const temPeriodo = estado.debriefingInicio !== "" || estado.debriefingFim !== "";
 
   return (
     <div className="flex flex-col gap-6">
@@ -87,6 +92,58 @@ export function EtapaProdutoPrincipal({ estado, atualizar }: PropsEtapa) {
             </li>
           ))}
         </ul>
+      )}
+
+      {produtos.length > 0 && (
+        <fieldset className="flex flex-col gap-2" aria-describedby={erroPeriodo ? idErro : undefined}>
+          <legend className="mb-1.5 text-[13px] font-medium text-v2-nevoa/70">
+            Período de vendas do produto principal (opcional)
+          </legend>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Campo rotulo="Início das vendas" erro={!!erroPeriodo}>
+              {(a) => (
+                <Input
+                  {...a}
+                  className="h-11"
+                  type="date"
+                  aria-label="Início das vendas do produto principal"
+                  value={estado.debriefingInicio}
+                  onChange={(e) => atualizar({ debriefingInicio: e.target.value })}
+                />
+              )}
+            </Campo>
+            <Campo rotulo="Fim das vendas" erro={!!erroPeriodo}>
+              {(a) => (
+                <Input
+                  {...a}
+                  className="h-11"
+                  type="date"
+                  aria-label="Fim das vendas do produto principal"
+                  value={estado.debriefingFim}
+                  onChange={(e) => atualizar({ debriefingFim: e.target.value })}
+                />
+              )}
+            </Campo>
+          </div>
+          {erroPeriodo ? (
+            <p id={idErro} role="alert" className="text-xs text-v2-queda">
+              {erroPeriodo}
+            </p>
+          ) : (
+            <p className="text-xs text-v2-nevoa/55">
+              Em branco, o Debriefing segue o período escolhido no dashboard.
+            </p>
+          )}
+          {temPeriodo && (
+            <Button
+              variante="secundario"
+              className="h-11 self-start"
+              onClick={() => atualizar({ debriefingInicio: "", debriefingFim: "" })}
+            >
+              Limpar período
+            </Button>
+          )}
+        </fieldset>
       )}
 
       {noPainel && (

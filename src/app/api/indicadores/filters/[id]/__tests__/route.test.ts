@@ -146,6 +146,59 @@ describe("PUT /api/indicadores/filters/[id]", () => {
     expect(mockUpdate.mock.calls[0][0]).not.toHaveProperty("status_changed_at");
   });
 
+  describe("período do produto principal (debriefing_start_date/end_date)", () => {
+    const put = async (body: object) => {
+      const { PUT } = await import("../route");
+      return PUT(makeRequest("PUT", "http://localhost/api/indicadores/filters/filter-uuid", body), {
+        params: Promise.resolve(params),
+      });
+    };
+
+    beforeEach(() => {
+      mockSingle.mockResolvedValueOnce({ data: { id: "filter-uuid" }, error: null });
+    });
+
+    it("grava as duas datas no update", async () => {
+      const res = await put({
+        name: "X",
+        meta_ads_terms: ["y"],
+        debriefing_start_date: "2026-10-01",
+        debriefing_end_date: "2026-10-20",
+      });
+      expect(res.status).toBe(200);
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ debriefing_start_date: "2026-10-01", debriefing_end_date: "2026-10-20" }),
+      );
+    });
+
+    it("null nos dois limpa o período salvo", async () => {
+      await put({ name: "X", meta_ads_terms: ["y"], debriefing_start_date: null, debriefing_end_date: null });
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ debriefing_start_date: null, debriefing_end_date: null }),
+      );
+    });
+
+    it.each([
+      ["só o início", { debriefing_start_date: "2026-10-01" }],
+      ["início depois do fim", { debriefing_start_date: "2026-10-21", debriefing_end_date: "2026-10-20" }],
+    ])("retorna 400 com %s", async (_n, extra) => {
+      const res = await put({ name: "X", meta_ads_terms: ["y"], ...extra });
+      expect(res.status).toBe(400);
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it("sem os campos no corpo, não toca nas colunas", async () => {
+      await put({ name: "X", meta_ads_terms: ["y"] });
+      expect(mockUpdate.mock.calls[0][0]).not.toHaveProperty("debriefing_start_date");
+      expect(mockUpdate.mock.calls[0][0]).not.toHaveProperty("debriefing_end_date");
+    });
+
+    it("o período do evento não interfere no do produto principal", async () => {
+      await put({ name: "X", meta_ads_terms: ["y"], start_date: "2026-01-01", end_date: "2026-01-05" });
+      expect(mockUpdate.mock.calls[0][0]).not.toHaveProperty("debriefing_start_date");
+    });
+  });
+
   describe("data de fim vencida manda no status", () => {
     const put = async (body: object) => {
       const { PUT } = await import("../route");

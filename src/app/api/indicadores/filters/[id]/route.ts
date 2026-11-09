@@ -32,12 +32,24 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<Pa
     status,
     start_date,
     end_date,
+    debriefing_start_date,
+    debriefing_end_date,
   } = body ?? {};
 
   // Período só entra no update quando o corpo traz alguma das datas; vazio nos dois limpa o período.
   const periodo = validateEventPeriod(start_date, end_date);
   if (!periodo.ok && (start_date !== undefined || end_date !== undefined)) {
     return NextResponse.json({ error: periodo.error }, { status: 400 });
+  }
+
+  const periodoDebriefing = validateEventPeriod(
+    debriefing_start_date,
+    debriefing_end_date,
+    "de vendas do produto principal",
+  );
+  const mexeNoPeriodoDebriefing = debriefing_start_date !== undefined || debriefing_end_date !== undefined;
+  if (!periodoDebriefing.ok && mexeNoPeriodoDebriefing) {
+    return NextResponse.json({ error: periodoDebriefing.error }, { status: 400 });
   }
 
   let debriefingProductsValue: DebriefingProduct[] | null | undefined;
@@ -115,6 +127,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<Pa
   if (main_hotmart_product !== undefined) update.main_hotmart_product = main_hotmart_product;
   if (debriefing_offer_codes !== undefined) update.debriefing_offer_codes = debriefing_offer_codes;
   if (debriefingProductsValue !== undefined) update.debriefing_products = debriefingProductsValue;
+  if (periodoDebriefing.ok && mexeNoPeriodoDebriefing) {
+    update.debriefing_start_date = periodoDebriefing.value.start_date;
+    update.debriefing_end_date = periodoDebriefing.value.end_date;
+  }
   if (periodo.ok && (start_date !== undefined || end_date !== undefined)) {
     update.start_date = periodo.value.start_date;
     update.end_date = periodo.value.end_date;

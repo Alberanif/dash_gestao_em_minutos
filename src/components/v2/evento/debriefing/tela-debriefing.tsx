@@ -17,7 +17,10 @@ import { fmtDate } from "./formatar";
 export function TelaDebriefing() {
   const { filter, periodo } = useEvento();
   const produtos = useMemo(() => resolveDebriefingProducts(filter), [filter]);
-  const { startDate, endDate } = periodo;
+  // Período próprio do produto principal (configurado no evento) manda sobre o do dashboard; sem ele, vale o do dashboard.
+  const proprio = Boolean(filter.debriefing_start_date && filter.debriefing_end_date);
+  const startDate = proprio ? filter.debriefing_start_date! : periodo.startDate;
+  const endDate = proprio ? filter.debriefing_end_date! : periodo.endDate;
   const consulta = useDebriefing({ startDate, endDate, produtos, ativo: true });
 
   // Seleção dos chips (vazio = Todos). Volta para Todos ao trocar período ou produtos do filtro (regra da V1):
@@ -52,6 +55,11 @@ export function TelaDebriefing() {
       .map((p) => p.product_name);
     corpo = (
       <div data-testid="debriefing-conteudo" className="space-y-6">
+        {proprio && (
+          <p data-testid="debriefing-periodo-proprio" className="text-sm text-v2-nevoa/70">
+            Vendas de {fmtDate(startDate)} a {fmtDate(endDate)} (período do produto principal)
+          </p>
+        )}
         <SeletorProdutos
           produtos={produtos}
           selecionados={selecionados}

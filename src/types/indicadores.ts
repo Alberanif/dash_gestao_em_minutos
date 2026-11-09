@@ -100,6 +100,9 @@ export interface FilterRecord {
   /** Período do evento (AAAA-MM-DD). null/ausente = sem período definido. */
   start_date?: string | null;
   end_date?: string | null;
+  /** Período de vendas do produto principal (AAAA-MM-DD). null/ausente = o Debriefing segue o período do dashboard. */
+  debriefing_start_date?: string | null;
+  debriefing_end_date?: string | null;
   status: FilterStatus;
   status_changed_at: string | null;
   /** Só na resposta da API: true quando "finalizado" veio da data de fim, não do banco. */
