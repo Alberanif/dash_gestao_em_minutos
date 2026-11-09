@@ -31,8 +31,28 @@ export function useLarguraMedida<T extends HTMLElement>() {
  * Item ativo de um gráfico, comandado por mouse e teclado.
  * Setas movem, Home e End vão às pontas, Escape limpa. Foco entrando já ativa o primeiro item.
  */
-export function useItemAtivo(total: number) {
-  const [ativo, setAtivo] = useState<number | null>(null);
+export type ControleAtivo = {
+  /** Índice ativo vindo de fora. `undefined` mantém o gráfico no modo próprio (não controlado). */
+  indiceAtivo?: number | null;
+  /** Avisa o pai a cada mudança do índice ativo (mouse, toque, teclado, foco). */
+  onIndiceAtivo?: (i: number | null) => void;
+};
+
+export function useItemAtivo(total: number, controle?: ControleAtivo) {
+  const [interno, setInterno] = useState<number | null>(null);
+  const controlado = controle?.indiceAtivo !== undefined;
+  const ativo = controlado ? (controle!.indiceAtivo as number | null) : interno;
+  const aoMudar = controle?.onIndiceAtivo;
+  const ativoRef = useRef(ativo);
+  ativoRef.current = ativo;
+  const setAtivo = useCallback(
+    (v: number | null | ((a: number | null) => number | null)) => {
+      const prox = typeof v === "function" ? v(ativoRef.current) : v;
+      if (!controlado) setInterno(prox);
+      aoMudar?.(prox);
+    },
+    [controlado, aoMudar],
+  );
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -62,13 +82,13 @@ export function useItemAtivo(total: number) {
           break;
       }
     },
-    [total],
+    [total, setAtivo],
   );
 
-  const onFocus = useCallback(() => setAtivo((a) => a ?? 0), []);
-  const onBlur = useCallback(() => setAtivo(null), []);
+  const onFocus = useCallback(() => setAtivo((a) => a ?? 0), [setAtivo]);
+  const onBlur = useCallback(() => setAtivo(null), [setAtivo]);
 
   // Dados novos podem ter menos itens que o índice ativo.
-  const valido = ativo !== null && ativo < total ? ativo : null;
+  const valido = ativo !== null && ativo >= 0 && ativo < total ? ativo : null;
   return { ativo: valido, setAtivo, handlers: { onKeyDown, onFocus, onBlur } };
 }

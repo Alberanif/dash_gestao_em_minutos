@@ -7,7 +7,7 @@ import { COR } from "./palette";
 import { GradienteBarra } from "./bar-chart";
 import { escalaLinear } from "./scales";
 import { CamadaAnimada, EstadoVazio, TabelaDados, TooltipGrafico } from "./parts";
-import { useItemAtivo, useLarguraMedida } from "./use-chart";
+import { useItemAtivo, useLarguraMedida, type ControleAtivo } from "./use-chart";
 
 export type BarChartDiarioProps = {
   titulo: string;
@@ -19,7 +19,7 @@ export type BarChartDiarioProps = {
   formatarY?: (n: number) => string;
   animKey?: string;
   className?: string;
-};
+} & ControleAtivo;
 
 const MARGEM = { topo: 16, base: 28 };
 const SLOT_MIN = 20; // abaixo disto por barra o gráfico para de encolher e passa a rolar
@@ -36,7 +36,7 @@ const ESPACO_ROTULO_X = 52;
  * O eixo do valor fica parado e a escala cobre o período inteiro, então a altura das barras não
  * muda enquanto se rola. Uma miniatura do período todo mostra onde a janela está e também arrasta.
  */
-export function BarChartDiario({ titulo, data, cor, altura = 240, formatarY = formatarCompacto, animKey, className }: BarChartDiarioProps) {
+export function BarChartDiario({ titulo, data, cor, altura = 240, formatarY = formatarCompacto, animKey, className, indiceAtivo, onIndiceAtivo }: BarChartDiarioProps) {
   const { ref, largura } = useLarguraMedida<HTMLDivElement>();
   const pontos = useMemo(() => cleanPoints(data), [data]);
   return (
@@ -51,6 +51,7 @@ export function BarChartDiario({ titulo, data, cor, altura = 240, formatarY = fo
           altura={altura}
           cor={cor}
           formatarY={formatarY}
+          controle={{ indiceAtivo, onIndiceAtivo }}
           animKey={animKey ?? pontos.map((p) => `${p.x}:${p.y}`).join("|")}
         />
       ) : (
@@ -70,7 +71,9 @@ function DiarioInterno({
   cor,
   formatarY,
   animKey,
+  controle,
 }: {
+  controle: ControleAtivo;
   titulo: string;
   pontos: ReadonlyArray<{ x: number; y: number }>;
   largura: number;
@@ -80,7 +83,7 @@ function DiarioInterno({
   animKey: string;
 }) {
   const n = pontos.length;
-  const { ativo, setAtivo, handlers } = useItemAtivo(n);
+  const { ativo, setAtivo, handlers } = useItemAtivo(n, controle);
   const idGrad = `v2-barra-${useId().replace(/:/g, "")}`;
   const vpRef = useRef<HTMLDivElement>(null);
   const [rolagem, setRolagem] = useState<Rolagem>({ esq: 0, vista: 0, total: 0 });
