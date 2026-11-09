@@ -6,6 +6,8 @@ import { selectDebriefingProducts } from "@/lib/indicadores/debriefing-selection
 import { useEvento } from "../contexto";
 import { cx } from "../../ui/cx";
 import { EstadoCarregando, EstadoErro, EstadoSemProdutoPrincipal, EstadoSemVendas } from "./estados";
+import { BlocosProdutos } from "./bloco-produto";
+import { EvolucaoDiaria } from "./evolucao-diaria";
 import { Resultado } from "./resultado";
 import { SeletorProdutos } from "./seletor-produtos";
 import { useDebriefing } from "./use-debriefing";
@@ -64,8 +66,8 @@ export function TelaDebriefing() {
         ) : (
           <>
             <Resultado totais={visivel.totals} />
-            {/* TODO(#297): <EvolucaoDiaria /> com visivel.daily_series (consolidada ou do produto selecionado). */}
-            {/* TODO(#298): lista de <BlocoProduto /> a partir de visivel.products. */}
+            <EvolucaoDiaria series={visivel.daily_series} />
+            <BlocosProdutos products={visivel.products} />
           </>
         )}
       </div>

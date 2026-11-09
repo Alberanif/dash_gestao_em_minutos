@@ -16,7 +16,11 @@ import { mockReducedMotion } from "./helpers";
 jest.mock("next/navigation", () => ({ useRouter: () => ({ push: jest.fn(), refresh: jest.fn() }) }));
 jest.mock("next/dynamic", () => ({
   __esModule: true,
-  default: () => require("../evento/debriefing/tela-debriefing").TelaDebriefing,
+  // Só a tela do Debriefing é servida de forma síncrona; os gráficos lazy (charts-lazy) ficam como um componente vazio.
+  default: (loader: { toString(): string }) =>
+    String(loader).includes("tela-debriefing")
+      ? require("../evento/debriefing/tela-debriefing").TelaDebriefing
+      : () => null,
 }));
 
 // Formatação da V1 (debriefing-view.tsx), sem a troca de NBSP: a paridade é de número, não de espaço.
