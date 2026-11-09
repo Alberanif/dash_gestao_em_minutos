@@ -140,6 +140,51 @@ describe("BlocoResultado", () => {
   });
 });
 
+describe("BlocoResultado de evento orgânico", () => {
+  const leadsFonte = (f: FilterRecord, total: number): Fonte<typeof ZERADO_LEADS> => ({
+    data: { ...ZERADO_LEADS, total },
+    chave: montarConsulta(f, PERIODO).chave,
+  });
+
+  it("troca Receita e Vendas por Leads e CPL (investimento ÷ leads da Captação)", () => {
+    const f = filtro({ is_organic: true });
+    montar(f, <BlocoResultado meta={metaFonte(f, 200)} hotmart={hotmartFonte(f, 1000)} leads={leadsFonte(f, 40)} />);
+    expect(screen.getByText("Leads")).toBeTruthy();
+    expect(screen.getByText("CPL")).toBeTruthy();
+    expect(screen.getByText("40")).toBeTruthy();
+    expect(screen.getByText("R$ 5,00")).toBeTruthy(); // 200 ÷ 40, não 200 ÷ meta_leads (10)
+    expect(screen.getByText("Captação de Leads")).toBeTruthy();
+    expect(screen.queryByText("Receita")).toBeNull();
+    expect(screen.queryByText("Vendas")).toBeNull();
+    expect(screen.queryByText("ROAS")).toBeNull();
+    expect(urlsDeDados()).toHaveLength(0);
+  });
+
+  it("sem Captação de Leads usa os leads da Meta e diz isso na nota", async () => {
+    const f = filtro({ is_organic: true, captacao_leads_eventos: [] });
+    montar(f, <BlocoResultado meta={metaFonte(f, 200)} />);
+    expect(await screen.findByText("Meta Ads")).toBeTruthy();
+    expect(screen.getByText("10")).toBeTruthy();
+    expect(screen.getByText("R$ 20,00")).toBeTruthy();
+  });
+
+  it("sem investimento o CPL é traço, nunca R$ 0,00", async () => {
+    const f = filtro({ is_organic: true, meta_ads_terms: [] });
+    montar(f, <BlocoResultado leads={leadsFonte(f, 40)} />);
+    expect(await screen.findByText("40")).toBeTruthy();
+    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    expect(screen.queryByText("R$ 0,00")).toBeNull();
+  });
+
+  it("evento não orgânico segue com ROAS, Receita e Vendas", () => {
+    const f = filtro();
+    montar(f, <BlocoResultado meta={metaFonte(f, 200)} hotmart={hotmartFonte(f, 1000)} leads={leadsFonte(f, 40)} />);
+    expect(screen.getByText("ROAS")).toBeTruthy();
+    expect(screen.getByText("Receita")).toBeTruthy();
+    expect(screen.queryByText("CPL")).toBeNull();
+  });
+});
+
 describe("BlocoJornada", () => {
   it("só aparece com Meta e Hotmart configurados", () => {
     const f = filtro({ meta_ads_terms: [] });

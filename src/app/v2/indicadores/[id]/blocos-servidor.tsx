@@ -11,8 +11,8 @@ import { BlocoResultado } from "@/components/v2/evento/bloco-resultado";
  */
 
 export async function ResultadoServidor({ carga }: { carga: CargaDoEvento }) {
-  const [meta, hotmart] = await Promise.all([carga.meta, carga.hotmart]);
-  return <BlocoResultado meta={meta} hotmart={hotmart} />;
+  const [meta, hotmart, leads] = await Promise.all([carga.meta, carga.hotmart, carga.leads]);
+  return <BlocoResultado meta={meta} hotmart={hotmart} leads={leads} />;
 }
 
 export async function JornadaServidor({ carga }: { carga: CargaDoEvento }) {
