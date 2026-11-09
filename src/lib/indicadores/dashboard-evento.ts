@@ -103,6 +103,38 @@ export function paramsDaFonte(consulta: Consulta, fonte: FonteId): string {
   return fonte === "leads" ? consulta.leadsParams : consulta.params;
 }
 
+export interface CaptacaoDerivada {
+  leads: number | null;
+  /** De onde veio o número de leads (aparece na nota do card). */
+  origem: "Captação de Leads" | "Meta Ads" | null;
+  /** Investimento da Meta ÷ os leads exibidos; null sem investimento ou sem leads. */
+  cpl: number | null;
+}
+
+/**
+ * Leads e CPL de um evento orgânico. Leads: total da Captação de Leads quando o evento
+ * tem essa fonte; senão `meta_leads`. CPL: investimento da Meta ÷ esses mesmos leads.
+ */
+export function derivarCaptacao(
+  expanded: ExpandedFilter,
+  meta: GlobalMetrics | null,
+  leads: GlobalLeadsMetrics | null,
+): CaptacaoDerivada {
+  const temMeta = expanded.sources.meta;
+  let total: number | null = null;
+  let origem: CaptacaoDerivada["origem"] = null;
+  if (expanded.sources.leads) {
+    total = leads?.total ?? null;
+    origem = "Captação de Leads";
+  } else if (temMeta) {
+    total = meta?.meta_leads ?? null;
+    origem = "Meta Ads";
+  }
+  const spend = temMeta ? (meta?.meta_spend ?? null) : null;
+  const cpl = spend !== null && spend > 0 && total !== null && total > 0 ? spend / total : null;
+  return { leads: total, origem, cpl };
+}
+
 export interface ResultadoDerivado {
   roas: number | null;
   cpa: number | null;

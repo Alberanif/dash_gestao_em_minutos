@@ -1,8 +1,8 @@
 "use client";
 
 import type { Fonte } from "@/lib/indicadores/dashboard-evento";
-import { derivarResultado } from "@/lib/indicadores/dashboard-evento";
-import type { GlobalHotmartMetrics, GlobalMetrics } from "@/types/indicadores";
+import { derivarCaptacao, derivarResultado } from "@/lib/indicadores/dashboard-evento";
+import type { GlobalHotmartMetrics, GlobalLeadsMetrics, GlobalMetrics } from "@/types/indicadores";
 import { CountUp } from "../motion/count-up";
 import type { Dado } from "../cor";
 import { Corpo } from "./bloco";
@@ -36,17 +36,33 @@ function KpiResultado({
   );
 }
 
-/** Resultado: ROAS, receita e vendas do período, com as mesmas regras do V1. */
+/** Resultado: ROAS, receita e vendas do período; num evento orgânico, leads e CPL. */
 export function BlocoResultado({
+  meta,
+  hotmart,
+  leads,
+}: {
+  meta?: Fonte<GlobalMetrics> | null;
+  hotmart?: Fonte<GlobalHotmartMetrics> | null;
+  leads?: Fonte<GlobalLeadsMetrics> | null;
+}) {
+  const { filter } = useEvento();
+  // Evento orgânico não vende: o resultado é a captação (leads e CPL), não receita e vendas.
+  return filter.is_organic === true ? (
+    <ResultadoOrganico meta={meta} leads={leads} />
+  ) : (
+    <ResultadoComVendas meta={meta} hotmart={hotmart} />
+  );
+}
+
+function ResultadoComVendas({
   meta: metaInicial,
   hotmart: hotmartInicial,
 }: {
   meta?: Fonte<GlobalMetrics> | null;
   hotmart?: Fonte<GlobalHotmartMetrics> | null;
 }) {
-  const { consulta, filter } = useEvento();
-  // Sem anúncios não há investimento, então não há ROAS para mostrar.
-  const organico = filter.is_organic === true;
+  const { consulta } = useEvento();
   const meta = useFonte("meta", metaInicial);
   const hotmart = useFonte("hotmart", hotmartInicial);
   const { roas } = derivarResultado(consulta.expanded, meta.data?.data ?? null, hotmart.data?.data ?? null, null);
@@ -54,12 +70,32 @@ export function BlocoResultado({
 
   return (
     <Corpo consultas={[meta, hotmart]} esqueletoAltura="h-32">
-      <div className={organico ? "grid gap-4 @xl:grid-cols-2" : "grid gap-4 @xl:grid-cols-3"}>
-        {organico ? null : (
-          <KpiResultado rotulo="ROAS" nota="Receita ÷ Investimento" valor={roas} formato={roasFmt} dado="custo" icone="roas" />
-        )}
+      <div className="grid gap-4 @xl:grid-cols-3">
+        <KpiResultado rotulo="ROAS" nota="Receita ÷ Investimento" valor={roas} formato={roasFmt} dado="custo" icone="roas" />
         <KpiResultado rotulo="Receita" nota="Via Hotmart, em reais" valor={h ? h.total_revenue : null} formato={fmtBRL} dado="venda" icone="receita" />
         <KpiResultado rotulo="Vendas" nota="Total de conversões" valor={h ? h.total_sales : null} formato={fmtNum} dado="venda" icone="vendas" />
+      </div>
+    </Corpo>
+  );
+}
+
+function ResultadoOrganico({
+  meta: metaInicial,
+  leads: leadsInicial,
+}: {
+  meta?: Fonte<GlobalMetrics> | null;
+  leads?: Fonte<GlobalLeadsMetrics> | null;
+}) {
+  const { consulta } = useEvento();
+  const meta = useFonte("meta", metaInicial);
+  const leads = useFonte("leads", leadsInicial);
+  const c = derivarCaptacao(consulta.expanded, meta.data?.data ?? null, leads.data?.data ?? null);
+
+  return (
+    <Corpo consultas={[meta, leads]} esqueletoAltura="h-32">
+      <div className="grid gap-4 @xl:grid-cols-2">
+        <KpiResultado rotulo="Leads" nota={c.origem ?? "Sem fonte de leads"} valor={c.leads} formato={fmtNum} dado="lead" icone="leads" />
+        <KpiResultado rotulo="CPL" nota="Investimento ÷ Leads" valor={c.cpl} formato={fmtBRL} dado="custo" icone="receita" />
       </div>
     </Corpo>
   );
