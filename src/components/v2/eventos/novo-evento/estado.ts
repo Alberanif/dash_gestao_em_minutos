@@ -32,6 +32,9 @@ export interface EstadoAssistente {
   eventosLeads: string[];
   /** Produtos do Debriefing, cada um com as ofertas escolhidas (vazio = todas). */
   produtosPrincipais: DebriefingProduct[];
+  /** Período de vendas do produto principal (AAAA-MM-DD ou ""). Só vale com produto principal escolhido. */
+  debriefingInicio: string;
+  debriefingFim: string;
   /** Termos de campanha do Meta Ads, como digitados (podem ter vazios). */
   termos: string[];
 }
@@ -44,6 +47,8 @@ export const estadoInicial: EstadoAssistente = {
   produtosCaptura: [],
   eventosLeads: [],
   produtosPrincipais: [],
+  debriefingInicio: "",
+  debriefingFim: "",
   termos: [""],
 };
 
@@ -71,6 +76,8 @@ export function estadoDoEvento(f: FilterRecord): EstadoAssistente {
     produtosCaptura: f.hotmart_products ?? [],
     eventosLeads: f.captacao_leads_eventos ?? [],
     produtosPrincipais: f.debriefing_products ?? [],
+    debriefingInicio: f.debriefing_start_date ?? "",
+    debriefingFim: f.debriefing_end_date ?? "",
     termos: f.meta_ads_terms?.length ? f.meta_ads_terms : [""],
   };
 }
@@ -85,12 +92,23 @@ export function termosLimpos(termos: string[]): string[] {
   return termos.map((t) => t.trim()).filter(Boolean);
 }
 
+export const ROTULO_PERIODO_PRODUTO = "de vendas do produto principal";
+
+/** Validação do período do produto principal: sem produto principal o período é ignorado. */
+export function periodoProdutoPrincipal(e: EstadoAssistente) {
+  if (e.produtosPrincipais.length === 0) return validateEventPeriod("", "", ROTULO_PERIODO_PRODUTO);
+  return validateEventPeriod(e.debriefingInicio, e.debriefingFim, ROTULO_PERIODO_PRODUTO);
+}
+
 /** Bloqueios que impedem criar. Lista vazia = pode criar. */
 export function problemasDoEstado(e: EstadoAssistente): Problema[] {
   const problemas: Problema[] = [];
   if (!e.nome.trim()) problemas.push({ etapa: "identificacao", mensagem: "Dê um nome ao evento." });
   const periodo = validateEventPeriod(e.inicio, e.fim);
   if (!periodo.ok) problemas.push({ etapa: "identificacao", mensagem: periodo.error });
+
+  const periodoProduto = periodoProdutoPrincipal(e);
+  if (!periodoProduto.ok) problemas.push({ etapa: "produto", mensagem: periodoProduto.error });
 
   const termos = termosLimpos(e.termos);
   if (e.organico) {
@@ -117,6 +135,7 @@ export function avisoFontes(e: EstadoAssistente): string | null {
 /** Corpo do POST /api/indicadores/filters. Chame só quando `problemasDoEstado` for vazio. */
 export function montarCorpo(e: EstadoAssistente, accountId: string) {
   const periodo = validateEventPeriod(e.inicio, e.fim);
+  const periodoProduto = periodoProdutoPrincipal(e);
   return {
     account_id: accountId,
     name: e.nome.trim(),
@@ -126,5 +145,12 @@ export function montarCorpo(e: EstadoAssistente, accountId: string) {
     captacao_leads_eventos: e.eventosLeads,
     is_organic: e.organico,
     ...(periodo.ok ? periodo.value : {}),
+    // Sempre enviado: no PUT, vazio limpa o período salvo (inclusive ao remover o último produto principal).
+    ...(periodoProduto.ok
+      ? {
+          debriefing_start_date: periodoProduto.value.start_date,
+          debriefing_end_date: periodoProduto.value.end_date,
+        }
+      : {}),
   };
 }

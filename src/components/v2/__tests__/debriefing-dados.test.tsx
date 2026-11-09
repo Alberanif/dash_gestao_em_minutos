@@ -19,7 +19,10 @@ const HOJE = "2026-07-28";
 const PERIODO = { startDate: "2026-07-01", endDate: "2026-07-07", preset: null };
 const PRODUTO: DebriefingProduct = { product_id: "p1", product_name: "Produto A", offer_codes: ["o1"] };
 
-function filtro(debriefing_products: DebriefingProduct[] | null): FilterRecord {
+function filtro(
+  debriefing_products: DebriefingProduct[] | null,
+  periodoProprio?: { de: string; ate: string },
+): FilterRecord {
   return {
     id: "11111111-1111-4111-8111-111111111111",
     account_id: "acc",
@@ -33,6 +36,8 @@ function filtro(debriefing_products: DebriefingProduct[] | null): FilterRecord {
     created_at: "2026-06-01T00:00:00Z",
     updated_at: "2026-06-01T00:00:00Z",
     debriefing_products,
+    debriefing_start_date: periodoProprio?.de ?? null,
+    debriefing_end_date: periodoProprio?.ate ?? null,
   } as unknown as FilterRecord;
 }
 
@@ -122,6 +127,50 @@ describe("use-debriefing: consulta", () => {
     await waitFor(() =>
       expect(screen.getByTestId("debriefing-conteudo").parentElement?.className).not.toContain("opacity-50"),
     );
+  });
+});
+
+describe("período próprio do produto principal", () => {
+  const PROPRIO = { de: "2026-09-01", ate: "2026-09-15" };
+
+  it("consulta com as datas do evento, não com as do dashboard, e mostra a faixa", async () => {
+    fetchMock.mockImplementation(() => resposta(metricas(3)));
+    montar(filtro([PRODUTO], PROPRIO));
+    await screen.findByTestId("debriefing-conteudo");
+    const url = new URL(chamadasDebriefing()[0][0] as string, "http://x");
+    expect(url.searchParams.get("start_date")).toBe("2026-09-01");
+    expect(url.searchParams.get("end_date")).toBe("2026-09-15");
+    expect(screen.getByTestId("debriefing-periodo-proprio").textContent).toBe(
+      "Vendas de 01/09 a 15/09 (período do produto principal)",
+    );
+  });
+
+  it("trocar o período do dashboard não refaz a consulta do Debriefing", async () => {
+    fetchMock.mockImplementation(() => resposta(metricas(3)));
+    montar(filtro([PRODUTO], PROPRIO));
+    await screen.findByTestId("debriefing-conteudo");
+    fireEvent.click(screen.getByRole("tab", { name: "7 dias" }));
+    await act(async () => {});
+    expect(chamadasDebriefing()).toHaveLength(1);
+  });
+
+  it("sem período próprio, segue o do dashboard e não mostra a faixa", async () => {
+    fetchMock.mockImplementation(() => resposta(metricas(3)));
+    montar(filtro([PRODUTO]));
+    await screen.findByTestId("debriefing-conteudo");
+    const url = new URL(chamadasDebriefing()[0][0] as string, "http://x");
+    expect(url.searchParams.get("start_date")).toBe("2026-07-01");
+    expect(screen.queryByTestId("debriefing-periodo-proprio")).toBeNull();
+  });
+
+  it("só uma das datas salvas não vale: segue o dashboard", async () => {
+    fetchMock.mockImplementation(() => resposta(metricas(3)));
+    const f = filtro([PRODUTO], PROPRIO);
+    (f as unknown as { debriefing_end_date: null }).debriefing_end_date = null;
+    montar(f);
+    await screen.findByTestId("debriefing-conteudo");
+    const url = new URL(chamadasDebriefing()[0][0] as string, "http://x");
+    expect(url.searchParams.get("start_date")).toBe("2026-07-01");
   });
 });
 

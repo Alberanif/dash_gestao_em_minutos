@@ -81,6 +81,9 @@ export interface NewFilterInput {
   /** Já validado pela rota; `undefined` mantém as colunas fora do insert. */
   start_date?: string | null;
   end_date?: string | null;
+  /** Já validado pela rota; `undefined` mantém as colunas fora do insert. */
+  debriefing_start_date?: string | null;
+  debriefing_end_date?: string | null;
 }
 
 export async function createFilter(input: NewFilterInput, supabase: SupabaseLike): Promise<LeituraResult<FilterRecord>> {
@@ -97,6 +100,9 @@ export async function createFilter(input: NewFilterInput, supabase: SupabaseLike
       captacao_leads_eventos: input.captacao_leads_eventos,
       is_organic: input.is_organic ?? false,
       ...(input.start_date !== undefined ? { start_date: input.start_date, end_date: input.end_date ?? null } : {}),
+      ...(input.debriefing_start_date !== undefined
+        ? { debriefing_start_date: input.debriefing_start_date, debriefing_end_date: input.debriefing_end_date ?? null }
+        : {}),
       status: "ativo",
     })
     .select()

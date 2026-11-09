@@ -1,4 +1,12 @@
-import { avisoFontes, estadoInicial, montarCorpo, problemasDoEstado, type EstadoAssistente } from "../estado";
+import {
+  avisoFontes,
+  estadoDoEvento,
+  estadoInicial,
+  montarCorpo,
+  problemasDoEstado,
+  type EstadoAssistente,
+} from "../estado";
+import type { FilterRecord } from "@/types/indicadores";
 
 const produto = { product_id: "10", product_name: "Mentoria" };
 const base = (p: Partial<EstadoAssistente> = {}): EstadoAssistente => ({ ...estadoInicial, nome: "Evento", ...p });
@@ -97,5 +105,68 @@ describe("montarCorpo", () => {
     const c = montarCorpo(base({ produtosPrincipais: dp }), "acc");
     expect(c.is_organic).toBe(false);
     expect(c.debriefing_products).toEqual(dp);
+  });
+});
+
+describe("período do produto principal", () => {
+  const dp = [{ product_id: "1", product_name: "P", offer_codes: [] }];
+  const com = (p: Partial<EstadoAssistente> = {}) =>
+    base({ produtosCaptura: [produto], produtosPrincipais: dp, ...p });
+
+  it("sem produto principal o período é ignorado (nem valida, nem envia)", () => {
+    const e = base({ produtosCaptura: [produto], debriefingInicio: "2026-02-01" });
+    expect(problemasDoEstado(e)).toEqual([]);
+    expect(montarCorpo(e, "acc")).toMatchObject({ debriefing_start_date: null, debriefing_end_date: null });
+  });
+
+  it("só uma data aponta a etapa do produto principal", () => {
+    const p = problemasDoEstado(com({ debriefingInicio: "2026-02-01" }));
+    expect(p).toHaveLength(1);
+    expect(p[0].etapa).toBe("produto");
+    expect(p[0].mensagem).toContain("produto principal");
+  });
+
+  it("fim antes do início é inválido", () => {
+    const p = problemasDoEstado(com({ debriefingInicio: "2026-02-10", debriefingFim: "2026-02-01" }));
+    expect(p.map((x) => x.etapa)).toEqual(["produto"]);
+  });
+
+  it("não exige que caia dentro do período do evento", () => {
+    const e = com({ inicio: "2026-01-01", fim: "2026-01-10", debriefingInicio: "2026-02-01", debriefingFim: "2026-02-20" });
+    expect(problemasDoEstado(e)).toEqual([]);
+  });
+
+  it("datas válidas vão no corpo, separadas das do evento", () => {
+    const c = montarCorpo(
+      com({ inicio: "2026-01-01", fim: "2026-01-10", debriefingInicio: "2026-02-01", debriefingFim: "2026-02-20" }),
+      "acc",
+    );
+    expect(c).toMatchObject({
+      start_date: "2026-01-01",
+      end_date: "2026-01-10",
+      debriefing_start_date: "2026-02-01",
+      debriefing_end_date: "2026-02-20",
+    });
+  });
+
+  it("vazio vira null no corpo (limpa o período salvo no PUT)", () => {
+    expect(montarCorpo(com(), "acc")).toMatchObject({ debriefing_start_date: null, debriefing_end_date: null });
+  });
+
+  it("estadoDoEvento carrega o período salvo", () => {
+    const f = {
+      name: "E",
+      is_organic: false,
+      hotmart_products: [],
+      captacao_leads_eventos: [],
+      meta_ads_terms: [],
+      debriefing_start_date: "2026-02-01",
+      debriefing_end_date: "2026-02-20",
+    } as unknown as FilterRecord;
+    expect(estadoDoEvento(f)).toMatchObject({ debriefingInicio: "2026-02-01", debriefingFim: "2026-02-20" });
+    expect(estadoDoEvento({ ...f, debriefing_start_date: null, debriefing_end_date: null })).toMatchObject({
+      debriefingInicio: "",
+      debriefingFim: "",
+    });
   });
 });

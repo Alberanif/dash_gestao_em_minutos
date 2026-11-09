@@ -263,6 +263,48 @@ describe("POST /api/indicadores/filters", () => {
       expect(mockInsert.mock.calls[0][0]).not.toHaveProperty("debriefing_products");
     });
   });
+
+  describe("período do produto principal (debriefing_start_date/end_date)", () => {
+    const url = "http://localhost/api/indicadores/filters";
+    const base = {
+      account_id: "acc",
+      name: "T",
+      hotmart_products: [{ product_id: "p1", product_name: "P1" }],
+    };
+
+    it("grava as duas datas no insert", async () => {
+      mockSingle.mockResolvedValueOnce({ data: { id: "x" }, error: null });
+      const { POST } = await import("../route");
+      const res = await POST(
+        makeRequest("POST", url, { ...base, debriefing_start_date: "2026-10-01", debriefing_end_date: "2026-10-20" }),
+      );
+      expect(res.status).toBe(201);
+      expect(mockInsert.mock.calls[0][0]).toMatchObject({
+        debriefing_start_date: "2026-10-01",
+        debriefing_end_date: "2026-10-20",
+      });
+    });
+
+    it.each([
+      ["só o início", { debriefing_start_date: "2026-10-01" }],
+      ["só o fim", { debriefing_end_date: "2026-10-20" }],
+      ["início depois do fim", { debriefing_start_date: "2026-10-21", debriefing_end_date: "2026-10-20" }],
+      ["data impossível", { debriefing_start_date: "2026-02-31", debriefing_end_date: "2026-03-05" }],
+    ])("retorna 400 com %s", async (_n, extra) => {
+      const { POST } = await import("../route");
+      const res = await POST(makeRequest("POST", url, { ...base, ...extra }));
+      expect(res.status).toBe(400);
+      expect(mockInsert).not.toHaveBeenCalled();
+    });
+
+    it("sem os campos, não inclui as colunas no insert", async () => {
+      mockSingle.mockResolvedValueOnce({ data: { id: "x" }, error: null });
+      const { POST } = await import("../route");
+      await POST(makeRequest("POST", url, base));
+      expect(mockInsert.mock.calls[0][0]).not.toHaveProperty("debriefing_start_date");
+      expect(mockInsert.mock.calls[0][0]).not.toHaveProperty("debriefing_end_date");
+    });
+  });
 });
 
 
