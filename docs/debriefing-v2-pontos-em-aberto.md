@@ -24,3 +24,18 @@ Limite: a janela da coleta é de 24 h, então vendas mais antigas só chegam pel
 A chave é `["debriefing", start, end, produtos]`, com `produtos` = produtos principais do evento (o que vai em
 `products` na API). A seleção dos chips (#296) recorta o resultado no cliente com `selectDebriefingProducts`, como na
 V1, então trocar de chip não refaz a consulta. O hook não tem retry automático: o erro aparece e "Tentar de novo" refaz.
+
+## #297 (evolução diária)
+
+### Hover/foco controlado entre os dois gráficos
+
+Resposta: `LineChart` e `BarChartDiario` ganharam as props opcionais `indiceAtivo` e `onIndiceAtivo`, ligadas ao hook
+`useItemAtivo` (`charts/use-chart.ts`). Sem as props o comportamento é o de sempre (estado interno), então os usos
+existentes não mudam. Com elas, `EvolucaoDiaria` guarda um único índice e o passa aos dois gráficos: passar o mouse,
+tocar ou usar o teclado em um destaca o mesmo dia no outro e no painel de leitura. Os dois gráficos recebem a série
+ordenada pelas mesmas datas, então o índice vale para ambos. Cobertura: `charts-indice-controlado.test.tsx` e
+`evolucao-diaria.test.tsx`.
+
+## #298 (blocos por produto e oferta)
+
+Nenhum ponto em aberto.
