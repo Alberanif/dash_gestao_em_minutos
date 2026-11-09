@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from "react
 import type { FilterRecord } from "@/types/indicadores";
 import { montarConsulta, type Consulta } from "@/lib/indicadores/dashboard-evento";
 import { calcPresetDates, getActivePreset, type PresetKey } from "@/lib/utils/period-presets";
+import type { Visao } from "./visao";
 
 export interface PeriodoEvento {
   startDate: string;
@@ -23,6 +24,9 @@ interface ContextoEvento {
   hoje: string;
   escolherPreset: (key: PresetKey) => void;
   escolherDatas: (startDate: string, endDate: string) => void;
+  /** Visão do corpo da página (`?view=`). Trocar só muda o corpo: herói e cena seguem montados. */
+  visao: Visao;
+  escolherVisao: (visao: Visao) => void;
 }
 
 const Contexto = createContext<ContextoEvento | null>(null);
@@ -50,11 +54,20 @@ function gravarNaUrl(periodo: PeriodoEvento, padrao: PeriodoEvento) {
   window.history.replaceState(null, "", url);
 }
 
+/** `?view=debriefing` na URL; o padrão (dashboard) sai dela. Preserva `de`/`ate`. */
+function gravarVisaoNaUrl(visao: Visao) {
+  const url = new URL(window.location.href);
+  if (visao === "dashboard") url.searchParams.delete("view");
+  else url.searchParams.set("view", visao);
+  window.history.replaceState(null, "", url);
+}
+
 export function ProvedorEvento({
   filter,
   filters,
   periodoInicial,
   hoje,
+  visaoInicial = "dashboard",
   children,
 }: {
   filter: FilterRecord;
@@ -62,11 +75,18 @@ export function ProvedorEvento({
   periodoInicial: PeriodoEvento;
   /** YYYY-MM-DD do servidor: o cliente não recalcula "hoje" na hidratação. */
   hoje: string;
+  visaoInicial?: Visao;
   children: React.ReactNode;
 }) {
   const [queryClient] = useState(novoCliente);
   const [periodo, setPeriodo] = useState(periodoInicial);
   const [padrao] = useState(periodoInicial);
+  const [visao, setVisao] = useState<Visao>(visaoInicial);
+
+  const escolherVisao = useCallback((proxima: Visao) => {
+    setVisao(proxima);
+    gravarVisaoNaUrl(proxima);
+  }, []);
 
   const aplicar = useCallback(
     (proximo: PeriodoEvento) => {
@@ -99,8 +119,8 @@ export function ProvedorEvento({
   );
 
   const valor = useMemo(
-    () => ({ filter, filters, consulta, chaveInicial, periodo, hoje, escolherPreset, escolherDatas }),
-    [filter, filters, consulta, chaveInicial, periodo, hoje, escolherPreset, escolherDatas],
+    () => ({ filter, filters, consulta, chaveInicial, periodo, hoje, escolherPreset, escolherDatas, visao, escolherVisao }),
+    [filter, filters, consulta, chaveInicial, periodo, hoje, escolherPreset, escolherDatas, visao, escolherVisao],
   );
 
   return (

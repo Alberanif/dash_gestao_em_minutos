@@ -11,6 +11,8 @@ import { ControlesDoEvento } from "@/components/v2/evento/controles";
 import { HeroSlot } from "@/components/v2/evento/hero-slot";
 import { Esqueleto } from "@/components/v2/evento/bloco";
 import { periodoDaUrl } from "@/components/v2/evento/periodo";
+import { visaoDaUrl } from "@/components/v2/evento/visao";
+import { CorpoDoEvento } from "@/components/v2/evento/corpo-do-evento";
 import { BotaoVoltar } from "@/components/v2/evento/voltar";
 import "@/components/v2/evento/voltar.css";
 import { JornadaServidor, LeadsServidor, PlataformasServidor, ResultadoServidor } from "./blocos-servidor";
@@ -39,33 +41,41 @@ export default async function EventoV2Page({
   if (!filter) notFound();
 
   const hoje = new Date().toISOString().slice(0, 10);
-  const periodo = periodoDaUrl(await searchParams, hoje, filter);
+  const query = await searchParams;
+  const periodo = periodoDaUrl(query, hoje, filter);
+  const visao = visaoDaUrl(query);
   const consulta = montarConsulta(filter, periodo);
 
   // As cinco fontes começam juntas aqui; cada bloco aguarda só as suas, dentro do próprio Suspense.
   const carga = iniciarCargaDoEvento(consulta, periodo, createSupabaseServiceClient());
 
   return (
-    <ProvedorEvento filter={filter} filters={filters} periodoInicial={periodo} hoje={hoje}>
+    <ProvedorEvento filter={filter} filters={filters} periodoInicial={periodo} hoje={hoje} visaoInicial={visao}>
       <div data-pagina-evento className="v2-pagina-evento mx-auto max-w-6xl space-y-8 pt-2">
         <BotaoVoltar />
         <HeroSlot nome={filter.name} status={filter.status}>
           <ControlesDoEvento />
         </HeroSlot>
-        <section aria-label="Resultado">
-          <Suspense fallback={<Esqueleto className="h-32 w-full" />}>
-            <ResultadoServidor carga={carga} />
-          </Suspense>
-        </section>
-        <Suspense fallback={<Esqueleto className="h-72 w-full" />}>
-          <JornadaServidor carga={carga} />
-        </Suspense>
-        <Suspense fallback={<Esqueleto className="h-96 w-full" />}>
-          <PlataformasServidor carga={carga} />
-        </Suspense>
-        <Suspense fallback={<Esqueleto className="h-96 w-full" />}>
-          <LeadsServidor carga={carga} />
-        </Suspense>
+        <CorpoDoEvento
+          dashboard={
+              <>
+              <section aria-label="Resultado">
+                <Suspense fallback={<Esqueleto className="h-32 w-full" />}>
+                  <ResultadoServidor carga={carga} />
+                </Suspense>
+              </section>
+              <Suspense fallback={<Esqueleto className="h-72 w-full" />}>
+                <JornadaServidor carga={carga} />
+              </Suspense>
+              <Suspense fallback={<Esqueleto className="h-96 w-full" />}>
+                <PlataformasServidor carga={carga} />
+              </Suspense>
+              <Suspense fallback={<Esqueleto className="h-96 w-full" />}>
+                <LeadsServidor carga={carga} />
+              </Suspense>
+              </>
+          }
+        />
       </div>
     </ProvedorEvento>
   );
