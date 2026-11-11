@@ -23,13 +23,15 @@ interface DashboardProps {
   onRangeChange: (range: DateRange | null) => Promise<boolean>;
   // Pede à tela que releia a visualização (estado da coleta, last_refresh_at).
   onViewChanged: () => void;
+  // Abre a edição desta visualização. Só chega para quem edita.
+  onEdit?: () => void;
 }
 
 // Inteiros sem símbolo: o Intl pt-BR não põe NBSP aqui (só em moeda), então o
 // número quebra normalmente no celular (PR #162).
 const fmtInt = (n: number) => Intl.NumberFormat("pt-BR").format(n);
 
-export function DashboardDaVisualizacao({ view, productName, role, onRangeChange, onViewChanged }: DashboardProps) {
+export function DashboardDaVisualizacao({ view, productName, role, onRangeChange, onViewChanged, onEdit }: DashboardProps) {
   const canEdit = role === "gestor" || role === "analista";
   const { range, dados, erro, atualizando, recarregar } = useDadosDaVisualizacao(view);
 
@@ -67,9 +69,16 @@ export function DashboardDaVisualizacao({ view, productName, role, onRangeChange
     <div data-testid="view-dashboard" className="flex min-w-0 flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h2 data-testid="view-selected-name" className="text-xl font-bold text-v2-nevoa [overflow-wrap:anywhere]">
-            {view.name}
-          </h2>
+          <div className="flex flex-wrap items-center gap-x-2">
+            <h2 data-testid="view-selected-name" className="text-xl font-bold text-v2-nevoa [overflow-wrap:anywhere]">
+              {view.name}
+            </h2>
+            {canEdit && onEdit && (
+              <Button variante="fantasma" data-testid="vendas-edit-view-btn" className="h-8 px-2" onClick={onEdit}>
+                Editar
+              </Button>
+            )}
+          </div>
           <p data-testid="view-product" className="mt-0.5 text-sm text-v2-nevoa/65 [overflow-wrap:anywhere]">
             {productName}, {ofertas} {ofertas === 1 ? "oferta" : "ofertas"}
           </p>

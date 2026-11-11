@@ -4,9 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import type { UserRole } from "@/types/auth";
 import type { VendasFolderRecord, VendasViewRecord } from "@/types/vendas";
 import { groupViewsByFolder, selectInitialViewId } from "@/lib/vendas/views";
-import { Button, Surface } from "../ui";
+import { Button, Confirmar, Surface } from "../ui";
 import type { DateRange } from "@/lib/vendas/date-range";
 import { DashboardDaVisualizacao } from "./dashboard-da-visualizacao";
+import { ModalDePasta } from "./modal-de-pasta";
+import { ModalDeVisualizacao } from "./modal-de-visualizacao";
 import { PainelVisualizacoes } from "./painel-visualizacoes";
 import type { CicloNaoMigrado, ProdutoHotmart } from "./tipos";
 
@@ -17,6 +19,10 @@ interface TelaDeVendasProps {
 
 // Enquanto o histórico é coletado a tela relê a visualização neste intervalo.
 const INTERVALO_BACKFILL_MS = 5000;
+
+type AlvoDeExclusao =
+  | { kind: "view"; view: VendasViewRecord }
+  | { kind: "folder"; folder: VendasFolderRecord };
 
 /**
  * Relatório de Vendas (PRD #303): painel de visualizações por pasta e o
@@ -32,6 +38,14 @@ export function TelaDeVendas({ role, products }: TelaDeVendasProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [recarga, setRecarga] = useState(0);
   const [pastaAberta, setPastaAberta] = useState<Record<string, boolean>>({});
+
+  const [criarAberto, setCriarAberto] = useState(false);
+  const [editando, setEditando] = useState<VendasViewRecord | null>(null);
+  const [criarPastaAberto, setCriarPastaAberto] = useState(false);
+  const [renomeando, setRenomeando] = useState<VendasFolderRecord | null>(null);
+  const [excluir, setExcluir] = useState<AlvoDeExclusao | null>(null);
+  const [excluindo, setExcluindo] = useState(false);
+  const [erroDeExclusao, setErroDeExclusao] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -105,6 +119,83 @@ export function TelaDeVendas({ role, products }: TelaDeVendasProps) {
     return () => clearInterval(timer);
   }, [coletando, selecionadaId, reler]);
 
+  function aoSalvarView(view: VendasViewRecord, modo: "created" | "edited") {
+    if (modo === "created") {
+      setViews((prev) => [view, ...(prev ?? [])]);
+      setSelectedId(view.id);
+      setCriarAberto(false);
+    } else {
+      substituirView(view);
+      setEditando(null);
+    }
+  }
+
+  async function criarPasta(name: string) {
+    const res = await fetch("/api/vendas/folders", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.error ?? "Erro ao criar pasta");
+    setFolders((prev) => [...prev, data.folder as VendasFolderRecord]);
+    setCriarPastaAberto(false);
+  }
+
+  async function renomearPasta(name: string) {
+    if (!renomeando) return;
+    const res = await fetch(`/api/vendas/folders/${renomeando.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.error ?? "Erro ao renomear pasta");
+    const atualizada: VendasFolderRecord = data.folder;
+    setFolders((prev) => prev.map((f) => (f.id === atualizada.id ? atualizada : f)));
+    setRenomeando(null);
+  }
+
+  function pedirExclusao(alvo: AlvoDeExclusao) {
+    setErroDeExclusao(null);
+    setExcluir(alvo);
+  }
+
+  // Exclusão confirmada. Erro da API fica no próprio diálogo, que continua aberto.
+  async function confirmarExclusao() {
+    if (!excluir) return;
+    setExcluindo(true);
+    setErroDeExclusao(null);
+    try {
+      if (excluir.kind === "view") {
+        const { view } = excluir;
+        const res = await fetch(`/api/vendas/views/${view.id}`, { method: "DELETE" });
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error ?? "Erro ao excluir a visualização");
+        }
+        const restantes = (views ?? []).filter((v) => v.id !== view.id);
+        setViews(restantes);
+        setSelectedId((cur) => (cur && restantes.some((v) => v.id === cur) ? cur : selectInitialViewId(restantes)));
+        setEditando(null);
+      } else {
+        const { folder } = excluir;
+        const res = await fetch(`/api/vendas/folders/${folder.id}`, { method: "DELETE" });
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error ?? "Erro ao deletar pasta");
+        }
+        setFolders((prev) => prev.filter((f) => f.id !== folder.id));
+        setViews((prev) => (prev ?? []).map((v) => (v.folder_id === folder.id ? { ...v, folder_id: null } : v)));
+      }
+      setExcluir(null);
+    } catch (err) {
+      setErroDeExclusao(err instanceof Error ? err.message : "Não foi possível concluir a exclusão.");
+    } finally {
+      setExcluindo(false);
+    }
+  }
+
   async function salvarPeriodo(range: DateRange | null): Promise<boolean> {
     if (!selecionada) return false;
     try {
@@ -137,10 +228,65 @@ export function TelaDeVendas({ role, products }: TelaDeVendasProps) {
 
   return (
     <div className="flex flex-col gap-5">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight text-v2-nevoa">Relatório de vendas</h1>
-        <p className="mt-1 text-sm text-v2-nevoa/65">Vendas da Hotmart por produto e oferta.</p>
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-v2-nevoa">Relatório de vendas</h1>
+          <p className="mt-1 text-sm text-v2-nevoa/65">Vendas da Hotmart por produto e oferta.</p>
+        </div>
+        {canEdit && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variante="secundario" onClick={() => setCriarPastaAberto(true)} data-testid="vendas-new-folder-btn">
+              Nova pasta
+            </Button>
+            <Button onClick={() => setCriarAberto(true)} data-testid="vendas-new-view-btn">
+              Nova visualização
+            </Button>
+          </div>
+        )}
       </header>
+
+      {criarAberto && canEdit && (
+        <ModalDeVisualizacao
+          products={products}
+          folders={folders}
+          onSaved={aoSalvarView}
+          onCancel={() => setCriarAberto(false)}
+        />
+      )}
+      {editando && canEdit && (
+        <ModalDeVisualizacao
+          products={products}
+          folders={folders}
+          editTarget={editando}
+          onSaved={aoSalvarView}
+          onCancel={() => setEditando(null)}
+          onRequestDelete={(view) => pedirExclusao({ kind: "view", view })}
+        />
+      )}
+      {criarPastaAberto && canEdit && (
+        <ModalDePasta onSave={criarPasta} onCancel={() => setCriarPastaAberto(false)} />
+      )}
+      {renomeando && canEdit && (
+        <ModalDePasta folderTarget={renomeando} onSave={renomearPasta} onCancel={() => setRenomeando(null)} />
+      )}
+      {canEdit && (
+        <Confirmar
+          aberto={excluir !== null}
+          onFechar={() => !excluindo && setExcluir(null)}
+          onConfirmar={() => void confirmarExclusao()}
+          titulo={excluir?.kind === "folder" ? "Deletar pasta" : "Excluir visualização"}
+          descricao={
+            excluir?.kind === "folder"
+              ? `Deletar a pasta "${excluir.folder.name}"? As visualizações desta pasta voltarão para "Sem pasta".`
+              : excluir
+                ? `Excluir a visualização "${excluir.view.name}"? As vendas coletadas da Hotmart não são apagadas, mas esta configuração será removida e não pode ser desfeita.`
+                : undefined
+          }
+          rotuloConfirmar={excluir?.kind === "folder" ? "Deletar" : "Excluir"}
+          carregando={excluindo}
+          erro={erroDeExclusao}
+        />
+      )}
 
       {canEdit && naoMigrados.length > 0 && (
         <p
@@ -179,6 +325,11 @@ export function TelaDeVendas({ role, products }: TelaDeVendasProps) {
               ? "Crie a primeira visualização para acompanhar a quantidade de vendas de um produto e de suas ofertas."
               : "Assim que alguém criar a primeira visualização, ela aparecerá aqui."}
           </p>
+          {canEdit && (
+            <Button onClick={() => setCriarAberto(true)} data-testid="vendas-create-cta">
+              Criar visualização
+            </Button>
+          )}
         </Surface>
       )}
 
@@ -188,6 +339,9 @@ export function TelaDeVendas({ role, products }: TelaDeVendasProps) {
             grupos={grupos}
             selecionadaId={selecionada.id}
             onSelecionar={setSelectedId}
+            canEdit={canEdit}
+            onRenomearPasta={setRenomeando}
+            onExcluirPasta={(folder) => pedirExclusao({ kind: "folder", folder })}
             onAlternarPasta={(id) =>
               setPastaAberta((prev) => ({ ...prev, [id]: !grupos.find((g) => g.id === id)?.isExpanded }))
             }
@@ -200,6 +354,7 @@ export function TelaDeVendas({ role, products }: TelaDeVendasProps) {
             role={role}
             onRangeChange={salvarPeriodo}
             onViewChanged={() => void reler(selecionada.id)}
+            onEdit={canEdit ? () => setEditando(selecionada) : undefined}
           />
         </div>
       )}

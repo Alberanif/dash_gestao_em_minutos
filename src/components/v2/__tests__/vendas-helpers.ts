@@ -59,6 +59,14 @@ export function instalaFetch(m: Mock) {
     }
     if (url === "/api/vendas/folders") return respond({ folders: m.folders ?? [] });
     const path = url.split("?")[0];
+    if (path === "/api/vendas/offer-options") {
+      return respond({
+        offers: [
+          { offer_code: "OF-1", offer_name: "Oferta Um", sales_count: 10 },
+          { offer_code: "OF-2", offer_name: "Oferta Dois", sales_count: 3 },
+        ],
+      });
+    }
     if (/\/kpis$/.test(path)) return respond(m.kpis ?? { sales: 7, refunded: 2 });
     if (/\/daily$/.test(path)) return respond({ rows: m.daily ?? [{ day: "2026-08-01", sales: 3 }, { day: "2026-08-02", sales: 4 }] });
     if (/\/hourly$/.test(path)) return respond({ rows: [{ hour: "2026-08-01T10", sales: 7 }] });
@@ -74,3 +82,10 @@ export function instalaFetch(m: Mock) {
   return calls;
 }
 
+
+/** O Radix Select e o Dialog usam APIs que o jsdom não implementa. */
+export function polyfillsDoRadix() {
+  Element.prototype.hasPointerCapture = () => false;
+  Element.prototype.releasePointerCapture = () => {};
+  Element.prototype.scrollIntoView = () => {};
+}
