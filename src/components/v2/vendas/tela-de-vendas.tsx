@@ -5,6 +5,8 @@ import type { UserRole } from "@/types/auth";
 import type { VendasFolderRecord, VendasViewRecord } from "@/types/vendas";
 import { groupViewsByFolder, selectInitialViewId } from "@/lib/vendas/views";
 import { Button, Surface } from "../ui";
+import type { DateRange } from "@/lib/vendas/date-range";
+import { DashboardDaVisualizacao } from "./dashboard-da-visualizacao";
 import { PainelVisualizacoes } from "./painel-visualizacoes";
 import type { CicloNaoMigrado, ProdutoHotmart } from "./tipos";
 
@@ -103,6 +105,27 @@ export function TelaDeVendas({ role, products }: TelaDeVendasProps) {
     return () => clearInterval(timer);
   }, [coletando, selecionadaId, reler]);
 
+  async function salvarPeriodo(range: DateRange | null): Promise<boolean> {
+    if (!selecionada) return false;
+    try {
+      const res = await fetch(`/api/vendas/views/${selecionada.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          view_start_date: range?.start ?? null,
+          view_end_date: range?.end ?? null,
+        }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (!data?.view) return false;
+      substituirView(data.view as VendasViewRecord);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   const grupos = groupViewsByFolder(views ?? [], folders, selecionada?.id ?? null).map((g) => ({
     ...g,
     isExpanded: pastaAberta[g.id] ?? g.isExpanded,
@@ -170,14 +193,14 @@ export function TelaDeVendas({ role, products }: TelaDeVendasProps) {
             }
           />
 
-          <Surface data-testid="view-dashboard" className="flex flex-col gap-1">
-            <h2 data-testid="view-selected-name" className="text-lg font-bold text-v2-nevoa">
-              {selecionada.name}
-            </h2>
-            <p data-testid="view-product" className="text-sm text-v2-nevoa/65">
-              {nomeDoProduto(selecionada)}
-            </p>
-          </Surface>
+          <DashboardDaVisualizacao
+            key={selecionada.id}
+            view={selecionada}
+            productName={nomeDoProduto(selecionada)}
+            role={role}
+            onRangeChange={salvarPeriodo}
+            onViewChanged={() => void reler(selecionada.id)}
+          />
         </div>
       )}
     </div>

@@ -3,71 +3,11 @@ import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { TelaDeVendas } from "../vendas/tela-de-vendas";
-import type { ProdutoHotmart } from "../vendas/tipos";
-import type { VendasFolderRecord, VendasViewRecord } from "@/types/vendas";
 import type { UserRole } from "@/types/auth";
+import { PRODUCTS, PASTA, makeView, instalaFetch } from "./vendas-helpers";
 
 // O tipo só admite gestor e analista; o guard da página barra o resto. A tela ainda assim nega edição a qualquer outro valor.
 const SEM_EDICAO = "leitor" as unknown as UserRole;
-
-const PRODUCTS: ProdutoHotmart[] = [{ product_id: "p1", product_name: "Produto Um", account_id: "acc-1" }];
-
-function makeView(overrides: Partial<VendasViewRecord> = {}): VendasViewRecord {
-  return {
-    id: "v1",
-    name: "Visão 1",
-    account_id: "acc-1",
-    product_id: "p1",
-    offer_codes: ["OF-1", "OF-2"],
-    folder_id: null,
-    view_start_date: null,
-    view_end_date: null,
-    refresh_started_at: null,
-    last_refresh_at: null,
-    backfill_status: "done",
-    backfill_from: null,
-    migrated_from_cycle_id: null,
-    created_by: "u1",
-    created_at: "2026-08-01T00:00:00Z",
-    updated_at: "2026-08-01T00:00:00Z",
-    ...overrides,
-  };
-}
-
-const PASTA = {
-  id: "f1",
-  name: "Lançamentos",
-  created_by: "u1",
-  created_at: "2026-01-01T00:00:00Z",
-  updated_at: "2026-01-01T00:00:00Z",
-} as unknown as VendasFolderRecord;
-
-interface Mock {
-  views: VendasViewRecord[];
-  unmigrated?: { id: string; name: string }[];
-  folders?: VendasFolderRecord[];
-  viewsStatus?: number;
-  overrides?: Record<string, { status?: number; body: unknown }>;
-}
-
-function instalaFetch(m: Mock) {
-  const calls: { method: string; url: string }[] = [];
-  global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
-    const method = init?.method ?? "GET";
-    calls.push({ method, url });
-    const respond = (body: unknown, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
-    const over = m.overrides?.[`${method} ${url}`];
-    if (over) return respond(over.body, over.status ?? 200);
-    if (url === "/api/vendas/views") {
-      return m.viewsStatus && m.viewsStatus >= 400
-        ? respond({ error: "x" }, m.viewsStatus)
-        : respond({ views: m.views, unmigrated_cycles: m.unmigrated ?? [] });
-    }
-    if (url === "/api/vendas/folders") return respond({ folders: m.folders ?? [] });
-    return respond({ error: "sem mock" }, 404);
-  }) as unknown as typeof global.fetch;
-  return calls;
-}
 
 afterEach(() => {
   jest.restoreAllMocks();
