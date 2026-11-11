@@ -91,6 +91,16 @@ const CARTAO_CENTRAL_DE_LINKS: CartaoDoMenu = {
   tamanho: "grande",
 };
 
+const CARTAO_RELATORIO_DE_VENDAS: CartaoDoMenu = {
+  id: "relatorio-de-vendas",
+  href: "/v2/relatorio-de-vendas",
+  titulo: "Relatório de vendas",
+  icone: ICONE_VENDAS,
+  descricao: "Visualizações de vendas por produto e oferta da Hotmart",
+  destaque: "#d9b26a",
+  tamanho: "grande",
+};
+
 const CARTAO_CONFIGURACOES: CartaoDoMenu = {
   id: "configuracoes",
   href: "/v2/ajustes",
@@ -113,12 +123,14 @@ const CARTAO_SAIR: CartaoDoMenu = {
 /**
  * Cartões das áreas de trabalho da V2, em blocos como os do Windows Phone: as áreas são grandes e as ações
  * simples (Configurações, Sair) são menores. Configurações leva ao hub de Ajustes e é só do gestor — o
- * analista não vê o cartão. Sair encerra a sessão.
+ * analista não vê o cartão. O Relatório de vendas atende gestor e analista. Sair encerra a sessão.
  */
 export function cartoesDoMenu(role: ActiveRole): CartaoDoMenu[] {
   return [
     CARTAO_INDICADORES,
     CARTAO_CENTRAL_DE_LINKS,
+    // Mesmo público da tela: o papel legado (comum) é levado à Base de Dados.
+    ...(role !== "comum" ? [CARTAO_RELATORIO_DE_VENDAS] : []),
     ...(canManageSettings(role) ? [CARTAO_CONFIGURACOES] : []),
     CARTAO_SAIR,
   ];
@@ -136,16 +148,6 @@ export const CARTOES_DO_LAYOUT_ANTERIOR: readonly CartaoDoMenu[] = [
     icone: ICONE_GESTAO_A_VISTA,
     descricao: "Painéis de EQA, posicionamento, relacionamento e Meta Ads",
     destaque: "#7fa6e8",
-    tamanho: "pequeno",
-    selo: "V1",
-  },
-  {
-    id: "relatorio-de-vendas",
-    href: "/relatorio-de-vendas",
-    titulo: "Relatório de Vendas",
-    icone: ICONE_VENDAS,
-    descricao: "Visualizações de vendas por produto e oferta da Hotmart",
-    destaque: "#d9b26a",
     tamanho: "pequeno",
     selo: "V1",
   },

@@ -4,7 +4,7 @@ import type { NextConfig } from "next";
  * A V2 é o layout padrão: os endereços do layout anterior (V1) levam ao equivalente na V2, num único salto
  * e de forma temporária (307), para a regra poder ser revista sem ficar presa em cache de navegador. A query
  * (ex.: ?view=) segue junto. Cada regra aponta direto para o destino final, sem cadeias. As áreas que não
- * têm versão V2 (Gestão à Vista, Base de Dados, Relatório de Vendas) seguem nos endereços de sempre.
+ * têm versão V2 (Gestão à Vista, Base de Dados) seguem nos endereços de sempre.
  */
 const redirectsDoLayoutAnterior = [
   { source: "/", destination: "/v2", permanent: false },
@@ -15,6 +15,7 @@ const redirectsDoLayoutAnterior = [
   // Rotas legadas que já eram redirects para o V1: vão direto à V2.
   { source: "/dashboard/settings", destination: "/v2/ajustes/contas", permanent: false },
   { source: "/dashboard/dados", destination: "/v2/ajustes/dados", permanent: false },
+  { source: "/relatorio-de-vendas", destination: "/v2/relatorio-de-vendas", permanent: false },
 ];
 
 const nextConfig: NextConfig = {

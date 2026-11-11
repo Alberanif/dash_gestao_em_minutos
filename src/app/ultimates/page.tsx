@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function UltimatesRedirectPage() {
-  redirect("/relatorio-de-vendas");
+  redirect("/v2/relatorio-de-vendas");
 }

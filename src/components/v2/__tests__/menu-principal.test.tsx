@@ -7,17 +7,23 @@ import { CARTOES_DO_LAYOUT_ANTERIOR, MenuPrincipal, cartoesDoMenu } from "../men
 import { primeiroNome, saudacao } from "../menu-principal/saudacao";
 
 describe("menu principal da V2", () => {
-  it("gestor tem Indicadores, Central de links, Configurações e Sair, nessa ordem", () => {
+  it("gestor tem Indicadores, Central de links, Relatório de vendas, Configurações e Sair, nessa ordem", () => {
     expect(cartoesDoMenu("gestor").map((c) => c.titulo)).toEqual([
       "Indicadores",
       "Central de links",
+      "Relatório de vendas",
       "Configurações",
       "Sair",
     ]);
   });
 
   it("analista não vê Configurações: só o gestor gerencia contas e usuários", () => {
-    expect(cartoesDoMenu("analista").map((c) => c.titulo)).toEqual(["Indicadores", "Central de links", "Sair"]);
+    expect(cartoesDoMenu("analista").map((c) => c.titulo)).toEqual([
+      "Indicadores",
+      "Central de links",
+      "Relatório de vendas",
+      "Sair",
+    ]);
     render(<MenuPrincipal saudacao="Bom dia" nome="Ana" role="analista" />);
     expect(screen.queryByRole("link", { name: /Configurações/ })).toBeNull();
     expect(document.querySelector('a[href="/v2/ajustes"]')).toBeNull();
@@ -40,12 +46,21 @@ describe("menu principal da V2", () => {
     expect(container.textContent).not.toMatch(/Layout V2/);
   });
 
+  it("o Relatório de vendas abre a V2, sem selo V1, e o papel legado não o vê", () => {
+    const cartao = cartoesDoMenu("gestor").find((c) => c.id === "relatorio-de-vendas")!;
+    expect(cartao.href).toBe("/v2/relatorio-de-vendas");
+    expect(cartao.selo).toBeUndefined();
+    expect(cartao.tamanho).toBe("grande");
+    expect(cartoesDoMenu("comum").map((c) => c.id)).not.toContain("relatorio-de-vendas");
+    // Nenhum cartão do layout anterior aponta mais para ele.
+    expect(CARTOES_DO_LAYOUT_ANTERIOR.map((c) => c.href)).not.toContain("/relatorio-de-vendas");
+  });
+
   it("as áreas sem versão V2 abrem nos endereços de sempre, com selo V1, numa faixa à parte", () => {
     const { container } = render(<MenuPrincipal saudacao="Bom dia" nome="Ana" role="gestor" />);
     const faixa = container.querySelector(".v2-menu-legado") as HTMLElement;
     expect(Array.from(faixa.querySelectorAll("a")).map((a) => a.getAttribute("href"))).toEqual([
       "/dashboard",
-      "/relatorio-de-vendas",
       "/base-de-dados",
     ]);
     expect(faixa.querySelectorAll(".v2-menu-selo")).toHaveLength(CARTOES_DO_LAYOUT_ANTERIOR.length);
@@ -54,15 +69,15 @@ describe("menu principal da V2", () => {
     for (const c of CARTOES_DO_LAYOUT_ANTERIOR) expect(c.href).not.toMatch(/^\/v2/);
   });
 
-  it("Indicadores, Central de links e Configurações levam às suas telas da V2", () => {
+  it("Indicadores, Central de links, Relatório de vendas e Configurações levam às suas telas da V2", () => {
     render(<MenuPrincipal saudacao="Bom dia" nome="Ana" role="gestor" />);
     const links = screen.getAllByRole("link");
     expect(links.map((l) => l.getAttribute("href"))).toEqual([
       "/v2/indicadores",
       "/v2/central-de-links",
+      "/v2/relatorio-de-vendas",
       "/v2/ajustes",
       "/dashboard",
-      "/relatorio-de-vendas",
       "/base-de-dados",
     ]);
   });
@@ -88,7 +103,7 @@ describe("menu principal da V2", () => {
   it("Configurações usa o cartão menor, e os da faixa do layout anterior também", () => {
     const { container } = render(<MenuPrincipal saudacao="Bom dia" nome="Ana" role="gestor" />);
     const pequenos = container.querySelectorAll(".v2-menu-card--pequeno");
-    expect(pequenos).toHaveLength(4);
+    expect(pequenos).toHaveLength(3);
     expect(pequenos[0].getAttribute("href")).toBe("/v2/ajustes");
   });
 
@@ -110,7 +125,7 @@ describe("menu principal da V2", () => {
     const cores = Array.from(container.querySelectorAll<HTMLElement>(".v2-menu-card")).map((el) =>
       el.style.getPropertyValue("--destaque"),
     );
-    expect(cores).toEqual(["#6ec3ea", "#8fb3a3", "#8fa6b5", "#a8939b", "#7fa6e8", "#d9b26a", "#7fbf9a"]);
+    expect(cores).toEqual(["#6ec3ea", "#8fb3a3", "#d9b26a", "#8fa6b5", "#a8939b", "#7fa6e8", "#7fbf9a"]);
   });
 });
 
