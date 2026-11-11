@@ -9,5 +9,6 @@ export function tituloDaRota(pathname: string): string {
   if (p === "/v2/indicadores/testes-ab" || p.startsWith("/v2/indicadores/testes-ab/")) return "Testes A/B";
   if (p === "/v2/indicadores" || p.startsWith("/v2/indicadores/")) return "Indicadores";
   if (p === "/v2/central-de-links" || p.startsWith("/v2/central-de-links/")) return "Central de links";
+  if (p === "/v2/relatorio-de-vendas" || p.startsWith("/v2/relatorio-de-vendas/")) return "Relatório de vendas";
   return "Dash V2";
 }
