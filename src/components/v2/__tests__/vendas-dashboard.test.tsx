@@ -74,12 +74,29 @@ describe("Dashboard: números", () => {
     expect(screen.getByTestId("view-kpi-refunded").innerHTML).not.toContain("v2-ponto");
   });
 
-  it("mostra os totais do gráfico e das ofertas, iguais ao KPI", async () => {
+  it("visualização com 2 produtos: cabeçalho lista os nomes e soma as ofertas; a lista traz um item por produto", async () => {
+    const dois = makeView({ products: [{ product_id: "p1", offer_codes: ["OF-1", "OF-2"] }, { product_id: "p2", offer_codes: ["OF-9"] }] });
+    instalaFetch({
+      views: [dois],
+      offers: [
+        { product_id: "p1", product_name: "Produto Um", offer_code: "OF-1", offer_name: null, sales: 4, refunded: 0 },
+        { product_id: "p1", product_name: "Produto Um", offer_code: "OF-2", offer_name: null, sales: 1, refunded: 0 },
+        { product_id: "p2", product_name: "Produto Dois", offer_code: "OF-9", offer_name: null, sales: 2, refunded: 0 },
+      ],
+    });
+    render(<TelaDeVendas role="gestor" products={[...PRODUCTS, { product_id: "p2", product_name: "Produto Dois", account_id: "acc-1" }]} />);
+    expect(await screen.findByTestId("view-product")).toHaveTextContent("Produto Um, Produto Dois, 3 ofertas");
+    await screen.findByTestId("view-product-p2");
+    expect(screen.getByTestId("view-product-p1-sales")).toHaveTextContent("5");
+    expect(screen.getByTestId("view-product-p2-sales")).toHaveTextContent("2");
+  });
+
+  it("mostra os totais do gráfico e dos produtos, iguais ao KPI", async () => {
     instalaFetch({ views: [makeView()] });
     render(<TelaDeVendas role="gestor" products={PRODUCTS} />);
-    await screen.findByTestId("view-offers-list");
+    await screen.findByTestId("view-products-list");
     expect(screen.getByText("Total no gráfico: 7")).toBeInTheDocument();
-    expect(screen.getByText("Total nas ofertas: 7")).toBeInTheDocument();
+    expect(screen.getByText("Total nos produtos: 7")).toBeInTheDocument();
   });
 
   it("alternar para Hora troca os dois gráficos, dentro do dashboard", async () => {

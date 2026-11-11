@@ -20,8 +20,9 @@ let lockCount: number;
 let upsertError: { message: string } | null;
 
 const VIEW = {
-  id: "view-1", account_id: "acc-1", product_id: "prod-99", view_start_date: null,
-  last_refresh_at: null, name: "V", offer_codes: ["A", "B"],
+  id: "view-1", account_id: "acc-1", view_start_date: null,
+  last_refresh_at: null, name: "V",
+  products: [{ product_id: "prod-99", offer_codes: ["A", "B"] }],
   backfill_status: "done", updated_at: "2020-01-01T00:00:00.000Z",
 };
 
@@ -121,6 +122,18 @@ describe("POST /views/[id]/refresh", () => {
     expect(release.filters.filter(([n]) => n === "eq")[1][1][0]).toBe("refresh_started_at");
   });
 
+  it("visualização com 2 produtos: busca cada produto no incremental e soma o upserted", async () => {
+    viewRow = { ...VIEW, products: [{ product_id: "prod-99", offer_codes: ["A"] }, { product_id: "prod-100", offer_codes: ["Z"] }] };
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: "tok" }), text: async () => "" })
+      .mockResolvedValue({ ok: true, json: async () => ({ items: [saleItem], page_info: {} }), text: async () => "" });
+    const res = await call();
+    expect(res.status).toBe(200);
+    expect((await res.json()).upserted).toBe(2);
+    const products = (global.fetch as jest.Mock).mock.calls.slice(1).map(([u]) => new URL(String(u)).searchParams.get("product_id"));
+    expect(products).toEqual(["prod-99", "prod-100"]);
+  });
+
   it("só grava vendas (nenhuma RPC e nenhuma tabela além de views, contas e hotmart_*)", async () => {
     mockHotmart();
     await call();
@@ -179,6 +192,61 @@ describe("POST /views/[id]/refresh", () => {
       expect(offers).toEqual(["A", "B"]); // allowlist inteira, não só a janela de 30 dias
       expect(backfillStatusWrites().map((c) => (c.payload as { backfill_status: string }).backfill_status)).toEqual(["running", "done"]);
       expect(viewUpdates().at(-1)!.payload).toMatchObject({ refresh_started_at: null });
+    });
+
+    it("2 produtos: o backfill de recuperação cobre produto -> oferta em ordem, por janela", async () => {
+      viewRow = {
+        ...VIEW,
+        backfill_status: "partial",
+        view_start_date: new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10),
+        products: [{ product_id: "prod-99", offer_codes: ["A", "B"] }, { product_id: "prod-100", offer_codes: ["Z"] }],
+      };
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: "tok" }), text: async () => "" })
+        .mockResolvedValue({ ok: true, json: async () => ({ items: [], page_info: {} }), text: async () => "" });
+      const res = await call();
+      expect(res.status).toBe(200);
+      const pairs = salesCalls().map(([u]) => {
+        const q = new URL(String(u)).searchParams;
+        return `${q.get("product_id")}/${q.get("offer_code")}`;
+      });
+      expect(pairs).toEqual(["prod-99/A", "prod-99/B", "prod-100/Z"]);
+      for (const [, init] of (global.fetch as jest.Mock).mock.calls) {
+        expect(init.signal).toBeInstanceOf(AbortSignal);
+      }
+    });
+
+    it("abort no meio do upsert (supabase devolve { error }) => partial, não failed", async () => {
+      viewRow = {
+        ...VIEW,
+        backfill_status: "failed",
+        view_start_date: new Date(Date.now() - 70 * 86_400_000).toISOString().slice(0, 10),
+      };
+      // 1ª janela completa (A, B sem itens); 2ª: A devolve item e o upsert falha com a deadline já abortada
+      let sales = 0;
+      (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
+        if (String(url).includes("oauth/token")) {
+          return { ok: true, json: async () => ({ access_token: "tok" }), text: async () => "" };
+        }
+        sales += 1;
+        return { ok: true, json: async () => ({ items: sales === 3 ? [saleItem] : [], page_info: {} }), text: async () => "" };
+      });
+      upsertError = { message: "AbortError: The operation was aborted" };
+      const realTimeout = AbortSignal.timeout;
+      const ctrl = new AbortController();
+      jest.spyOn(AbortSignal, "timeout").mockImplementation(() => ctrl.signal);
+      const origFetch = global.fetch as jest.Mock;
+      const impl = origFetch.getMockImplementation()!;
+      origFetch.mockImplementation(async (url: string, init: unknown) => {
+        const r = await impl(url, init);
+        if (sales === 3) ctrl.abort(Object.assign(new Error("t"), { name: "TimeoutError" }));
+        return r;
+      });
+      const res = await call();
+      AbortSignal.timeout = realTimeout;
+      jest.restoreAllMocks();
+      expect(res.status).toBe(200);
+      expect((await res.json()).backfill).toBe("partial");
     });
 
     it("running órfão (updated_at antigo) é recuperado", async () => {

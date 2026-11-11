@@ -1,4 +1,5 @@
 import { parseDateRange } from "@/lib/vendas/date-range";
+import type { VendasViewProduct } from "@/types/vendas";
 
 // Validação de entrada das rotas /api/vendas/views. Pura (sem I/O) para as rotas
 // de POST e PATCH aplicarem exatamente as mesmas regras do CHECK do banco
@@ -28,6 +29,41 @@ export function parseOfferCodes(raw: unknown): Parsed<string[]> {
     return { ok: false, error: "Selecione ao menos uma oferta" };
   }
   return { ok: true, value: codes };
+}
+
+/**
+ * `products: [{product_id, offer_codes}]` (PRD #213, RF-1): >= 1 produto, sem
+ * product_id duplicado e, por produto, a mesma regra de parseOfferCodes. Pura:
+ * existência dos produtos e "mesma conta" são checadas contra o banco em
+ * resolveProductsAccount (view-products.ts).
+ */
+export function parseProducts(raw: unknown): Parsed<VendasViewProduct[]> {
+  if (!Array.isArray(raw)) {
+    return { ok: false, error: "products deve ser um array" };
+  }
+  if (raw.length === 0) {
+    return { ok: false, error: "Selecione ao menos um produto" };
+  }
+  const products: VendasViewProduct[] = [];
+  for (const item of raw) {
+    if (item === null || typeof item !== "object" || Array.isArray(item)) {
+      return { ok: false, error: "products deve conter objetos { product_id, offer_codes }" };
+    }
+    const entry = item as Record<string, unknown>;
+    const productId = typeof entry.product_id === "string" ? entry.product_id.trim() : "";
+    if (productId.length === 0) {
+      return { ok: false, error: "product_id é obrigatório em cada produto" };
+    }
+    if (products.some((p) => p.product_id === productId)) {
+      return { ok: false, error: `Produto duplicado: ${productId}` };
+    }
+    const codes = parseOfferCodes(entry.offer_codes);
+    if (!codes.ok) {
+      return { ok: false, error: `Produto ${productId}: ${codes.error}` };
+    }
+    products.push({ product_id: productId, offer_codes: codes.value });
+  }
+  return { ok: true, value: products };
 }
 
 /** null = limpar. Par SEMPRE junto (mesma regra do CHECK chk_vendas_views_range). */

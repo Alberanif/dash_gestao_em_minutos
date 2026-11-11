@@ -4,12 +4,16 @@ import type { ProdutoHotmart } from "../vendas/tipos";
 export const PRODUCTS: ProdutoHotmart[] = [{ product_id: "p1", product_name: "Produto Um", account_id: "acc-1" }];
 
 export function makeView(overrides: Partial<VendasViewRecord> = {}): VendasViewRecord {
+  const productId = overrides.product_id ?? "p1";
+  const offerCodes = overrides.offer_codes ?? ["OF-1", "OF-2"];
   return {
     id: "v1",
     name: "Visão 1",
     account_id: "acc-1",
-    product_id: "p1",
-    offer_codes: ["OF-1", "OF-2"],
+    product_id: productId,
+    offer_codes: offerCodes,
+    // PRD #213: quem manda é `products`; sem ele, deriva do par legado dos testes antigos.
+    products: [{ product_id: productId, offer_codes: offerCodes }],
     folder_id: null,
     view_start_date: null,
     view_end_date: null,
@@ -40,7 +44,7 @@ export interface Mock {
   viewsStatus?: number;
   kpis?: { sales: number; refunded: number };
   daily?: { day: string; sales: number }[];
-  offers?: { offer_code: string; offer_name: string | null; sales: number; refunded: number }[];
+  offers?: { product_id?: string; product_name?: string; offer_code: string; offer_name: string | null; sales: number; refunded: number }[];
   overrides?: Record<string, { status?: number; body: unknown }>;
 }
 
@@ -60,6 +64,7 @@ export function instalaFetch(m: Mock) {
     if (url === "/api/vendas/folders") return respond({ folders: m.folders ?? [] });
     const path = url.split("?")[0];
     if (path === "/api/vendas/offer-options") {
+      if (url.includes("product_id=p2")) return respond({ offers: [{ offer_code: "OF-9", offer_name: "Oferta Nove", sales_count: 1 }] });
       return respond({
         offers: [
           { offer_code: "OF-1", offer_name: "Oferta Um", sales_count: 10 },
@@ -73,8 +78,8 @@ export function instalaFetch(m: Mock) {
     if (/\/offers$/.test(path))
       return respond({
         rows: m.offers ?? [
-          { offer_code: "OF-1", offer_name: "Oferta Um", sales: 7, refunded: 2 },
-          { offer_code: "OF-2", offer_name: null, sales: 0, refunded: 0 },
+          { product_id: "p1", product_name: "Produto Um", offer_code: "OF-1", offer_name: "Oferta Um", sales: 7, refunded: 2 },
+          { product_id: "p1", product_name: "Produto Um", offer_code: "OF-2", offer_name: null, sales: 0, refunded: 0 },
         ],
       });
     return respond({ error: "sem mock" }, 404);

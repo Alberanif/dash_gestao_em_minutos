@@ -21,15 +21,27 @@ export type VendasViewBackfillStatus =
   | "partial"
   | "failed";
 
-/** Linha de dash_gestao_vendas_views. */
+/** Linha de dash_gestao_vendas_view_products (migration 072). */
+export interface VendasViewProduct {
+  product_id: string;
+  /** Allowlist do produto: >= 1 oferta, sem duplicados. */
+  offer_codes: string[];
+}
+
+/** Linha de dash_gestao_vendas_views (+ `products`, da tabela filha). */
 export interface VendasViewRecord {
   id: string;
   name: string;
   account_id: string;
-  /** Imutável após a criação (trigger no banco). */
+  /**
+   * @deprecated Legado (migration 072 relaxou para NULL; o drop é a última
+   * fatia do PRD #213). Leia `products`.
+   */
   product_id: string;
-  /** Allowlist: >= 1 oferta, sem duplicados. */
+  /** @deprecated Legado, ver `product_id`. Leia `products`. */
   offer_codes: string[];
+  /** Produtos da visualização, cada um com a sua allowlist (>= 1 produto). */
+  products: VendasViewProduct[];
   folder_id: string | null;
   view_start_date: string | null;
   view_end_date: string | null;
@@ -65,8 +77,13 @@ export interface VendasViewHourlyRow {
   sales: number;
 }
 
-/** dash_gestao_vendas_view_offers(p_view_id, p_start, p_end): uma por oferta da allowlist. */
+/**
+ * dash_gestao_vendas_view_offers(p_view_id, p_start, p_end): uma linha por
+ * (produto, oferta) da allowlist, inclusive com 0 vendas.
+ */
 export interface VendasViewOfferRow {
+  product_id: string;
+  product_name: string;
   offer_code: string;
   /** null para código manual que não existe em hotmart_offers. */
   offer_name: string | null;

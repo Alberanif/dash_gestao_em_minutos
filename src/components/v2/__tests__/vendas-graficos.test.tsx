@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { GraficoAcumulado, GraficoDeVendas } from "../vendas/graficos-de-vendas";
-import { PorOferta } from "../vendas/por-oferta";
+import { PorProduto } from "../vendas/por-produto";
 import type { ChartGranularity } from "@/lib/vendas/cumulative-chart";
 import type { VendasViewDailyRow, VendasViewHourlyRow } from "@/types/vendas";
 import { mockReducedMotion } from "./helpers";
@@ -117,45 +117,71 @@ describe("GraficoDeVendas e GraficoAcumulado", () => {
   });
 });
 
-describe("PorOferta", () => {
-  const OFERTAS = [
-    { offer_code: "OF-1", offer_name: "Oferta Um", sales: 7, refunded: 2 },
-    { offer_code: "OF-2", offer_name: null, sales: 0, refunded: 0 },
-    { offer_code: "OF-3", offer_name: "Oferta Três", sales: 1, refunded: 1 },
+describe("PorProduto", () => {
+  const P1 = { product_id: "p1", product_name: "Produto Um" };
+  const P2 = { product_id: "p2", product_name: "Produto Dois" };
+  const LINHAS = [
+    { ...P1, offer_code: "OF-1", offer_name: "Oferta Um", sales: 7, refunded: 2 },
+    { ...P1, offer_code: "OF-2", offer_name: null, sales: 0, refunded: 0 },
+    { ...P2, offer_code: "OF-3", offer_name: "Oferta Três", sales: 1, refunded: 1 },
   ];
+  const abrir = (id: string) => fireEvent.click(screen.getByTestId(`view-product-${id}-toggle`));
 
-  it("mostra o total, o nome com o código e as vendas de cada oferta", () => {
-    render(<PorOferta offers={OFERTAS} />);
-    expect(screen.getByText("Total nas ofertas: 8")).toBeInTheDocument();
+  it("lista cada produto com o subtotal e o total geral", () => {
+    render(<PorProduto offers={LINHAS} />);
+    expect(screen.getByText("Total nos produtos: 8")).toBeInTheDocument();
+    expect(screen.getByTestId("view-product-p1")).toHaveTextContent("Produto Um");
+    expect(screen.getByTestId("view-product-p1-sales")).toHaveTextContent("7");
+    expect(screen.getByTestId("view-product-p2-sales")).toHaveTextContent("1");
+    expect(screen.getByTestId("view-product-p1")).toHaveTextContent("2 ofertas");
+    expect(screen.getByTestId("view-product-p2")).toHaveTextContent("1 oferta");
+  });
+
+  it("as ofertas só aparecem ao expandir o produto, e só as dele", () => {
+    render(<PorProduto offers={LINHAS} />);
+    expect(screen.queryByTestId("view-offer-OF-1")).not.toBeInTheDocument();
+    abrir("p1");
+    expect(screen.getByTestId("view-product-p1-toggle")).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByTestId("view-offer-OF-1")).toHaveTextContent("Oferta Um");
-    expect(screen.getByTestId("view-offer-OF-1")).toHaveTextContent("OF-1");
     expect(screen.getByTestId("view-offer-OF-1-sales")).toHaveTextContent("7");
     expect(screen.getByTestId("view-offer-OF-2")).not.toHaveTextContent(", ");
+    expect(screen.queryByTestId("view-offer-OF-3")).not.toBeInTheDocument();
+    abrir("p1");
+    expect(screen.queryByTestId("view-offer-OF-1")).not.toBeInTheDocument();
   });
 
   it("oferta sem venda coletada mostra 0 e a marca; oferta com venda não tem a marca", () => {
-    render(<PorOferta offers={OFERTAS} />);
+    render(<PorProduto offers={LINHAS} />);
+    abrir("p1");
     expect(screen.getByTestId("view-offer-OF-2-sales")).toHaveTextContent("0");
     expect(screen.getByTestId("view-offer-OF-2-empty")).toHaveTextContent("0 vendas coletadas");
     expect(screen.queryByTestId("view-offer-OF-1-empty")).not.toBeInTheDocument();
   });
 
+  it("produto com todas as ofertas em zero continua na lista", () => {
+    render(<PorProduto offers={[{ ...P2, offer_code: "OF-7", offer_name: null, sales: 0, refunded: 0 }]} />);
+    expect(screen.getByTestId("view-product-p2-sales")).toHaveTextContent("0");
+  });
+
   it("oferta com reembolso mas sem venda não ganha a marca de 'sem vendas coletadas'", () => {
-    render(<PorOferta offers={[{ offer_code: "OF-9", offer_name: null, sales: 0, refunded: 3 }]} />);
+    render(<PorProduto offers={[{ ...P1, offer_code: "OF-9", offer_name: null, sales: 0, refunded: 3 }]} />);
+    abrir("p1");
     expect(screen.queryByTestId("view-offer-OF-9-empty")).not.toBeInTheDocument();
     expect(screen.getByTestId("view-offer-OF-9")).toHaveTextContent("3 reembolsadas");
   });
 
-  it("reembolsadas no singular e no plural, e nada quando é zero", () => {
-    render(<PorOferta offers={OFERTAS} />);
-    expect(screen.getByTestId("view-offer-OF-1")).toHaveTextContent("2 reembolsadas");
+  it("reembolsadas no singular e no plural, no produto e na oferta", () => {
+    render(<PorProduto offers={LINHAS} />);
+    expect(screen.getByTestId("view-product-p1-refunded")).toHaveTextContent("2 reembolsadas");
+    expect(screen.getByTestId("view-product-p2-refunded")).toHaveTextContent("1 reembolsada");
+    expect(screen.getByTestId("view-product-p2-refunded")).not.toHaveTextContent("1 reembolsadas");
+    abrir("p2");
     expect(screen.getByTestId("view-offer-OF-3")).toHaveTextContent("1 reembolsada");
     expect(screen.getByTestId("view-offer-OF-3")).not.toHaveTextContent("1 reembolsadas");
-    expect(screen.getByTestId("view-offer-OF-2")).not.toHaveTextContent("reembolsada");
   });
 
   it("o cabeçalho da seção não leva numeração", () => {
-    render(<PorOferta offers={OFERTAS} />);
-    expect(screen.getByRole("heading", { name: "Por oferta" })).toBeInTheDocument();
+    render(<PorProduto offers={LINHAS} />);
+    expect(screen.getByRole("heading", { name: "Por produto" })).toBeInTheDocument();
   });
 });

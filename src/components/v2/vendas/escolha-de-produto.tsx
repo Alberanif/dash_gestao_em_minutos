@@ -10,6 +10,9 @@ interface EscolhaDeProdutoProps {
   /** product_id escolhido, ou "" enquanto não houver escolha. */
   valor: string;
   onEscolher: (productId: string) => void;
+  /** Nome acessível do campo. */
+  rotulo?: string;
+  placeholder?: string;
 }
 
 // A base tem centenas de produtos: desenhar todos de uma vez pesa e esconde o que importa.
@@ -33,7 +36,13 @@ export function filtrarProdutos(produtos: ProdutoHotmart[], consulta: string): P
  * Combobox de produto com busca por nome e por ID. A lista fica no fluxo do modal (sem portal),
  * ocupa a largura do campo e rola por dentro, então cabe em qualquer tela.
  */
-export function EscolhaDeProduto({ produtos, valor, onEscolher }: EscolhaDeProdutoProps) {
+export function EscolhaDeProduto({
+  produtos,
+  valor,
+  onEscolher,
+  rotulo = "Produto",
+  placeholder = "Buscar por nome ou ID do produto",
+}: EscolhaDeProdutoProps) {
   const idLista = useId();
   const escolhido = produtos.find((p) => p.product_id === valor) ?? null;
   const [consulta, setConsulta] = useState<string | null>(null); // null = mostrando o escolhido
@@ -86,14 +95,14 @@ export function EscolhaDeProduto({ produtos, valor, onEscolher }: EscolhaDeProdu
     <div className="flex flex-col gap-2">
       <Input
         role="combobox"
-        aria-label="Produto"
+        aria-label={rotulo}
         aria-expanded={aberto}
         aria-controls={idLista}
         aria-autocomplete="list"
         aria-activedescendant={aberto && visiveis[indice] ? idOpcao(indice) : undefined}
         autoComplete="off"
         data-testid="view-form-product-search"
-        placeholder="Buscar por nome ou ID do produto"
+        placeholder={placeholder}
         value={consulta ?? escolhido?.product_name ?? ""}
         onChange={(e) => {
           setConsulta(e.target.value);

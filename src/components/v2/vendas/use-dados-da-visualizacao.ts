@@ -45,7 +45,7 @@ export function useDadosDaVisualizacao(view: VendasViewRecord) {
   const chave = [
     view.id,
     chaveDoPeriodo,
-    view.offer_codes.join(","),
+    view.products.map((p) => `${p.product_id}:${p.offer_codes.join(",")}`).join(";"),
     view.last_refresh_at ?? "",
     view.backfill_status,
     token,

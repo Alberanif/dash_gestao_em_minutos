@@ -81,13 +81,13 @@ describe("Visualização: criar e editar", () => {
     fireEvent.click(await screen.findByTestId("vendas-create-cta"));
 
     fireEvent.change(await screen.findByTestId("view-form-name"), { target: { value: "Nova visão" } });
-    await escolher("Produto", "Produto Um");
+    await escolher("Adicionar produto","Produto Um");
     fireEvent.click(await screen.findByTestId("view-form-offer-OF-2"));
     fireEvent.click(screen.getByTestId("view-form-save"));
 
     await waitFor(() => expect(screen.queryByTestId("view-form-modal")).not.toBeInTheDocument());
     expect(await screen.findByTestId("view-selected-name")).toHaveTextContent("Nova visão");
-    expect(calls.find((c) => c.method === "POST")?.body).toMatchObject({ name: "Nova visão", product_id: "p1", offer_codes: ["OF-2"] });
+    expect(calls.find((c) => c.method === "POST")?.body).toMatchObject({ name: "Nova visão", products: [{ product_id: "p1", offer_codes: ["OF-2"] }] });
   });
 
   it("devolve o foco ao botão que abriu o modal", async () => {

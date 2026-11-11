@@ -12,12 +12,13 @@ import { cx, foco } from "../ui/cx";
 import { ControleDeAtualizacao } from "./controle-de-atualizacao";
 import { FiltroDePeriodo } from "./filtro-de-periodo";
 import { GraficoAcumulado, GraficoDeVendas } from "./graficos-de-vendas";
-import { PorOferta } from "./por-oferta";
+import { PorProduto } from "./por-produto";
 import { useDadosDaVisualizacao } from "./use-dados-da-visualizacao";
 
 interface DashboardProps {
   view: VendasViewRecord;
-  productName: string;
+  /** Nomes dos produtos da visualização, na ordem de inclusão. */
+  productNames: string[];
   role: UserRole;
   // Grava o período na visualização (só quem edita chega a chamar). Devolve se deu certo.
   onRangeChange: (range: DateRange | null) => Promise<boolean>;
@@ -31,7 +32,7 @@ interface DashboardProps {
 // número quebra normalmente no celular (PR #162).
 const fmtInt = (n: number) => Intl.NumberFormat("pt-BR").format(n);
 
-export function DashboardDaVisualizacao({ view, productName, role, onRangeChange, onViewChanged, onEdit }: DashboardProps) {
+export function DashboardDaVisualizacao({ view, productNames, role, onRangeChange, onViewChanged, onEdit }: DashboardProps) {
   const canEdit = role === "gestor" || role === "analista";
   const { range, dados, erro, atualizando, recarregar } = useDadosDaVisualizacao(view);
 
@@ -63,7 +64,7 @@ export function DashboardDaVisualizacao({ view, productName, role, onRangeChange
     }
   }
 
-  const ofertas = view.offer_codes.length;
+  const ofertas = view.products.reduce((n, p) => n + p.offer_codes.length, 0);
 
   return (
     <div data-testid="view-dashboard" className="flex min-w-0 flex-col gap-5">
@@ -80,7 +81,7 @@ export function DashboardDaVisualizacao({ view, productName, role, onRangeChange
             )}
           </div>
           <p data-testid="view-product" className="mt-0.5 text-sm text-v2-nevoa/65 [overflow-wrap:anywhere]">
-            {productName}, {ofertas} {ofertas === 1 ? "oferta" : "ofertas"}
+            {productNames.join(", ")}, {ofertas} {ofertas === 1 ? "oferta" : "ofertas"}
           </p>
         </div>
         <ControleDeAtualizacao
@@ -218,7 +219,7 @@ export function DashboardDaVisualizacao({ view, productName, role, onRangeChange
             />
           </section>
 
-          <PorOferta offers={dados.offers} />
+          <PorProduto offers={dados.offers} />
         </div>
       )}
     </div>

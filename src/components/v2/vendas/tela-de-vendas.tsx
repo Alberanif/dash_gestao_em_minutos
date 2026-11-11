@@ -223,8 +223,8 @@ export function TelaDeVendas({ role, products }: TelaDeVendasProps) {
   }));
 
   const temViews = Boolean(views && views.length > 0);
-  const nomeDoProduto = (view: VendasViewRecord) =>
-    products.find((p) => p.product_id === view.product_id)?.product_name ?? view.product_id;
+  const nomesDosProdutos = (view: VendasViewRecord) =>
+    view.products.map((vp) => products.find((p) => p.product_id === vp.product_id)?.product_name ?? vp.product_id);
 
   return (
     <div className="flex flex-col gap-5">
@@ -350,7 +350,7 @@ export function TelaDeVendas({ role, products }: TelaDeVendasProps) {
           <DashboardDaVisualizacao
             key={selecionada.id}
             view={selecionada}
-            productName={nomeDoProduto(selecionada)}
+            productNames={nomesDosProdutos(selecionada)}
             role={role}
             onRangeChange={salvarPeriodo}
             onViewChanged={() => void reler(selecionada.id)}

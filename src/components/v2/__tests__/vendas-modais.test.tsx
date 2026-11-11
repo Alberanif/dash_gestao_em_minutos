@@ -24,6 +24,9 @@ beforeEach(() => {
   global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
     calls.push({ method, url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    if (url.startsWith("/api/vendas/offer-options?product_id=p2")) {
+      return { ok: true, status: 200, json: async () => ({ offers: [{ offer_code: "OF-9", offer_name: "Oferta Nove", sales_count: 1 }] }) };
+    }
     if (url.startsWith("/api/vendas/offer-options")) {
       return {
         ok: true,
@@ -63,7 +66,7 @@ describe("ModalDeVisualizacao: criar", () => {
     render(<ModalDeVisualizacao products={PRODUCTS} folders={[]} onSaved={onSaved} onCancel={() => {}} />);
 
     fireEvent.change(screen.getByTestId("view-form-name"), { target: { value: "  Minha visão  " } });
-    await escolher("Produto", "Produto Um");
+    await escolher("Adicionar produto","Produto Um");
     expect(await screen.findByTestId("view-form-offer-OF-1")).toBeInTheDocument();
     expect(calls.some((c) => c.url === "/api/vendas/offer-options?product_id=p1")).toBe(true);
     fireEvent.click(screen.getByTestId("view-form-offer-OF-2"));
@@ -75,8 +78,7 @@ describe("ModalDeVisualizacao: criar", () => {
     expect(post.body).toEqual({
       name: "Minha visão",
       folder_id: null,
-      product_id: "p1",
-      offer_codes: ["OF-2"],
+      products: [{ product_id: "p1", offer_codes: ["OF-2"] }],
       view_start_date: null,
       view_end_date: null,
     });
@@ -99,7 +101,7 @@ describe("ModalDeVisualizacao: criar", () => {
     );
     fireEvent.change(screen.getByTestId("view-form-name"), { target: { value: "X" } });
     await escolherNoSelect("Pasta", "Lançamentos");
-    await escolher("Produto", "Produto Um");
+    await escolher("Adicionar produto","Produto Um");
     await screen.findByTestId("view-form-offer-OF-1");
     fireEvent.click(screen.getByTestId("view-form-offer-OF-1"));
     fireEvent.click(screen.getByTestId("view-form-save"));
@@ -113,36 +115,36 @@ describe("ModalDeVisualizacao: criar", () => {
     expect(screen.getByTestId("view-form-error")).toHaveTextContent("Nome é obrigatório.");
     fireEvent.change(screen.getByTestId("view-form-name"), { target: { value: "X" } });
     fireEvent.click(screen.getByTestId("view-form-save"));
-    expect(screen.getByTestId("view-form-error")).toHaveTextContent("Selecione um produto.");
-    await escolher("Produto", "Produto Um");
+    expect(screen.getByTestId("view-form-error")).toHaveTextContent("Selecione ao menos um produto.");
+    await escolher("Adicionar produto","Produto Um");
     await screen.findByTestId("view-form-offer-OF-1");
     fireEvent.click(screen.getByTestId("view-form-save"));
-    expect(screen.getByTestId("view-form-error")).toHaveTextContent("ao menos uma oferta");
+    expect(screen.getByTestId("view-form-error")).toHaveTextContent("ao menos uma oferta de Produto Um");
     expect(calls.some((c) => c.method === "POST")).toBe(false);
   });
 
   it("código manual: trim, aceita sem venda conhecida, recusa duplicado e vazio", async () => {
     render(<ModalDeVisualizacao products={PRODUCTS} folders={[]} onSaved={jest.fn()} onCancel={() => {}} />);
-    await escolher("Produto", "Produto Um");
+    await escolher("Adicionar produto","Produto Um");
     await screen.findByTestId("view-form-offer-OF-1");
 
-    fireEvent.click(screen.getByTestId("view-form-manual-add"));
-    expect(screen.getByTestId("view-form-offer-message")).toHaveTextContent("Informe um código");
+    fireEvent.click(screen.getByTestId("view-form-manual-add-p1"));
+    expect(screen.getByTestId("view-form-offer-message-p1")).toHaveTextContent("Informe um código");
 
-    fireEvent.change(screen.getByTestId("view-form-manual-input"), { target: { value: "  ZZ9  " } });
-    fireEvent.click(screen.getByTestId("view-form-manual-add"));
+    fireEvent.change(screen.getByTestId("view-form-manual-input-p1"), { target: { value: "  ZZ9  " } });
+    fireEvent.click(screen.getByTestId("view-form-manual-add-p1"));
     expect(screen.getByTestId("view-form-offer-ZZ9")).toBeChecked();
 
-    fireEvent.change(screen.getByTestId("view-form-manual-input"), { target: { value: "ZZ9" } });
-    fireEvent.click(screen.getByTestId("view-form-manual-add"));
-    expect(screen.getByTestId("view-form-offer-message")).toHaveTextContent("já está na lista");
+    fireEvent.change(screen.getByTestId("view-form-manual-input-p1"), { target: { value: "ZZ9" } });
+    fireEvent.click(screen.getByTestId("view-form-manual-add-p1"));
+    expect(screen.getByTestId("view-form-offer-message-p1")).toHaveTextContent("já está na lista");
   });
 
   it("a busca filtra a lista por nome ou código", async () => {
     render(<ModalDeVisualizacao products={PRODUCTS} folders={[]} onSaved={jest.fn()} onCancel={() => {}} />);
-    await escolher("Produto", "Produto Um");
+    await escolher("Adicionar produto","Produto Um");
     await screen.findByTestId("view-form-offer-OF-1");
-    fireEvent.change(screen.getByTestId("view-form-offer-search"), { target: { value: "dois" } });
+    fireEvent.change(screen.getByTestId("view-form-offer-search-p1"), { target: { value: "dois" } });
     expect(screen.queryByTestId("view-form-offer-OF-1")).not.toBeInTheDocument();
     expect(screen.getByTestId("view-form-offer-OF-2")).toBeInTheDocument();
   });
@@ -150,7 +152,7 @@ describe("ModalDeVisualizacao: criar", () => {
   it("período com uma data só ou invertido é recusado", async () => {
     render(<ModalDeVisualizacao products={PRODUCTS} folders={[]} onSaved={jest.fn()} onCancel={() => {}} />);
     fireEvent.change(screen.getByTestId("view-form-name"), { target: { value: "X" } });
-    await escolher("Produto", "Produto Um");
+    await escolher("Adicionar produto","Produto Um");
     await screen.findByTestId("view-form-offer-OF-1");
     fireEvent.click(screen.getByTestId("view-form-offer-OF-1"));
     fireEvent.change(screen.getByTestId("view-form-start"), { target: { value: "2026-08-10" } });
@@ -167,7 +169,7 @@ describe("ModalDeVisualizacao: criar", () => {
     const onCancel = jest.fn();
     render(<ModalDeVisualizacao products={PRODUCTS} folders={[]} onSaved={onSaved} onCancel={onCancel} />);
     fireEvent.change(screen.getByTestId("view-form-name"), { target: { value: "X" } });
-    await escolher("Produto", "Produto Um");
+    await escolher("Adicionar produto","Produto Um");
     await screen.findByTestId("view-form-offer-OF-1");
     fireEvent.click(screen.getByTestId("view-form-offer-OF-1"));
     fireEvent.click(screen.getByTestId("view-form-save"));
@@ -190,32 +192,82 @@ describe("ModalDeVisualizacao: criar", () => {
 });
 
 describe("ModalDeVisualizacao: editar", () => {
-  it("produto travado com explicação e botão 'Salvar alterações'", async () => {
+  it("abre com os produtos da visualização e botão 'Salvar alterações'", async () => {
     render(<ModalDeVisualizacao products={PRODUCTS} folders={[]} editTarget={EXISTENTE} onSaved={jest.fn()} onCancel={() => {}} />);
-    expect(screen.getByRole("combobox", { name: "Produto" })).toBeDisabled();
-    expect(screen.getByTestId("view-form-product-locked")).toHaveTextContent("não pode ser alterado");
+    expect(screen.getByTestId("view-form-product-p1")).toHaveTextContent("Produto Um");
     expect(screen.getByTestId("view-form-save")).toHaveTextContent("Salvar alterações");
+    expect(screen.queryByTestId("view-form-product-locked")).not.toBeInTheDocument();
     await screen.findByTestId("view-form-offer-OF-1");
   });
 
-  it("bloqueia remover a última oferta, com a mensagem do PRD", async () => {
+  it("bloqueia remover a última oferta do produto", async () => {
     render(<ModalDeVisualizacao products={PRODUCTS} folders={[]} editTarget={EXISTENTE} onSaved={jest.fn()} onCancel={() => {}} />);
     const caixa = await screen.findByTestId("view-form-offer-OF-1");
     expect(caixa).toBeChecked();
     fireEvent.click(caixa);
     expect(caixa).toBeChecked();
-    expect(screen.getByTestId("view-form-offer-message")).toHaveTextContent(
-      "Uma visualização precisa de pelo menos uma oferta; para descartar, exclua a visualização.",
-    );
+    expect(screen.getByTestId("view-form-offer-message-p1")).toHaveTextContent("pelo menos uma oferta");
   });
 
-  it("com 2 ofertas dá para remover uma; o PATCH não envia product_id", async () => {
+  it("adiciona um segundo produto, com ofertas próprias, e o PATCH leva os dois", async () => {
+    const onSaved = jest.fn();
+    render(<ModalDeVisualizacao products={PRODUCTS} folders={[]} editTarget={EXISTENTE} onSaved={onSaved} onCancel={() => {}} />);
+    await screen.findByTestId("view-form-offer-OF-1");
+    await escolher("Adicionar produto", "Produto Dois");
+    expect(await screen.findByTestId("view-form-offer-OF-9")).toBeInTheDocument();
+    expect(calls.some((c) => c.url === "/api/vendas/offer-options?product_id=p2")).toBe(true);
+    fireEvent.click(screen.getByTestId("view-form-offer-OF-9"));
+    fireEvent.click(screen.getByTestId("view-form-save"));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(calls.find((c) => c.method === "PATCH")!.body).toMatchObject({
+      products: [
+        { product_id: "p1", offer_codes: ["OF-1"] },
+        { product_id: "p2", offer_codes: ["OF-9"] },
+      ],
+    });
+  });
+
+  it("remover um produto tira só ele; remover o último é bloqueado", () => {
+    const dois = makeView({ products: [{ product_id: "p1", offer_codes: ["OF-1"] }, { product_id: "p2", offer_codes: ["OF-9"] }] });
+    render(<ModalDeVisualizacao products={PRODUCTS} folders={[]} editTarget={dois} onSaved={jest.fn()} onCancel={() => {}} />);
+    fireEvent.click(screen.getByTestId("view-form-product-p2-remove"));
+    expect(screen.queryByTestId("view-form-product-p2")).not.toBeInTheDocument();
+    expect(screen.getByTestId("view-form-product-p1")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("view-form-product-p1-remove"));
+    expect(screen.getByTestId("view-form-product-p1")).toBeInTheDocument();
+    expect(screen.getByTestId("view-form-product-message")).toHaveTextContent("pelo menos um produto");
+  });
+
+  it("produto já escolhido não aparece de novo nas opções de adicionar", () => {
+    render(<ModalDeVisualizacao products={PRODUCTS} folders={[]} editTarget={EXISTENTE} onSaved={jest.fn()} onCancel={() => {}} />);
+    fireEvent.focus(screen.getByRole("combobox", { name: "Adicionar produto" }));
+    const opcoes = screen.getAllByRole("option").map((o) => o.textContent ?? "");
+    expect(opcoes).toHaveLength(1);
+    expect(opcoes[0]).toContain("Produto Dois");
+  });
+
+  it("só oferece produtos da mesma conta Hotmart dos já escolhidos", () => {
+    const outraConta = [...PRODUCTS, { product_id: "p3", product_name: "Produto Três", account_id: "acc-2" }];
+    render(<ModalDeVisualizacao products={outraConta} folders={[]} editTarget={EXISTENTE} onSaved={jest.fn()} onCancel={() => {}} />);
+    fireEvent.focus(screen.getByRole("combobox", { name: "Adicionar produto" }));
+    const nomes = screen.getAllByRole("option").map((o) => o.textContent ?? "");
+    expect(nomes.some((n) => n.includes("Produto Três"))).toBe(false);
+  });
+
+  it("sem produto restante da conta, avisa em vez de mostrar o campo", () => {
+    render(<ModalDeVisualizacao products={[PRODUCTS[0]]} folders={[]} editTarget={EXISTENTE} onSaved={jest.fn()} onCancel={() => {}} />);
+    expect(screen.getByTestId("view-form-no-more-products")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Adicionar produto" })).not.toBeInTheDocument();
+  });
+
+  it("com 2 ofertas dá para remover uma; o PATCH manda products e não manda product_id", async () => {
     const onSaved = jest.fn();
     render(
       <ModalDeVisualizacao
         products={PRODUCTS}
         folders={[]}
-        editTarget={{ ...EXISTENTE, offer_codes: ["OF-1", "OF-2"] }}
+        editTarget={makeView({ offer_codes: ["OF-1", "OF-2"] })}
         onSaved={onSaved}
         onCancel={() => {}}
       />,
@@ -228,11 +280,12 @@ describe("ModalDeVisualizacao: editar", () => {
     expect(patch.body).toEqual({
       name: "Visão 1",
       folder_id: null,
-      offer_codes: ["OF-1"],
+      products: [{ product_id: "p1", offer_codes: ["OF-1"] }],
       view_start_date: null,
       view_end_date: null,
     });
     expect(patch.body).not.toHaveProperty("product_id");
+    expect(patch.body).not.toHaveProperty("offer_codes");
   });
 
   it("oferta salva que a Hotmart não lista continua visível, como código manual", async () => {
@@ -240,7 +293,7 @@ describe("ModalDeVisualizacao: editar", () => {
       <ModalDeVisualizacao
         products={PRODUCTS}
         folders={[]}
-        editTarget={{ ...EXISTENTE, offer_codes: ["OF-1", "SO-MANUAL"] }}
+        editTarget={makeView({ offer_codes: ["OF-1", "SO-MANUAL"] })}
         onSaved={jest.fn()}
         onCancel={() => {}}
       />,

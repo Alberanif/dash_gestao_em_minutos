@@ -90,9 +90,9 @@ describe("formato das respostas (bigint chega como string)", () => {
   });
 
   it("offers: nome nulo é preservado", async () => {
-    rpcData = [{ offer_code: "A", offer_name: null, sales: "0", refunded: "1" }];
+    rpcData = [{ product_id: "p1", product_name: "Produto 1", offer_code: "A", offer_name: null, sales: "0", refunded: "1" }];
     expect(await (await (await import("../offers/route")).GET(get(), ctx)).json()).toEqual({
-      rows: [{ offer_code: "A", offer_name: null, sales: 0, refunded: 1 }],
+      rows: [{ product_id: "p1", product_name: "Produto 1", offer_code: "A", offer_name: null, sales: 0, refunded: 1 }],
     });
   });
 });

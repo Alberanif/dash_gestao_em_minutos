@@ -1,19 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { VendasFolderRecord, VendasViewRecord } from "@/types/vendas";
 import { parseDateRange } from "@/lib/vendas/date-range";
-import { normalizeOfferCode } from "@/lib/vendas/views";
 import { Button, Campo, Dialog, DialogClose, DialogContent, DialogTitle, Input, Select } from "../ui";
+import { BlocoDoProduto } from "./bloco-do-produto";
 import { EscolhaDeProduto } from "./escolha-de-produto";
 import { useRetornoDeFoco } from "./use-retorno-de-foco";
 import type { ProdutoHotmart } from "./tipos";
-
-export interface OpcaoDeOferta {
-  offer_code: string;
-  offer_name: string | null;
-  sales_count?: number;
-}
 
 interface ModalDeVisualizacaoProps {
   products: ProdutoHotmart[];
@@ -25,17 +19,24 @@ interface ModalDeVisualizacaoProps {
   onRequestDelete?: (view: VendasViewRecord) => void;
 }
 
+interface BlocoState {
+  product_id: string;
+  offer_codes: string[];
+  aberto: boolean;
+}
+
 const SEM_PASTA = "__sem_pasta__";
 
-const MENSAGEM_ULTIMA_OFERTA =
-  "Uma visualização precisa de pelo menos uma oferta; para descartar, exclua a visualização.";
+const MENSAGEM_ULTIMO_PRODUTO =
+  "Uma visualização precisa de pelo menos um produto; para descartar, exclua a visualização.";
 
 const rotulo = "text-[13px] font-medium text-v2-nevoa/70";
 
 /**
- * Criar e editar visualização (PRD #185 RF-2/RF-3): nome, pasta, UM produto (travado na
- * edição), ofertas (lista + código manual, mínimo 1) e período. Sem meta, status, base
- * ou "incluir compras sem oferta".
+ * Criar e editar visualização (PRD #185 RF-2/RF-3, PRD #213): nome, pasta, N produtos da mesma
+ * conta Hotmart (cada um com a sua lista de ofertas, mínimo 1 produto e 1 oferta por produto)
+ * e período. Na edição dá para adicionar e remover produtos. Sem meta, status, base ou
+ * "incluir compras sem oferta".
  */
 export function ModalDeVisualizacao({ products, folders, editTarget, onSaved, onCancel, onRequestDelete }: ModalDeVisualizacaoProps) {
   const edicao = Boolean(editTarget);
@@ -43,108 +44,54 @@ export function ModalDeVisualizacao({ products, folders, editTarget, onSaved, on
 
   const [name, setName] = useState(editTarget?.name ?? "");
   const [folderId, setFolderId] = useState(editTarget?.folder_id ?? "");
-  const [productId, setProductId] = useState(editTarget?.product_id ?? "");
-  const [selecionadas, setSelecionadas] = useState<string[]>(editTarget?.offer_codes ?? []);
+  const [blocos, setBlocos] = useState<BlocoState[]>(() =>
+    (editTarget?.products ?? []).map((p, i) => ({ product_id: p.product_id, offer_codes: [...p.offer_codes], aberto: i === 0 })),
+  );
   const [inicio, setInicio] = useState(editTarget?.view_start_date ?? "");
   const [fim, setFim] = useState(editTarget?.view_end_date ?? "");
 
-  const [opcoes, setOpcoes] = useState<OpcaoDeOferta[]>([]);
-  const [carregandoOfertas, setCarregandoOfertas] = useState(false);
-  const [erroDeOfertas, setErroDeOfertas] = useState(false);
-  const [recargaDeOfertas, setRecargaDeOfertas] = useState(0);
-
-  const [busca, setBusca] = useState("");
-  const [manual, setManual] = useState("");
-  const [mensagemDeOferta, setMensagemDeOferta] = useState<string | null>(null);
+  const [mensagemDeProduto, setMensagemDeProduto] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
-  useEffect(() => {
-    if (!productId) return;
-    let cancelado = false;
-    async function carregar() {
-      setCarregandoOfertas(true);
-      setErroDeOfertas(false);
-      try {
-        const res = await fetch(`/api/vendas/offer-options?product_id=${encodeURIComponent(productId)}`);
-        if (!res.ok) throw new Error("offer-options");
-        const data = await res.json();
-        if (!cancelado) setOpcoes(Array.isArray(data?.offers) ? data.offers : []);
-      } catch {
-        if (!cancelado) setErroDeOfertas(true);
-      } finally {
-        if (!cancelado) setCarregandoOfertas(false);
-      }
-    }
-    void carregar();
-    return () => {
-      cancelado = true;
-    };
-  }, [productId, recargaDeOfertas]);
+  const nomeDe = (id: string) => products.find((p) => p.product_id === id)?.product_name ?? id;
 
-  // Lista = ofertas sincronizadas + selecionadas que a Hotmart não conhece (código
-  // manual). Estas últimas nunca podem sumir da tela: contam na venda.
-  const linhas: OpcaoDeOferta[] = useMemo(() => {
-    const conhecidas = new Set(opcoes.map((o) => o.offer_code));
-    const extras: OpcaoDeOferta[] = selecionadas
-      .filter((code) => !conhecidas.has(code))
-      .map((code) => ({ offer_code: code, offer_name: null }));
-    return [...extras, ...opcoes];
-  }, [opcoes, selecionadas]);
+  // Candidatos a adicionar: ainda não escolhidos e da mesma conta dos já escolhidos.
+  const candidatos = useMemo(() => {
+    const escolhidos = new Set(blocos.map((b) => b.product_id));
+    const conta = blocos.length > 0 ? products.find((p) => p.product_id === blocos[0].product_id)?.account_id : null;
+    return products.filter((p) => !escolhidos.has(p.product_id) && (conta == null || p.account_id === conta));
+  }, [products, blocos]);
 
-  const visiveis = useMemo(() => {
-    const termo = busca.trim().toLowerCase();
-    if (!termo) return linhas;
-    return linhas.filter(
-      (o) =>
-        selecionadas.includes(o.offer_code) ||
-        o.offer_code.toLowerCase().includes(termo) ||
-        (o.offer_name ?? "").toLowerCase().includes(termo),
-    );
-  }, [linhas, busca, selecionadas]);
-
-  function alternarOferta(code: string) {
+  function adicionarProduto(id: string) {
     setErro(null);
-    if (selecionadas.includes(code)) {
-      if (selecionadas.length === 1) {
-        setMensagemDeOferta(MENSAGEM_ULTIMA_OFERTA);
-        return;
-      }
-      setSelecionadas(selecionadas.filter((c) => c !== code));
-    } else {
-      setSelecionadas([...selecionadas, code]);
-    }
-    setMensagemDeOferta(null);
+    setMensagemDeProduto(null);
+    setBlocos((atual) => (atual.some((b) => b.product_id === id) ? atual : [...atual, { product_id: id, offer_codes: [], aberto: true }]));
   }
 
-  function adicionarManual() {
-    const code = normalizeOfferCode(manual);
-    if (!code) {
-      setMensagemDeOferta("Informe um código de oferta.");
+  function removerProduto(id: string) {
+    if (blocos.length === 1) {
+      setMensagemDeProduto(MENSAGEM_ULTIMO_PRODUTO);
       return;
     }
-    if (selecionadas.includes(code)) {
-      setMensagemDeOferta(`A oferta ${code} já está na lista.`);
-      return;
-    }
-    setSelecionadas([...selecionadas, code]);
-    setManual("");
-    setMensagemDeOferta(null);
+    setMensagemDeProduto(null);
+    setBlocos((atual) => atual.filter((b) => b.product_id !== id));
   }
 
-  function trocarProduto(proximo: string) {
-    setProductId(proximo);
-    setOpcoes([]);
-    setSelecionadas([]);
-    setBusca("");
-    setMensagemDeOferta(null);
+  function ajustarBloco(id: string, patch: Partial<BlocoState>) {
+    setErro(null);
+    setBlocos((atual) => atual.map((b) => (b.product_id === id ? { ...b, ...patch } : b)));
   }
 
   async function salvar() {
     const aparado = name.trim();
     if (!aparado) return setErro("Nome é obrigatório.");
-    if (!productId) return setErro("Selecione um produto.");
-    if (selecionadas.length === 0) return setErro("Selecione ao menos uma oferta.");
+    if (blocos.length === 0) return setErro("Selecione ao menos um produto.");
+    const vazio = blocos.find((b) => b.offer_codes.length === 0);
+    if (vazio) {
+      ajustarBloco(vazio.product_id, { aberto: true });
+      return setErro(`Selecione ao menos uma oferta de ${nomeDe(vazio.product_id)}.`);
+    }
 
     let dataInicial: string | null = null;
     let dataFinal: string | null = null;
@@ -162,24 +109,13 @@ export function ModalDeVisualizacao({ products, folders, editTarget, onSaved, on
       const res = await fetch(edicao ? `/api/vendas/views/${editTarget!.id}` : "/api/vendas/views", {
         method: edicao ? "PATCH" : "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(
-          edicao
-            ? {
-                name: aparado,
-                folder_id: folderId || null,
-                offer_codes: selecionadas,
-                view_start_date: dataInicial,
-                view_end_date: dataFinal,
-              }
-            : {
-                name: aparado,
-                folder_id: folderId || null,
-                product_id: productId,
-                offer_codes: selecionadas,
-                view_start_date: dataInicial,
-                view_end_date: dataFinal,
-              },
-        ),
+        body: JSON.stringify({
+          name: aparado,
+          folder_id: folderId || null,
+          products: blocos.map((b) => ({ product_id: b.product_id, offer_codes: b.offer_codes })),
+          view_start_date: dataInicial,
+          view_end_date: dataFinal,
+        }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.view) {
@@ -194,7 +130,6 @@ export function ModalDeVisualizacao({ products, folders, editTarget, onSaved, on
     }
   }
 
-  const nomeDoProduto = products.find((p) => p.product_id === productId)?.product_name ?? productId;
   const titulo = edicao ? "Editar visualização" : "Nova visualização";
 
   return (
@@ -236,113 +171,47 @@ export function ModalDeVisualizacao({ products, folders, editTarget, onSaved, on
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <span className={rotulo}>Produto</span>
-            {edicao ? (
-              <>
-                <Select
-                  aria-label="Produto"
-                  value={productId}
-                  disabled
-                  opcoes={[{ value: productId, label: nomeDoProduto }]}
-                />
-                <p data-testid="view-form-product-locked" className="text-xs text-v2-nevoa/65">
-                  O produto não pode ser alterado depois de criada a visualização, porque o histórico coletado pertence a
-                  ele. Para acompanhar outro produto, crie uma nova visualização.
-                </p>
-              </>
+          <div data-testid="view-form-products" className="flex flex-col gap-2">
+            <span className={rotulo}>
+              Produtos ({blocos.length} selecionado{blocos.length === 1 ? "" : "s"})
+            </span>
+
+            {blocos.map((b) => (
+              <BlocoDoProduto
+                key={b.product_id}
+                productId={b.product_id}
+                nome={nomeDe(b.product_id)}
+                selecionadas={b.offer_codes}
+                aberto={b.aberto}
+                edicao={edicao}
+                onAlternar={() => ajustarBloco(b.product_id, { aberto: !b.aberto })}
+                onRemover={() => removerProduto(b.product_id)}
+                onChange={(proximas) => ajustarBloco(b.product_id, { offer_codes: proximas })}
+              />
+            ))}
+
+            {mensagemDeProduto && (
+              <p role="alert" data-testid="view-form-product-message" className="text-xs text-v2-queda">
+                {mensagemDeProduto}
+              </p>
+            )}
+
+            {candidatos.length > 0 ? (
+              <EscolhaDeProduto
+                produtos={candidatos}
+                valor=""
+                onEscolher={adicionarProduto}
+                rotulo="Adicionar produto"
+                placeholder={blocos.length === 0 ? "Buscar por nome ou ID do produto" : "Adicionar outro produto: buscar por nome ou ID"}
+              />
             ) : (
-              <EscolhaDeProduto produtos={products} valor={productId} onEscolher={trocarProduto} />
+              blocos.length > 0 && (
+                <p data-testid="view-form-no-more-products" className="text-xs text-v2-nevoa/65">
+                  Não há mais produtos da mesma conta Hotmart para adicionar.
+                </p>
+              )
             )}
           </div>
-
-          {productId && (
-            <div data-testid="view-form-offers" className="flex flex-col gap-2">
-              <span className={rotulo}>
-                Ofertas ({selecionadas.length} selecionada{selecionadas.length === 1 ? "" : "s"})
-              </span>
-
-              {carregandoOfertas && <p className="text-xs text-v2-nevoa/65">Carregando ofertas…</p>}
-              {erroDeOfertas && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <p data-testid="view-form-offers-error" className="text-xs text-v2-queda">
-                    Não foi possível carregar as ofertas. Você ainda pode adicionar códigos manualmente.
-                  </p>
-                  <Button variante="fantasma" className="h-8 px-2 text-xs" onClick={() => setRecargaDeOfertas((n) => n + 1)}>
-                    Tentar novamente
-                  </Button>
-                </div>
-              )}
-
-              <Input
-                data-testid="view-form-offer-search"
-                aria-label="Buscar oferta"
-                placeholder="Buscar por nome ou código"
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-              />
-
-              <ul className="flex max-h-52 flex-col gap-0.5 overflow-y-auto rounded-v2-sm bg-v2-abismo/40 p-1">
-                {visiveis.map((o) => {
-                  const marcada = selecionadas.includes(o.offer_code);
-                  return (
-                    <li key={o.offer_code}>
-                      <label className="flex min-w-0 cursor-pointer items-center gap-2.5 rounded-[6px] px-2 py-1.5 text-sm text-v2-nevoa hover:bg-v2-nevoa/5">
-                        <input
-                          type="checkbox"
-                          data-testid={`view-form-offer-${o.offer_code}`}
-                          checked={marcada}
-                          onChange={() => alternarOferta(o.offer_code)}
-                          className="size-4 shrink-0 accent-[var(--v2-azul-igt)]"
-                        />
-                        <span className="min-w-0 [overflow-wrap:anywhere]">
-                          {o.offer_name ? `${o.offer_name}, ` : ""}
-                          <code className="text-v2-nevoa/70">{o.offer_code}</code>
-                          {typeof o.sales_count === "number" && (
-                            <span className="text-v2-nevoa/60">, {o.sales_count} vendas</span>
-                          )}
-                          {o.offer_name === null && !carregandoOfertas && <span className="text-v2-nevoa/60">, manual</span>}
-                        </span>
-                      </label>
-                    </li>
-                  );
-                })}
-                {!carregandoOfertas && visiveis.length === 0 && (
-                  <li className="px-2 py-1.5 text-sm text-v2-nevoa/65">Nenhuma oferta encontrada.</li>
-                )}
-              </ul>
-
-              <div className="flex gap-2">
-                <Input
-                  data-testid="view-form-manual-input"
-                  aria-label="Código da oferta"
-                  placeholder="Adicionar código manualmente"
-                  value={manual}
-                  onChange={(e) => setManual(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      adicionarManual();
-                    }
-                  }}
-                />
-                <Button variante="secundario" data-testid="view-form-manual-add" onClick={adicionarManual}>
-                  Adicionar
-                </Button>
-              </div>
-
-              {mensagemDeOferta && (
-                <p role="alert" data-testid="view-form-offer-message" className="text-xs text-v2-queda">
-                  {mensagemDeOferta}
-                </p>
-              )}
-              {edicao && (
-                <p className="text-xs text-v2-nevoa/65">
-                  Ofertas adicionadas disparam a coleta do histórico delas. Remover uma oferta não apaga vendas coletadas.
-                </p>
-              )}
-            </div>
-          )}
 
           <div className="flex flex-col gap-1.5">
             <span className={rotulo}>Período (opcional)</span>
