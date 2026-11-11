@@ -1,15 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { ChartGranularity } from "@/lib/vendas/cumulative-chart";
 import type { VendasViewRecord } from "@/types/vendas";
 import type { UserRole } from "@/types/auth";
 import type { DateRange } from "@/lib/vendas/date-range";
 import { interpretRefreshResponse } from "@/lib/vendas/refresh";
-import { describeBackfill, incompleteBadge, totalsMismatch } from "@/lib/vendas/views";
+import { describeBackfill, incompleteBadge, sumSales, totalsMismatch } from "@/lib/vendas/views";
 import { Button, Selo, Surface } from "../ui";
 import { cx, foco } from "../ui/cx";
 import { ControleDeAtualizacao } from "./controle-de-atualizacao";
 import { FiltroDePeriodo } from "./filtro-de-periodo";
+import { GraficoAcumulado, GraficoDeVendas } from "./graficos-de-vendas";
+import { PorOferta } from "./por-oferta";
 import { useDadosDaVisualizacao } from "./use-dados-da-visualizacao";
 
 interface DashboardProps {
@@ -30,6 +33,7 @@ export function DashboardDaVisualizacao({ view, productName, role, onRangeChange
   const canEdit = role === "gestor" || role === "analista";
   const { range, dados, erro, atualizando, recarregar } = useDadosDaVisualizacao(view);
 
+  const [granularidade, setGranularidade] = useState<ChartGranularity>("dia");
   const [ajudaAberta, setAjudaAberta] = useState(false);
   const [tentando, setTentando] = useState(false);
   const [erroDaTentativa, setErroDaTentativa] = useState<string | null>(null);
@@ -183,6 +187,29 @@ export function DashboardDaVisualizacao({ view, productName, role, onRangeChange
               )}
             </Surface>
           </div>
+
+          <section aria-labelledby="vendas-ao-longo-do-tempo" className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h3 id="vendas-ao-longo-do-tempo" className="text-base font-semibold text-v2-nevoa">
+                Vendas ao longo do tempo
+              </h3>
+              <span className="text-sm text-v2-nevoa/65">Total no gráfico: {fmtInt(sumSales(dados.daily))}</span>
+            </div>
+            <GraficoDeVendas
+              daily={dados.daily}
+              hourly={dados.hourly}
+              granularity={granularidade}
+              onGranularityChange={setGranularidade}
+            />
+            <GraficoAcumulado
+              daily={dados.daily}
+              hourly={dados.hourly}
+              granularity={granularidade}
+              onGranularityChange={setGranularidade}
+            />
+          </section>
+
+          <PorOferta offers={dados.offers} />
         </div>
       )}
     </div>

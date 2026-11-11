@@ -19,6 +19,14 @@ export type BarChartDiarioProps = {
   formatarY?: (n: number) => string;
   animKey?: string;
   className?: string;
+  /** Rótulo do eixo x. Padrão: dia e mês curtos. Troque para séries que não são diárias (por exemplo, por hora). */
+  formatarX?: (x: number) => string;
+  /** Rótulo completo no tooltip e na tabela. Padrão: data completa. */
+  formatarXLongo?: (x: number) => string;
+  /** Nome da coluna do eixo x na tabela de dados. Padrão: "Dia". */
+  rotuloX?: string;
+  /** Unidade no plural, para o aviso de rolagem ("de 12 dias"). Padrão: "dias". */
+  unidade?: string;
 } & ControleAtivo;
 
 const MARGEM = { topo: 16, base: 28 };
@@ -36,7 +44,7 @@ const ESPACO_ROTULO_X = 52;
  * O eixo do valor fica parado e a escala cobre o período inteiro, então a altura das barras não
  * muda enquanto se rola. Uma miniatura do período todo mostra onde a janela está e também arrasta.
  */
-export function BarChartDiario({ titulo, data, cor, altura = 240, formatarY = formatarCompacto, animKey, className, indiceAtivo, onIndiceAtivo }: BarChartDiarioProps) {
+export function BarChartDiario({ titulo, data, cor, altura = 240, formatarY = formatarCompacto, animKey, className, indiceAtivo, onIndiceAtivo, formatarX = formatarDataCurta, formatarXLongo = formatarDataLonga, rotuloX = "Dia", unidade = "dias" }: BarChartDiarioProps) {
   const { ref, largura } = useLarguraMedida<HTMLDivElement>();
   const pontos = useMemo(() => cleanPoints(data), [data]);
   return (
@@ -51,6 +59,10 @@ export function BarChartDiario({ titulo, data, cor, altura = 240, formatarY = fo
           altura={altura}
           cor={cor}
           formatarY={formatarY}
+          formatarX={formatarX}
+          formatarXLongo={formatarXLongo}
+          rotuloX={rotuloX}
+          unidade={unidade}
           controle={{ indiceAtivo, onIndiceAtivo }}
           animKey={animKey ?? pontos.map((p) => `${p.x}:${p.y}`).join("|")}
         />
@@ -70,10 +82,18 @@ function DiarioInterno({
   altura,
   cor,
   formatarY,
+  formatarX,
+  formatarXLongo,
+  rotuloX,
+  unidade,
   animKey,
   controle,
 }: {
   controle: ControleAtivo;
+  formatarX: (x: number) => string;
+  formatarXLongo: (x: number) => string;
+  rotuloX: string;
+  unidade: string;
   titulo: string;
   pontos: ReadonlyArray<{ x: number; y: number }>;
   largura: number;
@@ -206,7 +226,7 @@ function DiarioInterno({
       <div
         role="group"
         aria-roledescription="gráfico de barras com rolagem"
-        aria-label={`${titulo}. Use as setas para percorrer os dias.`}
+        aria-label={`${titulo}. Use as setas para percorrer as barras.`}
         tabIndex={0}
         className={cx("relative rounded-v2-sm", foco)}
         onKeyDown={aoTeclar}
@@ -254,7 +274,7 @@ function DiarioInterno({
                         fontSize={11}
                         fill={COR.textoMudo}
                       >
-                        {formatarDataCurta(p.x)}
+                        {formatarX(p.x)}
                       </text>
                     ) : null,
                   )}
@@ -318,14 +338,14 @@ function DiarioInterno({
             x={esq + ativoX - rolagem.esq}
             y={MARGEM.topo + bTopo - 8}
             larguraContainer={largura}
-            titulo={formatarDataLonga(b.x)}
+            titulo={formatarXLongo(b.x)}
             linhas={[{ cor, rotulo: titulo, valor: formatarY(b.y) }]}
           />
         ) : null}
         <div aria-live="polite" className="sr-only">
-          {b ? `${formatarDataLonga(b.x)}: ${formatarY(b.y)}` : ""}
+          {b ? `${formatarXLongo(b.x)}: ${formatarY(b.y)}` : ""}
         </div>
-        <TabelaDados legenda={titulo} colunas={["Dia", "Valor"]} linhas={pontos.map((p) => [formatarDataLonga(p.x), formatarY(p.y)])} />
+        <TabelaDados legenda={titulo} colunas={[rotuloX, "Valor"]} linhas={pontos.map((p) => [formatarXLongo(p.x), formatarY(p.y)])} />
       </div>
       {!cabe ? (
         <div aria-hidden="true" className="mt-2" style={{ paddingLeft: esq }}>
@@ -337,7 +357,7 @@ function DiarioInterno({
             <rect x={janela.x + 0.5} y={0.5} width={Math.max(8, janela.w - 1)} height={MINI_H - 1} rx={4} fill={cor} fillOpacity={0.14} stroke={cor} strokeOpacity={0.75} />
           </svg>
           <p className="mt-1 text-xs text-v2-nevoa/60">
-            {formatarDataCurta(pontos[primeiro].x)} a {formatarDataCurta(pontos[ultimo].x)} de {n} dias · arraste para ver o histórico
+            {formatarX(pontos[primeiro].x)} a {formatarX(pontos[ultimo].x)} de {n} {unidade} · arraste para ver o histórico
           </p>
         </div>
       ) : null}

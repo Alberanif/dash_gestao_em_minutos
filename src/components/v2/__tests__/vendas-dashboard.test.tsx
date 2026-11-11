@@ -1,12 +1,21 @@
 /** @jest-environment jsdom */
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { TelaDeVendas } from "../vendas/tela-de-vendas";
 import type { UserRole } from "@/types/auth";
+import { mockReducedMotion } from "./helpers";
 import { PRODUCTS, makeView, instalaFetch } from "./vendas-helpers";
 
 const SEM_EDICAO = "leitor" as unknown as UserRole;
+
+// O chunk lazy dos gráficos vira o gráfico real: o jsdom não tem matchMedia nem ResizeObserver.
+jest.mock("../evento/charts-lazy", () => {
+  const c = jest.requireActual("../charts");
+  return { LineChartLazy: c.LineChart, BarChartDiarioLazy: c.BarChartDiario };
+});
+
+beforeEach(() => mockReducedMotion(false));
 
 afterEach(() => {
   jest.restoreAllMocks();
@@ -63,6 +72,34 @@ describe("Dashboard: números", () => {
     await screen.findByTestId("view-kpi-sales");
     expect(screen.getByTestId("view-kpi-sales-value")).toHaveClass("text-v2-ponto");
     expect(screen.getByTestId("view-kpi-refunded").innerHTML).not.toContain("v2-ponto");
+  });
+
+  it("mostra os totais do gráfico e das ofertas, iguais ao KPI", async () => {
+    instalaFetch({ views: [makeView()] });
+    render(<TelaDeVendas role="gestor" products={PRODUCTS} />);
+    await screen.findByTestId("view-offers-list");
+    expect(screen.getByText("Total no gráfico: 7")).toBeInTheDocument();
+    expect(screen.getByText("Total nas ofertas: 7")).toBeInTheDocument();
+  });
+
+  it("alternar para Hora troca os dois gráficos, dentro do dashboard", async () => {
+    instalaFetch({ views: [makeView()] });
+    render(<TelaDeVendas role="gestor" products={PRODUCTS} />);
+    await screen.findByTestId("view-daily-chart");
+    expect(screen.getByTestId("view-daily-chart")).toHaveTextContent("Vendas por dia");
+    fireEvent.click(within(screen.getByTestId("view-daily-chart")).getByRole("tab", { name: "Hora" }));
+    expect(screen.getByTestId("view-daily-chart")).toHaveTextContent("Vendas por hora");
+    expect(screen.getByTestId("view-cumulative-chart")).toHaveTextContent("Vendas acumuladas por hora");
+  });
+
+  it("sem /hourly o dashboard não mostra o switch Dia/Hora", async () => {
+    instalaFetch({
+      views: [makeView()],
+      overrides: { "GET /api/vendas/views/v1/hourly": { status: 500, body: { error: "x" } } },
+    });
+    render(<TelaDeVendas role="gestor" products={PRODUCTS} />);
+    await screen.findByTestId("view-daily-chart");
+    expect(screen.queryByRole("tab", { name: "Hora" })).not.toBeInTheDocument();
   });
 
   it("avisa quando KPI, dia e oferta divergem", async () => {

@@ -4,10 +4,19 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { TelaDeVendas } from "../vendas/tela-de-vendas";
 import type { UserRole } from "@/types/auth";
+import { mockReducedMotion } from "./helpers";
 import { PRODUCTS, PASTA, makeView, instalaFetch } from "./vendas-helpers";
 
 // O tipo só admite gestor e analista; o guard da página barra o resto. A tela ainda assim nega edição a qualquer outro valor.
 const SEM_EDICAO = "leitor" as unknown as UserRole;
+
+// O chunk lazy dos gráficos vira o gráfico real: o jsdom não tem matchMedia nem ResizeObserver.
+jest.mock("../evento/charts-lazy", () => {
+  const c = jest.requireActual("../charts");
+  return { LineChartLazy: c.LineChart, BarChartDiarioLazy: c.BarChartDiario };
+});
+
+beforeEach(() => mockReducedMotion(false));
 
 afterEach(() => {
   jest.restoreAllMocks();
