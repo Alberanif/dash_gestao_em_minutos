@@ -1,12 +1,10 @@
-import "../dash-theme.css";
-import "./relatorio-de-vendas.css";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { VendasScreen } from "@/components/vendas/vendas-screen";
+import { TelaDeVendas } from "@/components/v2/vendas/tela-de-vendas";
 import { sortProductsByName } from "@/lib/utils/hotmart-products";
 import { resolveAccountRole } from "@/types/auth";
 
-export default async function VendasPage() {
+export default async function RelatorioDeVendasPage() {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -23,10 +21,5 @@ export default async function VendasPage() {
     .select("product_id, product_name, account_id")
     .eq("is_active", true);
 
-  return (
-    <VendasScreen
-      role={role}
-      products={sortProductsByName(products ?? [])}
-    />
-  );
+  return <TelaDeVendas role={role} products={sortProductsByName(products ?? [])} />;
 }

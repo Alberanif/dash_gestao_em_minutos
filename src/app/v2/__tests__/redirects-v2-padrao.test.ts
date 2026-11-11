@@ -31,12 +31,13 @@ describe("V2 como layout padrão: redirects do layout anterior", () => {
     ["/ajustes/configuracoes", "/v2/ajustes/contas"],
     ["/dashboard/settings", "/v2/ajustes/contas"],
     ["/dashboard/dados", "/v2/ajustes/dados"],
+    ["/relatorio-de-vendas", "/v2/relatorio-de-vendas"],
   ])("%s leva a %s", async (de, para) => {
     expect((await resolver(de))?.para).toBe(para);
   });
 
   it("são temporários (307): a regra pode ser revista sem cache de navegador", async () => {
-    for (const c of ["/", "/indicadores", "/ajustes", "/ajustes/configuracoes", "/dashboard/settings"]) {
+    for (const c of ["/", "/indicadores", "/ajustes", "/ajustes/configuracoes", "/dashboard/settings", "/relatorio-de-vendas"]) {
       expect((await resolver(c))?.regra.permanent).toBe(false);
     }
   });
@@ -59,7 +60,6 @@ describe("V2 como layout padrão: redirects do layout anterior", () => {
       "/dashboard/eqa",
       "/base-de-dados",
       "/base-de-dados/eqa",
-      "/relatorio-de-vendas",
       "/api/indicadores/daily",
       "/api/admin/users",
       "/login",

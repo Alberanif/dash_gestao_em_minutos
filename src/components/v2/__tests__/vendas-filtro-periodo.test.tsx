@@ -2,7 +2,7 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import { DateRangeFilter } from "../date-range-filter";
+import { FiltroDePeriodo } from "../vendas/filtro-de-periodo";
 
 const JANELA = { start: "2026-07-10", end: "2026-07-20" };
 
@@ -14,10 +14,10 @@ function inputs() {
   };
 }
 
-describe("DateRangeFilter — gestor", () => {
+describe("FiltroDePeriodo — gestor", () => {
   it("salva o intervalo preenchido", async () => {
     const onSave = jest.fn().mockResolvedValue(true);
-    render(<DateRangeFilter value={null} canEdit onSave={onSave} />);
+    render(<FiltroDePeriodo value={null} canEdit onSave={onSave} />);
 
     const { start, end, apply } = inputs();
     fireEvent.change(start, { target: { value: "2026-07-10" } });
@@ -29,7 +29,7 @@ describe("DateRangeFilter — gestor", () => {
 
   it("recusa uma ponta só e não chama onSave", () => {
     const onSave = jest.fn().mockResolvedValue(true);
-    render(<DateRangeFilter value={null} canEdit onSave={onSave} />);
+    render(<FiltroDePeriodo value={null} canEdit onSave={onSave} />);
 
     const { start, apply } = inputs();
     fireEvent.change(start, { target: { value: "2026-07-10" } });
@@ -43,7 +43,7 @@ describe("DateRangeFilter — gestor", () => {
 
   it("recusa fim anterior ao início", () => {
     const onSave = jest.fn().mockResolvedValue(true);
-    render(<DateRangeFilter value={null} canEdit onSave={onSave} />);
+    render(<FiltroDePeriodo value={null} canEdit onSave={onSave} />);
 
     const { start, end, apply } = inputs();
     fireEvent.change(start, { target: { value: "2026-07-20" } });
@@ -58,7 +58,7 @@ describe("DateRangeFilter — gestor", () => {
 
   it("limpar manda null e esvazia os campos", async () => {
     const onSave = jest.fn().mockResolvedValue(true);
-    render(<DateRangeFilter value={JANELA} canEdit onSave={onSave} />);
+    render(<FiltroDePeriodo value={JANELA} canEdit onSave={onSave} />);
 
     fireEvent.click(screen.getByTestId("vendas-date-clear"));
 
@@ -67,12 +67,12 @@ describe("DateRangeFilter — gestor", () => {
   });
 
   it("sem janela salva, não oferece Limpar", () => {
-    render(<DateRangeFilter value={null} canEdit onSave={jest.fn().mockResolvedValue(true)} />);
+    render(<FiltroDePeriodo value={null} canEdit onSave={jest.fn().mockResolvedValue(true)} />);
     expect(screen.queryByTestId("vendas-date-clear")).not.toBeInTheDocument();
   });
 
   it("preenche os campos a partir da janela salva", () => {
-    render(<DateRangeFilter value={JANELA} canEdit onSave={jest.fn().mockResolvedValue(true)} />);
+    render(<FiltroDePeriodo value={JANELA} canEdit onSave={jest.fn().mockResolvedValue(true)} />);
     expect((screen.getByTestId("vendas-date-start") as HTMLInputElement).value).toBe(
       "2026-07-10"
     );
@@ -82,7 +82,7 @@ describe("DateRangeFilter — gestor", () => {
   });
 
   it("diz que o período vale para todo mundo — não é filtro pessoal", () => {
-    render(<DateRangeFilter value={null} canEdit onSave={jest.fn().mockResolvedValue(true)} />);
+    render(<FiltroDePeriodo value={null} canEdit onSave={jest.fn().mockResolvedValue(true)} />);
     expect(screen.getByTestId("vendas-date-scope")).toHaveTextContent(
       "Vale para todos os usuários"
     );
@@ -90,7 +90,7 @@ describe("DateRangeFilter — gestor", () => {
 
   it("falha ao salvar avisa e PRESERVA o rascunho", async () => {
     const onSave = jest.fn().mockResolvedValue(false);
-    render(<DateRangeFilter value={null} canEdit onSave={onSave} />);
+    render(<FiltroDePeriodo value={null} canEdit onSave={onSave} />);
 
     const { start, end, apply } = inputs();
     fireEvent.change(start, { target: { value: "2026-07-10" } });
@@ -109,7 +109,7 @@ describe("DateRangeFilter — gestor", () => {
   it("trava os controles enquanto grava", async () => {
     let resolver: (ok: boolean) => void = () => {};
     const onSave = jest.fn(() => new Promise<boolean>((r) => (resolver = r)));
-    render(<DateRangeFilter value={null} canEdit onSave={onSave} />);
+    render(<FiltroDePeriodo value={null} canEdit onSave={onSave} />);
 
     const { start, end, apply } = inputs();
     fireEvent.change(start, { target: { value: "2026-07-10" } });
@@ -117,7 +117,7 @@ describe("DateRangeFilter — gestor", () => {
     fireEvent.click(apply);
 
     expect(apply).toBeDisabled();
-    expect(apply).toHaveTextContent("Salvando...");
+    expect(apply).toHaveTextContent("Salvando…");
 
     resolver(true);
     await waitFor(() => expect(apply).not.toBeDisabled());
@@ -125,18 +125,18 @@ describe("DateRangeFilter — gestor", () => {
 
   it("aviso de recorte não aplicado aparece em vermelho", () => {
     render(
-      <DateRangeFilter value={JANELA} canEdit onSave={jest.fn().mockResolvedValue(true)} unavailable />
+      <FiltroDePeriodo value={JANELA} canEdit onSave={jest.fn().mockResolvedValue(true)} unavailable />
     );
     expect(screen.getByTestId("vendas-date-unavailable")).toHaveTextContent(
-      "os números abaixo são do período inteiro"
+      "Os números abaixo são do período inteiro"
     );
   });
 });
 
-describe("DateRangeFilter — quem não edita", () => {
+describe("FiltroDePeriodo — quem não edita", () => {
   it("mostra a janela como texto, com autoria e sem controles", () => {
     render(
-      <DateRangeFilter value={JANELA} canEdit={false} onSave={jest.fn().mockResolvedValue(true)} />
+      <FiltroDePeriodo value={JANELA} canEdit={false} onSave={jest.fn().mockResolvedValue(true)} />
     );
 
     expect(screen.getByTestId("vendas-date-readonly")).toHaveTextContent(
@@ -150,14 +150,14 @@ describe("DateRangeFilter — quem não edita", () => {
 
   it("sem janela definida, a barra inteira some", () => {
     const { container } = render(
-      <DateRangeFilter value={null} canEdit={false} onSave={jest.fn().mockResolvedValue(true)} />
+      <FiltroDePeriodo value={null} canEdit={false} onSave={jest.fn().mockResolvedValue(true)} />
     );
     expect(container).toBeEmptyDOMElement();
   });
 
   it("recebe o aviso de recorte não aplicado — é quem não tem como descobrir sozinho", () => {
     render(
-      <DateRangeFilter
+      <FiltroDePeriodo
         value={JANELA}
         canEdit={false}
         onSave={jest.fn().mockResolvedValue(true)}

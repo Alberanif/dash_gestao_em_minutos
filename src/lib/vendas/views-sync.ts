@@ -130,15 +130,25 @@ export async function fetchAndStoreProductSales(args: {
     .upsert(rows, { onConflict: "transaction_code" })
     .abortSignal(deadline);
 
-  if (error) throw new Error(`Hotmart upsert error: ${error.message}`);
+  if (error) {
+    // O supabase-js devolve o abort como { error }, não como exceção: sem isto o
+    // estouro do orçamento no meio do upsert viraria "failed" em vez de "partial".
+    if (deadline.aborted) throw deadline.reason;
+    throw new Error(`Hotmart upsert error: ${error.message}`);
+  }
   return rows.length;
 }
 
 export interface BackfillTarget {
   id: string;
   account_id: string;
-  product_id: string;
   view_start_date: string | null;
+}
+
+/** Produto (e as ofertas) a buscar no backfill. */
+export interface BackfillProductTarget {
+  productId: string;
+  offerCodes: string[];
 }
 
 export interface BackfillOutcome {
@@ -148,26 +158,29 @@ export interface BackfillOutcome {
 }
 
 /**
- * Backfill de uma visualização. `offerCodes` = ofertas a buscar (todas na
- * criação; só as NOVAS ao adicionar oferta). Janelas de BACKFILL_CHUNK_DAYS do
- * dia mais recente para o mais antigo: se o orçamento estourar, o que já foi
- * gravado é a cauda recente contínua, e `backfill_from` é o começo dela.
+ * Backfill de uma visualização. `targets` = produtos/ofertas a buscar (todos na
+ * criação; só o que é NOVO na edição). Ordem janela -> produto -> oferta, tudo
+ * sequencial. Janelas de BACKFILL_CHUNK_DAYS do dia mais recente para o mais
+ * antigo; uma janela só conta como coberta quando TODOS os produtos/ofertas dela
+ * foram buscados. Assim, se o orçamento estourar, a cauda recente está completa
+ * para todos os produtos e `backfill_from` (único) é o começo dela.
  *
  *  - concluiu tudo        -> done,    backfill_from = início do período
  *  - orçamento estourou   -> partial, backfill_from = início da cauda coberta
  *                            (nenhuma janela coberta -> failed)
+ *  - sem nenhuma oferta   -> failed (não há o que buscar; nunca "done" vazio)
  *  - qualquer outro erro  -> failed
  * NUNCA devolve done quando estourou. Sempre grava o status final.
  */
 export async function runBackfill(args: {
   supabase: Supabase;
   view: BackfillTarget;
-  offerCodes: string[];
+  targets: BackfillProductTarget[];
   now?: Date;
   budgetMs?: number;
   signal?: AbortSignal;
 }): Promise<BackfillOutcome> {
-  const { supabase, view, offerCodes } = args;
+  const { supabase, view, targets } = args;
   const now = args.now ?? new Date();
   const todayMs = now.getTime();
 
@@ -180,6 +193,9 @@ export async function runBackfill(args: {
   try {
     const timeout = AbortSignal.timeout(args.budgetMs ?? BACKFILL_BUDGET_MS);
     const deadline = args.signal ? AbortSignal.any([args.signal, timeout]) : timeout;
+    if (!targets.some((t) => t.offerCodes.length > 0)) {
+      throw new Error("Nenhum produto/oferta para buscar no backfill");
+    }
     const accessToken = await getHotmartAccessToken(supabase, view.account_id, deadline);
     const collectedAt = now.toISOString();
     const chunkMs = BACKFILL_CHUNK_DAYS * DAY_MS;
@@ -191,18 +207,20 @@ export async function runBackfill(args: {
       while (windowEnd > startMs) {
         const windowStart = Math.max(startMs, windowEnd - chunkMs);
         // Sequencial de propósito: não multiplicar a taxa de chamadas à Hotmart.
-        for (const offerCode of offerCodes) {
-          await fetchAndStoreProductSales({
-            supabase,
-            accountId: view.account_id,
-            accessToken,
-            productId: view.product_id,
-            offerCode,
-            startMs: windowStart,
-            endMs: windowEnd,
-            collectedAt,
-            deadline,
-          });
+        for (const target of targets) {
+          for (const offerCode of target.offerCodes) {
+            await fetchAndStoreProductSales({
+              supabase,
+              accountId: view.account_id,
+              accessToken,
+              productId: target.productId,
+              offerCode,
+              startMs: windowStart,
+              endMs: windowEnd,
+              collectedAt,
+              deadline,
+            });
+          }
         }
         coveredFromMs = windowStart;
         windowEnd = windowStart - 1;
