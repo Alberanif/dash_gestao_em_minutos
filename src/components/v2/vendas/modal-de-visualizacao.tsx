@@ -5,6 +5,7 @@ import type { VendasFolderRecord, VendasViewRecord } from "@/types/vendas";
 import { parseDateRange } from "@/lib/vendas/date-range";
 import { normalizeOfferCode } from "@/lib/vendas/views";
 import { Button, Campo, Dialog, DialogClose, DialogContent, DialogTitle, Input, Select } from "../ui";
+import { EscolhaDeProduto } from "./escolha-de-produto";
 import { useRetornoDeFoco } from "./use-retorno-de-foco";
 import type { ProdutoHotmart } from "./tipos";
 
@@ -251,13 +252,7 @@ export function ModalDeVisualizacao({ products, folders, editTarget, onSaved, on
                 </p>
               </>
             ) : (
-              <Select
-                aria-label="Produto"
-                value={productId || undefined}
-                onValueChange={trocarProduto}
-                placeholder="Selecione um produto"
-                opcoes={products.map((p) => ({ value: p.product_id, label: p.product_name }))}
-              />
+              <EscolhaDeProduto produtos={products} valor={productId} onEscolher={trocarProduto} />
             )}
           </div>
 

@@ -33,8 +33,10 @@ afterEach(() => {
 });
 
 async function escolher(rotulo: string, opcao: string) {
-  fireEvent.keyDown(screen.getByRole("combobox", { name: rotulo }), { key: "Enter" });
-  fireEvent.click(await screen.findByRole("option", { name: opcao }));
+  const campo = screen.getByRole("combobox", { name: rotulo });
+  fireEvent.focus(campo);
+  const alvo = (await screen.findAllByRole("option")).find((o) => o.textContent?.startsWith(opcao));
+  fireEvent.mouseDown(alvo!);
 }
 
 describe("Papéis: quem não edita não vê nenhuma ação de gestão", () => {

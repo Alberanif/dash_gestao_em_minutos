@@ -45,10 +45,16 @@ beforeEach(() => {
 
 afterEach(() => jest.restoreAllMocks());
 
-async function escolher(rotulo: string, opcao: string) {
-  const gatilho = screen.getByRole("combobox", { name: rotulo });
-  fireEvent.keyDown(gatilho, { key: "Enter" });
+async function escolherNoSelect(rotulo: string, opcao: string) {
+  fireEvent.keyDown(screen.getByRole("combobox", { name: rotulo }), { key: "Enter" });
   fireEvent.click(await screen.findByRole("option", { name: opcao }));
+}
+
+async function escolher(rotulo: string, opcao: string) {
+  const campo = screen.getByRole("combobox", { name: rotulo });
+  fireEvent.focus(campo);
+  const alvo = (await screen.findAllByRole("option")).find((o) => o.textContent?.startsWith(opcao));
+  fireEvent.mouseDown(alvo!);
 }
 
 describe("ModalDeVisualizacao: criar", () => {
@@ -92,7 +98,7 @@ describe("ModalDeVisualizacao: criar", () => {
       />,
     );
     fireEvent.change(screen.getByTestId("view-form-name"), { target: { value: "X" } });
-    await escolher("Pasta", "Lançamentos");
+    await escolherNoSelect("Pasta", "Lançamentos");
     await escolher("Produto", "Produto Um");
     await screen.findByTestId("view-form-offer-OF-1");
     fireEvent.click(screen.getByTestId("view-form-offer-OF-1"));
